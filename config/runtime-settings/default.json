@@ -1,0 +1,16 @@
+{
+  "thinkTime": {
+    "mode": "fixed",
+    "fixed": 1
+  },
+  "pacing": {
+    "enabled": false
+  },
+  "http": {
+    "timeoutSeconds": 60,
+    "maxRedirects": 10,
+    "throwOnError": false
+  },
+  "errorBehavior": "continue",
+  "debugMode": false
+}

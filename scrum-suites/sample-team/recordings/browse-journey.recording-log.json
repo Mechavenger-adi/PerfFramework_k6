@@ -1,0 +1,26 @@
+[
+  {
+    "harEntryId": "sample_req_1",
+    "transaction": "Homepage",
+    "recordingStartedAt": "2026-03-30T00:00:00.000Z",
+    "tags": {
+      "transaction": "Homepage",
+      "har_entry_id": "sample_req_1",
+      "recording_started_at": "2026-03-30T00:00:00.000Z"
+    },
+    "request": {
+      "method": "GET",
+      "url": "https://your-dev-environment.com/",
+      "headers": [],
+      "queryParams": {},
+      "cookies": [],
+      "body": null
+    },
+    "response": {
+      "status": 200,
+      "headers": [],
+      "cookies": [],
+      "body": "<html></html>"
+    }
+  }
+]

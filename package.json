@@ -1,0 +1,51 @@
+{
+  "name": "@k6-perf/core-engine",
+  "version": "1.0.0",
+  "description": "k6 Performance Framework – Core Engine (Phase 1 Foundation)",
+  "keywords": [
+    "k6",
+    "performance",
+    "testing",
+    "framework"
+  ],
+  "homepage": "https://github.com/<your-org>/K6-PerfFramework#readme",
+  "bugs": {
+    "url": "https://github.com/<your-org>/K6-PerfFramework/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/<your-org>/K6-PerfFramework.git"
+  },
+  "license": "ISC",
+  "author": "",
+  "type": "commonjs",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "k6-framework": "dist/cli/run.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "typecheck": "tsc --noEmit",
+    "cli": "tsx core-engine/src/cli/run.ts",
+    "init": "tsx core-engine/src/cli/run.ts init",
+    "generate": "tsx core-engine/src/cli/run.ts generate",
+    "convert": "tsx core-engine/src/cli/run.ts convert",
+    "validate": "tsx core-engine/src/cli/run.ts validate",
+    "watch": "tsx watch core-engine/src/cli/run.ts"
+  },
+  "dependencies": {
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
+    "commander": "^13.1.0",
+    "dotenv": "^16.4.7",
+    "yargs": "^17.7.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "@types/yargs": "^17.0.33",
+    "tsx": "^4.21.0",
+    "typescript": "^5.8.2"
+  }
+}

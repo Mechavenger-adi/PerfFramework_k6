@@ -1,0 +1,20 @@
+[
+  {
+    "scriptPath": "scrum-suites\\jpet-team\\tests\\jpet-login-test.js",
+    "recordingLogPath": "scrum-suites\\jpet-team\\recordings\\jpet-login-test.recording-log.json",
+    "sourceHarPath": "scrum-suites\\jpet-team\\recordings\\jpetstore.aspectran.com_buydog.har",
+    "generatedAt": "2026-03-31T06:21:22.014Z"
+  },
+  {
+    "scriptPath": "scrum-suites\\jpet-team\\tests\\jpetstore.aspectran.com_buydog.js",
+    "recordingLogPath": "scrum-suites\\jpet-team\\recordings\\jpetstore.aspectran.com_buydog.recording-log.json",
+    "sourceHarPath": "scrum-suites\\jpet-team\\recordings\\jpetstore.aspectran.com_buydog.har",
+    "generatedAt": "2026-03-31T06:35:08.455Z"
+  },
+  {
+    "scriptPath": "scrum-suites\\jpet-team\\tests\\jpetstore.aspectran.com_buydog_1.js",
+    "recordingLogPath": "scrum-suites\\jpet-team\\recordings\\jpetstore.aspectran.com_buydog_1.recording-log.json",
+    "sourceHarPath": "scrum-suites\\jpet-team\\recordings\\jpetstore.aspectran.com_buydog.har",
+    "generatedAt": "2026-03-31T12:56:03.452Z"
+  }
+]

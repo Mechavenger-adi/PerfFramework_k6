@@ -1,0 +1,23 @@
+# k6 Performance Framework – .gitignore
+
+# ── Secrets ────────────────────────────────────
+.env
+
+# ── Build output ───────────────────────────────
+dist/
+
+# ── Node modules ───────────────────────────────
+node_modules/
+
+# ── k6 temp files ──────────────────────────────
+.k6-temp/
+
+# ── Test results ───────────────────────────────
+**/results/**/*.json
+**/results/**/*.csv
+**/results/**/*.html
+
+# ── OS / Editor ────────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/settings.json

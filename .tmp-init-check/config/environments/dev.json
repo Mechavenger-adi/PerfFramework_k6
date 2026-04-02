@@ -1,0 +1,10 @@
+{
+  "name": "dev",
+  "baseUrl": "https://your-dev-environment.com",
+  "serviceUrls": {
+    "auth": "https://auth.your-dev-environment.com"
+  },
+  "custom": {
+    "tenantId": "tenant-001"
+  }
+}

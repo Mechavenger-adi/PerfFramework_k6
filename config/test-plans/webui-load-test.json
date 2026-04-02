@@ -1,0 +1,30 @@
+{
+  "name": "WebUI Load Test - test.k6.io",
+  "environment": "dev",
+  "execution_mode": "parallel",
+  "global_load_profile": {
+    "executor": "ramping-vus",
+    "startVUs": 0,
+    "stages": [
+      { "duration": "15s", "target": 10 },
+      { "duration": "1m",  "target": 10 },
+      { "duration": "15s", "target": 0  }
+    ]
+  },
+  "user_journeys": [
+    {
+      "name": "homepage_browsing",
+      "scriptPath": "homepage-journey.js",
+      "weight": 60
+    },
+    {
+      "name": "login_flow",
+      "scriptPath": "login-journey.js",
+      "weight": 40
+    }
+  ],
+  "global_sla": {
+    "p95": 2000,
+    "errorRate": 10
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "name": "Sample Load Test",
+  "environment": "dev",
+  "execution_mode": "parallel",
+  "global_load_profile": {
+    "executor": "ramping-vus",
+    "startVUs": 0,
+    "stages": [
+      {
+        "duration": "2m",
+        "target": 50
+      },
+      {
+        "duration": "5m",
+        "target": 50
+      },
+      {
+        "duration": "2m",
+        "target": 0
+      }
+    ]
+  },
+  "user_journeys": [
+    {
+      "name": "browse",
+      "scriptPath": "scrum-suites/sample-team/tests/browse-journey.js",
+      "weight": 70
+    },
+    {
+      "name": "checkout",
+      "scriptPath": "scrum-suites/sample-team/tests/checkout-journey.js",
+      "weight": 30
+    }
+  ],
+  "global_sla": {
+    "p95": 3000,
+    "errorRate": 1
+  }
+}

@@ -1,0 +1,234 @@
+[
+  {
+    "harEntryId": "req_0",
+    "transaction": "T01_Login",
+    "recordingStartedAt": "2026-03-24T01:00:00.100Z",
+    "tags": {
+      "transaction": "T01_Login",
+      "har_entry_id": "req_0",
+      "recording_started_at": "2026-03-24T01:00:00.100Z"
+    },
+    "request": {
+      "method": "GET",
+      "url": "https://api.example.com/auth/csrf-token",
+      "headers": [
+        {
+          "name": "Accept",
+          "value": "application/json"
+        }
+      ],
+      "queryParams": {},
+      "cookies": []
+    },
+    "response": {
+      "status": 200,
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "X-CSRF-Token",
+          "value": "csrf_abc123def456"
+        }
+      ],
+      "cookies": [],
+      "body": "{\"csrfToken\": \"csrf_abc123def456\"}"
+    }
+  },
+  {
+    "harEntryId": "req_1",
+    "transaction": "T01_Login",
+    "recordingStartedAt": "2026-03-24T01:00:00.350Z",
+    "tags": {
+      "transaction": "T01_Login",
+      "har_entry_id": "req_1",
+      "recording_started_at": "2026-03-24T01:00:00.350Z"
+    },
+    "request": {
+      "method": "POST",
+      "url": "https://api.example.com/auth/login",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Accept",
+          "value": "application/json"
+        },
+        {
+          "name": "X-CSRF-Token",
+          "value": "csrf_abc123def456"
+        }
+      ],
+      "queryParams": {},
+      "cookies": [],
+      "body": "{\"username\": \"testuser\", \"password\": \"testpass123\"}"
+    },
+    "response": {
+      "status": 200,
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "X-Session-Id",
+          "value": "sess_xyz789abc"
+        }
+      ],
+      "cookies": [],
+      "body": "{\"status\": \"ok\", \"token\": \"eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjEyM30.bearer_jwt_token\"}"
+    }
+  },
+  {
+    "harEntryId": "req_3",
+    "transaction": "T02_Dashboard",
+    "recordingStartedAt": "2026-03-24T01:00:02.100Z",
+    "tags": {
+      "transaction": "T02_Dashboard",
+      "har_entry_id": "req_3",
+      "recording_started_at": "2026-03-24T01:00:02.100Z"
+    },
+    "request": {
+      "method": "GET",
+      "url": "https://api.example.com/user/profile",
+      "headers": [
+        {
+          "name": "Accept",
+          "value": "application/json"
+        },
+        {
+          "name": "X-Session-Id",
+          "value": "sess_xyz789abc"
+        }
+      ],
+      "queryParams": {},
+      "cookies": []
+    },
+    "response": {
+      "status": 200,
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "cookies": [],
+      "body": "{\"userId\": 123, \"name\": \"Test User\", \"cart\": []}"
+    }
+  },
+  {
+    "harEntryId": "req_4",
+    "transaction": "T02_Dashboard",
+    "recordingStartedAt": "2026-03-24T01:00:02.450Z",
+    "tags": {
+      "transaction": "T02_Dashboard",
+      "har_entry_id": "req_4",
+      "recording_started_at": "2026-03-24T01:00:02.450Z"
+    },
+    "request": {
+      "method": "GET",
+      "url": "https://api.example.com/products?category=electronics&limit=10",
+      "headers": [
+        {
+          "name": "Accept",
+          "value": "application/json"
+        }
+      ],
+      "queryParams": {
+        "category": "electronics",
+        "limit": "10"
+      },
+      "cookies": []
+    },
+    "response": {
+      "status": 200,
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "cookies": [],
+      "body": "{\"products\": [{\"id\": \"prod_001\", \"name\": \"Laptop\", \"price\": 999.99}]}"
+    }
+  },
+  {
+    "harEntryId": "req_5",
+    "transaction": "T03_Checkout",
+    "recordingStartedAt": "2026-03-24T01:00:04.100Z",
+    "tags": {
+      "transaction": "T03_Checkout",
+      "har_entry_id": "req_5",
+      "recording_started_at": "2026-03-24T01:00:04.100Z"
+    },
+    "request": {
+      "method": "POST",
+      "url": "https://api.example.com/cart/add",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "X-Session-Id",
+          "value": "sess_xyz789abc"
+        }
+      ],
+      "queryParams": {},
+      "cookies": [],
+      "body": "{\"productId\": \"prod_001\", \"qty\": 1}"
+    },
+    "response": {
+      "status": 201,
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "cookies": [],
+      "body": "{\"orderId\": \"ORD-9982\", \"status\": \"pending\"}"
+    }
+  },
+  {
+    "harEntryId": "req_6",
+    "transaction": "T03_Checkout",
+    "recordingStartedAt": "2026-03-24T01:00:04.520Z",
+    "tags": {
+      "transaction": "T03_Checkout",
+      "har_entry_id": "req_6",
+      "recording_started_at": "2026-03-24T01:00:04.520Z"
+    },
+    "request": {
+      "method": "POST",
+      "url": "https://api.example.com/checkout/confirm",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "X-Session-Id",
+          "value": "sess_xyz789abc"
+        }
+      ],
+      "queryParams": {},
+      "cookies": [],
+      "body": "{\"orderId\": \"ORD-9982\", \"paymentMethod\": \"card\"}"
+    },
+    "response": {
+      "status": 200,
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "cookies": [],
+      "body": "{\"confirmation\": \"CONF-44521\", \"status\": \"confirmed\"}"
+    }
+  }
+]

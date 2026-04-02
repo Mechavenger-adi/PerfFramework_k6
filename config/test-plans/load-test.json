@@ -1,0 +1,47 @@
+{
+  "name": "Sample Load Test",
+  "environment": "dev",
+  "execution_mode": "parallel",
+  "global_load_profile": {
+    "executor": "ramping-vus",
+    "startVUs": 0,
+    "stages": [
+      {
+        "duration": "10s",
+        "target": 5
+      },
+      {
+        "duration": "30s",
+        "target": 5
+      },
+      {
+        "duration": "10s",
+        "target": 0
+      }
+    ]
+  },
+  "debug": {
+    "enabled": false,
+    "mode": "diff",
+    "vus": 1,
+    "iterations": 2,
+    "reportDir": "results/debug",
+    "failOnMissingRecordingLog": false
+  },
+  "user_journeys": [
+    {
+      "name": "browse_crocodiles",
+      "scriptPath": "browse-journey.js",
+      "weight": 50
+    },
+    {
+      "name": "checkout_crocodiles",
+      "scriptPath": "checkout-journey.js",
+      "weight": 50
+    }
+  ],
+  "global_sla": {
+    "p95": 3000,
+    "errorRate": 40
+  }
+}

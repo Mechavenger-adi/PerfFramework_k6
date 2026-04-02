@@ -1,0 +1,4 @@
+p_username,p_password,p_email
+testuser001,P@ssw0rd1,testuser001@perf-test.local
+testuser002,P@ssw0rd2,testuser002@perf-test.local
+testuser003,P@ssw0rd3,testuser003@perf-test.local

@@ -1,0 +1,33 @@
+[
+  {
+    "name": "csrfToken",
+    "source": "body",
+    "extractor": "jsonpath",
+    "pattern": "csrfToken",
+    "fallback": "fail",
+    "isCritical": true
+  },
+  {
+    "name": "bearerToken",
+    "source": "body",
+    "extractor": "jsonpath",
+    "pattern": "token",
+    "fallback": "fail",
+    "isCritical": true
+  },
+  {
+    "name": "sessionId",
+    "source": "header",
+    "extractor": "header",
+    "pattern": "X-Session-Id",
+    "fallback": "skip"
+  },
+  {
+    "name": "orderId",
+    "source": "body",
+    "extractor": "jsonpath",
+    "pattern": "orderId",
+    "fallback": "default",
+    "defaultValue": "ORD-UNKNOWN"
+  }
+]
