@@ -9,6 +9,7 @@ import * as path from 'path';
 import { ResolvedConfig } from '../types/ConfigContracts';
 import { TestPlan } from '../types/TestPlanSchema';
 
+import { DataValidator } from '../data/DataValidator';
 import { RecordingLogResolver } from '../debug/RecordingLogResolver';
 import { Logger } from '../utils/logger';
 import { PathResolver } from '../utils/PathResolver';
@@ -126,6 +127,41 @@ export class GatekeeperValidator {
       failures.push('[TestPlan] execution_mode is "hybrid" but no hybrid_groups are defined.');
     }
 
+    // -- 8. Data file & column validation ------
+    for (const journey of plan.user_journeys ?? []) {
+      const scriptPath = journey.scriptPath;
+      if (!scriptPath || !fs.existsSync(scriptPath)) continue;
+
+      const scriptContent = fs.readFileSync(scriptPath, 'utf-8');
+      const dataRefs = this.extractDataReferences(scriptContent);
+      if (dataRefs.length === 0) continue;
+
+      const scriptDir = path.dirname(scriptPath);
+
+      for (const ref of dataRefs) {
+        const absDataPath = path.resolve(scriptDir, ref.filePath);
+
+        if (!fs.existsSync(absDataPath)) {
+          failures.push(
+            `[Journey:${journey.name}] Data file not found: ${ref.filePath} (resolved: ${absDataPath})`,
+          );
+          continue;
+        }
+
+        if (ref.columns.length > 0) {
+          const result = DataValidator.validateCSV(absDataPath, ref.columns);
+          if (!result.valid) {
+            for (const err of result.errors) {
+              failures.push(`[Journey:${journey.name}] [${ref.dataset}] ${err}`);
+            }
+          }
+          for (const warn of result.warnings) {
+            warnings.push(`[Journey:${journey.name}] [${ref.dataset}] ${warn}`);
+          }
+        }
+      }
+    }
+
     return {
       passed: failures.length === 0,
       failures,
@@ -154,6 +190,45 @@ export class GatekeeperValidator {
     }
 
     return result;
+  }
+
+  /**
+   * Scan a k6 script for data file references and column usage.
+   * Detects: fs.open("path") → file mapping, FILES["name"]["col"] → column refs.
+   */
+  private extractDataReferences(
+    scriptContent: string,
+  ): Array<{ dataset: string; filePath: string; columns: string[] }> {
+    // Match: datasetName: await csv.parse(await fs.open("path"), ...)
+    const filePattern = /(\w+)\s*:\s*await\s+csv\.parse\(\s*await\s+fs\.open\(\s*["']([^"']+)["']\)/g;
+    const datasetMap = new Map<string, string>();
+    let m;
+
+    while ((m = filePattern.exec(scriptContent)) !== null) {
+      datasetMap.set(m[1], m[2]);
+    }
+
+    // Match column references: FILES["dataset"]["col"] or ...FILES["dataset"])["col"]
+    const colPattern = /FILES\s*\[\s*["'](\w+)["']\s*\](?:\s*\))?\s*\[\s*["'](\w+)["']\s*\]/g;
+    const datasetColumns = new Map<string, Set<string>>();
+
+    while ((m = colPattern.exec(scriptContent)) !== null) {
+      const dataset = m[1];
+      const column = m[2];
+      if (!datasetColumns.has(dataset)) datasetColumns.set(dataset, new Set());
+      datasetColumns.get(dataset)!.add(column);
+    }
+
+    const refs: Array<{ dataset: string; filePath: string; columns: string[] }> = [];
+    for (const [dataset, filePath] of datasetMap) {
+      refs.push({
+        dataset,
+        filePath,
+        columns: Array.from(datasetColumns.get(dataset) ?? []),
+      });
+    }
+
+    return refs;
   }
 
   private estimateRequestedVUs(plan: TestPlan): number {

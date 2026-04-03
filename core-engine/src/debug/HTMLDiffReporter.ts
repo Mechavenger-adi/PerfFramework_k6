@@ -36,7 +36,7 @@ export class HTMLDiffReporter {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>k6 Debug Replay Diff</title>
+    <title>Replay Insights</title>
     <style>
       html { scroll-behavior: smooth; }
       :root {
@@ -641,7 +641,7 @@ export class HTMLDiffReporter {
   <body>
     <div class="shell">
       <section class="hero">
-        <h1>Debug Replay Diff Report</h1>
+        <h1>Replay Insights</h1>
         <p class="muted">Iteration-aware replay debugging with request diffs, request timings, and captured variable values.</p>
         <div class="stats">
           <div class="stat">
