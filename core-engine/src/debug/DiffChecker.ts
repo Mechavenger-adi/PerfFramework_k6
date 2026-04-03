@@ -24,6 +24,8 @@ export interface SideSnapshot {
   responseHeaders: { name: string; value: string }[];
   requestBody?: string;
   responseBody?: string;
+  requestCookies?: { name: string; value: string }[];
+  responseCookies?: { name: string; value: string }[];
 }
 
 export interface DiffResult {
@@ -250,6 +252,8 @@ export class DiffChecker {
         responseHeaders: original.responseHeaders ?? [],
         requestBody: original.postData?.text,
         responseBody: original.responseBody?.text,
+        requestCookies: original.requestCookies ?? [],
+        responseCookies: original.responseCookies ?? [],
       },
       replayed: {
         method: replay.method,
@@ -259,6 +263,8 @@ export class DiffChecker {
         responseHeaders: replay.responseHeaders ?? [],
         requestBody: replay.postData?.text,
         responseBody: replay.responseBody?.text,
+        requestCookies: replay.requestCookies ?? [],
+        responseCookies: replay.responseCookies ?? [],
       },
     };
   }
@@ -478,6 +484,8 @@ export class DiffChecker {
             text: entry.response.body,
           }
         : undefined,
+      requestCookies: entry.request.cookies ?? [],
+      responseCookies: entry.response.cookies ?? [],
       pageref: entry.transaction,
       startedDateTime: entry.recordingStartedAt,
       time: 0,
@@ -511,6 +519,8 @@ export class DiffChecker {
               text: entry.response.body,
             }
           : undefined,
+        requestCookies: entry.request?.cookies ?? [],
+        responseCookies: entry.response?.cookies ?? [],
         pageref: entry.transaction ?? entry.tags?.transaction,
         startedDateTime: entry.recordingStartedAt ?? entry.tags?.recording_started_at,
       },
@@ -583,6 +593,8 @@ export class DiffChecker {
         responseHeaders: [],
         requestBody: undefined,
         responseBody: undefined,
+        requestCookies: [],
+        responseCookies: [],
       },
       replayed: {
         method: replay.har.method,
@@ -592,6 +604,8 @@ export class DiffChecker {
         responseHeaders: replay.har.responseHeaders ?? [],
         requestBody: replay.har.postData?.text,
         responseBody: replay.har.responseBody?.text,
+        requestCookies: replay.har.requestCookies ?? [],
+        responseCookies: replay.har.responseCookies ?? [],
       },
     };
   }

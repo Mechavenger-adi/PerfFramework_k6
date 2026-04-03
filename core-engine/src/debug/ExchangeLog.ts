@@ -1,5 +1,5 @@
-import { HAREntry } from '../types/HARContracts';
 import { TransactionGroup } from '../recording/TransactionGrouper';
+import { HAREntry } from '../types/HARContracts';
 
 export interface ExchangeLogHeader {
   name: string;
@@ -92,12 +92,37 @@ export class ExchangeLogBuilder {
         status: entry.status,
         headers: entry.responseHeaders ?? [],
         cookies: this.extractCookies(entry.responseHeaders ?? [], 'set-cookie'),
-        body: this.normalizeBody(entry.responseBody?.text, entry.responseBody?.encoding),
+        body: this.normalizeBody(entry.responseBody?.text, entry.responseBody?.encoding, entry.mimeType, entry.url),
       },
     };
   }
 
-  private static normalizeBody(body?: string, encoding?: string): string | undefined {
+  private static readonly BINARY_CONTENT_RE = /^(?:image|audio|video|font)\//i;
+  private static readonly BINARY_MIME_TYPES = new Set([
+    'application/octet-stream', 'application/zip', 'application/pdf',
+    'application/x-font-ttf', 'application/x-font-woff',
+    'application/font-woff', 'application/font-woff2',
+    'application/vnd.ms-fontobject',
+  ]);
+  private static readonly STATIC_EXT_RE = /\.(?:png|jpe?g|gif|svg|ico|webp|avif|bmp|tiff?|woff2?|ttf|otf|eot|mp[34]|webm|ogg|flac|wav|zip|gz|br|pdf)(?:[?#]|$)/i;
+
+  private static isBinaryContent(mimeType?: string, url?: string): string | null {
+    if (mimeType) {
+      const ct = mimeType.split(';')[0].trim().toLowerCase();
+      if (this.BINARY_CONTENT_RE.test(ct) || this.BINARY_MIME_TYPES.has(ct)) {
+        return `[binary: ${ct}]`;
+      }
+    }
+    if (url && this.STATIC_EXT_RE.test(url)) {
+      return '[binary: static asset]';
+    }
+    return null;
+  }
+
+  private static normalizeBody(body?: string, encoding?: string, mimeType?: string, url?: string): string | undefined {
+    const binaryTag = this.isBinaryContent(mimeType, url);
+    if (binaryTag) return binaryTag;
+
     if (!body) return body;
     if ((encoding || '').toLowerCase() !== 'base64') {
       return body;

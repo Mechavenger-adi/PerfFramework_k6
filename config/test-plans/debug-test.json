@@ -30,8 +30,8 @@
   },
   "user_journeys": [
     {
-      "name": "buyanimal_new",
-      "scriptPath": "buyanimal_new.js"
+      "name": "buyanimal_raw",
+      "scriptPath": "buyanimal_raw.js"
     }
   ]
 }

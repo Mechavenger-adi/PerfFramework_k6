@@ -15,6 +15,8 @@ export interface HAREntry {
     text: string;
     encoding?: string;
   };
+  requestCookies?: { name: string; value: string }[];
+  responseCookies?: { name: string; value: string }[];
   pageref?: string;
   startedDateTime: string;
   time: number;

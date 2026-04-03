@@ -16,6 +16,7 @@ import { PipelineRunner } from '../execution/PipelineRunner';
 import { TestPlanLoader } from '../scenario/TestPlanLoader';
 import { TestPlan, UserJourney } from '../types/TestPlanSchema';
 import { Logger } from '../utils/logger';
+import { ProgressBar } from '../utils/ProgressBar';
 import { runConvert } from './convert';
 import { runGenerate } from './generate';
 import { runGenerateByos } from './generate-byos';
@@ -283,23 +284,25 @@ async function runPlanDebugMode(plan: TestPlan): Promise<void> {
 
   fs.mkdirSync(runDir, { recursive: true });
 
-  Logger.pass('Debug mode enabled from test plan');
-  Logger.detail(`Debug overrides: ${debugSettings.vus ?? 1} VU(s), ${debugSettings.iterations ?? 1} iteration(s) per journey (weights & load profile ignored)`);
-  Logger.detail(`Debug artifacts will be saved to: ${runDir}\n`);
+  const journeyCount = plan.user_journeys.length;
+  Logger.pass(`Debug mode · ${journeyCount} journey(s) · ${debugSettings.vus ?? 1} VU(s) · ${debugSettings.iterations ?? 1} iteration(s) each`);
+  Logger.detail(`Output: ${runDir}\n`);
 
   const failures: string[] = [];
+  const journeyProgress = new ProgressBar('Debug journeys', plan.user_journeys.length);
 
   for (const journey of plan.user_journeys) {
     try {
+      journeyProgress.update(journeyProgress.current, journey.name);
       const result = await runJourneyDebug(plan, journey, runDir);
-      Logger.pass(journey.name);
-      Logger.detail(`Replay log : ${result.replayLogPath}`);
-      Logger.detail(`HTML report: ${result.htmlReportPath}`);
-      Logger.detail(`Steps      : ${result.results.length}\n`);
+      journeyProgress.done(`${journey.name} — ${result.results.length} steps`);
+      journeyProgress.tick();
+      Logger.detail(`  Report: ${path.basename(result.htmlReportPath)}`);
     } catch (err) {
-      const message = `[Journey:${journey.name}] ${(err as Error).message}`;
+      const message = `${journey.name}: ${(err as Error).message}`;
+      journeyProgress.fail(journey.name);
+      journeyProgress.tick();
       failures.push(message);
-      Logger.fail(`${message}\n`);
     }
   }
 

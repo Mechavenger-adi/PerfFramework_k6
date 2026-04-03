@@ -1,4 +1,5 @@
 import exec from 'k6/execution';
+import http from 'k6/http';
 
 const iterationState = {};
 
@@ -27,6 +28,21 @@ export function trackParameter(name, value, source) {
   const v = value === undefined || value === null ? '' : String(value);
   _variableRegistry[name] = { name, type: 'parameter', value: v, source: source || 'data' };
   return value;
+}
+
+/**
+ * Auto-register all properties from a data row object.
+ * Call once per data file per iteration. Registers every key-value pair as a parameter.
+ * e.g. trackDataRow("userdetails", getUniqueItem(FILES["userdetails"]))
+ * will register p_username, p_password, etc. — whatever columns the CSV has.
+ */
+export function trackDataRow(sourceName, rowObject) {
+  if (!rowObject || typeof rowObject !== 'object') return rowObject;
+  for (const [key, val] of Object.entries(rowObject)) {
+    const v = val === undefined || val === null ? '' : String(val);
+    _variableRegistry[key] = { name: key, type: 'parameter', value: v, source: sourceName || 'data' };
+  }
+  return rowObject;
 }
 
 /**
@@ -93,11 +109,85 @@ function extractCookies(headers = {}) {
   return cookies;
 }
 
+/**
+ * Extract cookies from k6's res.cookies object.
+ * k6 returns: { cookieName: [{ name, value, domain, path, ... }], ... }
+ */
+function extractK6ResponseCookies(resCookies) {
+  if (!resCookies || typeof resCookies !== 'object') return [];
+  const cookies = [];
+  for (const [cookieName, entries] of Object.entries(resCookies)) {
+    if (Array.isArray(entries)) {
+      for (const entry of entries) {
+        cookies.push({ name: cookieName, value: entry.value || '' });
+      }
+    }
+  }
+  return cookies;
+}
+
+/**
+ * Extract request cookies from k6's cookie jar for a given URL.
+ * Uses http.cookieJar().cookiesForURL() which returns all cookies
+ * the VU's jar would send to that URL (including auto-managed ones).
+ * Returns: [{ name, value }, ...]
+ */
+function extractJarCookies(url) {
+  try {
+    const jar = http.cookieJar();
+    const jarCookies = jar.cookiesForURL(url);
+    if (!jarCookies || typeof jarCookies !== 'object') return [];
+    const cookies = [];
+    for (const [name, values] of Object.entries(jarCookies)) {
+      if (Array.isArray(values)) {
+        for (const value of values) {
+          cookies.push({ name, value: String(value) });
+        }
+      } else {
+        cookies.push({ name, value: String(values) });
+      }
+    }
+    return cookies;
+  } catch {
+    return [];
+  }
+}
+
 function normalizeHeaders(headers = {}) {
   return Object.entries(headers).map(([name, value]) => ({
     name,
     value: Array.isArray(value) ? value.join(', ') : String(value),
   }));
+}
+
+const BINARY_CONTENT_RE = /^(?:image|audio|video|font)\//i;
+const BINARY_MIME_TYPES = new Set([
+  'application/octet-stream',
+  'application/zip',
+  'application/pdf',
+  'application/x-font-ttf',
+  'application/x-font-woff',
+  'application/font-woff',
+  'application/font-woff2',
+  'application/vnd.ms-fontobject',
+]);
+const STATIC_EXT_RE = /\.(?:png|jpe?g|gif|svg|ico|webp|avif|bmp|tiff?|woff2?|ttf|otf|eot|mp[34]|webm|ogg|flac|wav|zip|gz|br|pdf)(?:[?#]|$)/i;
+
+/**
+ * Determine whether response body should be omitted from the replay log.
+ * Returns a placeholder string for binary/static content, or null when body is fine.
+ */
+function binaryBodyPlaceholder(url, responseHeaders) {
+  // Check content-type header
+  const ct = (responseHeaders['Content-Type'] || responseHeaders['content-type'] || '').split(';')[0].trim().toLowerCase();
+  if (ct && (BINARY_CONTENT_RE.test(ct) || BINARY_MIME_TYPES.has(ct))) {
+    return `[binary: ${ct}]`;
+  }
+  // Fallback: check URL extension
+  if (typeof url === 'string' && STATIC_EXT_RE.test(url)) {
+    return '[binary: static asset]';
+  }
+  return null;
 }
 
 function currentIteration() {
@@ -137,6 +227,31 @@ export function logReplayExchange(meta, requestInfo, response) {
   const seen = new Set(autoDetected.map((e) => e.name));
   const merged = [...autoDetected, ...explicit.filter((e) => !seen.has(e.name))];
 
+  // Extract cookies from the ACTUAL headers k6 sent (includes auto-managed jar cookies)
+  // res.request.headers contains the real Cookie header; fall back to declared headers;
+  // final fallback: query the VU's cookie jar for cookies it would send to this URL
+  const actualRequestHeaders = requestInfo?.actualRequestHeaders || {};
+  const fromActualHeaders = extractCookies(actualRequestHeaders);
+  const fromDeclaredHeaders = extractCookies(requestHeaders);
+  const requestUrl = typeof meta.url === 'string' ? meta.url : String(meta.url ?? '');
+  const fromJar = requestUrl ? extractJarCookies(requestUrl) : [];
+  const requestCookies = fromActualHeaders.length > 0
+    ? fromActualHeaders
+    : fromDeclaredHeaders.length > 0
+      ? fromDeclaredHeaders
+      : fromJar;
+
+  // Use k6's parsed res.cookies (structured data) if available, else parse Set-Cookie header
+  const responseCookies = (requestInfo?.k6ResponseCookies && Object.keys(requestInfo.k6ResponseCookies).length > 0)
+    ? extractK6ResponseCookies(requestInfo.k6ResponseCookies)
+    : extractCookies(responseHeaders);
+
+  // Determine if the response body is binary and should be replaced with a placeholder
+  const binaryPlaceholder = binaryBodyPlaceholder(
+    typeof meta.url === 'string' ? meta.url : String(meta.url ?? ''),
+    responseHeaders,
+  );
+
   const entry = {
     harEntryId: meta.harEntryId,
     transaction: meta.transaction,
@@ -152,7 +267,7 @@ export function logReplayExchange(meta, requestInfo, response) {
       url: typeof meta.url === 'string' ? meta.url : String(meta.url ?? ''),
       headers: normalizeHeaders(requestHeaders),
       queryParams: extractQueryParams(typeof meta.url === 'string' ? meta.url : String(meta.url ?? '')),
-      cookies: extractCookies(requestHeaders),
+      cookies: requestCookies,
       body: requestInfo?.body !== null && requestInfo?.body !== undefined
         ? (typeof requestInfo.body === 'object' ? JSON.stringify(requestInfo.body) : String(requestInfo.body))
         : undefined,
@@ -160,8 +275,8 @@ export function logReplayExchange(meta, requestInfo, response) {
     response: {
       status: response?.status,
       headers: normalizeHeaders(responseHeaders),
-      cookies: extractCookies(responseHeaders),
-      body: response?.body ?? undefined,
+      cookies: responseCookies,
+      body: binaryPlaceholder ?? (response?.body ?? undefined),
     },
   };
 
@@ -187,6 +302,8 @@ export function logExchange(req, res) {
     {
       headers: req.params?.headers || {},
       body: req.body,
+      actualRequestHeaders: res?.request?.headers || {},   // actual headers k6 sent (includes Cookie from jar)
+      k6ResponseCookies: res?.cookies || {},                // k6's parsed response Set-Cookie data
     },
     res,
   );

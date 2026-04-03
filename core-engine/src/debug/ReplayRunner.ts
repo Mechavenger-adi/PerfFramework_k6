@@ -3,6 +3,7 @@ import * as path from 'path';
 import * as readline from 'readline';
 import { PipelineRunner } from '../execution/PipelineRunner';
 import { Logger } from '../utils/logger';
+import { createSpinner } from '../utils/ProgressBar';
 import { DiffChecker, DiffResult } from './DiffChecker';
 import { TaggedExchangeLogEntry } from './ExchangeLog';
 import { HTMLDiffReporter } from './HTMLDiffReporter';
@@ -31,8 +32,8 @@ export class ReplayRunner {
    * and generate an HTML diff report automatically.
    */
   static async runDebug(options: DebugReplayOptions): Promise<DebugReplayResult> {
-    Logger.info(`[ReplayRunner] Starting debug replay for script: ${options.scriptPath}`);
-    Logger.info(`[ReplayRunner] Comparing against recording log: ${options.recordingLogPath ?? 'not found - replay only mode'}`);
+    Logger.detail(`Script  : ${options.scriptPath}`);
+    Logger.detail(`Recording: ${options.recordingLogPath ?? 'none (replay-only mode)'}`);
 
     const absScriptPath = path.resolve(options.scriptPath);
     const absRecordingLogPath = options.recordingLogPath
@@ -49,9 +50,11 @@ export class ReplayRunner {
       throw new Error(`[ReplayRunner] Script not found: ${absScriptPath}`);
     }
     if (absRecordingLogPath && !fs.existsSync(absRecordingLogPath)) {
-      Logger.warn(`[ReplayRunner] Recording log not found, continuing in replay-only mode: ${absRecordingLogPath}`);
+      Logger.detail(`Recording log not found, replay-only mode`);
     }
 
+    const execSpinner = createSpinner('Executing k6 debug run');
+    execSpinner.start();
     const runResult = PipelineRunner.execute({
       scriptPath: absScriptPath,
       k6Options: {
@@ -66,9 +69,13 @@ export class ReplayRunner {
       env: { K6_PERF_DEBUG: 'true' },
       captureOutput: true,
     });
+    execSpinner.done('k6 debug execution complete');
 
+    const extractSpinner = createSpinner('Extracting replay entries');
+    extractSpinner.start();
     const replayEntries = await this.extractReplayEntries(runResult);
     this.writeJson(absReplayLogPath, replayEntries);
+    extractSpinner.done(`Extracted ${replayEntries.length} replay entries`);
 
     // Extract k6 runtime errors for the HTML report
     const k6Errors = this.extractK6Errors(runResult);
@@ -86,6 +93,8 @@ export class ReplayRunner {
       );
     }
 
+    const reportSpinner = createSpinner('Generating diff report');
+    reportSpinner.start();
     const recordingEntries = absRecordingLogPath && fs.existsSync(absRecordingLogPath)
       ? this.readRecordingLog(absRecordingLogPath)
       : [];
@@ -97,9 +106,7 @@ export class ReplayRunner {
       missingRecordingWarning,
     });
     HTMLDiffReporter.generateReport(diffResults, absHtmlPath, { k6Errors });
-
-    Logger.info(`[ReplayRunner] Replay log saved to: ${absReplayLogPath}`);
-    Logger.info(`[ReplayRunner] HTML diff report generated at: ${absHtmlPath}`);
+    reportSpinner.done('Diff report generated');
 
     PipelineRunner.ensureSuccess(runResult);
 
@@ -203,7 +210,10 @@ export class ReplayRunner {
     return (parsed as TaggedExchangeLogEntry[]).map((entry) => this.normalizeRecordingEntry(entry));
   }
 
+  private static readonly STATIC_EXT_RE = /\.(?:png|jpe?g|gif|svg|ico|webp|avif|bmp|tiff?|woff2?|ttf|otf|eot|mp[34]|webm|ogg|flac|wav|zip|gz|br|pdf)(?:[?#]|$)/i;
+
   private static normalizeRecordingEntry(entry: TaggedExchangeLogEntry): TaggedExchangeLogEntry {
+    const isBinaryUrl = this.STATIC_EXT_RE.test(entry.request?.url ?? '');
     return {
       ...entry,
       request: {
@@ -212,7 +222,7 @@ export class ReplayRunner {
       },
       response: {
         ...entry.response,
-        body: this.decodeBodyIfNeeded(entry.response.body),
+        body: isBinaryUrl ? '[binary: static asset]' : this.decodeBodyIfNeeded(entry.response.body),
       },
     };
   }

@@ -4,11 +4,11 @@
  * Writes generated options to a temp JS file and passes it to k6.
  */
 
+import * as childProcess from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as childProcess from 'child_process';
-import { K6Options } from './ParallelExecutionManager';
 import { Logger } from '../utils/logger';
+import { K6Options } from './ParallelExecutionManager';
 
 export interface RunOptions {
   /** Path to the k6 test script (entry point) */
@@ -62,10 +62,11 @@ export class PipelineRunner {
     const optionsFile = path.join(tempDir, 'resolved-options.json');
     fs.writeFileSync(optionsFile, JSON.stringify(k6Options, null, 2), 'utf-8');
 
-    Logger.info(`[PipelineRunner] Starting k6 execution...`);
-    Logger.info(`  Script  : ${absScript}`);
-    Logger.info(`  Options : ${optionsFile}`);
-    Logger.info(`  Journeys: ${Object.keys(k6Options.scenarios ?? {}).join(', ')}\n`);
+    if (!captureOutput) {
+      Logger.info(`[PipelineRunner] Starting k6 execution...`);
+      Logger.info(`  Script  : ${absScript}`);
+      Logger.info(`  Journeys: ${Object.keys(k6Options.scenarios ?? {}).join(', ')}\n`);
+    }
 
     const k6Args = [
       'run',

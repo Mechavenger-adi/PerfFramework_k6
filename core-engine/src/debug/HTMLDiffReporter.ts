@@ -66,8 +66,9 @@ export class HTMLDiffReporter {
         font-size: 14px;
         line-height: 1.6;
         -webkit-font-smoothing: antialiased;
+        overflow-x: hidden;
       }
-      .shell { max-width: 1440px; margin: 0 auto; }
+      .shell { max-width: 1440px; margin: 0 auto; overflow-x: clip; }
       .hero, .section-card, .transaction, .request-card {
         background: var(--surface);
         border: 1px solid var(--border);
@@ -256,6 +257,7 @@ export class HTMLDiffReporter {
       .section-card {
         margin-top: 16px;
         padding: 24px;
+        overflow: hidden;
       }
       .section-card h2 { font-size: 16px; font-weight: 700; letter-spacing: -0.01em; }
       .iteration-panel { display: none; margin-top: 16px; }
@@ -287,14 +289,20 @@ export class HTMLDiffReporter {
         border-collapse: collapse;
         margin-top: 12px;
         font-size: 13px;
+        table-layout: fixed;
+        max-width: 100%;
       }
       th, td {
-        border-bottom: 1px solid var(--border);
+        border: 1px solid var(--border);
         padding: 10px 8px;
         text-align: left;
         vertical-align: top;
       }
-      th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+      td { overflow-wrap: break-word; word-wrap: break-word; word-break: break-word; white-space: normal; }
+      th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; position: relative; background: var(--surface-alt); }
+      .col-resize { position: absolute; right: -2px; top: 0; bottom: 0; width: 5px; cursor: col-resize; background: transparent; z-index: 2; }
+      .col-resize:hover, .col-resize.active { background: var(--accent); opacity: 0.5; }
+      body.resizing, body.resizing * { cursor: col-resize !important; user-select: none !important; }
       tbody tr:nth-child(even) { background: var(--surface-alt); }
       tbody tr:hover { background: #e2e8f0; }
       .transaction {
@@ -337,11 +345,24 @@ export class HTMLDiffReporter {
         padding: 20px;
         border-left: 3px solid var(--border);
         transition: box-shadow 0.2s;
+        overflow: clip;
+        position: relative;
       }
       .request-card:hover { box-shadow: var(--shadow-lg); }
       .request-card.score-good { border-left-color: var(--good); }
       .request-card.score-warn { border-left-color: var(--warn); }
       .request-card.score-bad { border-left-color: var(--bad); }
+      .request-card-sticky {
+        position: sticky;
+        top: 52px;
+        z-index: 50;
+        background: var(--surface);
+        margin: -20px -20px 0;
+        padding: 14px 20px 12px;
+        border-bottom: 1px solid var(--border);
+        transition: box-shadow 0.2s;
+      }
+      .request-card-sticky.stuck { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
       .request-header {
         display: flex;
         justify-content: space-between;
@@ -396,6 +417,8 @@ export class HTMLDiffReporter {
         border-radius: var(--radius);
         padding: 16px;
         overflow-x: auto;
+        overflow-y: hidden;
+        max-width: 100%;
       }
       .panel h4 { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 8px; }
       .body-section {
@@ -404,6 +427,8 @@ export class HTMLDiffReporter {
         border: 1px solid var(--border);
         border-radius: var(--radius);
         padding: 16px;
+        overflow: clip;
+        max-width: 100%;
       }
       .body-section details {
         margin-top: 0;
@@ -418,6 +443,7 @@ export class HTMLDiffReporter {
       }
       .body-grid > * { min-width: 0;
       }
+      .body-pane { position: relative; }
       pre {
         margin: 10px 0 0;
         white-space: pre-wrap;
@@ -549,6 +575,58 @@ export class HTMLDiffReporter {
       .error-panel h2::before { content: '⚠'; font-size: 18px; }
       .error-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
       .error-item { background: #fff; border: 1px solid #fecaca; border-radius: 6px; padding: 8px 12px; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; color: #991b1b; word-break: break-word; white-space: pre-wrap; }
+      .body-pane > .pane-header { display: flex; align-items: center; }
+      .body-pane > .pane-header > .pane-label { flex: 1; }
+      /* Section search */
+      .section-search-btn {
+        background: var(--surface-alt); border: 1px solid var(--border); cursor: pointer;
+        color: var(--muted); font-size: 13px; width: 26px; height: 26px;
+        display: inline-flex; align-items: center; justify-content: center;
+        border-radius: 6px; transition: all 0.2s; flex-shrink: 0;
+      }
+      .section-search-btn:hover { background: var(--accent); color: #fff; border-color: var(--accent); box-shadow: 0 1px 4px rgba(0,0,0,0.12); }
+      .section-search-btn svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+      .section-search-bar {
+        display: none; align-items: center; gap: 6px;
+        padding: 6px 10px; margin-top: 8px;
+        background: var(--surface); border: 1px solid var(--border);
+        border-radius: 8px; font-size: 12px;
+      }
+      .section-search-bar.open { display: flex; flex-wrap: wrap; }
+      .section-search-bar input {
+        border: 1px solid var(--border); border-radius: 6px;
+        padding: 4px 8px; font-size: 12px; font-family: var(--font);
+        outline: none; min-width: 140px; flex: 1;
+      }
+      .section-search-bar input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(37,99,235,0.12); }
+      .section-search-bar .ss-badge {
+        font-size: 10px; font-weight: 600; padding: 2px 6px;
+        border-radius: 999px; background: var(--accent); color: white;
+        min-width: 16px; text-align: center;
+      }
+      .section-search-bar .ss-badge.zero { background: var(--muted); }
+      .section-search-bar button {
+        background: var(--surface-alt); border: 1px solid var(--border);
+        border-radius: 4px; padding: 2px 6px; cursor: pointer;
+        font-size: 12px; color: var(--muted); line-height: 1; transition: all 0.15s;
+      }
+      .section-search-bar button:hover { background: var(--border); color: var(--ink); }
+      .section-search-bar button:disabled { opacity: 0.3; cursor: default; }
+      .body-section summary { display: flex; align-items: center; }
+      .ss-sync-group { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; font-weight: normal; }
+      .ss-sync-group label { font-size: 11px; color: var(--muted); cursor: pointer; user-select: none; }
+      .ss-sync-toggle { width: 28px; height: 16px; position: relative; display: inline-block; vertical-align: middle; }
+      .ss-sync-toggle input { opacity: 0; width: 0; height: 0; }
+      .ss-sync-toggle .ss-slider {
+        position: absolute; cursor: pointer; inset: 0;
+        background: var(--border); border-radius: 16px; transition: background 0.2s;
+      }
+      .ss-sync-toggle .ss-slider::before {
+        content: ''; position: absolute; height: 12px; width: 12px; left: 2px; bottom: 2px;
+        background: white; border-radius: 50%; transition: transform 0.2s;
+      }
+      .ss-sync-toggle input:checked + .ss-slider { background: var(--accent); }
+      .ss-sync-toggle input:checked + .ss-slider::before { transform: translateX(12px); }
       @media (max-width: 960px) {
         body { padding: 12px; }
         .summary-grid, .grid, .body-grid { grid-template-columns: 1fr; }
@@ -637,7 +715,7 @@ export class HTMLDiffReporter {
               <th>Matched</th>
               <th>Missing</th>
               <th>Extra</th>
-              <th>Avg Score</th>
+              <th>Avg Match Score</th>
               <th>Total Request Time</th>
             </tr>
           </thead>
@@ -851,6 +929,256 @@ export class HTMLDiffReporter {
         modeToggle.addEventListener('change', function() {
           shellEl.classList.toggle('raw-mode', !this.checked);
         });
+
+        // Column resize
+        function initTableResize(table) {
+          if (table.dataset.resizeInit) return;
+          table.dataset.resizeInit = '1';
+          var ths = table.querySelectorAll('thead th');
+          if (ths.length === 0) return;
+          // Capture natural widths before switching to fixed layout
+          var widths = [];
+          ths.forEach(function(th) { widths.push(th.offsetWidth); });
+          if (widths[0] === 0) return; // not visible yet
+          table.style.tableLayout = 'fixed';
+          ths.forEach(function(th, i) { th.style.width = widths[i] + 'px'; });
+          ths.forEach(function(th, i) {
+            if (i === ths.length - 1) return;
+            var handle = document.createElement('div');
+            handle.className = 'col-resize';
+            th.appendChild(handle);
+            handle.addEventListener('mousedown', function(e) {
+              e.preventDefault();
+              var startX = e.pageX;
+              var startW = th.offsetWidth;
+              var nextTh = ths[i + 1];
+              var nextW = nextTh ? nextTh.offsetWidth : 0;
+              document.body.classList.add('resizing');
+              handle.classList.add('active');
+              function onMove(ev) {
+                var dx = ev.pageX - startX;
+                var newW = Math.max(60, startW + dx);
+                var newNextW = nextTh ? Math.max(60, nextW - dx) : 0;
+                if (nextTh && (newNextW <= 60 || newW <= 60)) return;
+                th.style.width = newW + 'px';
+                if (nextTh) nextTh.style.width = newNextW + 'px';
+              }
+              function onUp() {
+                document.removeEventListener('mousemove', onMove);
+                document.removeEventListener('mouseup', onUp);
+                document.body.classList.remove('resizing');
+                handle.classList.remove('active');
+              }
+              document.addEventListener('mousemove', onMove);
+              document.addEventListener('mouseup', onUp);
+            });
+          });
+        }
+        // Init visible tables
+        document.querySelectorAll('table').forEach(function(t) { initTableResize(t); });
+        // Init tables inside details when opened
+        document.addEventListener('toggle', function(e) {
+          if (e.target.tagName === 'DETAILS' && e.target.open) {
+            e.target.querySelectorAll('table').forEach(function(t) { initTableResize(t); });
+          }
+        }, true);
+
+        // ── Section-scoped search with scroll sync ──
+        function ssClearHighlights(container) {
+          container.querySelectorAll('mark.ss-mark').forEach(function(m) {
+            var p = m.parentNode;
+            p.replaceChild(document.createTextNode(m.textContent), m);
+            p.normalize();
+          });
+        }
+
+        function ssHighlight(node, regex) {
+          var count = 0;
+          var walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT, null, false);
+          var nodes = [];
+          while (walker.nextNode()) nodes.push(walker.currentNode);
+          nodes.forEach(function(tn) {
+            if (tn.parentNode.tagName === 'SCRIPT' || tn.parentNode.tagName === 'STYLE' || tn.parentNode.closest('.section-search-bar')) return;
+            if (tn.parentNode.tagName === 'MARK') return;
+            var val = tn.nodeValue;
+            if (!regex.test(val)) return;
+            regex.lastIndex = 0;
+            var frag = document.createDocumentFragment();
+            var last = 0, match;
+            while ((match = regex.exec(val)) !== null) {
+              if (match.index > last) frag.appendChild(document.createTextNode(val.slice(last, match.index)));
+              var mk = document.createElement('mark');
+              mk.className = 'ss-mark';
+              mk.textContent = match[0];
+              frag.appendChild(mk);
+              count++;
+              last = regex.lastIndex;
+              if (!regex.global) break;
+            }
+            if (last < val.length) frag.appendChild(document.createTextNode(val.slice(last)));
+            tn.parentNode.replaceChild(frag, tn);
+          });
+          return count;
+        }
+
+        function ssGetPre(pane) {
+          var pre = pane.querySelector('pre.body-formatted');
+          if (pre && pre.offsetParent === null) pre = pane.querySelector('pre.body-raw');
+          return pre || pane.querySelector('pre');
+        }
+
+        function ssGetSiblingPane(pane) {
+          var grid = pane.closest('.body-grid');
+          if (!grid) return null;
+          var panes = grid.querySelectorAll('.body-pane');
+          for (var i = 0; i < panes.length; i++) {
+            if (panes[i] !== pane) return panes[i];
+          }
+          return null;
+        }
+
+        function ssIsSyncEnabled(pane) {
+          var section = pane.closest('.body-section');
+          if (!section) return false;
+          var check = section.querySelector('.scroll-sync-check');
+          return check && check.checked;
+        }
+
+        function ssDoSearch(bar) {
+          var pane = bar.closest('.body-pane');
+          var input = bar.querySelector('input');
+          var badge = bar.querySelector('.ss-badge');
+          var prev = bar.querySelector('.ss-prev');
+          var next = bar.querySelector('.ss-next');
+          var pos = bar.querySelector('.ss-pos');
+          var query = input.value.trim();
+
+          ssClearHighlights(pane);
+          bar._marks = [];
+          bar._idx = -1;
+
+          if (!query) {
+            badge.textContent = '0';
+            badge.className = 'ss-badge zero';
+            pos.textContent = '';
+            prev.disabled = true;
+            next.disabled = true;
+            return;
+          }
+
+          var pre = ssGetPre(pane);
+          if (pre) {
+            ssHighlight(pre, new RegExp(escapeRegex(query), 'gi'));
+          }
+
+          bar._marks = Array.from(pane.querySelectorAll('mark.ss-mark'));
+          var cnt = bar._marks.length;
+          badge.textContent = cnt;
+          badge.className = 'ss-badge' + (cnt === 0 ? ' zero' : '');
+          prev.disabled = cnt <= 1;
+          next.disabled = cnt <= 1;
+
+          if (cnt > 0) {
+            ssGoTo(bar, 0);
+          } else {
+            pos.textContent = '';
+          }
+        }
+
+        function ssGoTo(bar, idx) {
+          var marks = bar._marks || [];
+          if (marks.length === 0) return;
+          if (marks[bar._idx]) marks[bar._idx].classList.remove('current');
+          bar._idx = ((idx % marks.length) + marks.length) % marks.length;
+          var m = marks[bar._idx];
+          m.classList.add('current');
+          var pre = m.closest('pre');
+          if (pre) {
+            var preRect = pre.getBoundingClientRect();
+            var markRect = m.getBoundingClientRect();
+            pre.scrollTop += markRect.top - preRect.top - preRect.height / 2 + markRect.height / 2;
+          }
+          bar.querySelector('.ss-pos').textContent = (bar._idx + 1) + '/' + marks.length;
+
+          // Scroll sync: if section-level toggle enabled, sync sibling pane
+          var pane = bar.closest('.body-pane');
+          if (ssIsSyncEnabled(pane) && pre) {
+            var siblingPane = ssGetSiblingPane(pane);
+            if (siblingPane) {
+              var sibPre = ssGetPre(siblingPane);
+              if (sibPre && pre.scrollHeight > pre.clientHeight) {
+                var ratio = pre.scrollTop / (pre.scrollHeight - pre.clientHeight);
+                sibPre.scrollTop = ratio * (sibPre.scrollHeight - sibPre.clientHeight);
+              }
+            }
+          }
+        }
+
+        window.openSectionSearch = function(btn) {
+          var pane = btn.closest('.body-pane');
+          if (!pane) return;
+          var bar = pane.querySelector('.section-search-bar');
+          if (!bar) return;
+          bar.classList.toggle('open');
+          if (bar.classList.contains('open')) {
+            var inp = bar.querySelector('input');
+            inp.focus();
+            inp.select();
+          } else {
+            ssClearHighlights(pane);
+            bar._marks = [];
+            bar._idx = -1;
+          }
+        };
+
+        // Bind all section search bars
+        document.querySelectorAll('.section-search-bar').forEach(function(bar) {
+          var input = bar.querySelector('input');
+          var timer = null;
+          input.addEventListener('input', function() {
+            clearTimeout(timer);
+            timer = setTimeout(function() { ssDoSearch(bar); }, 200);
+          });
+          input.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+              bar.classList.remove('open');
+              ssClearHighlights(bar.closest('.body-pane'));
+              bar._marks = []; bar._idx = -1;
+              return;
+            }
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              if (!(bar._marks || []).length) return;
+              if (e.shiftKey) ssGoTo(bar, (bar._idx || 0) - 1);
+              else ssGoTo(bar, (bar._idx || 0) + 1);
+            }
+          });
+          bar.querySelector('.ss-prev').addEventListener('click', function() { ssGoTo(bar, (bar._idx || 0) - 1); });
+          bar.querySelector('.ss-next').addEventListener('click', function() { ssGoTo(bar, (bar._idx || 0) + 1); });
+          bar.querySelector('.ss-close').addEventListener('click', function() {
+            bar.classList.remove('open');
+            ssClearHighlights(bar.closest('.body-pane'));
+            bar._marks = []; bar._idx = -1;
+          });
+        });
+
+        // Section-level scroll sync: bind pre scroll events per body-section
+        document.querySelectorAll('.body-section').forEach(function(section) {
+          var panes = section.querySelectorAll('.body-pane');
+          panes.forEach(function(pane) {
+            var pre = ssGetPre(pane);
+            if (!pre) return;
+            pre.addEventListener('scroll', function() {
+              if (!ssIsSyncEnabled(pane)) return;
+              var sib = ssGetSiblingPane(pane);
+              if (!sib) return;
+              var sibPre = ssGetPre(sib);
+              if (!sibPre || pre.scrollHeight <= pre.clientHeight) return;
+              var r = pre.scrollTop / (pre.scrollHeight - pre.clientHeight);
+              sibPre.scrollTop = r * (sibPre.scrollHeight - sibPre.clientHeight);
+            });
+          });
+        });
       })();
     </script>
   </body>
@@ -891,7 +1219,7 @@ export class HTMLDiffReporter {
         ${warnings}
         <div class="stats">
           <div class="iter-stat">
-            <span class="label">Avg Score</span>
+            <span class="label">Avg Match Score</span>
             <span class="value">${this.average(summary.items.map((item) => item.matchScore))}%</span>
           </div>
           <div class="iter-stat">
@@ -987,25 +1315,27 @@ export class HTMLDiffReporter {
     const reqId = `req-${result.iteration}-${result.requestSequence ?? 0}`;
 
     return `<article class="request-card score-${this.scoreClass(result.matchScore)}" id="${reqId}">
-      <div class="request-header">
-        <div>
-          <h3>${this.escapeHtml(result.harEntryId)}</h3>
-          <div class="request-meta">
-            Request #${result.requestSequence ?? '-'} | ${this.escapeHtml(result.replayed.method || result.recorded.method || '-')}
-            ${this.renderUrl(result.replayed.url || result.recorded.url || '-')}
+      <div class="request-card-sticky">
+        <div class="request-header">
+          <div>
+            <h3>${this.escapeHtml(result.harEntryId)}</h3>
+            <div class="request-meta">
+              Request #${result.requestSequence ?? '-'} | ${this.escapeHtml(result.replayed.method || result.recorded.method || '-')}
+              ${this.renderUrl(result.replayed.url || result.recorded.url || '-')}
+            </div>
           </div>
+          <div class="score ${scoreClass}">${result.matchScore}%</div>
         </div>
-        <div class="score ${scoreClass}">${result.matchScore}%</div>
+        <div class="chips">
+          <span class="chip">${comparisonLabel}</span>
+          <span class="chip">VU ${result.vu ?? '-'}</span>
+          <span class="chip">Duration ${this.formatDuration(result.durationMs)}</span>
+          <span class="chip ${requestHeaderSummary.className}">Request headers ${requestHeaderSummary.label}</span>
+          <span class="chip ${responseHeaderSummary.className}">Response headers ${responseHeaderSummary.label}</span>
+          <span class="chip ${this.statusCodeClass(result.replayed.status ?? result.recorded.status)}">${result.replayed.status ?? result.recorded.status ?? '-'}</span>
+        </div>
+        ${tags}
       </div>
-      <div class="chips">
-        <span class="chip">${comparisonLabel}</span>
-        <span class="chip">VU ${result.vu ?? '-'}</span>
-        <span class="chip">Duration ${this.formatDuration(result.durationMs)}</span>
-        <span class="chip ${requestHeaderSummary.className}">Request headers ${requestHeaderSummary.label}</span>
-        <span class="chip ${responseHeaderSummary.className}">Response headers ${responseHeaderSummary.label}</span>
-        <span class="chip ${this.statusCodeClass(result.replayed.status ?? result.recorded.status)}">${result.replayed.status ?? result.recorded.status ?? '-'}</span>
-      </div>
-      ${tags}
       <div class="grid">
         <section class="panel">
           <h4>Recorded</h4>
@@ -1018,23 +1348,82 @@ export class HTMLDiffReporter {
       </div>
       ${this.renderBodyComparison('Request Body', result.requestBody.summary, result.recorded.requestBody, result.replayed.requestBody, result.comparisonType === 'extra_in_replay', this.isBodyMethod(result.recorded.method || result.replayed.method))}
       ${this.renderBodyComparison('Response Body', result.responseBody.summary, result.recorded.responseBody, result.replayed.responseBody, result.comparisonType === 'extra_in_replay', false, this.detectRedirect(result))}
-      <details>
-        <summary>Request Variables</summary>
-        ${requestVariables}
-      </details>
-      <details>
-        <summary>Request/Response Header Diff</summary>
-        <div class="grid">
-          <section class="panel">
-            <h4>Request Header Diff</h4>
-            ${this.renderHeaderTable(result.requestHeaderDiffs)}
+      <section class="body-section">
+        <details>
+          <summary>Headers</summary>
+          <section class="body-section" style="margin-top:12px">
+            <details>
+              <summary>Request Headers</summary>
+              <div class="body-grid">
+                <div>
+                  <div class="muted">Recorded</div>
+                  ${this.renderHeaderList(result.recorded.requestHeaders)}
+                </div>
+                <div>
+                  <div class="muted">Replayed</div>
+                  ${this.renderHeaderList(result.replayed.requestHeaders)}
+                </div>
+              </div>
+            </details>
           </section>
-          <section class="panel">
-            <h4>Response Header Diff</h4>
-            ${this.renderHeaderTable(result.responseHeaderDiffs)}
+          <section class="body-section" style="margin-top:12px">
+            <details>
+              <summary>Response Headers</summary>
+              <div class="body-grid">
+                <div>
+                  <div class="muted">Recorded</div>
+                  ${this.renderHeaderList(result.recorded.responseHeaders)}
+                </div>
+                <div>
+                  <div class="muted">Replayed</div>
+                  ${this.renderHeaderList(result.replayed.responseHeaders)}
+                </div>
+              </div>
+            </details>
           </section>
-        </div>
-      </details>
+        </details>
+      </section>
+      <section class="body-section">
+        <details>
+          <summary>Cookies</summary>
+          <section class="body-section" style="margin-top:12px">
+            <details>
+              <summary>Request Cookies</summary>
+              <div class="body-grid">
+                <div>
+                  <div class="muted">Recorded</div>
+                  ${this.renderCookieList(result.recorded.requestCookies)}
+                </div>
+                <div>
+                  <div class="muted">Replayed</div>
+                  ${this.renderCookieList(result.replayed.requestCookies)}
+                </div>
+              </div>
+            </details>
+          </section>
+          <section class="body-section" style="margin-top:12px">
+            <details>
+              <summary>Response Cookies</summary>
+              <div class="body-grid">
+                <div>
+                  <div class="muted">Recorded</div>
+                  ${this.renderCookieList(result.recorded.responseCookies)}
+                </div>
+                <div>
+                  <div class="muted">Replayed</div>
+                  ${this.renderCookieList(result.replayed.responseCookies)}
+                </div>
+              </div>
+            </details>
+          </section>
+        </details>
+      </section>
+      <section class="body-section">
+        <details>
+          <summary>Variables</summary>
+          ${requestVariables}
+        </details>
+      </section>
     </article>`;
   }
 
@@ -1065,7 +1454,7 @@ export class HTMLDiffReporter {
           <th>Transaction</th>
           <th>Requests</th>
           <th>Total Time</th>
-          <th>Avg Score</th>
+          <th>Avg Match Score</th>
         </tr>
       </thead>
       <tbody>${rows || '<tr><td colspan="4" class="empty">No transaction data.</td></tr>'}</tbody>
@@ -1193,18 +1582,10 @@ export class HTMLDiffReporter {
         <tr><th>Status</th><td>${snapshot.status ?? '-'}</td></tr>
         <tr><th>Req Headers</th><td>${snapshot.requestHeaders.length}</td></tr>
         <tr><th>Resp Headers</th><td>${snapshot.responseHeaders.length}</td></tr>
+        <tr><th>Req Cookies</th><td>${(snapshot.requestCookies ?? []).length}</td></tr>
+        <tr><th>Resp Cookies</th><td>${(snapshot.responseCookies ?? []).length}</td></tr>
       </tbody>
-    </table>
-    <details>
-      <summary>Request Headers</summary>
-      <pre class="decoded">${this.escapeHtml(this.decodeText(this.formatHeaders(snapshot.requestHeaders)))}</pre>
-      <pre class="raw">${this.escapeHtml(this.formatHeaders(snapshot.requestHeaders))}</pre>
-    </details>
-    <details>
-      <summary>Response Headers</summary>
-      <pre class="decoded">${this.escapeHtml(this.decodeText(this.formatHeaders(snapshot.responseHeaders)))}</pre>
-      <pre class="raw">${this.escapeHtml(this.formatHeaders(snapshot.responseHeaders))}</pre>
-    </details>`;
+    </table>`;
   }
 
   private static renderHeaderTable(diffs: HeaderDiffEntry[]): string {
@@ -1232,6 +1613,73 @@ export class HTMLDiffReporter {
     </table>`;
   }
 
+  private static renderHeaderList(headers: { name: string; value: string }[]): string {
+    if (!headers || headers.length === 0) {
+      return '<p class="empty">No headers.</p>';
+    }
+    const rows = headers.map(h => `<tr>
+      <td>${this.escapeHtml(h.name)}</td>
+      <td><span class="decoded">${this.escapeHtml(this.decodeText(h.value))}</span><span class="raw">${this.escapeHtml(h.value)}</span></td>
+    </tr>`).join('\n');
+    return `<table>
+      <thead><tr><th>Header</th><th>Value</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+  }
+
+  private static renderCookieList(cookies?: { name: string; value: string }[]): string {
+    const list = cookies ?? [];
+    if (list.length === 0) {
+      return '<p class="empty">No cookies.</p>';
+    }
+    const rows = list.map(c => `<tr>
+      <td>${this.escapeHtml(c.name)}</td>
+      <td>${this.escapeHtml(c.value)}</td>
+    </tr>`).join('\n');
+    return `<table>
+      <thead><tr><th>Cookie</th><th>Value</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+  }
+
+  private static renderCookieTable(
+    replayedCookies?: { name: string; value: string }[],
+    recordedCookies?: { name: string; value: string }[],
+  ): string {
+    const replayed = replayedCookies ?? [];
+    const recorded = recordedCookies ?? [];
+    if (replayed.length === 0 && recorded.length === 0) {
+      return '<p class="empty">No cookies.</p>';
+    }
+    const replayedMap = new Map(replayed.map(c => [c.name, c.value]));
+    const recordedMap = new Map(recorded.map(c => [c.name, c.value]));
+    const allNames = new Set([...replayedMap.keys(), ...recordedMap.keys()]);
+    const rows = Array.from(allNames).sort().map(name => {
+      const rec = recordedMap.get(name) ?? '';
+      const rep = replayedMap.get(name) ?? '';
+      const status = !recordedMap.has(name) ? 'extra_in_replay'
+        : !replayedMap.has(name) ? 'missing_in_replay'
+        : rec === rep ? 'match' : 'mismatch';
+      return `<tr>
+        <td>${this.escapeHtml(name)}</td>
+        <td>${this.escapeHtml(rec)}</td>
+        <td>${this.escapeHtml(rep)}</td>
+        <td>${this.escapeHtml(status)}</td>
+      </tr>`;
+    }).join('\n');
+    return `<table>
+      <thead>
+        <tr>
+          <th>Cookie</th>
+          <th>Recorded</th>
+          <th>Replayed</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+  }
+
   private static renderBodyComparison(
     title: string,
     summary: string,
@@ -1248,17 +1696,38 @@ export class HTMLDiffReporter {
       : '';
     return `<section class="body-section">
       <details${openAttr}>
-        <summary>${this.escapeHtml(title)}</summary>
+        <summary>${this.escapeHtml(title)}
+          <span class="ss-sync-group">
+            <label class="ss-sync-toggle"><input type="checkbox" class="scroll-sync-check" /><span class="ss-slider"></span></label>
+            <label>Scroll sync</label>
+          </span>
+        </summary>
         ${warningHtml}
         <div class="muted">${this.escapeHtml(summary)}</div>
         <div class="body-grid">
-          <div>
-            <div class="muted">Recorded</div>
+          <div class="body-pane">
+            <div class="muted pane-header"><span class="pane-label">Recorded</span><button class="section-search-btn" title="Search this panel" onclick="window.openSectionSearch(this)"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/></svg></button></div>
+            <div class="section-search-bar">
+              <input type="text" placeholder="Search\u2026" autocomplete="off" />
+              <span class="ss-badge zero">0</span>
+              <button class="ss-prev" title="Previous" disabled>&#9650;</button>
+              <span class="ss-pos"></span>
+              <button class="ss-next" title="Next" disabled>&#9660;</button>
+              <button class="ss-close" title="Close">&times;</button>
+            </div>
             <pre class="body-formatted">${this.escapeHtml(this.formatBody(recordedMissing ? 'No data' : (recordedBody ?? emptyLabel)))}</pre>
             <pre class="body-raw">${this.escapeHtml(recordedMissing ? 'No data' : (recordedBody ?? emptyLabel))}</pre>
           </div>
-          <div>
-            <div class="muted">Replayed</div>
+          <div class="body-pane">
+            <div class="muted pane-header"><span class="pane-label">Replayed</span><button class="section-search-btn" title="Search this panel" onclick="window.openSectionSearch(this)"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/></svg></button></div>
+            <div class="section-search-bar">
+              <input type="text" placeholder="Search\u2026" autocomplete="off" />
+              <span class="ss-badge zero">0</span>
+              <button class="ss-prev" title="Previous" disabled>&#9650;</button>
+              <span class="ss-pos"></span>
+              <button class="ss-next" title="Next" disabled>&#9660;</button>
+              <button class="ss-close" title="Close">&times;</button>
+            </div>
             <pre class="body-formatted">${this.escapeHtml(this.formatBody(replayedBody ?? emptyLabel))}</pre>
             <pre class="body-raw">${this.escapeHtml(replayedBody ?? emptyLabel)}</pre>
           </div>

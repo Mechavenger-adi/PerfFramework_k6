@@ -16,5 +16,11 @@
     "recordingLogPath": "scrum-suites\\jpet-team\\recordings\\jpetstore.aspectran.com_buydog_1.recording-log.json",
     "sourceHarPath": "scrum-suites\\jpet-team\\recordings\\jpetstore.aspectran.com_buydog.har",
     "generatedAt": "2026-03-31T12:56:03.452Z"
+  },
+  {
+    "scriptPath": "scrum-suites\\jpet-team\\tests\\buyanimal_raw.js",
+    "recordingLogPath": "scrum-suites\\jpet-team\\recordings\\buyanimal_raw.recording-log.json",
+    "sourceHarPath": "scrum-suites\\jpet-team\\recordings\\jpetstore.aspectran.com_buydog.har",
+    "generatedAt": "2026-04-03T16:35:44.866Z"
   }
 ]

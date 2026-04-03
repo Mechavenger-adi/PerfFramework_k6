@@ -3,7 +3,7 @@ import execution from "k6/execution";
 import csv from "k6/experimental/csv";
 import fs from "k6/experimental/fs";
 import http from 'k6/http';
-import { logExchange, trackCorrelation, trackParameter } from '../../../core-engine/src/utils/replayLogger.js';
+import { logExchange, trackCorrelation, trackDataRow } from '../../../core-engine/src/utils/replayLogger.js';
 import { endTransaction, initTransactions, startTransaction } from '../../../core-engine/src/utils/transaction.js';
 
 initTransactions([
@@ -31,13 +31,12 @@ function getUniqueItem(array) {
 }
 
 export default function () {
-  const correlation_vars = {};
   let match;
   let regex;
+  const correlation_vars = {};
 
-  trackParameter("p_username", getUniqueItem(FILES["userdetails"])["p_username"], "data");
-  trackParameter("p_password", getUniqueItem(FILES["userdetails"])["p_password"], "data");
-  // trackParameter("p_pet", getUniqueItem(FILES["pet"])["p_pet"], "data");
+  trackDataRow("userdetails", getUniqueItem(FILES["userdetails"]));
+  trackDataRow("pet", getUniqueItem(FILES["pet"]));
 
   group("t01_launch", function () {
     startTransaction('t01_launch');
@@ -64,6 +63,7 @@ export default function () {
           "accept-language": `en-US,en;q=0.9`,
           priority: `u=0, i`,
           },
+        cookies: {},
         redirects: 0,
         tags: {
           transaction: "t01_launch",
@@ -106,6 +106,7 @@ export default function () {
           "accept-language": `en-US,en;q=0.9`,
           priority: `u=1, i`,
           },
+        cookies: {},
         redirects: 0,
         tags: {
           transaction: "t02_login",
@@ -143,6 +144,7 @@ export default function () {
           "accept-language": `en-US,en;q=0.9`,
           priority: `u=0, i`,
           },
+        cookies: {},
         redirects: 0,
         tags: {
           transaction: "t02_login",
@@ -185,6 +187,7 @@ export default function () {
           "accept-language": `en-US,en;q=0.9`,
           priority: `u=0, i`,
           },
+        cookies: {},
         redirects: 0,
         tags: {
           transaction: "t02_login",
@@ -223,6 +226,7 @@ export default function () {
           "accept-language": `en-US,en;q=0.9`,
           priority: `u=0, i`,
           },
+        cookies: {},
         redirects: 0,
         tags: {
           transaction: "t02_login",
@@ -264,6 +268,7 @@ export default function () {
           "accept-language": `en-US,en;q=0.9`,
           priority: `u=0, i`,
           },
+        cookies: {},
         redirects: 0,
         tags: {
           transaction: "search_animal",
@@ -312,6 +317,7 @@ export default function () {
           "accept-language": `en-US,en;q=0.9`,
           priority: `u=1, i`,
           },
+        cookies: {},
         redirects: 0,
         tags: {
           transaction: "select_product",
@@ -349,6 +355,7 @@ export default function () {
           "accept-language": `en-US,en;q=0.9`,
           priority: `u=0, i`,
           },
+        cookies: {},
         redirects: 0,
         tags: {
           transaction: "select_product",
@@ -391,6 +398,7 @@ export default function () {
           "accept-language": `en-US,en;q=0.9`,
           priority: `u=1, i`,
           },
+        cookies: {},
         redirects: 0,
         tags: {
           transaction: "add_to_cart",
@@ -428,6 +436,7 @@ export default function () {
           "accept-language": `en-US,en;q=0.9`,
           priority: `u=0, i`,
           },
+        cookies: {},
         redirects: 0,
         tags: {
           transaction: "add_to_cart",
@@ -465,6 +474,7 @@ export default function () {
           "accept-language": `en-US,en;q=0.9`,
           priority: `u=0, i`,
           },
+        cookies: {},
         redirects: 0,
         tags: {
           transaction: "add_to_cart",
@@ -509,6 +519,7 @@ export default function () {
           "accept-language": `en-US,en;q=0.9`,
           priority: `u=1, i`,
           },
+        cookies: {},
         redirects: 0,
         tags: {
           transaction: "increase_quantity_to_2_and_proceed_to_checkout",
@@ -547,6 +558,7 @@ export default function () {
           "accept-language": `en-US,en;q=0.9`,
           priority: `u=1, i`,
           },
+        cookies: {},
         redirects: 0,
         tags: {
           transaction: "increase_quantity_to_2_and_proceed_to_checkout",
@@ -584,6 +596,7 @@ export default function () {
           "accept-language": `en-US,en;q=0.9`,
           priority: `u=0, i`,
           },
+        cookies: {},
         redirects: 0,
         tags: {
           transaction: "increase_quantity_to_2_and_proceed_to_checkout",
@@ -630,6 +643,7 @@ export default function () {
           "accept-language": `en-US,en;q=0.9`,
           priority: `u=0, i`,
           },
+        cookies: {},
         redirects: 0,
         tags: {
           transaction: "click_continue",
@@ -674,6 +688,7 @@ export default function () {
           "accept-language": `en-US,en;q=0.9`,
           priority: `u=0, i`,
           },
+        cookies: {},
         redirects: 0,
         tags: {
           transaction: "click_confirm",
@@ -718,6 +733,7 @@ export default function () {
           "accept-language": `en-US,en;q=0.9`,
           priority: `u=0, i`,
           },
+        cookies: {},
         redirects: 0,
         tags: {
           transaction: "click_confirm",
@@ -760,6 +776,7 @@ export default function () {
           "accept-language": `en-US,en;q=0.9`,
           priority: `u=1, i`,
           },
+        cookies: {},
         redirects: 0,
         tags: {
           transaction: "logout",
@@ -797,6 +814,7 @@ export default function () {
           "accept-language": `en-US,en;q=0.9`,
           priority: `u=0, i`,
           },
+        cookies: {},
         redirects: 0,
         tags: {
           transaction: "logout",
@@ -834,6 +852,7 @@ export default function () {
           "accept-language": `en-US,en;q=0.9`,
           priority: `u=0, i`,
           },
+        cookies: {},
         redirects: 0,
         tags: {
           transaction: "logout",

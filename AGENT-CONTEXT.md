@@ -7,7 +7,7 @@
 > 4. If you add files, modify architecture, or fix bugs — update the relevant section AND the change log.
 > 5. This file is the single source of truth for resuming work across agents/tools/sessions.
 
-**Last Updated:** 2026-04-02
+**Last Updated:** 2026-04-03
 **Workspace:** d:\repos\K6-PerfFramework
 **Status:** Phase 1-3 complete (54/67 items = 81%), Phase 4 not started
 
@@ -88,7 +88,7 @@ K6-PerfFramework/
 │       ├── debug/                     # ReplayRunner, DiffChecker, HTMLDiffReporter, ExchangeLog, RecordingLogResolver
 │       ├── assertions/                # SLARegistry, ThresholdManager, JourneyAssertionResolver
 │       ├── reporters/                 # ResultTransformer, GrafanaReporter, AzureReporter, CustomUploader
-│       ├── utils/                     # Logger, PathResolver, transaction.ts/.js, replayLogger.js
+│       ├── utils/                     # Logger, ProgressBar, PathResolver, transaction.ts/.js, replayLogger.js
 │       └── types/                     # ConfigContracts, TestPlanSchema, HARContracts
 ├── scrum-suites/                      # Team test suites
 │   ├── sample-team/                   # 6 test scripts, CSV data, correlation rules, recording logs
@@ -131,7 +131,7 @@ K6-PerfFramework/
 |------|-------|---------|
 | JourneyAllocator.ts | `JourneyAllocator` | `allocate(journeys, totalVUs)` → weight-based VU distribution (min 1 each, respects explicit overrides, handles rounding). `printTable()` → formatted allocation output |
 | ParallelExecutionManager.ts | `ParallelExecutionManager` | `resolve(plan)` → K6Options (scenarios + thresholds). `extractMaxVUs()` → peak VU from load profile. `scaleProfileToVUs()` → proportional scaling preserving stage ratios |
-| PipelineRunner.ts | `PipelineRunner` | `run(options)` → spawns k6, exits with k6 status. `execute(options)` → writes temp JSON, spawns k6, captures stdout/stderr, returns PipelineRunResult. `ensureSuccess()`, `printCapturedOutput()` |
+| PipelineRunner.ts | `PipelineRunner` | `run(options)` → spawns k6 with `stdio: 'inherit'`, exits with k6 status. `execute(options)` → writes temp JSON, spawns k6 via `spawnSync`, captures stdout/stderr to files, returns PipelineRunResult. `ensureSuccess()`, `printCapturedOutput()`. Execution details (`Logger.info`) suppressed when `captureOutput: true` (debug mode — progress phases provide status instead) |
 
 ### 4. DATA LAYER (`core-engine/src/data/`)
 
@@ -170,10 +170,10 @@ K6-PerfFramework/
 
 | File | Class | Purpose |
 |------|-------|---------|
-| ReplayRunner.ts | `ReplayRunner` | `runDebug(options)` → full workflow: PipelineRunner executes k6 (1 VU, 1 iter, captureOutput) → extracts `[k6-perf][replay-log]` JSON entries from stdout/stderr/files → `extractK6Errors()` parses k6 stderr for `level=error msg="..."` and `ERRO[xxxx]` patterns (deduplicates) → DiffChecker compares → HTMLDiffReporter generates report with `{ k6Errors }`. Handles base64 decoding, replay-only mode (missing recording) |
+| ReplayRunner.ts | `ReplayRunner` | `runDebug(options)` → full workflow with phase-based progress logging: `▸ Executing k6 debug run...` → PipelineRunner executes k6 (1 VU, 1 iter, captureOutput) → `✔ k6 debug execution complete (Ns)` → `▸ Extracting replay entries...` → extracts `[k6-perf][replay-log]` JSON entries from stdout/stderr/files → `✔ Extracted N replay entries` → `extractK6Errors()` parses k6 stderr for `level=error msg="..."` and `ERRO[xxxx]` patterns (deduplicates) → `▸ Generating diff report...` → DiffChecker compares → HTMLDiffReporter generates report with `{ k6Errors }` → `✔ Diff report generated`. Uses `createSpinner()` from ProgressBar.ts. `normalizeRecordingEntry()` detects binary URLs via `STATIC_EXT_RE` and replaces response body with `[binary: static asset]` placeholder. Handles base64 decoding, replay-only mode (missing recording) |
 | DiffChecker.ts | `DiffChecker` | `compare()` single entry, `compareBatch()` multiple with fallback matching, `compareTaggedLogs()` iteration-grouped comparison. `diffHeaders()` → HeaderDiffEntry[] (match/mismatch/missing/extra). `diffBodies()` → Levenshtein similarity %. Returns `DiffResult { scores, diffs, transaction, variableEvents, warnings }` |
-| HTMLDiffReporter.ts | `HTMLDiffReporter` | `generateReport(results, path, options?)` → self-contained HTML with modern UI (system sans-serif, dark hero, frosted glass sticky bar), interactive iteration selector, search with scope/navigation, expandable accordions, side-by-side body comparison, header diff tables, variable event tracking, transaction summary, Decoded/Raw toggle (percent-decoding for URLs/headers/bodies), `formatBody()` auto-detects & pretty-prints URL-encoded and JSON bodies, CSS grid overflow handling, defensive `String()` coercion in `escapeHtml`/`sanitizeId`/`decodeText`. `ReportOptions { k6Errors?: string[] }` → conditionally renders error panel (red banner with error list) between hero section and sticky bar when k6 runtime errors are present |
-| ExchangeLog.ts | `ExchangeLogBuilder` | `fromGroups()`, `fromEntries()`, `fromHAREntry()` → `TaggedExchangeLogEntry { harEntryId, transaction, tags, request, response, variableEvents[] }`. Handles base64 body decoding, cookie extraction, query param parsing |
+| HTMLDiffReporter.ts | `HTMLDiffReporter` | `generateReport(results, path, options?)` → self-contained HTML with modern UI (system sans-serif, dark hero, frosted glass sticky bar), interactive iteration selector, search with scope/navigation, expandable accordions, side-by-side body comparison, header diff tables, variable event tracking, transaction summary, Decoded/Raw toggle (percent-decoding for URLs/headers/bodies), `formatBody()` auto-detects & pretty-prints URL-encoded and JSON bodies, CSS grid overflow handling, defensive `String()` coercion in `escapeHtml`/`sanitizeId`/`decodeText`. `ReportOptions { k6Errors?: string[] }` → conditionally renders error panel. **Section order:** Request Body → Response Body → Headers → Cookies → Variables. **Sticky request title:** `.request-card-sticky` with `position: sticky; top: 52px`. Uses `overflow: clip` on `.request-card` and `.body-section` (not `hidden`, which breaks sticky). **Per-section search:** SVG magnifying glass icon button (`.section-search-btn`) per Recorded/Replayed pane, floated right via flex `.pane-header`. Search bar with prev/next/close. **Scroll sync:** Toggle at section `<summary>` level (pushed to far right via `margin-left: auto` on flex summary), syncs scroll position between Recorded/Replayed panes. **Avg Match Score** label (was "Avg Score"). |
+| ExchangeLog.ts | `ExchangeLogBuilder` | `fromGroups()`, `fromEntries()`, `fromHAREntry()` → `TaggedExchangeLogEntry { harEntryId, transaction, tags, request, response, variableEvents[] }`. Handles base64 body decoding, cookie extraction, query param parsing. **Binary detection:** `isBinaryContent(mimeType?, url?)` checks Content-Type and URL extension — replaces body with `[binary: content-type]` or `[binary: static asset]` placeholder via `normalizeBody()` |
 | RecordingLogResolver.ts | `RecordingLogResolver` | `resolve(scriptPath, explicit?)` → multi-strategy: explicit path → `.recording-index.json` registry → expected path → fuzzy name match. `upsertRegistryEntry()` for generator tracking. Returns `RecordingLogResolution { status('resolved'|'missing'|'ambiguous'), paths, candidates, warnings }` |
 
 **Debug workflow:** k6 script runs → console outputs `[k6-perf][replay-log]` JSON per request → ReplayRunner captures → DiffChecker compares recording vs replay → HTMLDiffReporter generates interactive report
@@ -201,11 +201,12 @@ K6-PerfFramework/
 
 | File | Export | Purpose |
 |------|--------|---------|
-| logger.ts | `Logger` | `info()`, `warn()`, `error()`, `debug()`. Format: `[k6-perf] [LEVEL] [timestamp] message`. Routes: error→console.error, warn→console.warn, rest→console.log. Optional context metadata as JSON |
+| logger.ts | `Logger` | `info()`, `warn()`, `error()`, `debug()`. Format: `[k6-perf] [LEVEL] [timestamp] message`. Routes: error→console.error, warn→console.warn, rest→console.log. Optional context metadata as JSON. Status methods: `pass()` (green), `fail()` (red), `warning()` (yellow), `detail()` (dim `>` prefix), `header()` (cyan box), `bullet()` (colored bullet). Exports `ansi` object. Respects `NO_COLOR` env var and non-TTY. |
+| ProgressBar.ts | `ProgressBar`, `createSpinner` | Phase-based terminal progress logger compatible with blocking `spawnSync`. `start()` prints `▸ label...`, `done(msg?)` prints `✔ msg (elapsed)`, `fail(msg?)` prints `✖ msg (elapsed)`. `update(current, label?)` prints `▸ [n/total] label...` for multi-step progress. `createSpinner(label)` factory for single blocking operations. |
 | PathResolver.ts | `PathResolver` | `resolve(targetPath, searchRoot='scrum-suites')` → resolves exact path first, then recursively searches scrum-suites for filename match. Eliminates hardcoded paths in test plans |
 | transaction.ts | `initTransactions`, `startTransaction`, `endTransaction` | LoadRunner-style timing. Creates `txn_` prefixed Trend metrics in k6 init context. Records start timestamp → calculates duration → adds to Trend |
 | transaction.js | (same as .ts) | JavaScript version for k6 runtime consumption |
-| replayLogger.js | `logReplayExchange`, `logExchange`, `trackCorrelation`, `trackParameter`, `createVariableEvent` | k6-side logging. Outputs `[k6-perf][replay-log]` JSON with: harEntryId, transaction, iteration, VU, request/response details, headers, cookies, body. `trackCorrelation(name, value, source)` / `trackParameter(name, value, source)` register variables in `_variableRegistry`. `logExchange` auto-detects variable usage by scanning request URL/body/headers for registered values (via `detectVariableEvents()`). Body values stringified defensively (`typeof body === 'object' ? JSON.stringify(body) : String(body)`). Tracks per-iteration state and request sequencing |
+| replayLogger.js | `logReplayExchange`, `logExchange`, `trackCorrelation`, `trackParameter`, `trackDataRow`, `createVariableEvent` | k6-side logging. Outputs `[k6-perf][replay-log]` JSON with: harEntryId, transaction, iteration, VU, request/response details, headers, cookies, body. `trackCorrelation(name, value, source)` / `trackParameter(name, value, source)` register variables in `_variableRegistry`. `trackDataRow(sourceName, rowObject)` bulk-registers all CSV columns as parameters. `logExchange` auto-detects variable usage by scanning request URL/body/headers for registered values (via `detectVariableEvents()`). Body values stringified defensively (`typeof body === 'object' ? JSON.stringify(body) : String(body)`). **Binary body detection:** `binaryBodyPlaceholder(url, responseHeaders)` checks Content-Type (image/audio/video/font + common binary MIME types) and URL extension (.png/.ttf/.woff2/etc.) — replaces body with `[binary: content-type]` placeholder to prevent JSON serialization failures. Cookie extraction: `extractJarCookies(url)` uses `http.cookieJar().cookiesForURL()` for auto-managed cookies, `extractK6ResponseCookies(resCookies)` for k6's parsed `res.cookies` object. Tracks per-iteration state and request sequencing |
 
 ### 11. TYPES (`core-engine/src/types/`)
 
@@ -307,7 +308,7 @@ K6-PerfFramework/
 - **Target APIs:** https://test-api.k6.io (crocodile API), https://test.k6.io (web UI), httpbin.org (correlation demo)
 
 ### jpet-team (Real Site Recording)
-- **Scripts (3):** jpet-login-test.js, jpetstore.aspectran.com_buydog.js (~539 lines each, HAR-generated with replay metadata), buyanimal_new.js (converted from k6 Studio buy_animals.js via ScriptConverter — 20 requests across 9 groups, CSV parameterization + 2 correlation extractions)
+- **Scripts (4):** jpet-login-test.js, jpetstore.aspectran.com_buydog.js (~539 lines each, HAR-generated with replay metadata), buyanimal_new.js (converted from k6 Studio buy_animals.js via ScriptConverter — 20 requests across 9 groups, CSV parameterization + 2 correlation extractions), buyanimal_raw.js (HAR-generated via `generate` command — 29 requests across 9 transactions, full buy-a-dog flow including static assets like .gif images)
 - **Transactions:** t01_launch, t02_login, search_animal, select_product, add_to_cart, increase_quantity_to_2_and_proceed_to_checkout, click_continue, click_confirm, logout
 - **Data files:** Data/userdetails.csv (p_username, p_password), Data/pet.csv (p_pet)
 - **HAR recordings:** jpetstore.aspectran.com_buydog.har, jpetstore.aspectran.com - login logout.har
@@ -457,9 +458,17 @@ For each journey in test plan:
 ```bash
 npm run cli -- run --plan config/test-plans/debug-test.json
 # Exit Code: 0
-# Ran debug-test with buyanimal_new.js (converted k6 Studio script)
-# 20 requests captured, 3 parameterisation variables (p_username, p_password, p_pet), 2 correlations (correlation_0, correlation_1)
-# HTML diff report generated at results/debug/Sample_Debug_Test/Run_2026-04-02T04-35-10-033Z/buyanimal_new.diff.html
+# Ran debug-test with buyanimal_raw.js (HAR-generated script, jpet-team)
+# Clean phase-based terminal output:
+#   ▸ buyanimal_raw...
+#   ▸ Executing k6 debug run...
+#   ✔ k6 debug execution complete (12s)
+#   ▸ Extracting replay entries...
+#   ✔ Extracted 29 replay entries (16ms)
+#   ▸ Generating diff report...
+#   ✔ Diff report generated (34ms)
+#   ✔ buyanimal_raw — 29 steps (12s)
+# HTML diff report generated at results/debug/Sample_Debug_Test/Run_2026-04-03T.../buyanimal_raw.diff.html
 ```
 
 ---
@@ -687,6 +696,69 @@ npm run cli -- run --plan config/test-plans/debug-test.json
   - Added back `let match;` and `let regex;` declarations after `const correlation_vars = {};` (were stripped by old converter regex)
   - Added `trackParameter()` calls for `p_username`, `p_password`, `p_pet` before first group
 - **Verified:** Full debug run → 20 steps captured, 3 parameter variables + 2 correlation variables tracked, HTML report fully populated
+
+### 2026-04-03 — HTML Report: UI Improvements (Labels, Section Order, Sticky, Section Search)
+- **What:** Modified `core-engine/src/debug/HTMLDiffReporter.ts` — CSS, HTML rendering, JavaScript
+- **Why:** Four UI improvements requested: rename label, reorder sections, sticky request title, per-section search.
+- **Changes:**
+  1. **"Avg Score" → "Avg Match Score"** — Updated in 3 places: iteration stats, All Iterations Summary table, Transaction Timing Summary table
+  2. **Section order** — Reordered to: Request Body → Response Body → Headers → Cookies → Variables. Variables section wrapped in `body-section` styling for consistent look
+  3. **Sticky request title** — Added `.request-card-sticky` CSS class with `position: sticky; top: 52px; z-index: 50`. Request header/chips/tags wrapped in this div
+  4. **Per-section search** — Added search icon button (🔍) on each Recorded/Replayed pane header. Search bar with text input, match count badge, prev/next/close buttons. Scroll sync toggle per section. Full JS: `openSectionSearch()`, `ssDoSearch()`, `ssGoTo()`, `ssHighlight()`, `ssClearHighlights()`, scroll sync event binding
+
+### 2026-04-03 — HTML Report: Scroll Sync Moved to Section Level, Sticky Fix
+- **What:** Modified `core-engine/src/debug/HTMLDiffReporter.ts` — CSS + HTML structure + JavaScript
+- **Why:** (1) Scroll sync toggle was per-pane (inside each Recorded/Replayed search bar) but should be per-section. (2) Request title not actually sticking because `overflow: hidden` creates a scroll container that breaks `position: sticky`.
+- **Changes:**
+  - **Scroll sync:** Toggle moved from per-pane search bars to section-level `<summary>` element with class `scroll-sync-check`. JS rewritten: `ssIsSyncEnabled(pane)` queries section-level checkbox. Scroll events bound globally per `body-section` on all `pre` elements. `.ss-sync-group` styled with `display: inline-flex; margin-left: auto` (pushed to far right of summary via flex)
+  - **Sticky fix:** Changed `overflow: hidden` → `overflow: clip` on both `.request-card` and `.body-section`. `clip` prevents visual overflow without creating a scroll container, allowing `position: sticky` to work. `.body-section summary` set to `display: flex; align-items: center` for proper scroll sync alignment
+  - **Search icon styling:** Replaced emoji 🔍 with inline SVG magnifying glass (`<circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/>`). Button restyled: 26×26px bordered pill, rounded corners, surface background, accent color on hover with box-shadow. Moved to far right of sub-section header via flex `.pane-header` layout
+
+### 2026-04-03 — Terminal Progress Bar (ProgressBar.ts)
+- **What:** Created `core-engine/src/utils/ProgressBar.ts`; Modified `core-engine/src/debug/ReplayRunner.ts`, `core-engine/src/cli/run.ts`
+- **Why:** User wanted visual progress feedback in the terminal during debug execution and report generation.
+- **Design decision:** Originally implemented as animated spinner + bar (`▰▱` gradient style), but `PipelineRunner.execute()` uses `spawnSync` which blocks the Node.js event loop — `setInterval`-based animation never fires. Redesigned as a **phase-based logger** that prints start/done lines instead of animating.
+- **ProgressBar.ts:** `ProgressBar` class with `start()` (`▸ label...`), `done(msg?)` (`✔ msg (elapsed)`), `fail(msg?)` (`✖ msg (elapsed)`), `update(current, label?)` (`▸ [n/total] label...`), `tick()`. `createSpinner(label)` factory for single blocking operations. Uses stderr output, respects `NO_COLOR`.
+- **ReplayRunner.ts:** 3 phases: `createSpinner('Executing k6 debug run')` → `.start()` / `.done()` around `PipelineRunner.execute()`, then `createSpinner('Extracting replay entries')` → `.done('Extracted N entries')`, then `createSpinner('Generating diff report')` → `.done()`. Removed redundant `Logger.info` "saved to" lines (already shown by run.ts). Verbose `Logger.info("[ReplayRunner]...")` replaced with `Logger.detail()` for script/recording paths.
+- **run.ts:** `runPlanDebugMode()` uses `new ProgressBar('Debug journeys', count)`. Per-journey: `.update(current, journey.name)` → `.done('journey — N steps')` / `.fail(journey)` → `.tick()`. Consolidated debug header into single `[PASS] Debug mode · N journey(s) · N VU(s) · N iteration(s) each` line.
+- **PipelineRunner.ts:** `Logger.info` execution details suppressed when `captureOutput: true` (debug mode — progress phases provide status instead).
+
+### 2026-04-03 — Binary Content Detection for Static Resources
+- **What:** Modified `core-engine/src/utils/replayLogger.js`, `core-engine/src/debug/ExchangeLog.ts`, `core-engine/src/debug/ReplayRunner.ts`
+- **Why:** Static resources (.png, .ttf, .gif, etc.) caused JSON parse errors in debug mode. Response bodies for binary content were serialized via `JSON.stringify()` producing broken/enormous log lines.
+- **Three-layer fix:**
+  1. **replayLogger.js (source):** New `binaryBodyPlaceholder(url, responseHeaders)` function. Checks: (a) response `Content-Type` header against `BINARY_CONTENT_RE` (`image/*`, `audio/*`, `video/*`, `font/*`) and `BINARY_MIME_TYPES` set (`application/octet-stream`, `application/zip`, `application/pdf`, various font types), (b) URL extension against `STATIC_EXT_RE` (.png, .jpg, .gif, .svg, .ico, .webp, .woff2, .ttf, .otf, .eot, .mp3, .mp4, .zip, .pdf, etc.). Replaces body with `[binary: content-type]` or `[binary: static asset]` placeholder **before** `JSON.stringify()`.
+  2. **ExchangeLog.ts (recording side):** New `isBinaryContent(mimeType?, url?)` static method with same regex/set patterns. `normalizeBody()` now takes optional `mimeType` and `url` params — returns placeholder for binary content. `fromHAREntry()` passes `entry.mimeType` and `entry.url` to `normalizeBody()`.
+  3. **ReplayRunner.ts (recording log file side):** New `STATIC_EXT_RE` regex. `normalizeRecordingEntry()` checks URL against regex — replaces response body with `[binary: static asset]` for pre-existing recording-log JSON files loaded from disk.
+- **jpet-team test:** `buyanimal_raw.js` has 4 image requests (logo-topbar.gif, splash.gif, banner_dogs.gif + cdn-cgi requests). These now log `[binary: image/gif]` instead of raw binary data, eliminating parse errors.
+
+### 2026-04-03 — Terminal Log Cleanup (Readability)
+- **What:** Modified `core-engine/src/debug/ReplayRunner.ts`, `core-engine/src/execution/PipelineRunner.ts`, `core-engine/src/cli/run.ts`
+- **Why:** Verbose `[k6-perf] [INFO] [timestamp]` lines from `Logger.info()` interleaved with clean `▸`/`✔` progress lines, making terminal output hard to scan.
+- **ReplayRunner.ts:** `Logger.info("[ReplayRunner] Starting debug replay...")` → `Logger.detail("Script  : ...")` / `Logger.detail("Recording: ...")`. Removed `Logger.info` "saved to" lines (redundant — run.ts already shows report path). `Logger.warn` for missing recording → `Logger.detail`.
+- **PipelineRunner.ts:** `Logger.info` execution details (script path, options file, journeys) now only print when `captureOutput` is false (normal run mode). Debug mode progress phases already provide this info.
+- **run.ts:** Consolidated 3-line debug header into single `[PASS] Debug mode · N journey(s) · N VU(s) · N iteration(s)`. Per-journey output trimmed to just report filename + step count.
+- **Result:** Clean phase-based output:
+  ```
+  [PASS]  Debug mode · 1 journey(s) · 1 VU(s) · 1 iteration(s) each
+  >  Output: .../Run_2026-04-03T16-28-49-660Z
+    ▸ buyanimal_raw...
+  >  Script  : .../buyanimal_raw.js
+  >  Recording: .../buyanimal_raw.recording-log.json
+    ▸ Executing k6 debug run...
+    ✔ k6 debug execution complete (12s)
+    ▸ Extracting replay entries...
+    ✔ Extracted 29 replay entries (16ms)
+    ▸ Generating diff report...
+    ✔ Diff report generated (34ms)
+    ✔ buyanimal_raw — 29 steps (12s)
+  >    Report: buyanimal_raw.diff.html
+  ```
+
+### 2026-04-03 — debug-test.json: Switched to buyanimal_raw.js
+- **What:** Modified `config/test-plans/debug-test.json`
+- **Why:** Switched active debug test from converted `buyanimal_new.js` (20 requests) to HAR-generated `buyanimal_raw.js` (29 requests, full jpetstore buy-a-dog flow including static assets) for more comprehensive testing.
+- **Journey:** `buyanimal_raw`, scriptPath `buyanimal_raw.js`, recording `buyanimal_raw.recording-log.json`
 
 ---
 

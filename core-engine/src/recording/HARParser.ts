@@ -73,6 +73,12 @@ export class HARParser {
         status: e.response.status,
         responseHeaders: e.response.headers,
         responseBody: e.response.content,
+        requestCookies: Array.isArray(e.request.cookies)
+          ? e.request.cookies.map((c: any) => ({ name: c.name, value: c.value }))
+          : [],
+        responseCookies: Array.isArray(e.response.cookies)
+          ? e.response.cookies.map((c: any) => ({ name: c.name, value: c.value }))
+          : [],
         pageref: e.pageref,
         startedDateTime: e.startedDateTime,
         time: e.time,

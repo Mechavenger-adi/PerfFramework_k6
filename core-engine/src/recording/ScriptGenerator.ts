@@ -77,7 +77,7 @@ export class ScriptGenerator {
     method: string;
     url: string;
     body: string | null;
-    params: { headers?: Record<string, string>; redirects: number; tags: Record<string, string> };
+    params: { headers?: Record<string, string>; cookies: Record<string, string>; redirects: number; tags: Record<string, string> };
   } {
     return {
       id: sequentialId,
@@ -94,8 +94,9 @@ export class ScriptGenerator {
     req: TransactionGroup['entries'][number],
     transactionName: string,
     sequentialId: string,
-  ): { headers?: Record<string, string>; redirects: number; tags: Record<string, string> } {
-    const params: { headers?: Record<string, string>; redirects: number; tags: Record<string, string> } = {
+  ): { headers?: Record<string, string>; cookies: Record<string, string>; redirects: number; tags: Record<string, string> } {
+    const params: { headers?: Record<string, string>; cookies: Record<string, string>; redirects: number; tags: Record<string, string> } = {
+      cookies: {},
       redirects: 0,
       tags: {
         transaction: transactionName,

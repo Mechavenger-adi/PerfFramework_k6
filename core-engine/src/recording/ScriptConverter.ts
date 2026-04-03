@@ -74,17 +74,44 @@ export class ScriptConverter {
       }
     }
 
-    // Pre-scan: find parameterised values from getUniqueItem(FILES["xxx"])["p_yyy"] patterns
+    // Pre-scan: find ALL ${...} template expressions for variable tracking.
+    // Anything inside ${...} is treated as a variable and will be captured
+    // and displayed in the report, irrespective of type.
+    //
+    // Two tracking strategies:
+    //   1. FILES references: emit trackDataRow("fileName", getUniqueItem(FILES["fileName"]))
+    //      which auto-registers ALL columns from that CSV row at once.
+    //   2. Other expressions: emit trackParameter("name", expression, "expression")
+    //      for individual non-data expressions.
+    const dataRowTracking = new Map<string, string>(); // fileName → getUniqueItem expression
     const paramTracking: { paramName: string; expression: string }[] = [];
     const paramSeen = new Set<string>();
-    const paramScanRegex = /getUniqueItem\(FILES\[["'](\w+)["']\]\)\[["'](p_\w+)["']\]/g;
-    let paramScanMatch;
-    while ((paramScanMatch = paramScanRegex.exec(source)) !== null) {
-      const [, fileName, paramName] = paramScanMatch;
-      if (!paramSeen.has(paramName)) {
-        paramSeen.add(paramName);
-        paramTracking.push({ paramName, expression: `getUniqueItem(FILES["${fileName}"])["${paramName}"]` });
+    const templateExprRegex = /\$\{([^}]+)\}/g;
+    let templateExprMatch;
+    while ((templateExprMatch = templateExprRegex.exec(source)) !== null) {
+      const expr = templateExprMatch[1].trim();
+      // Skip correlation_vars references — already tracked via trackCorrelation
+      if (/^correlation_vars\s*\[/.test(expr)) continue;
+      // Check if this is a FILES data access pattern
+      const filesMatch = expr.match(/getUniqueItem\(FILES\[["'](\w+)["']\]\)/);
+      if (filesMatch) {
+        const fileName = filesMatch[1];
+        if (!dataRowTracking.has(fileName)) {
+          dataRowTracking.set(fileName, `getUniqueItem(FILES["${fileName}"])`);
+        }
+        continue; // trackDataRow will cover all properties
       }
+      // Non-FILES expression: derive a display name
+      let paramName: string;
+      const propMatch = expr.match(/\["(\w+)"\]\s*$/);
+      if (propMatch) {
+        paramName = propMatch[1];
+      } else {
+        paramName = expr.replace(/[^a-zA-Z0-9_]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '').substring(0, 40);
+      }
+      if (!paramName || paramSeen.has(paramName)) continue;
+      paramSeen.add(paramName);
+      paramTracking.push({ paramName, expression: expr });
     }
     let paramTrackInjected = false;
 
@@ -186,12 +213,17 @@ export class ScriptConverter {
       // Detect group start
       const groupMatch = line.match(/^(\s*)group\s*\(\s*['"`]([^'"`]+)['"`]/);
       if (groupMatch && !insideGroup) {
-        // Inject trackParameter calls before the first group
-        if (!paramTrackInjected && paramTracking.length > 0) {
+        // Inject variable tracking calls before the first group
+        if (!paramTrackInjected && (dataRowTracking.size > 0 || paramTracking.length > 0)) {
           paramTrackInjected = true;
           const pIndent = groupMatch[1] || '  ';
+          // trackDataRow for each unique FILES reference (auto-registers all CSV columns)
+          for (const [fileName, expr] of dataRowTracking) {
+            result.push(`${pIndent}trackDataRow("${fileName}", ${expr});`);
+          }
+          // trackParameter for non-FILES expressions
           for (const pt of paramTracking) {
-            result.push(`${pIndent}trackParameter("${pt.paramName}", ${pt.expression}, "data");`);
+            result.push(`${pIndent}trackParameter("${pt.paramName}", ${pt.expression}, "expression");`);
           }
           result.push('');
         }
@@ -464,9 +496,9 @@ export class ScriptConverter {
       if (txnImport) lines.push(txnImport.trim());
     }
 
-    // logExchange + trackCorrelation + trackParameter
+    // logExchange + trackCorrelation + trackParameter + trackDataRow
     lines.push(
-      `import { logExchange, trackCorrelation, trackParameter } from '../../../core-engine/src/utils/replayLogger.js';`,
+      `import { logExchange, trackCorrelation, trackParameter, trackDataRow } from '../../../core-engine/src/utils/replayLogger.js';`,
     );
 
     // Preserve any other imports (CorrelationEngine, RuleProcessor, etc.)
@@ -687,6 +719,18 @@ export class ScriptConverter {
           s += `${innerInner}headers: ${this.reindent(headersContent, innerInner)},\n`;
         }
       }
+    }
+
+    // Cookies — preserve from source or default to empty object
+    if (paramsStr && paramsStr !== 'null' && paramsStr !== 'undefined') {
+      const cookiesContent = this.extractObjectProperty(paramsStr, 'cookies');
+      if (cookiesContent) {
+        s += `${innerInner}cookies: ${this.reindent(cookiesContent, innerInner)},\n`;
+      } else {
+        s += `${innerInner}cookies: {},\n`;
+      }
+    } else {
+      s += `${innerInner}cookies: {},\n`;
     }
 
     // Always emit redirects: 0
