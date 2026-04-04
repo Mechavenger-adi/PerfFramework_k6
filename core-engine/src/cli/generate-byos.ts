@@ -22,17 +22,14 @@ export function runGenerateByos(teamName: string, scriptName: string): void {
 
   const template = `import http from 'k6/http';
 import { check, sleep, group } from 'k6';
-import { Trend } from 'k6/metrics';
-import { Logger } from '@k6-perf/core-engine';
+import { initTransactions, startTransaction, endTransaction } from '../../../core-engine/src/utils/transaction.js';
+import { logExchange } from '../../../core-engine/src/utils/replayLogger.js';
 
-// -- Transaction Trends (Add your custom trends here) --
-const txn_BYOS_Sample = new Trend('txn_BYOS_Sample');
+initTransactions(['BYOS_Custom_Logic']);
 
 export default function () {
-  Logger.info('Starting BYOS script execution...');
-
   group('BYOS Custom Logic', function () {
-    const start = Date.now();
+    startTransaction('BYOS_Custom_Logic');
     
     // ==========================================================
     //   PASTE YOUR GRAFANA STUDIO / CUSTOM K6 SCRIPT BELOW  
@@ -47,7 +44,7 @@ export default function () {
     //   PASTE YOUR GRAFANA STUDIO / CUSTOM K6 SCRIPT ABOVE  
     // ==========================================================
 
-    txn_BYOS_Sample.add(Date.now() - start);
+    endTransaction('BYOS_Custom_Logic');
   });
 
   sleep(1);

@@ -206,28 +206,27 @@ testuser003,P@ssw0rd3,testuser003@perf-test.local
     path.join(projectDir, 'scrum-suites/sample-team/tests/browse-journey.js'),
     `import http from 'k6/http';
 import { check, sleep, group } from 'k6';
-import { Trend } from 'k6/metrics';
+import { initTransactions, startTransaction, endTransaction } from '../../../core-engine/src/utils/transaction.js';
+import { logExchange } from '../../../core-engine/src/utils/replayLogger.js';
 
-// Transaction Trend metrics (LoadRunner-style per-transaction timing)
-const txn_Homepage = new Trend('txn_Homepage');
-const txn_ProductList = new Trend('txn_ProductList');
+initTransactions(['Homepage', 'Product_List']);
 
 export default function () {
   group('Homepage', function () {
-    const start = Date.now();
+    startTransaction('Homepage');
     // TODO: Replace with your baseUrl from config
     const res = http.get('https://your-dev-environment.com/');
     check(res, { 'Homepage: status 2xx': (r) => r.status >= 200 && r.status < 300 });
-    txn_Homepage.add(Date.now() - start);
+    endTransaction('Homepage');
   });
 
   sleep(1); // think time between transactions
 
   group('Product List', function () {
-    const start = Date.now();
+    startTransaction('Product_List');
     const res = http.get('https://your-dev-environment.com/products');
     check(res, { 'ProductList: status 2xx': (r) => r.status >= 200 && r.status < 300 });
-    txn_ProductList.add(Date.now() - start);
+    endTransaction('Product_List');
   });
 
   sleep(1);
@@ -241,16 +240,14 @@ export default function () {
     path.join(projectDir, 'scrum-suites/sample-team/tests/checkout-journey.js'),
     `import http from 'k6/http';
 import { check, sleep, group } from 'k6';
-import { Trend } from 'k6/metrics';
+import { initTransactions, startTransaction, endTransaction } from '../../../core-engine/src/utils/transaction.js';
+import { logExchange } from '../../../core-engine/src/utils/replayLogger.js';
 
-// Transaction Trend metrics (LoadRunner-style per-transaction timing)
-const txn_Login = new Trend('txn_Login');
-const txn_AddToCart = new Trend('txn_AddToCart');
-const txn_Checkout = new Trend('txn_Checkout');
+initTransactions(['Login', 'Add_To_Cart', 'Checkout']);
 
 export default function () {
   group('Login', function () {
-    const start = Date.now();
+    startTransaction('Login');
     const res = http.post('https://your-dev-environment.com/auth/login', JSON.stringify({
       // TODO: parameterize with p_username and p_password from data file
       username: 'testuser001',
@@ -258,30 +255,30 @@ export default function () {
     }), { headers: { 'Content-Type': 'application/json' } });
     check(res, { 'Login: status 200': (r) => r.status === 200 });
     // TODO: Correlate auth token -> c_authToken
-    txn_Login.add(Date.now() - start);
+    endTransaction('Login');
   });
 
   sleep(1);
 
   group('Add To Cart', function () {
-    const start = Date.now();
+    startTransaction('Add_To_Cart');
     const res = http.post('https://your-dev-environment.com/cart/add', JSON.stringify({
       productId: 'PROD-001',
       quantity: 1,
     }), { headers: { 'Content-Type': 'application/json' } });
     check(res, { 'AddToCart: status 2xx': (r) => r.status >= 200 && r.status < 300 });
-    txn_AddToCart.add(Date.now() - start);
+    endTransaction('Add_To_Cart');
   });
 
   sleep(1);
 
   group('Checkout', function () {
-    const start = Date.now();
+    startTransaction('Checkout');
     const res = http.post('https://your-dev-environment.com/checkout', '{}', {
       headers: { 'Content-Type': 'application/json' },
     });
     check(res, { 'Checkout: status 2xx': (r) => r.status >= 200 && r.status < 300 });
-    txn_Checkout.add(Date.now() - start);
+    endTransaction('Checkout');
   });
 
   sleep(1);

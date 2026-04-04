@@ -6,7 +6,7 @@ const txnTrends: Record<string, Trend> = {};
 
 /**
  * Initializes Trends for the specified transactions.
- * Automatically prefixes the trend name with `txn_`.
+ * Uses the transaction name directly as the k6 Trend metric name.
  * 
  * **CRITICAL**: This MUST be called in the script's init context (global scope),
  * not inside the default function or VU execution context.
@@ -16,7 +16,7 @@ const txnTrends: Record<string, Trend> = {};
 export function initTransactions(names: string[]): void {
   names.forEach(name => {
     if (!txnTrends[name]) {
-      txnTrends[name] = new Trend(`txn_${name}`);
+      txnTrends[name] = new Trend(`${name}`);
     }
   });
 }

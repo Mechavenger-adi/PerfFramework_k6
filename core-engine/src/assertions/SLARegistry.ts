@@ -5,7 +5,7 @@ export class SLARegistry {
 
   /**
    * Register an SLA for a specific execution scenario or transaction.
-   * Prefix transaction target names with 'txn_'.
+   * Use the transaction name directly (no prefix needed).
    */
   static register(targetName: string, config: SLADefinition): void {
     this.registry.set(targetName, config);

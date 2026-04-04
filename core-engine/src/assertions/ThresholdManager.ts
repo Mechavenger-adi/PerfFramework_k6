@@ -39,8 +39,8 @@ export class ThresholdManager {
         errorRule = `rate<${config.errorRate / 100}`;
       }
 
-      if (targetName.startsWith('txn_')) {
-        // Transaction Trend threshold
+      if (!targetName.includes(':') && !targetName.includes('{')) {
+        // Transaction Trend threshold (metric name matches trend name directly)
         if (rules.length > 0) thresholds[targetName] = rules;
       } else {
         // Scenario (journey) specific threshold

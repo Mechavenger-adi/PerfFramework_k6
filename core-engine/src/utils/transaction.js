@@ -6,7 +6,7 @@ const txnTrends = {};
 export function initTransactions(names) {
   names.forEach((name) => {
     if (!txnTrends[name]) {
-      txnTrends[name] = new Trend(`txn_${name}`);
+      txnTrends[name] = new Trend(`${name}`);
     }
   });
 }
