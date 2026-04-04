@@ -24,6 +24,15 @@ export interface DebugReplayResult {
   recordingLogPath?: string;
 }
 
+export interface K6Metrics {
+  checks: { name: string; passed: boolean }[];
+  transactions: { name: string; avg: string; min: string; max: string; med: string; p90: string; p95: string }[];
+  http: { name: string; avg: string; min: string; max: string; med: string; p90: string; p95: string }[];
+  httpSummary: { reqs: string; failedPct: string };
+  execution: { duration: string; iterations: string; vus: string };
+  network: { received: string; sent: string };
+}
+
 export class ReplayRunner {
   private static readonly REPLAY_PREFIX = '[k6-perf][replay-log] ';
 
@@ -43,8 +52,13 @@ export class ReplayRunner {
     const absReplayLogPath = path.resolve(
       options.replayLogPath ?? this.defaultReplayLogPath(absHtmlPath),
     );
-    const vus = options.vus ?? 1;
+    let vus = options.vus ?? 1;
     const iterations = options.iterations ?? 1;
+
+    if (vus > 1) {
+      Logger.warn(`[Debug Mode] VUs set to ${vus}, but debug mode only supports 1 VU. Overriding to 1.`);
+      vus = 1;
+    }
 
     if (!fs.existsSync(absScriptPath)) {
       throw new Error(`[ReplayRunner] Script not found: ${absScriptPath}`);
@@ -77,8 +91,9 @@ export class ReplayRunner {
     this.writeJson(absReplayLogPath, replayEntries);
     extractSpinner.done(`Extracted ${replayEntries.length} replay entries`);
 
-    // Extract k6 runtime errors for the HTML report
+    // Extract k6 runtime errors and performance metrics for the HTML report
     const k6Errors = this.extractK6Errors(runResult);
+    const k6Metrics = this.extractK6Metrics(runResult);
 
     if (replayEntries.length === 0) {
       if (runResult.status !== 0) {
@@ -105,7 +120,7 @@ export class ReplayRunner {
     const diffResults = DiffChecker.compareTaggedLogs(recordingEntries, replayEntries, {
       missingRecordingWarning,
     });
-    HTMLDiffReporter.generateReport(diffResults, absHtmlPath, { k6Errors });
+    HTMLDiffReporter.generateReport(diffResults, absHtmlPath, { k6Errors, k6Metrics });
     reportSpinner.done('Diff report generated');
 
     PipelineRunner.ensureSuccess(runResult);
@@ -320,6 +335,92 @@ export class ReplayRunner {
     }
 
     return errors;
+  }
+
+  /**
+   * Parse k6 performance metrics from the TOTAL RESULTS section of stdout.
+   */
+  private static extractK6Metrics(runResult: { stdout?: string; stderr?: string; stdoutPath?: string; stderrPath?: string }): K6Metrics {
+    let text = '';
+    if (runResult.stdoutPath && fs.existsSync(runResult.stdoutPath)) {
+      text = fs.readFileSync(runResult.stdoutPath, 'utf-8');
+    } else if (runResult.stdout) {
+      text = runResult.stdout;
+    }
+
+    const metrics: K6Metrics = {
+      checks: [],
+      transactions: [],
+      http: [],
+      httpSummary: { reqs: '', failedPct: '' },
+      execution: { duration: '', iterations: '', vus: '' },
+      network: { received: '', sent: '' },
+    };
+
+    const lines = text.split(/\r?\n/);
+
+    // Parse check results: ✓ or ✗ lines
+    for (const line of lines) {
+      const checkMatch = line.match(/^\s+(✓|✗)\s+(.+)$/);
+      if (checkMatch) {
+        metrics.checks.push({ name: checkMatch[2].trim(), passed: checkMatch[1] === '✓' });
+      }
+    }
+
+    // Parse metric lines with avg/min/med/max/p(90)/p(95)
+    const metricRe = /^\s{4}(\S+?)\.{2,}:\s+avg=(\S+)\s+min=(\S+)\s+med=(\S+)\s+max=(\S+)\s+p\(90\)=(\S+)\s+p\(95\)=(\S+)/;
+    const subMetricRe = /^\s+\{[^}]+\}\.{2,}:\s+avg=(\S+)\s+min=(\S+)\s+med=(\S+)\s+max=(\S+)\s+p\(90\)=(\S+)\s+p\(95\)=(\S+)/;
+
+    let section = '';
+    for (const line of lines) {
+      if (/^\s{4}CUSTOM\s*$/.test(line)) { section = 'custom'; continue; }
+      if (/^\s{4}HTTP\s*$/.test(line)) { section = 'http'; continue; }
+      if (/^\s{4}EXECUTION\s*$/.test(line)) { section = 'execution'; continue; }
+      if (/^\s{4}NETWORK\s*$/.test(line)) { section = 'network'; continue; }
+
+      const m = metricRe.exec(line);
+      if (m) {
+        const entry = { name: m[1], avg: m[2], min: m[3], med: m[4], max: m[5], p90: m[6], p95: m[7] };
+        if (section === 'custom') {
+          metrics.transactions.push(entry);
+        } else if (section === 'http' || m[1].startsWith('http_req_duration')) {
+          metrics.http.push(entry);
+        } else if (m[1] === 'iteration_duration') {
+          metrics.execution.duration = `avg=${m[2]} min=${m[3]} max=${m[5]}`;
+        }
+        continue;
+      }
+
+      // Sub-metrics for http (e.g., { expected_response:true })
+      if (section === 'http') {
+        const sm = subMetricRe.exec(line);
+        if (sm) {
+          const label = line.match(/\{([^}]+)\}/)?.[1]?.trim() ?? 'filtered';
+          metrics.http.push({ name: `http_req_duration {${label}}`, avg: sm[1], min: sm[2], med: sm[3], max: sm[4], p90: sm[5], p95: sm[6] });
+        }
+      }
+
+      // Simple value lines
+      const simpleRe = /^\s{4}(\S+?)\.{2,}:\s+(.+)$/;
+      const sv = simpleRe.exec(line);
+      if (sv) {
+        if (sv[1] === 'http_req_failed') {
+          metrics.httpSummary.failedPct = sv[2].split(/\s+/)[0];
+        } else if (sv[1] === 'http_reqs') {
+          metrics.httpSummary.reqs = sv[2].split(/\s+/)[0];
+        } else if (sv[1] === 'iterations') {
+          metrics.execution.iterations = sv[2].split(/\s+/)[0];
+        } else if (sv[1] === 'vus') {
+          metrics.execution.vus = sv[2].split(/\s+/)[0];
+        } else if (sv[1] === 'data_received') {
+          metrics.network.received = sv[2].split(/\s+/).slice(0, 2).join(' ');
+        } else if (sv[1] === 'data_sent') {
+          metrics.network.sent = sv[2].split(/\s+/).slice(0, 2).join(' ');
+        }
+      }
+    }
+
+    return metrics;
   }
 
   private static defaultReplayLogPath(htmlPath: string): string {

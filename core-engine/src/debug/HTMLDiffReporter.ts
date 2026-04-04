@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { DiffResult, HeaderDiffEntry } from './DiffChecker';
 import { VariableEvent } from './ExchangeLog';
+import { K6Metrics } from './ReplayRunner';
 
 interface IterationSummary {
   iteration: number;
@@ -11,6 +12,7 @@ interface IterationSummary {
 
 export interface ReportOptions {
   k6Errors?: string[];
+  k6Metrics?: K6Metrics;
 }
 
 export class HTMLDiffReporter {
@@ -19,6 +21,7 @@ export class HTMLDiffReporter {
     const iterationKeys = Array.from(groupedByIteration.keys()).sort((a, b) => a - b);
     const overallScore = this.average(results.map((result) => result.matchScore));
     const k6Errors = options?.k6Errors ?? [];
+    const k6Metrics = options?.k6Metrics;
 
     const iterationSummaryRows = iterationKeys
       .map((iteration) => this.renderIterationSummaryRow(groupedByIteration.get(iteration)!))
@@ -286,25 +289,38 @@ export class HTMLDiffReporter {
       }
       table {
         width: 100%;
-        border-collapse: collapse;
+        border-collapse: separate;
+        border-spacing: 0;
         margin-top: 12px;
         font-size: 13px;
         table-layout: fixed;
         max-width: 100%;
       }
       th, td {
-        border: 1px solid var(--border);
-        padding: 10px 8px;
+        border-bottom: 1px solid var(--border);
+        border-right: 1px solid var(--border);
+        padding: 9px 12px;
         text-align: left;
         vertical-align: top;
       }
-      td { overflow-wrap: break-word; word-wrap: break-word; word-break: break-word; white-space: normal; }
-      th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; position: relative; background: var(--surface-alt); }
+      th:first-child, td:first-child { border-left: 1px solid var(--border); }
+      thead tr:first-child th { border-top: 1px solid var(--border); }
+      thead tr:first-child th:first-child { border-top-left-radius: 8px; }
+      thead tr:first-child th:last-child { border-top-right-radius: 8px; }
+      tbody tr:last-child td:first-child { border-bottom-left-radius: 8px; }
+      tbody tr:last-child td:last-child { border-bottom-right-radius: 8px; }
+      td { overflow-wrap: break-word; word-wrap: break-word; word-break: break-word; white-space: normal; transition: background 0.1s; }
+      th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; position: relative; background: linear-gradient(to bottom, var(--surface-alt), #e8ecf1); border-bottom: 2px solid var(--border); white-space: nowrap; }
       .col-resize { position: absolute; right: -2px; top: 0; bottom: 0; width: 5px; cursor: col-resize; background: transparent; z-index: 2; }
       .col-resize:hover, .col-resize.active { background: var(--accent); opacity: 0.5; }
       body.resizing, body.resizing * { cursor: col-resize !important; user-select: none !important; }
-      tbody tr:nth-child(even) { background: var(--surface-alt); }
-      tbody tr:hover { background: #e2e8f0; }
+      tbody tr:nth-child(even) td { background: rgba(241,245,249,0.5); }
+      tbody tr:hover td { background: #dbeafe; }
+      th.sortable { cursor: pointer; position: relative; padding-right: 20px; }
+      th.sortable:hover { background: #dbeafe; color: var(--accent); }
+      th.sortable::after { content: '⇅'; position: absolute; right: 4px; top: 50%; transform: translateY(-50%); font-size: 10px; color: var(--muted); opacity: 0.5; }
+      th.sortable.sort-asc::after { content: '▲'; opacity: 1; color: var(--accent); }
+      th.sortable.sort-desc::after { content: '▼'; opacity: 1; color: var(--accent); }
       .transaction {
         margin-top: 16px;
         overflow: hidden;
@@ -575,6 +591,28 @@ export class HTMLDiffReporter {
       .error-panel h2::before { content: '⚠'; font-size: 18px; }
       .error-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
       .error-item { background: #fff; border: 1px solid #fecaca; border-radius: 6px; padding: 8px 12px; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; color: #991b1b; word-break: break-word; white-space: pre-wrap; }
+      /* Performance metrics section */
+      .metrics-section { margin-top: 16px; margin-bottom: 20px; }
+      .metrics-section h2 { font-size: 16px; font-weight: 700; margin: 0 0 14px; display: flex; align-items: center; gap: 8px; }
+      .metrics-section h2::before { content: '⚡'; font-size: 16px; }
+      .metrics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+      .metrics-grid .metrics-card.full-width { grid-column: 1 / -1; }
+      @media (max-width: 960px) { .metrics-grid { grid-template-columns: 1fr; } }
+      .metrics-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+      .metrics-card h3 { font-size: 13px; font-weight: 700; color: var(--ink); padding: 12px 16px; margin: 0; background: var(--surface-alt); border-bottom: 1px solid var(--border); text-transform: uppercase; letter-spacing: 0.04em; }
+      .metrics-card table { margin: 0; font-size: 12px; }
+      .metrics-card th { font-size: 10px; }
+      .metrics-card td { font-family: var(--font-mono); font-size: 12px; }
+      .metrics-card td:not(:first-child) { text-align: right; font-variant-numeric: tabular-nums; }
+      .metrics-card th:not(:first-child) { text-align: right; }
+      .check-pass { color: var(--good); font-weight: 700; }
+      .check-fail { color: var(--bad); font-weight: 700; }
+      .check-pass::before { content: ''; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--good); margin-right: 6px; vertical-align: middle; }
+      .check-fail::before { content: ''; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--bad); margin-right: 6px; vertical-align: middle; }
+      .metric-kv { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 16px; }
+      .metric-kv-item { background: var(--surface-alt); border: 1px solid var(--border); border-radius: 8px; padding: 8px 14px; flex: 1; min-width: 120px; }
+      .metric-kv-item .mk-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 600; }
+      .metric-kv-item .mk-value { display: block; margin-top: 2px; font-size: 16px; font-weight: 700; font-family: var(--font-mono); color: var(--ink); }
       .body-pane > .pane-header { display: flex; align-items: center; }
       .body-pane > .pane-header > .pane-label { flex: 1; }
       /* Section search */
@@ -671,6 +709,8 @@ export class HTMLDiffReporter {
         </ul>
       </section>
       ` : ''}
+
+      ${k6Metrics ? this.renderMetricsSection(k6Metrics) : ''}
 
       <div class="sticky-bar" id="sticky-bar">
         <div class="sticky-left">
@@ -1177,6 +1217,39 @@ export class HTMLDiffReporter {
               var r = pre.scrollTop / (pre.scrollHeight - pre.clientHeight);
               sibPre.scrollTop = r * (sibPre.scrollHeight - sibPre.clientHeight);
             });
+          });
+        });
+      })();
+
+      // ── Metrics table sorting ──
+      (function() {
+        document.querySelectorAll('table.m-sortable th.sortable').forEach(function(th) {
+          th.addEventListener('click', function() {
+            var table = th.closest('table');
+            var tbody = table.querySelector('tbody');
+            var colIdx = parseInt(th.dataset.col, 10);
+            var type = th.dataset.type || 'string';
+            var isAsc = th.classList.contains('sort-asc');
+            // Clear sort classes on sibling headers
+            table.querySelectorAll('th.sortable').forEach(function(h) {
+              h.classList.remove('sort-asc', 'sort-desc');
+            });
+            var dir = isAsc ? -1 : 1;
+            th.classList.add(dir === 1 ? 'sort-asc' : 'sort-desc');
+            var rows = Array.from(tbody.querySelectorAll('tr'));
+            rows.sort(function(a, b) {
+              var cellA = a.children[colIdx];
+              var cellB = b.children[colIdx];
+              if (type === 'num') {
+                var nA = parseFloat(cellA.dataset.val || cellA.textContent.replace(/[^0-9.\-]/g, '')) || 0;
+                var nB = parseFloat(cellB.dataset.val || cellB.textContent.replace(/[^0-9.\-]/g, '')) || 0;
+                return (nA - nB) * dir;
+              }
+              var sA = cellA.textContent.trim().toLowerCase();
+              var sB = cellB.textContent.trim().toLowerCase();
+              return sA < sB ? -dir : sA > sB ? dir : 0;
+            });
+            rows.forEach(function(row) { tbody.appendChild(row); });
           });
         });
       })();
@@ -1828,6 +1901,56 @@ export class HTMLDiffReporter {
     return headers.map((header) => `${header.name}: ${header.value}`).join('\n');
   }
 
+  private static renderMetricsSection(m: K6Metrics): string {
+    const topRow: string[] = [];
+    const midRow: string[] = [];
+    const bottomRow: string[] = [];
+
+    // Row 1: Execution Summary (full width, overview KV tiles)
+    const kvItems: string[] = [];
+    if (m.httpSummary.reqs) kvItems.push(`<div class="metric-kv-item"><span class="mk-label">Total Requests</span><span class="mk-value">${this.escapeHtml(m.httpSummary.reqs)}</span></div>`);
+    if (m.httpSummary.failedPct) kvItems.push(`<div class="metric-kv-item"><span class="mk-label">Failed %</span><span class="mk-value">${this.escapeHtml(m.httpSummary.failedPct)}</span></div>`);
+    if (m.execution.iterations) kvItems.push(`<div class="metric-kv-item"><span class="mk-label">Iterations</span><span class="mk-value">${this.escapeHtml(m.execution.iterations)}</span></div>`);
+    if (m.execution.vus) kvItems.push(`<div class="metric-kv-item"><span class="mk-label">VUs</span><span class="mk-value">${this.escapeHtml(m.execution.vus)}</span></div>`);
+    if (m.network.received) kvItems.push(`<div class="metric-kv-item"><span class="mk-label">Data Received</span><span class="mk-value">${this.escapeHtml(m.network.received)}</span></div>`);
+    if (m.network.sent) kvItems.push(`<div class="metric-kv-item"><span class="mk-label">Data Sent</span><span class="mk-value">${this.escapeHtml(m.network.sent)}</span></div>`);
+    if (kvItems.length > 0) {
+      topRow.push(`<div class="metrics-card full-width"><h3>Execution Summary</h3><div class="metric-kv">${kvItems.join('')}</div></div>`);
+    }
+
+    // Row 2 left: Checks (narrow)
+    if (m.checks.length > 0) {
+      const rows = m.checks.map(c =>
+        `<tr><td>${this.escapeHtml(c.name)}</td><td class="${c.passed ? 'check-pass' : 'check-fail'}">${c.passed ? '✓ PASS' : '✗ FAIL'}</td></tr>`
+      ).join('');
+      midRow.push(`<div class="metrics-card"><h3>Checks</h3><table class="m-sortable"><thead><tr><th class="sortable" data-col="0" data-type="string">Check</th><th class="sortable" style="width:90px" data-col="1" data-type="string">Status</th></tr></thead><tbody>${rows}</tbody></table></div>`);
+    }
+
+    // Row 2 right: HTTP Metrics
+    if (m.http.length > 0) {
+      const rows = m.http.map(h =>
+        `<tr><td>${this.escapeHtml(h.name)}</td><td data-val="${this.parseMetricNum(h.avg)}">${h.avg}</td><td data-val="${this.parseMetricNum(h.min)}">${h.min}</td><td data-val="${this.parseMetricNum(h.med)}">${h.med}</td><td data-val="${this.parseMetricNum(h.max)}">${h.max}</td><td data-val="${this.parseMetricNum(h.p90)}">${h.p90}</td><td data-val="${this.parseMetricNum(h.p95)}">${h.p95}</td></tr>`
+      ).join('');
+      midRow.push(`<div class="metrics-card"><h3>HTTP Metrics</h3><table class="m-sortable"><thead><tr><th class="sortable" data-col="0" data-type="string">Metric</th><th class="sortable" data-col="1" data-type="num">Avg</th><th class="sortable" data-col="2" data-type="num">Min</th><th class="sortable" data-col="3" data-type="num">Med</th><th class="sortable" data-col="4" data-type="num">Max</th><th class="sortable" data-col="5" data-type="num">P90</th><th class="sortable" data-col="6" data-type="num">P95</th></tr></thead><tbody>${rows}</tbody></table></div>`);
+    }
+
+    // Row 3: Transaction Timings (full width, many rows)
+    if (m.transactions.length > 0) {
+      const rows = m.transactions.map(t =>
+        `<tr><td>${this.escapeHtml(t.name)}</td><td data-val="${this.parseMetricNum(t.avg)}">${t.avg}</td><td data-val="${this.parseMetricNum(t.min)}">${t.min}</td><td data-val="${this.parseMetricNum(t.med)}">${t.med}</td><td data-val="${this.parseMetricNum(t.max)}">${t.max}</td><td data-val="${this.parseMetricNum(t.p90)}">${t.p90}</td><td data-val="${this.parseMetricNum(t.p95)}">${t.p95}</td></tr>`
+      ).join('');
+      bottomRow.push(`<div class="metrics-card full-width"><h3>Transaction Timings</h3><table class="m-sortable"><thead><tr><th class="sortable" data-col="0" data-type="string">Transaction</th><th class="sortable" data-col="1" data-type="num">Avg</th><th class="sortable" data-col="2" data-type="num">Min</th><th class="sortable" data-col="3" data-type="num">Med</th><th class="sortable" data-col="4" data-type="num">Max</th><th class="sortable" data-col="5" data-type="num">P90</th><th class="sortable" data-col="6" data-type="num">P95</th></tr></thead><tbody>${rows}</tbody></table></div>`);
+    }
+
+    const allCards = [...topRow, ...midRow, ...bottomRow];
+    if (allCards.length === 0) return '';
+
+    return `<section class="metrics-section section-card" style="padding:24px">
+        <h2>Performance Metrics</h2>
+        <div class="metrics-grid">${allCards.join('\n')}</div>
+      </section>`;
+  }
+
   private static escapeHtml(value: string): string {
     const str = typeof value === 'object' ? JSON.stringify(value) : String(value ?? '');
     return str
@@ -1836,6 +1959,12 @@ export class HTMLDiffReporter {
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;');
+  }
+
+  /** Extract pure numeric value from metric strings like "147.69ms", "12.05s", "545" for sorting */
+  private static parseMetricNum(val: string): string {
+    const n = parseFloat(String(val ?? '').replace(/[^0-9.\-]/g, ''));
+    return isNaN(n) ? '0' : String(n);
   }
 
   private static sanitizeId(value: string): string {

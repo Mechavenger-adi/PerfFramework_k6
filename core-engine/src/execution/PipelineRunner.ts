@@ -80,9 +80,10 @@ export class PipelineRunner {
     let stderrPath: string | undefined;
 
     if (captureOutput) {
-      const stamp = `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
-      stdoutPath = path.join(tempDir, `k6-stdout-${stamp}.log`);
-      stderrPath = path.join(tempDir, `k6-stderr-${stamp}.log`);
+      const scriptName = path.basename(absScript, path.extname(absScript));
+      const stamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+      stdoutPath = path.join(tempDir, `${scriptName}_stdout_${stamp}.log`);
+      stderrPath = path.join(tempDir, `${scriptName}_stderr_${stamp}.log`);
       const stdoutFd = fs.openSync(stdoutPath, 'w');
       const stderrFd = fs.openSync(stderrPath, 'w');
 

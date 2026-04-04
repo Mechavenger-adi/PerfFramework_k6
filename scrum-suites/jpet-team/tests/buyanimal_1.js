@@ -1,10 +1,10 @@
-import http from 'k6/http';
-import { check, sleep, group } from 'k6';
-import { initTransactions, startTransaction, endTransaction } from '../../../core-engine/src/utils/transaction.js';
-import { logExchange, trackCorrelation, trackParameter, trackDataRow } from '../../../core-engine/src/utils/replayLogger.js';
+import { check, group, sleep } from 'k6';
 import execution from "k6/execution";
 import csv from "k6/experimental/csv";
 import fs from "k6/experimental/fs";
+import http from 'k6/http';
+import { logExchange, trackCorrelation, trackDataRow } from '../../../core-engine/src/utils/replayLogger.js';
+import { endTransaction, initTransactions, startTransaction } from '../../../core-engine/src/utils/transaction.js';
 
 initTransactions([
   "t01_launch",
