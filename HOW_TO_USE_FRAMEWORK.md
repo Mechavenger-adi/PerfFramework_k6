@@ -14,7 +14,8 @@ The framework is designed around several key operational layers:
 - **Data Layer (`DataPoolManager`)**: Easily manages CSV/JSON test data. It ensures test data lines are shared safely and enforces uniqueness rules without exhausting data resources across active VUs.
 - **Recording & Auto-Generation**: You can take standard `.har` recordings from a browser, discover domains interactively, choose which domains to keep, decide whether to include static assets, group actions into transactions based on page referrers, and output framework-aligned scripts with replay tags and replay logs.
 - **Correlation Layer (`CorrelationEngine`)**: Extracts dynamic elements like CSRF or Bearer tokens transparently through explicit JSON rules, keeping your test scripts free from messy regex and parsing logic.
-- **SLA & Reporting Layers**: Uses the framework transaction helpers (`initTransactions`, `startTransaction`, `endTransaction`) to record `txn_*` metrics, tests them against SLA thresholds, and supports richer HTML diff reporting for debug analysis.
+- **SLA & Reporting Layers**: Uses the framework transaction helpers (`initTransactions`, `startTransaction`, `endTransaction`) to record transaction metrics, tests them against SLA thresholds, and generates machine-readable run artifacts plus a unified tabbed HTML report for normal load runs.
+- **Simple Lifecycle Authoring**: Generated and converted scripts now follow the framework shape of `initPhase(ctx)`, `actionPhase(ctx)`, and `endPhase(ctx)`, while the framework manages the per-VU lifecycle bridge underneath.
 
 ---
 
@@ -25,8 +26,8 @@ The framework includes a CLI entrypoint (internally aliased as `k6-framework` or
 Available commands include:
 
 * **`init`**: Scaffolds a new performance project matching the framework's directory format in the targeted directory.
-* **`generate <team> <script-name> --har <path>`**: Auto-generates a k6 script from a HAR recording and interactively asks which domains to include and whether to keep static assets.
-* **`generate-byos <team> <script-name>`**: "Bring Your Own Script" - Scaffolds a ready-to-run template inside a team's scrum suite if you prefer to write boilerplate manually rather than dealing with HAR recordings.
+* **`generate <team> <script-name> --har <path>`**: Auto-generates a k6 script from a HAR recording and interactively asks which domains to include, whether to keep static assets, and which grouped transactions should belong to init/end phases.
+* **`generate-byos <team> <script-name>`**: "Bring Your Own Script" - Scaffolds a ready-to-run phase-based template inside a team's scrum suite if you prefer to write boilerplate manually rather than dealing with HAR recordings.
 * **`validate --plan <path> [options]`**: Runs the `GatekeeperValidator` to perform pre-flight checks on test plans and configs. It ensures you aren't referencing missing assets or violating schema definitions *before* wasting setup time on a broken run. 
 * **`run --plan <path> [options]`**: Loads the plan, resolves the config, provisions VUs, injects temporary staging scripts under `.k6-temp`, and launches the native k6 binary under the hood with all appropriate outputs configured.
 * **Test-plan driven debug mode**: If `debug.enabled` is set in the test plan, the `run` command automatically switches from load execution into per-journey replay debug mode, resolves the matching recording log, and generates HTML diff reports.
@@ -46,7 +47,38 @@ Configuration follows a strict merge order utilizing the `ConfigurationManager.t
 
 ---
 
-## 4. Examples: Files You Need to Create
+## 4. Run Artifacts & Reporting
+
+Every normal local load run now produces a run folder containing:
+
+- `summary.json`
+- `transaction-metrics.json`
+- `errors.ndjson`
+- `warnings.ndjson`
+- `ci-summary.json`
+- `timeseries.json`
+- `system-metrics.json`
+- `RunReport.html`
+- `run-manifest.json`
+
+Compatibility outputs are still preserved:
+
+- `TestDetails.html`
+- `TestSummary.html`
+
+For CI/CD, prefer consuming:
+
+- `ci-summary.json` for pass/fail gating
+- `transaction-metrics.json` for transaction-level stats
+- `errors.ndjson` / `warnings.ndjson` for structured diagnostics
+
+For humans, prefer:
+
+- `RunReport.html`
+
+---
+
+## 5. Examples: Files You Need to Create
 
 To run a test, you typically need to create or utilize three main components: a Test Plan, Correlation Rules (optional but recommended), and the actual Test Journey script.
 
@@ -113,47 +145,58 @@ Instead of burying token extractions heavily in JavaScript, you define rules in 
 
 ### C. Typical Test Journey (`scrum-suites/<team>/tests/browse-journey.js`)
 
-At its core, a journey is still a standard k6 script. However, the framework uses `initTransactions()`, `startTransaction()`, and `endTransaction()` to align transaction timing with framework-native `txn_*` metrics. Generated HAR scripts also attach replay tags and emit replay metadata logs so each request can be cross-referenced back to the original HAR entry.
+At its core, a journey is still a standard k6 script. The main difference now is that the framework expects the business flow to be split into `initPhase(ctx)`, `actionPhase(ctx)`, and `endPhase(ctx)`. The framework lifecycle helper then decides when each phase runs per VU for supported executors.
 
 ```javascript
 import http from 'k6/http';
 import { check, sleep, group } from 'k6';
 import { initTransactions, startTransaction, endTransaction } from '../../../core-engine/src/utils/transaction.js';
+import { createJourneyLifecycleStore, runJourneyLifecycle } from '../../../core-engine/src/utils/lifecycle.js';
 
-// Init SLA Trends globally for this script
-initTransactions(['PublicCrocodiles', 'SingleCrocodile']);
+initTransactions(['Login', 'Browse', 'Logout']);
+const lifecycleStore = createJourneyLifecycleStore();
+
+export function initPhase(ctx) {
+  group('Login', function () {
+    startTransaction('Login');
+    const res = http.post('https://example.com/login', JSON.stringify({
+      username: 'user',
+      password: 'pwd',
+    }), { headers: { 'Content-Type': 'application/json' } });
+    check(res, { 'Login: status 200': (r) => r.status === 200 });
+    endTransaction('Login');
+  });
+}
+
+export function actionPhase(ctx) {
+  group('Browse', function () {
+    startTransaction('Browse');
+    const res = http.get('https://example.com/products');
+    check(res, { 'Browse: status 200': (r) => r.status === 200 });
+    endTransaction('Browse');
+  });
+
+  sleep(1); // think time
+}
+
+export function endPhase(ctx) {
+  group('Logout', function () {
+    startTransaction('Logout');
+    const res = http.get('https://example.com/logout');
+    check(res, { 'Logout: status 200': (r) => r.status === 200 });
+    endTransaction('Logout');
+  });
+}
 
 export default function () {
-  console.log('[k6-perf] [INFO] Starting Public Crocodiles scenario');
-
-  group('Public Crocodiles', function () {
-    startTransaction('PublicCrocodiles');
-    
-    const res = http.get('https://test-api.k6.io/public/crocodiles/');
-    check(res, { 'Public Crocodiles: status 200': (r) => r.status === 200 });
-    
-    endTransaction('PublicCrocodiles'); // Ends timer
-  });
-
-  sleep(1); // Standard think time
-
-  group('Single Crocodile', function () {
-    startTransaction('SingleCrocodile');
-    
-    const res = http.get('https://test-api.k6.io/public/crocodiles/1/');
-    check(res, { 'Single Crocodile: status 200': (r) => r.status === 200 });
-    
-    endTransaction('SingleCrocodile');
-  });
-
-  sleep(1);
+  runJourneyLifecycle(lifecycleStore, { initPhase, actionPhase, endPhase });
 }
 ```
 
-## 5. Getting Started Checklist
+## 6. Getting Started Checklist
 
 1. **Initialize your team's suite**: Run the `init` command or manually create your folder in `scrum-suites/<your-team>`.
-2. **Generate baseline scripts**: Drop a `.har` file in your `recordings/` folder and run `generate <team> <script-name> --har <path>`. The generator will ask which domains to keep and whether to include static assets. OR use `generate-byos` to create a blank template.
+2. **Generate baseline scripts**: Drop a `.har` file in your `recordings/` folder and run `generate <team> <script-name> --har <path>`. The generator will ask which domains to keep, whether to include static assets, and which grouped transactions belong in init/end. OR use `generate-byos` to create a blank phase-based template.
 3. **Refine the Script**: Review the generated replay metadata logs and request tags, then adjust assertions, data, and correlation as needed.
 4. **Extract dynamic values**: Add correlation definitions to your `correlation-rules.json`.
 5. **Construct a Test Plan**: Create a new `.json` plan in `config/test-plans` targeting your new scripts.

@@ -58,6 +58,29 @@ export function runInit(projectDir: string = process.cwd()): void {
         pacing: { enabled: false },
         http: { timeoutSeconds: 60, maxRedirects: 10, throwOnError: false },
         errorBehavior: 'continue',
+        reporting: {
+          transactionStats: ['count', 'pass', 'fail', 'avg', 'min', 'max', 'p(90)', 'p(95)'],
+          includeTransactionTable: true,
+          includeErrorTable: true,
+          timeseries: {
+            enabled: true,
+            bucketSizeSeconds: 10,
+          },
+        },
+        errors: {
+          captureSnapshotOnFailure: true,
+          maxSnapshotsPerRun: 20,
+          includeRequestHeaders: true,
+          includeRequestBody: true,
+          includeResponseHeaders: true,
+          includeResponseBody: false,
+        },
+        monitoring: {
+          enabled: false,
+          cpuWarningPercent: 80,
+          memoryWarningPercent: 80,
+          sampleIntervalSeconds: 10,
+        },
         debugMode: false,
       },
       null,
@@ -207,11 +230,16 @@ testuser003,P@ssw0rd3,testuser003@perf-test.local
     `import http from 'k6/http';
 import { check, sleep, group } from 'k6';
 import { initTransactions, startTransaction, endTransaction } from '../../../core-engine/src/utils/transaction.js';
+import { createJourneyLifecycleStore, runJourneyLifecycle } from '../../../core-engine/src/utils/lifecycle.js';
 import { logExchange } from '../../../core-engine/src/utils/replayLogger.js';
 
 initTransactions(['Homepage', 'Product_List']);
+const lifecycleStore = createJourneyLifecycleStore();
 
-export default function () {
+export function initPhase(ctx) {
+}
+
+export function actionPhase(ctx) {
   group('Homepage', function () {
     startTransaction('Homepage');
     // TODO: Replace with your baseUrl from config
@@ -231,6 +259,13 @@ export default function () {
 
   sleep(1);
 }
+
+export function endPhase(ctx) {
+}
+
+export default function () {
+  runJourneyLifecycle(lifecycleStore, { initPhase, actionPhase, endPhase });
+}
 `,
     'scrum-suites/sample-team/tests/browse-journey.js',
   );
@@ -241,11 +276,13 @@ export default function () {
     `import http from 'k6/http';
 import { check, sleep, group } from 'k6';
 import { initTransactions, startTransaction, endTransaction } from '../../../core-engine/src/utils/transaction.js';
+import { createJourneyLifecycleStore, runJourneyLifecycle } from '../../../core-engine/src/utils/lifecycle.js';
 import { logExchange } from '../../../core-engine/src/utils/replayLogger.js';
 
 initTransactions(['Login', 'Add_To_Cart', 'Checkout']);
+const lifecycleStore = createJourneyLifecycleStore();
 
-export default function () {
+export function initPhase(ctx) {
   group('Login', function () {
     startTransaction('Login');
     const res = http.post('https://your-dev-environment.com/auth/login', JSON.stringify({
@@ -257,9 +294,9 @@ export default function () {
     // TODO: Correlate auth token -> c_authToken
     endTransaction('Login');
   });
+}
 
-  sleep(1);
-
+export function actionPhase(ctx) {
   group('Add To Cart', function () {
     startTransaction('Add_To_Cart');
     const res = http.post('https://your-dev-environment.com/cart/add', JSON.stringify({
@@ -282,6 +319,13 @@ export default function () {
   });
 
   sleep(1);
+}
+
+export function endPhase(ctx) {
+}
+
+export default function () {
+  runJourneyLifecycle(lifecycleStore, { initPhase, actionPhase, endPhase });
 }
 `,
     'scrum-suites/sample-team/tests/checkout-journey.js',

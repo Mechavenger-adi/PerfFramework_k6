@@ -2,7 +2,6 @@ import http from 'k6/http';
 import { check, sleep, group } from 'k6';
 import { initTransactions, startTransaction, endTransaction } from '../../../core-engine/src/utils/transaction.js';
 import { logExchange, trackCorrelation, trackParameter } from '../../../core-engine/src/utils/replayLogger.js';
-import execution from 'k6/execution';
 
 initTransactions([
   "t01_launch",
@@ -17,11 +16,6 @@ initTransactions([
 ]);
 
 export default function () {
-
-  // =========================================================
-  // vuser_init: Runs ONLY on the first iteration for this VU
-  // =========================================================
-  if (execution.vu.iterationInInstance === 0) {
   group('t01_launch', function () {
     startTransaction('t01_launch');
     // har_entry: req_1
@@ -469,11 +463,6 @@ export default function () {
   });
 
   sleep(1);
-  } // <-- End of vuser_init block
-
-  // =========================================================
-  // Action: Runs repeatedly during the test duration
-  // =========================================================
 
   group('search_animal', function () {
     startTransaction('search_animal');
@@ -1201,15 +1190,6 @@ export default function () {
   });
 
   sleep(1);
-
-  // =========================================================
-  // vuser_end: The Logout Challenge
-  // IMPORTANT: Unlike LoadRunner, k6 has NO native hook to run code when a VU ramps down.
-  // The VU will simply be interrupted when the test duration ends. 
-  // Best practice: Let sessions expire naturally on the server.
-  // If using a fixed-iteration executor, you could wrap this in:
-  // if (execution.vu.iterationInInstance === TOTAL_ITERATIONS - 1) {
-  // =========================================================
 
   group('logout', function () {
     startTransaction('logout');

@@ -23,19 +23,51 @@ export interface K6ScenarioDefinition {
 
 export type K6ScenariosMap = Record<string, K6ScenarioDefinition>;
 
+export interface ScenarioRuntimeMetadata {
+  runId: string;
+  planName: string;
+  environment: string;
+  executionMode: TestPlan['execution_mode'];
+  reportDir: string;
+  generatedAt: string;
+  runtime: {
+    errorBehavior: string;
+    thinkTimeMode: string;
+    pacingEnabled: boolean;
+    pacingSeconds: number;
+    reporting: {
+      transactionStats: string[];
+      includeTransactionTable: boolean;
+      includeErrorTable: boolean;
+      timeseriesEnabled: boolean;
+      timeseriesBucketSizeSeconds: number;
+    };
+  };
+}
+
+interface ScenarioPhaseEnvelope {
+  mode: 'ramping-vus' | 'per-vu-iterations' | 'unsupported';
+  startVUs?: number;
+  totalIterations?: number;
+  timeline?: Array<{
+    endMs: number;
+    vus: number;
+  }>;
+}
+
 export class ScenarioBuilder {
   /**
    * Build a k6 options.scenarios map from a test plan.
    * Handles parallel, sequential, and hybrid execution modes.
    */
-  static build(plan: TestPlan): K6ScenariosMap {
+  static build(plan: TestPlan, metadata?: ScenarioRuntimeMetadata): K6ScenariosMap {
     switch (plan.execution_mode) {
       case 'parallel':
-        return this.buildParallel(plan);
+        return this.buildParallel(plan, metadata);
       case 'sequential':
-        return this.buildSequential(plan);
+        return this.buildSequential(plan, metadata);
       case 'hybrid':
-        return this.buildHybrid(plan);
+        return this.buildHybrid(plan, metadata);
       default:
         throw new Error(`[ScenarioBuilder] Unknown execution_mode: '${plan.execution_mode}'`);
     }
@@ -45,17 +77,19 @@ export class ScenarioBuilder {
   // Parallel Mode – all journeys run concurrently
   // ---------------------------------------------
 
-  private static buildParallel(plan: TestPlan): K6ScenariosMap {
+  private static buildParallel(plan: TestPlan, metadata?: ScenarioRuntimeMetadata): K6ScenariosMap {
     const scenarios: K6ScenariosMap = {};
 
     for (const journey of plan.user_journeys) {
       const profile = journey.loadProfile ?? plan.global_load_profile;
       const executorConfig = ExecutorFactory.build(profile);
+      const execName = this.sanitizeExecName(journey.name);
 
       scenarios[journey.name] = {
         ...executorConfig,
-        exec: this.sanitizeExecName(journey.name),
+        exec: execName,
         tags: { journey: journey.name, ...journey.tags },
+        env: this.buildScenarioEnv(plan, journey, execName, metadata, executorConfig.env),
       };
     }
 
@@ -67,7 +101,7 @@ export class ScenarioBuilder {
   // Uses startTime offsets calculated from cumulative stage durations
   // ---------------------------------------------
 
-  private static buildSequential(plan: TestPlan): K6ScenariosMap {
+  private static buildSequential(plan: TestPlan, metadata?: ScenarioRuntimeMetadata): K6ScenariosMap {
     const scenarios: K6ScenariosMap = {};
     let offsetSeconds = 0;
 
@@ -75,11 +109,13 @@ export class ScenarioBuilder {
       const profile = journey.loadProfile ?? plan.global_load_profile;
       const executorConfig = ExecutorFactory.build(profile);
       const durationSecs = this.estimateTotalDurationSeconds(profile);
+      const execName = this.sanitizeExecName(journey.name);
 
       scenarios[journey.name] = {
         ...executorConfig,
-        exec: this.sanitizeExecName(journey.name),
+        exec: execName,
         tags: { journey: journey.name, ...journey.tags },
+        env: this.buildScenarioEnv(plan, journey, execName, metadata, executorConfig.env),
         // k6 uses string startTime in sequential scenarios
         ...(offsetSeconds > 0 && { startTime: `${offsetSeconds}s` }),
       };
@@ -94,7 +130,7 @@ export class ScenarioBuilder {
   // Hybrid Mode – groups of journeys with mixed modes
   // ---------------------------------------------
 
-  private static buildHybrid(plan: TestPlan): K6ScenariosMap {
+  private static buildHybrid(plan: TestPlan, metadata?: ScenarioRuntimeMetadata): K6ScenariosMap {
     if (!plan.hybrid_groups || plan.hybrid_groups.length === 0) {
       throw new Error('[ScenarioBuilder] Hybrid mode requires hybrid_groups to be defined.');
     }
@@ -110,11 +146,13 @@ export class ScenarioBuilder {
           if (!journey) throw new Error(`[ScenarioBuilder] Journey '${name}' not found in hybrid group.`);
           const profile = journey.loadProfile ?? plan.global_load_profile;
           const executorConfig = ExecutorFactory.build(profile);
+          const execName = this.sanitizeExecName(name);
 
           scenarios[name] = {
             ...executorConfig,
-            exec: this.sanitizeExecName(name),
+            exec: execName,
             tags: { journey: name, ...journey.tags },
+            env: this.buildScenarioEnv(plan, journey, execName, metadata, executorConfig.env),
             ...(groupOffset > 0 && { startTime: `${groupOffset}s` }),
           };
         }
@@ -136,11 +174,13 @@ export class ScenarioBuilder {
           const profile = journey.loadProfile ?? plan.global_load_profile;
           const executorConfig = ExecutorFactory.build(profile);
           const durationSecs = this.estimateTotalDurationSeconds(profile);
+          const execName = this.sanitizeExecName(name);
 
           scenarios[name] = {
             ...executorConfig,
-            exec: this.sanitizeExecName(name),
+            exec: execName,
             tags: { journey: name, ...journey.tags },
+            env: this.buildScenarioEnv(plan, journey, execName, metadata, executorConfig.env),
             startTime: `${groupOffset}s`,
           };
           groupOffset += durationSecs;
@@ -158,6 +198,93 @@ export class ScenarioBuilder {
   /** Sanitize journey name to a valid k6 exec function name */
   private static sanitizeExecName(name: string): string {
     return name.replace(/[^a-zA-Z0-9_]/g, '_');
+  }
+
+  private static buildScenarioEnv(
+    plan: TestPlan,
+    journey: UserJourney,
+    execName: string,
+    metadata?: ScenarioRuntimeMetadata,
+    existingEnv?: Record<string, string>,
+  ): Record<string, string> | undefined {
+    if (!metadata && !existingEnv) {
+      return undefined;
+    }
+
+    const scenarioMetadata = metadata
+      ? JSON.stringify({
+          runId: metadata.runId,
+          planName: metadata.planName,
+          environment: metadata.environment,
+          executionMode: metadata.executionMode,
+          reportDir: metadata.reportDir,
+          generatedAt: metadata.generatedAt,
+          journeyName: journey.name,
+          execName,
+        })
+      : undefined;
+
+    const runtimeMetadata = metadata ? JSON.stringify(metadata.runtime) : undefined;
+    const phaseMetadata = this.computePhaseEnvelope(journey.loadProfile ?? plan.global_load_profile, existingEnv);
+
+    return {
+      ...existingEnv,
+      ...(metadata
+        ? {
+            K6_PERF_RUN_ID: metadata.runId,
+            K6_PERF_PLAN_NAME: metadata.planName,
+            K6_PERF_ENVIRONMENT: metadata.environment,
+            K6_PERF_EXECUTION_MODE: plan.execution_mode,
+            K6_PERF_REPORT_DIR: metadata.reportDir,
+            K6_PERF_JOURNEY_NAME: journey.name,
+            K6_PERF_EXEC_NAME: execName,
+            K6_PERF_SCENARIO_METADATA: scenarioMetadata ?? '',
+            K6_PERF_RUNTIME_METADATA: runtimeMetadata ?? '',
+            K6_PERF_PHASES: JSON.stringify(phaseMetadata),
+          }
+        : {}),
+    };
+  }
+
+  private static computePhaseEnvelope(
+    profile: GlobalLoadProfile,
+    existingEnv?: Record<string, string>,
+  ): ScenarioPhaseEnvelope {
+    if (existingEnv?.K6_PERF_PHASES) {
+      try {
+        return JSON.parse(existingEnv.K6_PERF_PHASES) as ScenarioPhaseEnvelope;
+      } catch {
+        // fall through to recompute
+      }
+    }
+
+    if (profile.executor === 'ramping-vus' && profile.stages && profile.stages.length > 0) {
+      let cumulativeMs = 0;
+      const timeline = profile.stages.map((stage) => {
+        cumulativeMs += this.parseDurationToSeconds(stage.duration) * 1000;
+        return {
+          endMs: cumulativeMs,
+          vus: stage.target,
+        };
+      });
+
+      return {
+        mode: 'ramping-vus',
+        startVUs: profile.startVUs ?? 0,
+        timeline,
+      };
+    }
+
+    if (profile.executor === 'per-vu-iterations') {
+      return {
+        mode: 'per-vu-iterations',
+        totalIterations: profile.iterations ?? 1,
+      };
+    }
+
+    return {
+      mode: 'unsupported',
+    };
   }
 
   /** Estimate total duration of a load profile in seconds */

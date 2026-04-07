@@ -8,6 +8,8 @@
 
 // -- Types / Contracts ------------------------
 export * from './types/ConfigContracts';
+export * from './types/EventContracts';
+export * from './types/ReportingContracts';
 export * from './types/TestPlanSchema';
 
 // -- Config Layer -----------------------------
@@ -31,6 +33,7 @@ export type { JourneyAllocation } from './execution/JourneyAllocator';
 export { ParallelExecutionManager } from './execution/ParallelExecutionManager';
 export type { K6Options } from './execution/ParallelExecutionManager';
 export { PipelineRunner } from './execution/PipelineRunner';
+export { HostMonitor } from './execution/HostMonitor';
 
 // -- Data Layer -------------------------------
 export { DataFactory } from './data/DataFactory';
@@ -39,6 +42,16 @@ export { DataPoolManager } from './data/DataPoolManager';
 export { DataValidator } from './data/DataValidator';
 export type { DataValidationResult } from './data/DataValidator';
 export { DynamicValueFactory } from './data/DynamicValueFactory';
+
+// -- Runtime Layer ----------------------------
+export { LifecycleRuntime } from './runtime/LifecycleRuntime';
+export type { JourneyContext, LifecyclePhaseFns, LifecycleRunState, JourneyPhase, LifecycleDecision } from './runtime/LifecycleRuntime';
+export { ErrorRuntime } from './runtime/ErrorRuntime';
+export type { ErrorRuntimeContext } from './runtime/ErrorRuntime';
+export { MetricsRuntime } from './runtime/MetricsRuntime';
+export type { TransactionAggregate } from './runtime/MetricsRuntime';
+export { SnapshotRuntime } from './runtime/SnapshotRuntime';
+export { TimeseriesRuntime } from './runtime/TimeseriesRuntime';
 
 // -- Utils Layer --------------------------------
 export { Logger } from './utils/logger';
@@ -75,3 +88,11 @@ export { ResultTransformer } from './reporters/ResultTransformer';
 export { GrafanaReporter } from './reporters/GrafanaReporter';
 export { AzureReporter } from './reporters/AzureReporter';
 export { CustomUploader } from './reporters/CustomUploader';
+
+// -- Reporting Layer ----------------------------
+export { ArtifactWriter } from './reporting/ArtifactWriter';
+export { EventArtifactBuilder } from './reporting/EventArtifactBuilder';
+export { TransactionMetricsBuilder } from './reporting/TransactionMetricsBuilder';
+export { RunSummaryBuilder } from './reporting/RunSummaryBuilder';
+export { RunReportGenerator } from './reporting/RunReportGenerator';
+export { TimeseriesArtifactBuilder } from './reporting/TimeseriesArtifactBuilder';

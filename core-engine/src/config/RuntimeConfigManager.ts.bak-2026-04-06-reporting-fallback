@@ -1,0 +1,155 @@
+/**
+ * RuntimeConfigManager.ts
+ * Phase 1/2 – Typed accessors for runtime behavior the test scripts call at runtime.
+ * Lives in Phase 1 because the Gatekeeper needs it for pre-flight; scripts use it at run-time.
+ */
+
+import { RuntimeSettings, ThinkTimeConfig } from '../types/ConfigContracts';
+
+export class RuntimeConfigManager {
+  constructor(private readonly settings: RuntimeSettings) {}
+
+  // ---------------------------------------------
+  // Think Time
+  // ---------------------------------------------
+
+  /**
+   * Returns the think time in seconds to apply between transactions.
+   * When mode = 'random', returns a value in [min, max].
+   */
+  getThinkTimeSeconds(): number {
+    const cfg: ThinkTimeConfig = this.settings.thinkTime;
+    if (cfg.mode === 'fixed') {
+      return cfg.fixed ?? 1;
+    }
+    // random mode
+    const min = cfg.min ?? 0.5;
+    const max = cfg.max ?? 3;
+    return min + Math.random() * (max - min);
+  }
+
+  // ---------------------------------------------
+  // Pacing
+  // ---------------------------------------------
+
+  isPacingEnabled(): boolean {
+    return this.settings.pacing.enabled;
+  }
+
+  getPacingSeconds(): number {
+    return this.settings.pacing.targetIntervalSeconds ?? 0;
+  }
+
+  getPacingIntervalMs(): number {
+    return (this.settings.pacing.targetIntervalSeconds ?? 0) * 1000;
+  }
+
+  // ---------------------------------------------
+  // HTTP
+  // ---------------------------------------------
+
+  getTimeoutMs(): number {
+    return this.settings.http.timeoutSeconds * 1000;
+  }
+
+  getMaxRedirects(): number {
+    return this.settings.http.maxRedirects;
+  }
+
+  shouldThrowOnError(): boolean {
+    return this.settings.http.throwOnError;
+  }
+
+  // ---------------------------------------------
+  // Error Behavior
+  // ---------------------------------------------
+
+  getErrorBehavior(): RuntimeSettings['errorBehavior'] {
+    return this.settings.errorBehavior;
+  }
+
+  // ---------------------------------------------
+  // Reporting
+  // ---------------------------------------------
+
+  getTransactionStats(): string[] {
+    return [...this.settings.reporting.transactionStats];
+  }
+
+  shouldIncludeTransactionTable(): boolean {
+    return this.settings.reporting.includeTransactionTable;
+  }
+
+  shouldIncludeErrorTable(): boolean {
+    return this.settings.reporting.includeErrorTable;
+  }
+
+  isTimeseriesEnabled(): boolean {
+    return this.settings.reporting.timeseries.enabled;
+  }
+
+  getTimeseriesBucketSizeSeconds(): number {
+    return this.settings.reporting.timeseries.bucketSizeSeconds ?? 10;
+  }
+
+  // ---------------------------------------------
+  // Error Capture
+  // ---------------------------------------------
+
+  shouldCaptureSnapshotOnFailure(): boolean {
+    return this.settings.errors.captureSnapshotOnFailure;
+  }
+
+  getMaxSnapshotsPerRun(): number {
+    return this.settings.errors.maxSnapshotsPerRun;
+  }
+
+  shouldIncludeRequestHeadersInSnapshots(): boolean {
+    return this.settings.errors.includeRequestHeaders;
+  }
+
+  shouldIncludeRequestBodyInSnapshots(): boolean {
+    return this.settings.errors.includeRequestBody;
+  }
+
+  shouldIncludeResponseHeadersInSnapshots(): boolean {
+    return this.settings.errors.includeResponseHeaders;
+  }
+
+  shouldIncludeResponseBodyInSnapshots(): boolean {
+    return this.settings.errors.includeResponseBody;
+  }
+
+  // ---------------------------------------------
+  // Monitoring
+  // ---------------------------------------------
+
+  isMonitoringEnabled(): boolean {
+    return this.settings.monitoring.enabled;
+  }
+
+  getCpuWarningPercent(): number {
+    return this.settings.monitoring.cpuWarningPercent;
+  }
+
+  getMemoryWarningPercent(): number {
+    return this.settings.monitoring.memoryWarningPercent;
+  }
+
+  getMonitoringSampleIntervalSeconds(): number {
+    return this.settings.monitoring.sampleIntervalSeconds;
+  }
+
+  // ---------------------------------------------
+  // Debug
+  // ---------------------------------------------
+
+  isDebugMode(): boolean {
+    return this.settings.debugMode;
+  }
+
+  /** Return all settings (useful for logging) */
+  dump(): RuntimeSettings {
+    return { ...this.settings };
+  }
+}

@@ -7,7 +7,7 @@
 > 4. If you add files, modify architecture, or fix bugs — update the relevant section AND the change log.
 > 5. This file is the single source of truth for resuming work across agents/tools/sessions.
 
-**Last Updated:** 2026-04-03
+**Last Updated:** 2026-04-05
 **Workspace:** d:\repos\K6-PerfFramework
 **Status:** Phase 1-3 complete (54/67 items = 81%), Phase 4 not started
 
@@ -84,7 +84,7 @@ K6-PerfFramework/
 │       ├── execution/                 # JourneyAllocator, ParallelExecutionManager, PipelineRunner
 │       ├── data/                      # DataFactory, DataPoolManager, DataValidator, DynamicValueFactory
 │       ├── correlation/               # CorrelationEngine, ExtractorRegistry, FallbackHandler, RuleProcessor
-│       ├── recording/                 # HARParser, DomainFilter, ScriptGenerator, TransactionGrouper
+│       ├── recording/                 # HARParser, DomainFilter, ScriptGenerator, TransactionGrouper, ScriptConverter
 │       ├── debug/                     # ReplayRunner, DiffChecker, HTMLDiffReporter, ExchangeLog, RecordingLogResolver
 │       ├── assertions/                # SLARegistry, ThresholdManager, JourneyAssertionResolver
 │       ├── reporters/                 # ResultTransformer, GrafanaReporter, AzureReporter, CustomUploader
@@ -170,9 +170,9 @@ K6-PerfFramework/
 
 | File | Class | Purpose |
 |------|-------|---------|
-| ReplayRunner.ts | `ReplayRunner` | `runDebug(options)` → full workflow with phase-based progress logging: `▸ Executing k6 debug run...` → PipelineRunner executes k6 (1 VU, 1 iter, captureOutput) → `✔ k6 debug execution complete (Ns)` → `▸ Extracting replay entries...` → extracts `[k6-perf][replay-log]` JSON entries from stdout/stderr/files → `✔ Extracted N replay entries` → `extractK6Errors()` parses k6 stderr for `level=error msg="..."` and `ERRO[xxxx]` patterns (deduplicates) → `▸ Generating diff report...` → DiffChecker compares → HTMLDiffReporter generates report with `{ k6Errors }` → `✔ Diff report generated`. Uses `createSpinner()` from ProgressBar.ts. `normalizeRecordingEntry()` detects binary URLs via `STATIC_EXT_RE` and replaces response body with `[binary: static asset]` placeholder. Handles base64 decoding, replay-only mode (missing recording) |
+| ReplayRunner.ts | `ReplayRunner` | `runDebug(options)` → full workflow with phase-based progress logging: `▸ Executing k6 debug run...` → PipelineRunner executes k6 (1 VU, 1 iter, captureOutput) → `✔ k6 debug execution complete (Ns)` → `▸ Extracting replay entries...` → extracts `[k6-perf][replay-log]` JSON entries from stdout/stderr/files → `✔ Extracted N replay entries` → `extractK6Errors()` parses k6 stderr for `level=error msg="..."` and `ERRO[xxxx]` patterns (deduplicates) → `extractK6Metrics()` parses k6 stdout for performance metrics (checks, transaction timings, HTTP metrics, execution/network summary) → `▸ Generating diff report...` → DiffChecker compares → HTMLDiffReporter generates report with `{ k6Errors, k6Metrics }` → `✔ Diff report generated`. Forces VUs=1 and iterations=1 regardless of test plan config (logs warning if user specified higher). Uses `createSpinner()` from ProgressBar.ts. `normalizeRecordingEntry()` detects binary URLs via `STATIC_EXT_RE` and replaces response body with `[binary: static asset]` placeholder. Handles base64 decoding, replay-only mode (missing recording) |
 | DiffChecker.ts | `DiffChecker` | `compare()` single entry, `compareBatch()` multiple with fallback matching, `compareTaggedLogs()` iteration-grouped comparison. `diffHeaders()` → HeaderDiffEntry[] (match/mismatch/missing/extra). `diffBodies()` → Levenshtein similarity %. Returns `DiffResult { scores, diffs, transaction, variableEvents, warnings }` |
-| HTMLDiffReporter.ts | `HTMLDiffReporter` | `generateReport(results, path, options?)` → self-contained HTML with modern UI (system sans-serif, dark hero, frosted glass sticky bar), interactive iteration selector, search with scope/navigation, expandable accordions, side-by-side body comparison, header diff tables, variable event tracking, transaction summary, Decoded/Raw toggle (percent-decoding for URLs/headers/bodies), `formatBody()` auto-detects & pretty-prints URL-encoded and JSON bodies, CSS grid overflow handling, defensive `String()` coercion in `escapeHtml`/`sanitizeId`/`decodeText`. `ReportOptions { k6Errors?: string[] }` → conditionally renders error panel. **Section order:** Request Body → Response Body → Headers → Cookies → Variables. **Sticky request title:** `.request-card-sticky` with `position: sticky; top: 52px`. Uses `overflow: clip` on `.request-card` and `.body-section` (not `hidden`, which breaks sticky). **Per-section search:** SVG magnifying glass icon button (`.section-search-btn`) per Recorded/Replayed pane, floated right via flex `.pane-header`. Search bar with prev/next/close. **Scroll sync:** Toggle at section `<summary>` level (pushed to far right via `margin-left: auto` on flex summary), syncs scroll position between Recorded/Replayed panes. **Avg Match Score** label (was "Avg Score"). |
+| HTMLDiffReporter.ts | `HTMLDiffReporter` | `generateReport(results, path, options?)` → self-contained HTML with modern UI (system sans-serif, dark hero, frosted glass sticky bar), interactive iteration selector, search with scope/navigation, expandable accordions, side-by-side body comparison, header diff tables, variable event tracking, transaction summary, Decoded/Raw toggle (percent-decoding for URLs/headers/bodies), `formatBody()` auto-detects & pretty-prints URL-encoded and JSON bodies, CSS grid overflow handling, defensive `String()` coercion in `escapeHtml`/`sanitizeId`/`decodeText`. `ReportOptions { k6Errors?: string[], k6Metrics?: K6Metrics }` → conditionally renders error panel and **Performance Metrics section** (Execution Summary KV tiles, Checks table with pass/fail, HTTP Metrics table, Transaction Timings table — all with sortable column headers). **Report title:** "Replay Insights". **Section order:** Request Body → Response Body → Headers → Cookies → Variables. **Table styling:** `border-collapse: separate` with rounded corners, gradient header backgrounds, 2px header border, zebra striping, blue hover, sortable columns (click header for asc/desc with ▲/▼ indicators). **Sticky request title:** `.request-card-sticky` with `position: sticky; top: 52px`. Uses `overflow: clip` on `.request-card` and `.body-section` (not `hidden`, which breaks sticky). **Per-section search:** SVG magnifying glass icon button (`.section-search-btn`) per Recorded/Replayed pane, floated right via flex `.pane-header`. Search bar with prev/next/close. **Scroll sync:** Toggle at section `<summary>` level (pushed to far right via `margin-left: auto` on flex summary), syncs scroll position between Recorded/Replayed panes. **Avg Match Score** label (was "Avg Score"). |
 | ExchangeLog.ts | `ExchangeLogBuilder` | `fromGroups()`, `fromEntries()`, `fromHAREntry()` → `TaggedExchangeLogEntry { harEntryId, transaction, tags, request, response, variableEvents[] }`. Handles base64 body decoding, cookie extraction, query param parsing. **Binary detection:** `isBinaryContent(mimeType?, url?)` checks Content-Type and URL extension — replaces body with `[binary: content-type]` or `[binary: static asset]` placeholder via `normalizeBody()` |
 | RecordingLogResolver.ts | `RecordingLogResolver` | `resolve(scriptPath, explicit?)` → multi-strategy: explicit path → `.recording-index.json` registry → expected path → fuzzy name match. `upsertRegistryEntry()` for generator tracking. Returns `RecordingLogResolution { status('resolved'|'missing'|'ambiguous'), paths, candidates, warnings }` |
 
@@ -183,7 +183,7 @@ K6-PerfFramework/
 | File | Class | Purpose |
 |------|-------|---------|
 | SLARegistry.ts | `SLARegistry` | `register(targetName, sla)` per scenario or `txn_` prefix. `get(name)`, `getAll()` |
-| ThresholdManager.ts | `ThresholdManager` | `apply(plan)` → translates global + per-journey SLAs to k6-native thresholds. Metrics: `http_req_duration{scenario:X}` for p90/p95/avg, `http_req_failed{scenario:X}` for errorRate. Returns `Record<string, string[]>` |
+| ThresholdManager.ts | `ThresholdManager` | `apply(plan)` → translates global + per-journey SLAs to k6-native thresholds. Transaction names used directly as Trend metric keys. Scenario metrics: `http_req_duration{scenario:X}` for p90/p95/avg, `http_req_failed{scenario:X}` for errorRate. Returns `Record<string, string[]>` |
 | JourneyAssertionResolver.ts | `JourneyAssertionResolver` | `printReport(metrics)` → evaluates k6 end-of-test summary, prints pass/fail for check rates and SLA breaches |
 
 ### 9. REPORTERS LAYER (`core-engine/src/reporters/`)
@@ -204,7 +204,7 @@ K6-PerfFramework/
 | logger.ts | `Logger` | `info()`, `warn()`, `error()`, `debug()`. Format: `[k6-perf] [LEVEL] [timestamp] message`. Routes: error→console.error, warn→console.warn, rest→console.log. Optional context metadata as JSON. Status methods: `pass()` (green), `fail()` (red), `warning()` (yellow), `detail()` (dim `>` prefix), `header()` (cyan box), `bullet()` (colored bullet). Exports `ansi` object. Respects `NO_COLOR` env var and non-TTY. |
 | ProgressBar.ts | `ProgressBar`, `createSpinner` | Phase-based terminal progress logger compatible with blocking `spawnSync`. `start()` prints `▸ label...`, `done(msg?)` prints `✔ msg (elapsed)`, `fail(msg?)` prints `✖ msg (elapsed)`. `update(current, label?)` prints `▸ [n/total] label...` for multi-step progress. `createSpinner(label)` factory for single blocking operations. |
 | PathResolver.ts | `PathResolver` | `resolve(targetPath, searchRoot='scrum-suites')` → resolves exact path first, then recursively searches scrum-suites for filename match. Eliminates hardcoded paths in test plans |
-| transaction.ts | `initTransactions`, `startTransaction`, `endTransaction` | LoadRunner-style timing. Creates `txn_` prefixed Trend metrics in k6 init context. Records start timestamp → calculates duration → adds to Trend |
+| transaction.ts | `initTransactions`, `startTransaction`, `endTransaction` | LoadRunner-style timing. Creates Trend metrics using the transaction name directly (e.g., `new Trend('Homepage')`) in k6 init context. Records start timestamp → calculates duration → adds to Trend |
 | transaction.js | (same as .ts) | JavaScript version for k6 runtime consumption |
 | replayLogger.js | `logReplayExchange`, `logExchange`, `trackCorrelation`, `trackParameter`, `trackDataRow`, `createVariableEvent` | k6-side logging. Outputs `[k6-perf][replay-log]` JSON with: harEntryId, transaction, iteration, VU, request/response details, headers, cookies, body. `trackCorrelation(name, value, source)` / `trackParameter(name, value, source)` register variables in `_variableRegistry`. `trackDataRow(sourceName, rowObject)` bulk-registers all CSV columns as parameters. `logExchange` auto-detects variable usage by scanning request URL/body/headers for registered values (via `detectVariableEvents()`). Body values stringified defensively (`typeof body === 'object' ? JSON.stringify(body) : String(body)`). **Binary body detection:** `binaryBodyPlaceholder(url, responseHeaders)` checks Content-Type (image/audio/video/font + common binary MIME types) and URL extension (.png/.ttf/.woff2/etc.) — replaces body with `[binary: content-type]` placeholder to prevent JSON serialization failures. Cookie extraction: `extractJarCookies(url)` uses `http.cookieJar().cookiesForURL()` for auto-managed cookies, `extractK6ResponseCookies(resCookies)` for k6's parsed `res.cookies` object. Tracks per-iteration state and request sequencing |
 
@@ -359,7 +359,7 @@ For each journey in test plan:
 
 - **Data parameterization prefix:** `p_` (e.g., p_username, p_password, p_email)
 - **Correlation variable prefix:** `c_` (e.g., c_csrfToken, c_bearerToken)
-- **Transaction metric prefix:** `txn_` (k6 Trend metrics via initTransactions/startTransaction/endTransaction)
+- **Transaction metric naming:** Transaction name used directly as k6 Trend metric name (e.g., `Homepage`, `Login`) — no prefix
 - **Replay log marker:** `[k6-perf][replay-log]` in k6 console output (JSON per request)
 - **Recording index:** `.recording-index.json` in each team's recordings/ dir
 - **Script resolution:** PathResolver searches `scrum-suites/` recursively if direct path fails
@@ -760,6 +760,522 @@ npm run cli -- run --plan config/test-plans/debug-test.json
 - **Why:** Switched active debug test from converted `buyanimal_new.js` (20 requests) to HAR-generated `buyanimal_raw.js` (29 requests, full jpetstore buy-a-dog flow including static assets) for more comprehensive testing.
 - **Journey:** `buyanimal_raw`, scriptPath `buyanimal_raw.js`, recording `buyanimal_raw.recording-log.json`
 
+### 2026-04-05 — Performance Metrics Section in Debug Report
+- **What:** Modified `core-engine/src/debug/ReplayRunner.ts`, `core-engine/src/debug/HTMLDiffReporter.ts`
+- **Why:** User wanted k6 performance metrics (checks, HTTP timings, transaction durations) rendered in the debug report.
+- **Changes:**
+  - **ReplayRunner.ts:** New `K6Metrics` interface (exported) with `checks[]`, `transactions[]`, `http[]`, `httpSummary`, `execution`, `network` fields. New `extractK6Metrics()` private static method parses k6 stdout sections for all metric tables. Passes `{ k6Errors, k6Metrics }` to HTMLDiffReporter. VU clamping: forces VUs=1 in debug mode with terminal warning if user configured higher.
+  - **HTMLDiffReporter.ts:** New `renderMetricsSection()` method generates Performance Metrics section. CSS grid layout: Execution Summary (full-width KV tiles) → Checks + HTTP Metrics (side-by-side tables) → Transaction Timings (full-width table). `parseMetricNum()` helper extracts numeric values for `data-val` sort attributes. `ReportOptions` updated: `{ k6Errors?: string[], k6Metrics?: K6Metrics }`. Report title changed to "Replay Insights".
+
+### 2026-04-05 — Global Table Styling & Sortable Column Headers
+- **What:** Modified `core-engine/src/debug/HTMLDiffReporter.ts` — CSS, HTML, JavaScript
+- **Why:** User requested improved table appearance and column sorting across all report tables.
+- **Changes:**
+  - **Table CSS (global):** `border-collapse: separate` with `border-spacing: 0`, gradient header backgrounds (`#f0f4ff` → `#e8eef9`), 2px bottom header border (`#4a7adb`), rounded corners on first/last header cells, zebra striping (`.table-row:nth-child(even)` or `tr:nth-child(even)`), blue hover (`#eef3ff`), smooth transitions, `font-variant-numeric: tabular-nums`
+  - **Sortable headers:** `th.sortable` CSS with `cursor: pointer`, `::after` pseudo-element showing ⇅ (neutral) / ▲ (asc) / ▼ (desc). Text selection allowed (no `user-select: none`). JavaScript click handler on `table.m-sortable th.sortable` toggles ascending/descending, sorts by `data-val` attribute (numeric) or text content (string)
+
+### 2026-04-05 — Transaction Naming: Remove `txn_` Prefix
+- **What:** Modified `core-engine/src/utils/transaction.ts`, `core-engine/src/assertions/SLARegistry.ts`, `core-engine/src/assertions/ThresholdManager.ts`, `core-engine/src/cli/generate-byos.ts`, `core-engine/src/cli/init.ts`
+- **Why:** Transaction naming standardized to use name directly (e.g., `Homepage`) instead of `txn_Homepage` prefix.
+- **Changes:**
+  - **transaction.ts:** JSDoc updated — removed "Automatically prefixes with `txn_`", now says "Uses the transaction name directly"
+  - **ThresholdManager.ts:** Transaction detection changed from `startsWith('txn_')` to `!includes(':') && !includes('{')` (generic: any metric name that isn't a scenario tag or group selector)
+  - **SLARegistry.ts:** JSDoc updated — "Use the transaction name directly (no prefix needed)"
+  - **generate-byos.ts:** BYOS scaffold template rewritten from manual `Trend('txn_BYOS_Sample')` + `Date.now()` timing to framework-style `initTransactions/startTransaction/endTransaction` with `logExchange` import
+  - **init.ts:** Both scaffold templates (browse-journey.js, checkout-journey.js) rewritten from manual Trend timing to framework-style transactions. Browse: `Homepage`, `Product_List`. Checkout: `Login`, `Add_To_Cart`, `Checkout`
+
+### 2026-04-05 — Captured Output File Naming Improvement
+- **What:** Modified `core-engine/src/execution/PipelineRunner.ts`
+- **Why:** Captured output files were generic; now include script name and stream type for easier identification.
+- **Change:** File naming updated to `{scriptName}_{stdout|stderr}_{ISO-timestamp}.log`
+
 ---
 
 *END OF CONTEXT — Keep this file updated after every change!*
+
+### 2026-04-06 - Lifecycle / Reporting Architecture Agreed (Planning Only, No Production Code Changes)
+- **What:** Added planning/review artifacts only and updated architectural direction; no live framework source files were changed as part of this step.
+- **Backups / review artifacts created:**
+  - `VU-Lifecycle-Implementation-Plan.md.bak-2026-04-05`
+  - `VU-Lifecycle-Implementation-Plan.lifecycle-simple-plan.md`
+  - `VU-Lifecycle-Implementation-Plan.lifecycle-simple-plan.md.bak-2026-04-06`
+  - `AGENT-CONTEXT.md.bak-2026-04-06`
+- **Lifecycle design direction:**
+  - User-facing scripts should stay simple and export `initPhase(ctx)`, `actionPhase(ctx)`, and `endPhase(ctx)`.
+  - The framework should own lifecycle routing, per-VU state, ramp-down math, pacing, and error handling in a hidden shared runtime wrapper.
+  - Generator and converter should prompt users to choose which groups/transactions belong to init and end, with a skip option.
+  - If users skip lifecycle grouping, generated/converted scripts should still contain empty `initPhase(ctx)` and `endPhase(ctx)` and place all groups inside `actionPhase(ctx)`.
+- **Runtime settings precedence direction:**
+  - Runtime settings act as framework defaults.
+  - Explicit script behavior should override runtime defaults when intentionally set.
+  - Applies to think time, pacing, timeout, redirects, and throw/error behavior.
+- **Error behavior contract agreed:**
+  - Supported values should become: `continue`, `stop_iteration`, `stop_vu`, `abort_test`.
+  - Semantics:
+    - `continue` -> log and keep iterating
+    - `stop_iteration` -> stop only the current iteration for that VU
+    - `stop_vu` -> stop that VU completely
+    - `abort_test` -> abort the whole test
+- **Transaction metrics / reporting direction:**
+  - Add shared transaction metrics for duration + pass/fail counts.
+  - Support configurable reporting columns like `avg`, `min`, `max`, `p(90)`, `p(95)`, `p(99)`, pass/fail counts.
+  - Users should be able to add/remove visible stats from config without code changes.
+- **CI/CD direction:**
+  - Reporting should produce machine-readable artifacts by default:
+    - `summary.json`
+    - `transaction-metrics.json`
+    - `errors.ndjson`
+    - `warnings.ndjson`
+    - `ci-summary.json`
+  - HTML reports remain optional human-facing artifacts.
+- **Operational observability direction:**
+  - Add structured error/warning events containing request/transaction/VU/iteration/agent context.
+  - Support optional snapshot capture on failure.
+  - Add runner-side CPU/memory monitoring with warning thresholds (for example 80%).
+- **Prototype note:** A lifecycle prototype exists only in copied `.lifecycle-prototype.ts` files and `.k6-temp` artifacts. It is for design/reference discussion only and is not wired into production execution.
+
+### 2026-04-06 - Exact Error/Warning/CI Artifact Schema Agreed (Planning Only)
+- **What:** Extended the lifecycle/reporting planning direction with concrete schema shapes for machine-readable run artifacts.
+- **Plan file updated:** `VU-Lifecycle-Implementation-Plan.lifecycle-simple-plan.md`
+- **Exact artifact direction agreed:**
+  - `errors.ndjson` -> one structured error event per line with fields such as timestamp, type, journey, transaction, request, VU, iteration, phase, behavior, cause, correlation/data used, and snapshot path.
+  - `warnings.ndjson` -> one structured warning event per line for host/runtime warnings such as high CPU/high memory.
+  - `transaction-metrics.json` -> final per-transaction performance matrix with configurable visible stats/columns.
+  - `ci-summary.json` -> compact CI gate artifact containing status, threshold failures, error/warning counts, key transaction summary, and failed gate rules.
+  - snapshot files -> optional JSON request/response snapshots for failed requests only.
+- **Snapshot trigger direction:** Capture snapshots only for selected failure types (`http_request_failed`, `timeout`, `connection_error`, `correlation_missing`, `runtime_exception`) when enabled and within per-run limits.
+- **CI/CD direction reinforced:** Machine-readable artifacts should be default outputs and first-class citizens; HTML reports remain optional human-facing outputs.
+
+### 2026-04-06 - Reporting Architecture And Output Flow Agreed (Planning Only)
+- **What:** Extended the reporting design with explicit output layers, file ownership, run-directory layout, and CI/CD flow.
+- **Plan file updated:** `VU-Lifecycle-Implementation-Plan.lifecycle-simple-plan.md`
+- **Reporting direction agreed:**
+  - **Console layer:** compact live progress only; no noisy full failure dumps during long tests.
+  - **Machine-readable layer:** first-class outputs for automation/CI (`summary.json`, `transaction-metrics.json`, `errors.ndjson`, `warnings.ndjson`, `ci-summary.json`).
+  - **Human-friendly layer:** HTML reports built from persisted artifacts (`TestDetails.html`, optional `ErrorInsights.html`).
+- **Output ownership direction:**
+  - runtime wrapper/shared helpers emit events and metrics
+  - execution layer persists artifacts and manages run directories
+  - reporting layer renders HTML and final summaries from persisted artifacts
+- **Run-directory direction:**
+  - `results/<PlanName>/Run_<timestamp>/` should contain JSON/NDJSON artifacts, HTML reports, and optional `snapshots/` folder.
+- **Write timing direction:**
+  - stream `errors.ndjson` and `warnings.ndjson` during execution
+  - write summary/transaction/CI artifacts at end of run
+  - generate HTML from final persisted artifacts
+- **CI/CD rule reinforced:** pipelines should use `ci-summary.json` for gating and should not depend on scraping console logs.
+
+### 2026-04-06 - Interactive Graphs / Global Time Filter Direction Agreed (Planning Only)
+- **What:** Extended the reporting direction to support interactive graphs inside a single HTML report with a shared global time filter.
+- **Plan file updated:** `VU-Lifecycle-Implementation-Plan.lifecycle-simple-plan.md`
+- **Unified HTML direction:** Replace split HTML views with one `RunReport.html` containing tabs such as `Summary`, `Graphs`, `Transactions`, `Errors`, `Warnings`, `Snapshots`, and `System`.
+- **Data requirement agreed:** End-of-test summaries alone are not enough for cross-filtered graphs. The report will need bucketed time-series data.
+- **New artifact direction:** Add `timeseries.json` as a first-class machine-readable artifact.
+- **timeseries direction:** Store bucketed aggregates (not raw per-request time-series) for overview metrics, per-transaction trends, system metrics, and event markers.
+- **Global time filter direction:** One selected time window should update all graphs/tabs together and persist across tab switches.
+- **Deep-dive direction:** Graph interactions should drive filtered drill-down into transactions, errors, warnings, and snapshots.
+- **Scale direction:** Keep artifact size under control by using configurable bucket sizes (for example 5s / 10s / 30s / 60s) and reserving detailed payloads for error/snapshot artifacts only.
+
+### 2026-04-06 - Transaction Graph + Attached Table UX Agreed (Planning Only)
+- **What:** Extended the unified reporting design with exact behavior for the transaction response-time graph in the `Graphs` tab.
+- **Plan file updated:** `VU-Lifecycle-Implementation-Plan.lifecycle-simple-plan.md`
+- **UX direction agreed:**
+  - The `Graphs` tab should contain a combined transaction response-time widget with a graph on top and an attached summary table directly below it.
+  - Both graph and table must remain synchronized to the same selected transactions and the same global time window.
+  - Default view should show top 5 transactions.
+  - Users should have controls for `Top 5` vs `All`, plus transaction search/filter/multi-select.
+  - The graph should support metrics like `avg`, `p90`, `p95`, `p99`.
+  - The attached table should show configured stats such as `min`, `max`, `avg`, `p90`, `p95`, `p99` only when enabled in report config.
+  - When the global time range changes, both the graph and the attached table should recalculate/filter together for the selected window.
+
+### 2026-04-06 - Developer Checklist File Added (Planning / Execution Control)
+- **What:** Added a dedicated developer checklist file to break the agreed architecture into incremental framework tasks.
+- **Checklist file:** `FRAMEWORK-IMPLEMENTATION-TODO.md`
+- **Checklist direction:**
+  - Contains task-by-task execution order, dependencies, and expected outputs.
+  - Includes explicit non-regression rule: existing framework functionality must not break.
+  - Intended to be updated together with `AGENT-CONTEXT.md` as implementation progresses.
+- **Current task grouping:** runtime contracts, shared runtime foundation, execution wiring, generator/converter UX, artifact persistence, transaction metrics, error/warning/snapshot flow, host monitoring, unified HTML report, interactive graphs/time filter, CI/CD integration, docs/templates.
+
+### 2026-04-06 - Task 1 Implemented / Task 2 Scaffolded (Non-Breaking Foundation)
+- **What:** Started real framework implementation from the agreed checklist, focusing on Task 1 and Task 2 scaffolding while keeping current execution behavior intact.
+- **Existing files modified:**
+  - `core-engine/src/types/ConfigContracts.ts`
+  - `core-engine/src/config/SchemaValidator.ts`
+  - `core-engine/src/config/RuntimeConfigManager.ts`
+  - `core-engine/src/cli/init.ts`
+  - `core-engine/src/index.ts`
+  - `FRAMEWORK-IMPLEMENTATION-TODO.md`
+- **New files created:**
+  - `core-engine/src/types/EventContracts.ts`
+  - `core-engine/src/types/ReportingContracts.ts`
+  - `core-engine/src/runtime/LifecycleRuntime.ts`
+  - `core-engine/src/runtime/ErrorRuntime.ts`
+  - `core-engine/src/runtime/MetricsRuntime.ts`
+  - `core-engine/src/runtime/SnapshotRuntime.ts`
+  - `core-engine/src/runtime/TimeseriesRuntime.ts`
+- **Task 1 delivered:**
+  - Added runtime/reporting/error/monitoring/timeseries config contracts.
+  - Extended `errorBehavior` to `continue`, `stop_iteration`, `stop_vu`, `abort_test`.
+  - Added schema validation for new runtime sections.
+  - Added runtime config accessors for reporting, monitoring, timeseries, and snapshots.
+  - Updated project scaffold default runtime-settings template to include the new sections.
+- **Task 2 delivered so far:**
+  - Added non-breaking shared runtime scaffolds for lifecycle, structured errors, transaction metrics, snapshots, and bucketed timeseries.
+  - Exported the new runtime helpers from the main barrel file.
+- **Verification:** `cmd /c npm exec tsc -- --noEmit` passed after these changes.
+- **Non-regression note:** No live execution path has been switched over to the new runtime helpers yet; current framework behavior remains intact while the new foundation is being introduced.
+
+### 2026-04-06 - Pacing Rule Clarified During Implementation
+- **What:** Clarified the runtime pacing rule while implementing the config/runtime foundation.
+- **Implementation detail agreed:** The framework should expose pacing similarly to think time (for example `sleep(getFrameworkPacing())`).
+- **Behavior rule agreed:** Pacing should be applied once after the last transaction in `actionPhase(ctx)`, not between every transaction.
+- **Phase rule:** `initPhase(ctx)` and `endPhase(ctx)` should not receive normal pacing by default.
+- **Code update:** `RuntimeConfigManager.ts` now exposes `getPacingSeconds()` in addition to the existing millisecond accessor.
+
+### 2026-04-06 - Task 3 Implemented: Scenario Metadata And Run Orchestration Wiring
+- **What:** Implemented the first non-breaking execution wiring step for the new lifecycle/reporting architecture.
+- **Existing files modified:**
+  - `core-engine/src/scenario/ScenarioBuilder.ts`
+  - `core-engine/src/execution/ParallelExecutionManager.ts`
+  - `core-engine/src/cli/run.ts`
+  - `core-engine/src/execution/PipelineRunner.ts`
+  - `FRAMEWORK-IMPLEMENTATION-TODO.md`
+- **ScenarioBuilder changes:**
+  - Added optional `ScenarioRuntimeMetadata`.
+  - Scenarios can now receive framework-owned env values without changing current script authoring.
+  - Injected env metadata includes:
+    - `K6_PERF_RUN_ID`
+    - `K6_PERF_PLAN_NAME`
+    - `K6_PERF_ENVIRONMENT`
+    - `K6_PERF_EXECUTION_MODE`
+    - `K6_PERF_REPORT_DIR`
+    - `K6_PERF_JOURNEY_NAME`
+    - `K6_PERF_EXEC_NAME`
+    - `K6_PERF_SCENARIO_METADATA` (JSON)
+    - `K6_PERF_RUNTIME_METADATA` (JSON)
+- **ParallelExecutionManager changes:**
+  - `resolve(plan, runtimeMetadata?)` now passes runtime metadata through to `ScenarioBuilder`.
+  - Existing callers remain compatible because the new argument is optional.
+- **run.ts changes:**
+  - Execution now prepares stable run metadata before building scenarios.
+  - Added `prepareRunArtifacts()` to create a run directory and derive `runId`.
+  - Added `buildScenarioRuntimeMetadata()` using `RuntimeConfigManager`.
+  - Added `buildRunEnvironment()` for process-level env injection into k6.
+  - Added `writeRunManifest()` to persist `run-manifest.json` in the run directory.
+  - `ParallelExecutionManager.resolve()` now receives the scenario runtime metadata.
+  - k6 process launch now receives `runId`, `reportDir`, and `runManifestPath`.
+- **PipelineRunner changes:**
+  - `RunOptions` and `PipelineRunResult` now carry `runId`, `reportDir`, `runManifestPath`, and `optionsPath`.
+  - Resolved options file naming is now per-run when `runId` is available.
+- **New output artifact introduced:**
+  - `run-manifest.json` in each run directory. This is a lightweight execution/reporting seed artifact and currently includes:
+    - run metadata
+    - plan summary
+    - runtime reporting/error/pacing summary
+    - planned artifact paths
+    - environment summary
+- **Non-regression note:** This step does **not** switch scripts to the new lifecycle wrapper yet. Existing journey scripts still execute through the current temporary combined entry script, so current framework behavior remains intact while metadata plumbing is added underneath.
+
+### 2026-04-06 - Baseline Reporting Pipeline Implemented For Local Load Runs
+- **What:** Added the first working reporting pipeline on top of existing `summary.json` output so local/non-debug load runs now generate the new unified report artifacts without breaking the old ones.
+- **Existing files modified:**
+  - `core-engine/src/cli/run.ts`
+  - `core-engine/src/index.ts`
+  - `FRAMEWORK-IMPLEMENTATION-TODO.md`
+  - `AGENT-CONTEXT.md`
+- **New files created:**
+  - `core-engine/src/reporting/ArtifactWriter.ts`
+  - `core-engine/src/reporting/TransactionMetricsBuilder.ts`
+  - `core-engine/src/reporting/RunSummaryBuilder.ts`
+  - `core-engine/src/reporting/RunReportGenerator.ts`
+- **Local run artifact behavior now:**
+  - Every normal local load run continues to generate:
+    - `summary.json`
+    - `TestDetails.html`
+    - `TestSummary.html`
+  - In addition, the run now also generates:
+    - `transaction-metrics.json`
+    - `errors.ndjson` (empty placeholder for now)
+    - `warnings.ndjson` (empty placeholder for now)
+    - `ci-summary.json`
+    - `timeseries.json` (empty scaffold for now)
+    - `RunReport.html`
+- **Transaction metrics baseline:**
+  - `TransactionMetricsBuilder` derives transaction duration stats from k6 summary trend metrics.
+  - It derives pass/fail counts from grouped check results in `summary.json`.
+  - Supports configurable columns such as `count`, `pass`, `fail`, `avg`, `min`, `max`, `p(90)`, `p(95)`, `p(99)`.
+  - Includes compatibility logic for older prefixed metric names like `txn_*` and newer direct transaction names.
+- **CI summary baseline:**
+  - `RunSummaryBuilder` now creates `ci-summary.json` from execution status + threshold failures + transaction matrix.
+  - Threshold failures are currently derived from k6 threshold results present in `summary.json`.
+- **Unified HTML baseline:**
+  - `RunReportGenerator` creates a single `RunReport.html` with tabs for:
+    - Summary
+    - Graphs
+    - Transactions
+    - Errors
+    - Warnings
+    - Snapshots
+    - System
+  - The `Graphs` tab already reserves the agreed final shape, including the transaction response-time section and attached table area, but interactive time-series rendering is still pending because runtime time-bucket persistence is not wired yet.
+- **Smoke verification:**
+  - `cmd /c npm exec tsc -- --noEmit` passed.
+  - A smoke run against an existing local `summary.json` successfully generated:
+    - `RunReport.html`
+    - `transaction-metrics.json`
+    - `ci-summary.json`
+    in `.k6-temp/report-smoke`
+- **Non-regression note:** Current reporting remains additive. The framework still emits the previous HTML outputs while the new unified report matures.
+
+### 2026-04-06 - Baseline Structured Error And Warning Artifacts Implemented
+- **What:** Upgraded the reporting finalization path so the new error and warning artifacts now contain real derived events for local runs, instead of empty placeholders.
+- **Existing files modified:**
+  - `core-engine/src/cli/run.ts`
+  - `core-engine/src/index.ts`
+  - `FRAMEWORK-IMPLEMENTATION-TODO.md`
+  - `AGENT-CONTEXT.md`
+- **New file created:**
+  - `core-engine/src/reporting/EventArtifactBuilder.ts`
+- **What the new builder does:**
+  - Derives structured `ErrorEvent` rows from failed k6 checks found in `summary.json`, grouped by transaction.
+  - Derives a framework execution error event when the k6 process exits non-zero.
+  - Derives structured `WarningEvent` rows from threshold breaches found in `summary.json`.
+  - Attaches local runner identity metadata using hostname / PID and available CI job identifiers.
+- **Current artifact behavior:**
+  - `errors.ndjson` now contains real records for assertion/check failures and execution failures.
+  - `warnings.ndjson` now contains real records for threshold breaches.
+  - `ci-summary.json` now reflects derived `errorCount` and `warningCount`.
+  - `RunReport.html` Errors and Warnings tabs now render actual event data when present.
+- **Current limitation:** This is still summary-derived observability, not request-by-request runtime streaming. So the following remain pending:
+  - request/response-level failure events
+  - snapshot-on-failure payload files
+  - exact lifecycle-wrapper enforcement of `continue` / `stop_iteration` / `stop_vu` / `abort_test`
+- **Verification:**
+  - `cmd /c npm exec tsc -- --noEmit` passed after integration.
+  - Smoke rerun against a real historical summary file produced:
+    - `transactionCount: 9`
+    - `errorCount: 4`
+    - `warningCount: 0`
+    - `ciStatus: passed`
+
+### 2026-04-06 - Baseline Timeseries Artifact And Graph Filter Path Implemented
+- **What:** Added the first working `timeseries.json` generation path and connected the unified HTML report to real timeseries data for local runs.
+- **Existing files modified:**
+  - `core-engine/src/cli/run.ts`
+  - `core-engine/src/reporting/RunReportGenerator.ts`
+  - `core-engine/src/index.ts`
+  - `FRAMEWORK-IMPLEMENTATION-TODO.md`
+  - `AGENT-CONTEXT.md`
+- **New file created:**
+  - `core-engine/src/reporting/TimeseriesArtifactBuilder.ts`
+- **Artifact behavior now:**
+  - `timeseries.json` is no longer an empty placeholder.
+  - It now contains:
+    - `overview` series with end-of-run overview metrics such as requests, iterations, error rate, avg duration, p95 duration, and VU values
+    - `transactions` series with per-transaction points for count/pass/fail/avg/min/max/p90/p95/p99 where available
+    - `events` markers derived from structured error/warning artifacts
+    - `system` scaffold entries when agent metadata exists
+- **Report behavior now:**
+  - The `Graphs` tab is now backed by persisted timeseries data instead of a pure placeholder.
+  - Added baseline global time filter controls (`from` / `to` + Apply) in the unified report.
+  - Added baseline transaction visualization using persisted data:
+    - top-5/all toggle
+    - transaction text filter
+    - attached summary table synchronized with the visible transaction set
+  - Current graph rendering is still a lightweight HTML/CSS baseline, not the final richer chart-library implementation.
+- **Current limitation:** Since runtime bucket streaming is not wired yet, local runs currently produce a compact end-of-run timeseries baseline (for example one overview bucket / one point per transaction). This is enough to stabilize the artifact and UI contracts before deeper live-bucket persistence is added.
+- **Verification:**
+  - `cmd /c npm exec tsc -- --noEmit` passed after integration.
+  - Smoke test against a real historical summary file produced:
+    - `overviewPoints: 1`
+    - `transactionSeries: 9`
+    - `eventMarkers: 4`
+  - The updated smoke output was written to `.k6-temp/report-smoke`
+
+### 2026-04-06 - Baseline Phase-Based Generator / Converter UX Implemented
+- **What:** Moved the generator and converter toward the agreed simple author-facing script contract while preserving current execution compatibility.
+- **Existing files modified:**
+  - `core-engine/src/recording/ScriptGenerator.ts`
+  - `core-engine/src/recording/ScriptConverter.ts`
+  - `core-engine/src/cli/generate.ts`
+  - `core-engine/src/cli/convert.ts`
+  - `core-engine/src/cli/run.ts`
+  - `FRAMEWORK-IMPLEMENTATION-TODO.md`
+  - `AGENT-CONTEXT.md`
+- **New file created:**
+  - `core-engine/src/cli/LifecyclePrompt.ts`
+- **CLI behavior now:**
+  - `generate` prompts users to choose init and end groups/transactions after HAR grouping.
+  - `convert` prompts users to choose init and end groups/transactions when run interactively.
+  - Both flows support skipping lifecycle split by pressing Enter / using skip behavior.
+- **Generator output now:**
+  - exports `initPhase(ctx)`
+  - exports `actionPhase(ctx)`
+  - exports `endPhase(ctx)`
+  - still exports a compatibility `default` function that creates a minimal context object and calls `actionPhase(ctx)`
+  - when lifecycle split is skipped, `initPhase(ctx)` and `endPhase(ctx)` are empty and all groups remain in `actionPhase(ctx)`
+- **Converter output now:**
+  - existing conversion still adds framework request logging/transaction wrappers
+  - after conversion, output is reshaped into:
+    - `initPhase(ctx)`
+    - `actionPhase(ctx)`
+    - `endPhase(ctx)`
+    - compatibility `default`
+  - already-converted scripts can also be re-shaped through the same phase contract path
+- **Compatibility note:** This is intentionally a bridge step. The current runtime still executes the compatibility `default` export, so existing execution stays intact while the shared lifecycle runtime is prepared to take over later.
+- **Verification:**
+  - `cmd /c npm exec tsc -- --noEmit` passed after integration.
+  - smoke test confirmed both generator and converter output now contain:
+    - `export function initPhase`
+    - `export function actionPhase`
+    - `export function endPhase`
+    - `export default function`
+
+### 2026-04-06 - Shared Lifecycle Helper Bridge Implemented For Supported Executors
+- **What:** Connected the new phase-based script contract to a shared k6-side lifecycle helper so `initPhase` and `endPhase` can begin executing for supported executors instead of existing only as authoring structure.
+- **Existing files modified:**
+  - `core-engine/src/scenario/ScenarioBuilder.ts`
+  - `core-engine/src/recording/ScriptGenerator.ts`
+  - `core-engine/src/recording/ScriptConverter.ts`
+  - `FRAMEWORK-IMPLEMENTATION-TODO.md`
+  - `AGENT-CONTEXT.md`
+- **New file created:**
+  - `core-engine/src/utils/lifecycle.js`
+- **What the helper does:**
+  - creates a per-script module-scope lifecycle store (`ctx` + run state)
+  - runs `initPhase(ctx)` once per VU lifecycle
+  - runs `actionPhase(ctx)` repeatedly
+  - runs `endPhase(ctx)`:
+    - before action on `ramping-vus` when the computed VU exit time has arrived
+    - after the last action iteration on `per-vu-iterations`
+  - applies pacing after `actionPhase(ctx)` when runtime metadata enables it
+  - applies baseline phase error behavior handling for:
+    - `continue`
+    - `stop_iteration`
+    - `stop_vu`
+    - `abort_test`
+- **ScenarioBuilder update:**
+  - now emits `K6_PERF_PHASES` in scenario env for supported executors
+  - current supported phase envelopes:
+    - `ramping-vus`
+    - `per-vu-iterations`
+  - unsupported executors still fall back safely
+- **Generator / converter update:**
+  - generated and converted scripts now import:
+    - `createJourneyLifecycleStore`
+    - `runJourneyLifecycle`
+  - `default` no longer directly calls `actionPhase(ctx)`; it now delegates to the shared lifecycle helper with module-scope lifecycle state
+- **Compatibility note:** This is still a compatibility bridge, not the final full runtime takeover. Unsupported executors still degrade safely, and request-level runtime observability is still handled by the reporting pipeline rather than deep live lifecycle instrumentation.
+- **Verification:**
+  - `cmd /c npm exec tsc -- --noEmit` passed after integration.
+  - smoke test confirmed:
+    - generated script uses shared lifecycle helper
+    - converted script uses shared lifecycle helper
+    - `ScenarioBuilder` emits `K6_PERF_PHASES`
+    - sample ramping-vus phase envelope looked correct (`0 -> 5 -> 0`)
+
+### 2026-04-06 - Baseline Host Monitoring And System Reporting Implemented
+- **What:** Added a safe baseline host monitoring layer and surfaced the results into the new artifacts and unified report.
+- **Existing files modified:**
+  - `core-engine/src/cli/run.ts`
+  - `core-engine/src/reporting/RunReportGenerator.ts`
+  - `core-engine/src/index.ts`
+  - `FRAMEWORK-IMPLEMENTATION-TODO.md`
+  - `AGENT-CONTEXT.md`
+- **New file created:**
+  - `core-engine/src/execution/HostMonitor.ts`
+- **Behavior now:**
+  - When `runtime.monitoring.enabled` is true, the framework captures host snapshots before and after the run.
+  - Each snapshot currently records:
+    - timestamp
+    - CPU percent
+    - memory percent
+    - agent identity metadata
+  - CPU and memory threshold breaches now emit structured warning events into `warnings.ndjson`.
+  - Added `system-metrics.json` to the run folder.
+  - `RunReport.html` System tab now shows:
+    - agent metadata
+    - captured host snapshots
+- **Current limitation:** This is a baseline start/end snapshot approach, not yet continuous periodic sampling during the full load run.
+
+### 2026-04-06 - Host Monitoring Upgraded To Periodic Sampling During Normal Runs
+- **What:** Deepened the monitoring path so normal load runs can now collect host snapshots periodically while k6 is executing, without changing the existing sync debug flow.
+- **Existing files modified:**
+  - `core-engine/src/execution/PipelineRunner.ts`
+  - `core-engine/src/execution/HostMonitor.ts`
+  - `core-engine/src/cli/run.ts`
+  - `core-engine/src/reporting/TimeseriesArtifactBuilder.ts`
+  - `FRAMEWORK-IMPLEMENTATION-TODO.md`
+  - `AGENT-CONTEXT.md`
+- **Behavior now:**
+  - Added `PipelineRunner.executeAsync()` for the normal run path.
+  - The normal `run` command now uses the async path, while existing sync `execute()` remains intact for current debug usage.
+  - `HostMonitor.startPeriodicSampling()` now samples CPU and memory at the configured interval during execution.
+  - Captured host snapshots are written into:
+    - `system-metrics.json`
+    - `RunReport.html` System tab
+    - `timeseries.json` system series
+- **Verification:**
+  - `cmd /c npm exec tsc -- --noEmit` passed after integration.
+  - periodic sampler smoke test produced:
+    - `snapshotCount: 2`
+    - `hasMetrics: true`
+
+### 2026-04-06 - Scaffolds And Usage Guide Aligned With Phase-Based Model
+- **What:** Updated the framework scaffolds and primary usage guide so new users now see the simple phase-based authoring model by default.
+- **Existing files modified:**
+  - `core-engine/src/cli/init.ts`
+  - `core-engine/src/cli/generate-byos.ts`
+  - `HOW_TO_USE_FRAMEWORK.md`
+  - `FRAMEWORK-IMPLEMENTATION-TODO.md`
+  - `AGENT-CONTEXT.md`
+- **Scaffold behavior now:**
+  - `init` sample scripts use:
+    - `initPhase(ctx)`
+    - `actionPhase(ctx)`
+    - `endPhase(ctx)`
+    - shared lifecycle helper wiring
+  - `generate-byos` now creates the same phase-based script shape
+- **Documentation now covers:**
+  - run artifacts (`RunReport.html`, `ci-summary.json`, `transaction-metrics.json`, `errors.ndjson`, `warnings.ndjson`, `timeseries.json`, `system-metrics.json`, `run-manifest.json`)
+  - simple lifecycle authoring model
+  - updated generator/BYOS behavior
+  - CI/CD artifact-first consumption guidance
+
+### 2026-04-06 - Implementation Baseline Reached Across Remaining Tasks
+- **What:** Completed the current baseline implementation across the remaining planned areas without breaking existing framework execution.
+- **Current overall state:**
+  - Runtime/reporting contracts added
+  - Shared runtime scaffolds added
+  - Scenario/runtime metadata wiring added
+  - Local run artifacts and unified report added
+  - Structured derived errors/warnings added
+  - Baseline timeseries and graph filtering added
+  - Generator/converter moved to phase-based script shape
+  - Shared lifecycle helper bridge activated for supported executors
+  - Baseline host monitoring added
+  - Templates/docs aligned with new model
+- **Important note for future work:** Several areas are intentionally "baseline-first" rather than fully mature:
+  - request-by-request runtime error streaming
+  - failure snapshot payload generation
+  - richer interactive chart library integration
+  - continuous host sampling during the run
+  - deeper converted-script state mapping across phases
+
+### 2026-04-06 - Runtime Settings Backward Compatibility Fix
+- **What:** Relaxed runtime schema validation so older runtime JSON files remain valid while still supporting the newer `reporting`, `errors`, and `monitoring` sections.
+- **Files updated:**
+  - `core-engine/src/config/SchemaValidator.ts`
+  - `config/runtime-settings/default.json`
+  - `dist/config/SchemaValidator.js`
+- **Why:** Existing commands like `npm run cli -- run --plan config/test-plans/webui-load-test.json` were failing before execution because older runtime files lacked the newly introduced optional sections.
+- **Verification outcome:** Config validation now gets past the runtime-settings stage. The next visible blocker in `webui-load-test.json` is a missing journey script path (`buyanimal_1.framework-lifecycle-journey.js`), which is separate from runtime schema validation.
+
+### 2026-04-06 - RuntimeConfigManager Reporting Fallback Fix
+- **What:** Hardened `RuntimeConfigManager` so reporting/error/monitoring accessors fall back to `FRAMEWORK_DEFAULTS` when merged runtime config is partial or stale.
+- **Files updated:**
+  - `core-engine/src/config/RuntimeConfigManager.ts`
+  - `dist/config/RuntimeConfigManager.js`
+- **Why:** `tsx core-engine/src/cli/run.ts run --plan config/test-plans/webui-load-test.json` was crashing in `getTransactionStats()` with `transactionStats is not iterable`.
+- **Verification outcome:** The crash is resolved; the run now proceeds into k6 execution. Remaining failures observed are run-environment/network related (blocked outbound access to `jpetstore.aspectran.com`) and report-path polish, not runtime-config accessor crashes.

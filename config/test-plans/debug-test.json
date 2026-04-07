@@ -24,14 +24,14 @@
     "enabled": true,
     "mode": "diff",
     "vus": 1,
-    "iterations": 2,
+    "iterations": 5,
     "reportDir": "results/debug",
     "failOnMissingRecordingLog": false
   },
   "user_journeys": [
     {
-      "name": "buyanimal_raw",
-      "scriptPath": "buyanimal_1.js"
+      "name": "buyanimal_1_framework_lifecycle",
+      "scriptPath": "buyanimal_1_framework_lifecycle.js"
     }
   ]
 }

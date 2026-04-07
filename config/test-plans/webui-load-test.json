@@ -13,14 +13,9 @@
   },
   "user_journeys": [
     {
-      "name": "homepage_browsing",
-      "scriptPath": "homepage-journey.js",
-      "weight": 60
-    },
-    {
-      "name": "login_flow",
-      "scriptPath": "login-journey.js",
-      "weight": 40
+      "name": "buyanimal_1_framework_lifecycle",
+      "scriptPath": "buyanimal_1_framework_lifecycle.js",
+      "weight": 100
     }
   ],
   "global_sla": {

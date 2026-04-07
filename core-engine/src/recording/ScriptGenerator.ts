@@ -1,21 +1,51 @@
 import { TransactionGroup } from './TransactionGrouper';
 
+export interface LifecycleSelection {
+  initGroups: string[];
+  endGroups: string[];
+}
+
 export class ScriptGenerator {
   /**
    * Generates formatted TypeScript/JavaScript source code based on Transaction Groups.
    */
-  static generate(groups: TransactionGroup[]): string {
+  static generate(groups: TransactionGroup[], lifecycle?: LifecycleSelection): string {
     let script = `import http from 'k6/http';\n`;
     script += `import { check, sleep, group } from 'k6';\n`;
     script += `import { initTransactions, startTransaction, endTransaction } from '../../../core-engine/src/utils/transaction.js';\n`;
+    script += `import { createJourneyLifecycleStore, runJourneyLifecycle } from '../../../core-engine/src/utils/lifecycle.js';\n`;
     script += `import { logExchange, trackCorrelation, trackParameter } from '../../../core-engine/src/utils/replayLogger.js';\n\n`;
 
     const transactionNames = groups.map((g) => g.name);
+    const initSet = new Set(lifecycle?.initGroups ?? []);
+    const endSet = new Set(lifecycle?.endGroups ?? []);
+    const initGroups = groups.filter((groupItem) => initSet.has(groupItem.name));
+    const endGroups = groups.filter((groupItem) => endSet.has(groupItem.name));
+    const actionGroups = groups.filter((groupItem) => !initSet.has(groupItem.name) && !endSet.has(groupItem.name));
+
     script += `initTransactions(${this.formatArray(transactionNames)});\n\n`;
+    script += `const __journeyLifecycleStore = createJourneyLifecycleStore();\n\n`;
 
+    script += this.buildPhaseFunction('initPhase', initGroups);
+    script += `\n`;
+    script += this.buildPhaseFunction('actionPhase', actionGroups);
+    script += `\n`;
+    script += this.buildPhaseFunction('endPhase', endGroups);
+    script += `\n`;
     script += `export default function () {\n`;
+    script += `  runJourneyLifecycle(__journeyLifecycleStore, { initPhase, actionPhase, endPhase });\n`;
+    script += `}\n`;
+    return script;
+  }
 
+  private static buildPhaseFunction(functionName: string, groups: TransactionGroup[]): string {
+    let script = `export function ${functionName}(ctx) {\n`;
     let globalRequestId = 0;
+
+    if (groups.length === 0) {
+      script += `}\n`;
+      return script;
+    }
 
     groups.forEach((groupItem, groupIndex) => {
       script += `  group('${groupItem.name}', function () {\n`;

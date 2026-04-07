@@ -1,5 +1,5 @@
-import { SLARegistry } from './SLARegistry';
 import { TestPlan } from '../types/TestPlanSchema';
+import { SLARegistry } from './SLARegistry';
 
 export class ThresholdManager {
   /**

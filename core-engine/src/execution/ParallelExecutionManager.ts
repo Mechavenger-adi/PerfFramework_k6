@@ -5,7 +5,7 @@
  */
 
 import { TestPlan } from '../types/TestPlanSchema';
-import { ScenarioBuilder, K6ScenariosMap } from '../scenario/ScenarioBuilder';
+import { ScenarioBuilder, K6ScenariosMap, ScenarioRuntimeMetadata } from '../scenario/ScenarioBuilder';
 import { JourneyAllocator } from './JourneyAllocator';
 import { ThresholdManager } from '../assertions/ThresholdManager';
 
@@ -21,7 +21,7 @@ export class ParallelExecutionManager {
    * Resolve the full k6 options object from a test plan.
    * Handles VU allocation for parallel weighted journeys.
    */
-  static resolve(plan: TestPlan): K6Options {
+  static resolve(plan: TestPlan, runtimeMetadata?: ScenarioRuntimeMetadata): K6Options {
     // For parallel execution with weights, we recalculate per-journey VUs
     if (plan.execution_mode === 'parallel') {
       const maxVUs = this.extractMaxVUs(plan);
@@ -48,14 +48,14 @@ export class ParallelExecutionManager {
         };
 
         return { 
-          scenarios: ScenarioBuilder.build(modifiedPlan),
+          scenarios: ScenarioBuilder.build(modifiedPlan, runtimeMetadata),
           thresholds: ThresholdManager.apply(modifiedPlan)
         };
       }
     }
 
     return { 
-      scenarios: ScenarioBuilder.build(plan),
+      scenarios: ScenarioBuilder.build(plan, runtimeMetadata),
       thresholds: ThresholdManager.apply(plan)
     };
   }

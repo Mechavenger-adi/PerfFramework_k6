@@ -1,0 +1,571 @@
+# VU Lifecycle Implementation Plan
+
+## Objective
+
+Replicate LoadRunner-style `vuser_init` / `Action` / `vuser_end` behavior in k6 while keeping the **user-facing journey script as simple as possible**.
+
+The agreed design goal is:
+
+- **Simple for script authors**
+- **Framework handles lifecycle complexity internally**
+- **Safe for load and endurance execution**
+
+---
+
+## Final Direction
+
+### User-facing script contract
+
+Journey authors should write only business-flow code using these exports:
+
+```javascript
+export function initPhase(ctx) {}
+export function actionPhase(ctx) {}
+export function endPhase(ctx) {}
+```
+
+Where:
+
+- `initPhase(ctx)` = run once per VU when the VU enters an active window
+- `actionPhase(ctx)` = repeat for the life of that VU
+- `endPhase(ctx)` = run once when the VU is scheduled to exit, when k6 allows it
+
+### Per-VU memory
+
+The framework provides a per-VU `ctx` object:
+
+```javascript
+ctx = {
+  data: {},
+  session: {},
+  correlation: {},
+  meta: {},
+}
+```
+
+Recommended use:
+
+- `ctx.data` = parameterized CSV / test data values
+- `ctx.session` = cookies, auth tokens, login state
+- `ctx.correlation` = dynamic extracted values like product id, order id, csrf token
+- `ctx.meta` = optional helper/debug values
+
+### Hidden framework wrapper
+
+The framework, not the user script, will own:
+
+- VU lifecycle routing
+- per-VU state initialization/reset
+- ramp-down exit-time math
+- executor-specific lifecycle handling
+- reactivation handling for multi-spike scenarios
+
+This logic should live in a shared runtime helper or generated wrapper layer, **not** directly in the user-visible journey script.
+
+---
+
+## Why We Changed Direction
+
+The earlier prototype proved the logic works, but it also made the generated script too complex for new users:
+
+- large `default()` controller
+- `__PHASES` / `__getExitInfoForVU()`
+- state reset logic
+- lifecycle math in the script
+- too much framework plumbing mixed with business flow
+
+That would make script authorship, review, and onboarding harder than necessary.
+
+The new direction keeps the author-facing file close to the LoadRunner mental model while preserving the framework’s ability to simulate per-VU init/action/end.
+
+---
+
+## Example: Desired User-Facing Script
+
+### buyanimal journey shape
+
+For the existing buy-animal flow, the intended split is:
+
+- **Init**: `t01_launch`, `t02_login`
+- **Action**: `search_animal`, `select_product`, `add_to_cart`, `increase_quantity_to_2_and_proceed_to_checkout`, `click_continue`, `click_confirm`
+- **End**: `logout`
+
+### Example author-facing script
+
+```javascript
+export function initPhase(ctx) {
+  // choose user data
+  // login
+  // save tokens/session to ctx
+}
+
+export function actionPhase(ctx) {
+  // search animal
+  // select product
+  // add to cart
+  // checkout
+  // save dynamic IDs to ctx.correlation
+}
+
+export function endPhase(ctx) {
+  // logout using ctx.session / ctx.correlation
+}
+```
+
+The user should not have to care about:
+
+- `exec.vu.idInInstance`
+- elapsed time
+- stage analysis
+- VU removal math
+- reactivation windows
+
+---
+
+## Runtime Model
+
+### Lifecycle wrapper behavior
+
+The hidden wrapper should do this:
+
+1. Create one `ctx` per VU.
+2. Read lifecycle config and computed phase timing from framework env/config.
+3. On first active call for a VU window, run `initPhase(ctx)` if present.
+4. On normal iterations, run `actionPhase(ctx)`.
+5. When the VU reaches its scheduled exit time, run `endPhase(ctx)` if present.
+6. If k6 reuses a VU for a later spike window, reset the VU context and run init again.
+
+### Supported executors for v1
+
+Lifecycle support should be officially supported in v1 only for:
+
+- `ramping-vus` with explicit final `target: 0`
+- optionally `per-vu-iterations`
+
+Lifecycle should be **unsupported or clearly best-effort** for:
+
+- `constant-vus`
+- `shared-iterations`
+- `ramping-arrival-rate`
+- `constant-arrival-rate`
+
+### Exit timing model
+
+For `ramping-vus`, the framework computes a cumulative timeline from stages and determines which VU IDs are removed during each ramp-down segment.
+
+For a ramp-down segment from `prevVUs` to `targetVUs`:
+
+```text
+removedCount = prevVUs - targetVUs
+offset = prevVUs - vuId
+exitTime = segmentStart + segmentDuration * (offset / removedCount)
+```
+
+This correctly handles cases like `10 -> 4` and avoids the earlier incorrect simplification that only worked when the target was `0`.
+
+---
+
+## Performance / Endurance Design Rules
+
+To keep lifecycle support safe for load and endurance testing:
+
+- Keep the wrapper thin.
+- Keep `ctx` small.
+- Never store full response bodies in `ctx`.
+- Disable replay/debug logging in normal load runs.
+- Avoid generating large duplicated helper code into every script when a shared runtime helper will do.
+- Limit correlation and variable tracking to what the journey actually needs.
+
+Expected impact:
+
+- lifecycle control logic itself should be low overhead
+- the real execution cost remains dominated by HTTP, checks, parsing, and debug/reporting features
+
+---
+
+## Runtime Settings Precedence
+
+The framework also needs a clear rule for runtime-controlled behavior such as:
+
+- think time
+- pacing
+- request timeout
+- max redirects
+- throw-on-error behavior
+- error behavior (`continue`, `stop_iteration`, `stop_vu`, `abort_test`)
+
+### Current state
+
+Today, runtime settings are defined in config and exposed via `RuntimeConfigManager`, but they are not yet consistently enforced inside generated/converted scripts.
+
+So currently:
+
+- `sleep(5)` written in script stays `5s`
+- runtime `thinkTime.fixed = 1` does **not** automatically replace it
+- request params written in script are not automatically overwritten by runtime timeout/max-redirect settings
+
+### Final precedence rule
+
+The recommended rule is:
+
+1. **Explicit script value wins** when the script author intentionally overrides behavior.
+2. **Runtime settings provide the default** for framework-managed behavior.
+3. **Generated and converted scripts should call framework helpers** instead of hardcoding generic waits or HTTP defaults.
+
+### Practical meaning
+
+#### Think time
+
+- If user script explicitly writes `sleep(5)`, keep `5s`
+- If script uses framework-managed think time helper, use runtime config value
+
+Recommended framework helper:
+
+```javascript
+sleep(getFrameworkThinkTime());
+```
+
+#### Pacing
+
+- Pacing should be controlled by the framework wrapper, not hardcoded in scripts
+- Runtime settings should define pacing target when enabled
+- Script authors should not manually implement iteration pacing
+
+#### HTTP timeout / redirects / throw-on-error
+
+- Generated/converted requests should inherit runtime defaults unless the request explicitly sets its own override
+- If script explicitly sets request timeout or redirects, keep that explicit value
+
+### Implementation plan for precedence
+
+To achieve this cleanly:
+
+1. Add shared runtime helper functions for:
+   - `getFrameworkThinkTime()`
+   - `applyFrameworkHttpDefaults(params)`
+   - `applyFrameworkErrorBehavior(error, ctx)`
+   - pacing helper inside the hidden lifecycle wrapper
+   - structured error/event logging helper
+2. Update generator output to use framework helpers instead of hardcoded generic `sleep(1)` and generic request defaults.
+3. Update converter output to:
+   - preserve explicit hardcoded waits if user already wrote them intentionally
+   - optionally rewrite framework-generated/default sleeps to helper-driven waits
+4. Keep the precedence rule documented in the framework guide so users know when script values override runtime defaults.
+
+### Summary rule
+
+> **Framework runtime settings should act as defaults; explicit script behavior should override them.**
+
+---
+
+## Error Behavior Contract
+
+The framework should support explicit runtime-controlled behavior for execution failures via:
+
+```json
+"errorBehavior": "continue"
+```
+
+### Supported values
+
+- `continue`
+- `stop_iteration`
+- `stop_vu`
+- `abort_test`
+
+### Expected behavior
+
+#### `continue`
+
+- log the error
+- continue the current iteration
+- allow future iterations for that VU to continue
+
+#### `stop_iteration`
+
+- log the error
+- stop only the current iteration for that VU
+- allow the next iteration for that VU to continue
+
+#### `stop_vu`
+
+- log the error
+- stop that VU completely
+- no further iterations should run for that VU
+
+#### `abort_test`
+
+- log the error
+- abort the entire test execution
+
+### What counts as an error
+
+The runtime should apply `errorBehavior` to framework-managed execution failures such as:
+
+- HTTP/network failure
+- request timeout
+- critical correlation extraction failure
+- critical parameter/data lookup failure
+- explicit critical validation/check failure
+- script/runtime exception inside framework-managed journey execution
+
+### Implementation plan for error behavior
+
+To achieve this cleanly:
+
+1. Expand the runtime config contract to support:
+   - `continue`
+   - `stop_iteration`
+   - `stop_vu`
+   - `abort_test`
+2. Route all framework-managed execution failures through a shared error handler.
+3. The shared error handler should:
+   - build a structured error event
+   - attach VU, iteration, transaction, request, and correlation context
+   - apply the configured runtime behavior
+4. The hidden lifecycle/runtime wrapper should enforce the chosen behavior consistently across:
+   - `initPhase(ctx)`
+   - `actionPhase(ctx)`
+   - `endPhase(ctx)`
+
+### Design note
+
+`stop_vu` may require framework-managed VU termination handling because k6 does not expose a perfect LoadRunner-style stop-this-one-VU-forever primitive in the same user-facing way. The framework should still preserve this behavior as the contract and implement the closest reliable runtime handling possible.
+
+---
+
+## Implementation Strategy
+
+### Phase 1: Define the user-facing script contract
+
+Add framework conventions for:
+
+- `initPhase(ctx)`
+- `actionPhase(ctx)`
+- `endPhase(ctx)`
+
+`actionPhase(ctx)` should be required.
+`initPhase(ctx)` and `endPhase(ctx)` should be optional.
+
+### Phase 2: Add lifecycle config to the test-plan schema
+
+Add `lifecycle` to `UserJourney`:
+
+```json
+{
+  "lifecycle": {
+    "init": ["t01_launch", "t02_login"],
+    "end": ["logout"]
+  }
+}
+```
+
+Meaning:
+
+- generated/converted scripts can be split automatically
+- hand-authored scripts can either export phases directly or rely on grouping rules
+
+### Phase 3: Framework validation
+
+Schema + gatekeeper validation should:
+
+- validate `lifecycle.init` and `lifecycle.end` arrays
+- warn on overlap between `init` and `end`
+- fail/warn on unsupported executors
+- warn when `ramping-vus` does not end with explicit `target: 0`
+- require enough iterations for `per-vu-iterations`
+
+### Phase 4: Compute per-VU phase timing
+
+`ScenarioBuilder` should:
+
+- parse stages into cumulative timeline windows
+- compute `peakVUs`
+- inject `K6_PERF_PHASES` into scenario env
+- inject lifecycle metadata used by the wrapper/runtime
+
+### Phase 5: Create a shared lifecycle runtime wrapper
+
+Introduce a lifecycle runtime helper responsible for:
+
+- creating `ctx`
+- tracking VU lifecycle state
+- evaluating exit timing
+- handling reactivation between spike windows
+- invoking `initPhase`, `actionPhase`, and `endPhase`
+- applying runtime pacing behavior
+- exposing framework think-time / HTTP-default helpers
+- enforcing configured `errorBehavior`
+- routing runtime failures through the shared error handler
+
+This should be shared runtime code, not duplicated heavy logic in every user script.
+
+### Phase 6: Generator output
+
+`ScriptGenerator` should emit **simple user-facing scripts**, not large lifecycle controllers.
+
+For generated HAR journeys:
+
+- list discovered groups/transactions to the user during generation
+- ask which groups should go to `initPhase(ctx)`
+- ask which groups should go to `endPhase(ctx)`
+- offer a clear **skip lifecycle split** option
+- put early setup/login groups into `initPhase(ctx)`
+- put repeatable business groups into `actionPhase(ctx)`
+- put logout/signoff groups into `endPhase(ctx)`
+- use framework runtime helpers for default think time and HTTP settings instead of baking in generic values
+
+If the user skips lifecycle selection:
+
+- still generate `initPhase(ctx)` and `endPhase(ctx)`
+- keep both functions empty
+- place all groups in `actionPhase(ctx)`
+
+That keeps every generated script in the same easy-to-learn structure.
+
+### Phase 7: Converter output
+
+`ScriptConverter` should convert conventional k6 scripts into the same simple contract:
+
+- list discovered groups/transactions to the user during conversion
+- ask which groups should go to `initPhase(ctx)`
+- ask which groups should go to `endPhase(ctx)`
+- offer a clear **skip lifecycle split** option
+- transform group sections into `initPhase(ctx)`, `actionPhase(ctx)`, `endPhase(ctx)`
+- rewrite tracked parameter values to `ctx.data`
+- rewrite correlation storage to `ctx.correlation`
+- keep the resulting file readable and business-focused
+- preserve explicit script-specific waits and request overrides where they are clearly intentional
+- optionally normalize framework-default waits/params to runtime-helper calls
+
+If the user skips lifecycle selection:
+
+- still emit `initPhase(ctx)` and `endPhase(ctx)`
+- leave them empty
+- move all detected groups into `actionPhase(ctx)`
+
+Validation rule:
+
+- a group cannot belong to both `initPhase` and `endPhase`
+- overlapping selection should be blocked or corrected during the prompt flow
+
+### Phase 8: CLI/runtime integration
+
+The execution path should detect whether a journey exports:
+
+- `initPhase`
+- `actionPhase`
+- `endPhase`
+
+Then the framework should execute the hidden wrapper entry instead of exposing lifecycle logic inside the journey file itself.
+
+### Phase 9: Debug mode behavior
+
+Debug mode should remain simple:
+
+- ignore lifecycle timing
+- run phases sequentially in one pass
+- preserve diff/replay readability
+
+For debug mode, behavior should effectively be:
+
+```text
+initPhase -> actionPhase -> endPhase
+```
+
+with 1 VU / 1 iteration as today.
+
+---
+
+## UX Rules For New Users
+
+The framework should optimize for clarity:
+
+- authors should mostly read business transactions, not framework plumbing
+- no lifecycle math in journey files
+- no internal state-machine code in journey files
+- keep naming explicit: `initPhase`, `actionPhase`, `endPhase`, `ctx`
+- keep the generated/converter interaction guided and simple
+- always produce the same phase-based script shape, even when the user skips lifecycle grouping
+- documentation should teach only the simple contract first
+
+If users need advanced behavior, it should be additive, not the default authoring experience.
+
+---
+
+## Open Decisions
+
+### 1. Script authoring style
+
+Need to choose one of these as the official convention:
+
+- scripts directly export `initPhase/actionPhase/endPhase`
+- generator/converter emit those exports automatically
+- framework can still accept legacy `default()` scripts for backward compatibility
+
+### 2. Auto-detection rules
+
+Need final heuristics for generated/converted journeys:
+
+- detect login/signon as init
+- detect signoff/logout as end
+- put everything else into action
+
+### 3. Runtime helper placement
+
+Need to decide where the hidden lifecycle wrapper lives:
+
+- shared runtime utility module
+- generated temp wrapper per run
+- mixed model (shared helper + tiny generated wrapper)
+
+Preferred direction: **shared helper + tiny generated wrapper**
+
+---
+
+## Recommended v1 Scope
+
+v1 should deliver:
+
+- simple user-facing phase exports
+- per-VU `ctx`
+- hidden lifecycle wrapper
+- support for `ramping-vus`
+- optional support for `per-vu-iterations`
+- validation and documentation
+
+v1 should **not** try to solve everything:
+
+- no full lifecycle guarantee for all executors
+- no user-facing lifecycle math
+- no complex generated state machine in script files
+
+---
+
+## Files Likely To Change In The Real Implementation
+
+- `core-engine/src/types/TestPlanSchema.ts`
+- `core-engine/src/config/SchemaValidator.ts`
+- `core-engine/src/config/GatekeeperValidator.ts`
+- `core-engine/src/scenario/ScenarioBuilder.ts`
+- `core-engine/src/recording/ScriptGenerator.ts`
+- `core-engine/src/recording/ScriptConverter.ts`
+- new shared lifecycle runtime helper file(s)
+- CLI/execution entry integration for wrapper generation/loading
+- docs / examples / sample plans
+
+---
+
+## Summary
+
+The implementation plan is now based on this principle:
+
+> **Keep the user script simple. Hide lifecycle mechanics inside the framework.**
+
+That gives the framework:
+
+- LoadRunner-like authoring
+- less user frustration
+- cleaner onboarding
+- lower risk of unreadable generated scripts
+- lifecycle support without compromising load/endurance suitability

@@ -23,11 +23,16 @@ export function runGenerateByos(teamName: string, scriptName: string): void {
   const template = `import http from 'k6/http';
 import { check, sleep, group } from 'k6';
 import { initTransactions, startTransaction, endTransaction } from '../../../core-engine/src/utils/transaction.js';
+import { createJourneyLifecycleStore, runJourneyLifecycle } from '../../../core-engine/src/utils/lifecycle.js';
 import { logExchange } from '../../../core-engine/src/utils/replayLogger.js';
 
 initTransactions(['BYOS_Custom_Logic']);
+const lifecycleStore = createJourneyLifecycleStore();
 
-export default function () {
+export function initPhase(ctx) {
+}
+
+export function actionPhase(ctx) {
   group('BYOS Custom Logic', function () {
     startTransaction('BYOS_Custom_Logic');
     
@@ -47,7 +52,14 @@ export default function () {
     endTransaction('BYOS_Custom_Logic');
   });
 
-  sleep(1);
+  sleep(1); // think time between business steps if needed
+}
+
+export function endPhase(ctx) {
+}
+
+export default function () {
+  runJourneyLifecycle(lifecycleStore, { initPhase, actionPhase, endPhase });
 }
 `;
 
