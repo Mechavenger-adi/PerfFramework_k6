@@ -623,3 +623,16 @@ export default function () {
 | `config/test-plans/load-test.json` | Add lifecycle example | Sample config |
 
 **No changes to:** `ReplayRunner.ts`, `HTMLDiffReporter.ts`, `PipelineRunner.ts`, `transaction.ts`, `ThresholdManager.ts`, `SLARegistry.ts`, `ExecutorFactory.ts`, `WorkloadModels.ts`, `JourneyAllocator.ts`, `ParallelExecutionManager.ts`
+
+---
+
+## Addendum: Cookie Persistence (2026-04-08)
+
+The framework now defaults to `noCookiesReset: true` in k6 options to match LoadRunner's cookie persistence behavior. Without this, k6 clears the cookie jar between iterations, breaking session-dependent applications.
+
+- `TestPlan.noCookiesReset` (default true) — global setting
+- `UserJourney.noCookiesReset` — per-journey override via `session.js` utilities
+- `session.js` provides `registerBaseUrl()`, `clearCookies()`, `deleteCookie()` for fine-grained control
+- Generated/converted scripts auto-import session utilities and call `clearCookies()` in `initPhase`
+
+See `VU-Lifecycle-Implementation-Plan.lifecycle-simple-plan.md` for full details.

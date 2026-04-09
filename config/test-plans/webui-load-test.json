@@ -7,10 +7,11 @@
     "startVUs": 0,
     "stages": [
       { "duration": "15s", "target": 10 },
-      { "duration": "1m",  "target": 10 },
+      { "duration": "30s",  "target": 10 },
       { "duration": "15s", "target": 0  }
     ]
   },
+  "noCookiesReset": true,
   "user_journeys": [
     {
       "name": "buyanimal_1_framework_lifecycle",
@@ -19,7 +20,18 @@
     }
   ],
   "global_sla": {
-    "p95": 2000,
+    "p99": 2000,
     "errorRate": 10
+  },
+  "journey_slas": {
+    "buyanimal_1_framework_lifecycle": {
+      "p95": 1500,
+      "errorRate": 5
+    }
+  },
+  "transaction_slas": {
+    "t01_launch": { "p95": 800 },
+    "t02_login": { "p95": 1000 },
+    "click_confirm": { "p95": 1500, "p99": 3000 }
   }
 }

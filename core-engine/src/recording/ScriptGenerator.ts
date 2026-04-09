@@ -14,7 +14,15 @@ export class ScriptGenerator {
     script += `import { check, sleep, group } from 'k6';\n`;
     script += `import { initTransactions, startTransaction, endTransaction } from '../../../core-engine/src/utils/transaction.js';\n`;
     script += `import { createJourneyLifecycleStore, runJourneyLifecycle } from '../../../core-engine/src/utils/lifecycle.js';\n`;
-    script += `import { logExchange, trackCorrelation, trackParameter } from '../../../core-engine/src/utils/replayLogger.js';\n\n`;
+    script += `import { logExchange, trackCorrelation, trackParameter } from '../../../core-engine/src/utils/replayLogger.js';\n`;
+    script += `import { clearCookies, registerBaseUrl } from '../../../core-engine/src/utils/session.js';\n\n`;
+
+    // Extract unique base URLs from all request entries for registerBaseUrl
+    const baseUrls = this.extractBaseUrls(groups);
+    for (const baseUrl of baseUrls) {
+      script += `registerBaseUrl(${JSON.stringify(baseUrl)});\n`;
+    }
+    if (baseUrls.length > 0) script += `\n`;
 
     const transactionNames = groups.map((g) => g.name);
     const initSet = new Set(lifecycle?.initGroups ?? []);
@@ -41,6 +49,11 @@ export class ScriptGenerator {
   private static buildPhaseFunction(functionName: string, groups: TransactionGroup[]): string {
     let script = `export function ${functionName}(ctx) {\n`;
     let globalRequestId = 0;
+
+    // Clear cookies at the start of initPhase so each VU starts with a clean session
+    if (functionName === 'initPhase') {
+      script += `  clearCookies();\n\n`;
+    }
 
     if (groups.length === 0) {
       script += `}\n`;
@@ -186,5 +199,19 @@ export class ScriptGenerator {
       .replace(/"([^"]+)":/g, (_match, key: string) => {
         return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(key) ? `${key}:` : `"${key}":`;
       });
+  }
+
+  /** Extract unique origin URLs (protocol+host) from all HAR entries in all groups. */
+  private static extractBaseUrls(groups: TransactionGroup[]): string[] {
+    const origins = new Set<string>();
+    for (const group of groups) {
+      for (const entry of group.entries) {
+        try {
+          const u = new URL(entry.url);
+          origins.add(u.origin + '/');
+        } catch { /* skip malformed */ }
+      }
+    }
+    return [...origins];
   }
 }

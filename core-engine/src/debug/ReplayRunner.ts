@@ -15,6 +15,7 @@ export interface DebugReplayOptions {
   replayLogPath?: string;
   vus?: number;
   iterations?: number;
+  noCookiesReset?: boolean;
 }
 
 export interface DebugReplayResult {
@@ -72,6 +73,7 @@ export class ReplayRunner {
     const runResult = PipelineRunner.execute({
       scriptPath: absScriptPath,
       k6Options: {
+        noCookiesReset: options.noCookiesReset !== false,
         scenarios: {
           debug_replay: {
             executor: 'shared-iterations',

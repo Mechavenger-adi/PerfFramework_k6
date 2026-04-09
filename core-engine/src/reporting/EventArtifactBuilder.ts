@@ -1,7 +1,7 @@
 import * as os from 'os';
+import { ErrorRuntime } from '../runtime/ErrorRuntime';
 import { ErrorBehavior } from '../types/ConfigContracts';
 import { AgentContext, ErrorEvent, WarningEvent } from '../types/EventContracts';
-import { ErrorRuntime } from '../runtime/ErrorRuntime';
 
 interface SummaryCheck {
   name?: string;

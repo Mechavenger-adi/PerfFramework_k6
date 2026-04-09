@@ -90,8 +90,12 @@ export class RunReportGenerator {
     }
     .bar-label, .bar-value { font-size: 12px; color: var(--muted); margin-top: 8px; }
     .subtle { color: var(--muted); font-size: 13px; }
+    .chart-canvas-wrap { position: relative; width: 100%; min-height: 280px; }
+    .chart-canvas-wrap canvas { width: 100% !important; }
+    .donut-wrap { position: relative; width: 100%; max-width: 280px; margin: 0 auto; }
     @media (max-width: 980px) { .split { grid-template-columns: 1fr; } }
   </style>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 </head>
 <body>
   <div class="shell">
@@ -208,10 +212,12 @@ export class RunReportGenerator {
               \${selectedOverview ? renderOverviewCards(selectedOverview) : '<div class="empty">No overview points in the selected time range.</div>'}
             </div>
             <div class="chart-box">
-              <h3>Transaction Response Time Over Time</h3>
-              <p class="subtle">Baseline timeseries is now persisted from local load runs. As runtime bucket streaming is added, this same area will deepen into the fully interactive graph experience.</p>
-              <div id="transaction-chart-host"></div>
-              <p class="subtle">Configured stats: \${stats.map(escapeHtml).join(', ')}</p>
+              <h3>Transaction Response Time (ms)</h3>
+              <div class="chart-canvas-wrap"><canvas id="txn-bar-chart"></canvas></div>
+            </div>
+            <div class="chart-box">
+              <h3>Pass / Fail Distribution</h3>
+              <div class="donut-wrap"><canvas id="txn-donut-chart"></canvas></div>
             </div>
           </div>
           <div class="card">
@@ -222,7 +228,6 @@ export class RunReportGenerator {
       \`;
 
       const host = document.getElementById('graph-table-host');
-      const chartHost = document.getElementById('transaction-chart-host');
       const select = document.getElementById('txn-view-mode');
       const filter = document.getElementById('txn-filter');
       const fromInput = document.getElementById('global-from');
@@ -231,12 +236,104 @@ export class RunReportGenerator {
 
       hydrateTimeInputs(fromInput, toInput);
 
+      let barChartInstance = null;
+      let donutChartInstance = null;
+
       function renderAttachedTable() {
         const source = select.value === 'all' ? transactions : topFive;
         const filtered = source.filter((row) => row.transaction.toLowerCase().includes(filter.value.toLowerCase()));
         const columns = ['transaction', ...stats];
         host.innerHTML = filtered.length ? renderTable(filtered, columns) : '<div class="empty">No transactions match the current filter.</div>';
-        chartHost.innerHTML = filtered.length ? renderTransactionBars(filtered) : '<div class="empty">No transactions match the current filter.</div>';
+        renderBarChart(filtered);
+        renderDonutChart(transactions);
+      }
+
+      function renderBarChart(rows) {
+        if (barChartInstance) barChartInstance.destroy();
+        const canvas = document.getElementById('txn-bar-chart');
+        if (!canvas || !rows.length) return;
+        const labels = rows.map(r => r.transaction.length > 30 ? r.transaction.slice(0, 27) + '...' : r.transaction);
+        const avgData = rows.map(r => Number(r.avg || 0));
+        const p90Data = rows.map(r => Number(r['p(90)'] || 0));
+        const maxData = rows.map(r => Number(r.max || 0));
+        barChartInstance = new Chart(canvas, {
+          type: 'bar',
+          data: {
+            labels,
+            datasets: [
+              { label: 'Avg', data: avgData, backgroundColor: 'rgba(0,95,115,0.85)', borderRadius: 4, barPercentage: 0.7, categoryPercentage: 0.8 },
+              { label: 'p90', data: p90Data, backgroundColor: 'rgba(10,147,150,0.7)', borderRadius: 4, barPercentage: 0.7, categoryPercentage: 0.8 },
+              { label: 'Max', data: maxData, backgroundColor: 'rgba(194,65,12,0.5)', borderRadius: 4, barPercentage: 0.7, categoryPercentage: 0.8 }
+            ]
+          },
+          options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { position: 'top', labels: { usePointStyle: true, padding: 16 } },
+              tooltip: {
+                backgroundColor: 'rgba(29,39,49,0.92)',
+                titleFont: { size: 13 },
+                bodyFont: { size: 12 },
+                padding: 12,
+                cornerRadius: 8,
+                callbacks: {
+                  afterBody: function(items) {
+                    const idx = items[0].dataIndex;
+                    const row = rows[idx];
+                    return 'Count: ' + (row.count || 0) + '  |  Fail: ' + (row.fail || 0) + '  |  Err%: ' + (row.errorPct || 0) + '%';
+                  }
+                }
+              }
+            },
+            scales: {
+              x: { title: { display: true, text: 'Duration (ms)', color: '#66717d' }, grid: { color: 'rgba(0,0,0,0.04)' } },
+              y: { grid: { display: false }, ticks: { font: { size: 11 } } }
+            }
+          }
+        });
+        canvas.parentElement.style.minHeight = Math.max(280, rows.length * 50) + 'px';
+      }
+
+      function renderDonutChart(rows) {
+        if (donutChartInstance) donutChartInstance.destroy();
+        const canvas = document.getElementById('txn-donut-chart');
+        if (!canvas || !rows.length) return;
+        const totalPass = rows.reduce((s, r) => s + (r.pass || 0), 0);
+        const totalFail = rows.reduce((s, r) => s + (r.fail || 0), 0);
+        donutChartInstance = new Chart(canvas, {
+          type: 'doughnut',
+          data: {
+            labels: ['Pass', 'Fail'],
+            datasets: [{
+              data: [totalPass, totalFail],
+              backgroundColor: ['#15803d', '#b91c1c'],
+              hoverBackgroundColor: ['#16a34a', '#dc2626'],
+              borderWidth: 2,
+              borderColor: '#fffdf8'
+            }]
+          },
+          options: {
+            responsive: true,
+            cutout: '60%',
+            plugins: {
+              legend: { position: 'bottom', labels: { padding: 16, usePointStyle: true } },
+              tooltip: {
+                backgroundColor: 'rgba(29,39,49,0.92)',
+                padding: 12,
+                cornerRadius: 8,
+                callbacks: {
+                  label: function(ctx) {
+                    const total = totalPass + totalFail;
+                    const pct = total > 0 ? ((ctx.parsed / total) * 100).toFixed(1) : '0';
+                    return ctx.label + ': ' + ctx.parsed.toLocaleString() + ' (' + pct + '%)';
+                  }
+                }
+              }
+            }
+          }
+        });
       }
 
       select.onchange = renderAttachedTable;
@@ -325,18 +422,7 @@ export class RunReportGenerator {
       return '<div class="cards">' + cards.map(([label, value]) => '<div class="card"><h3>' + escapeHtml(label) + '</h3><strong>' + escapeHtml(Number(value).toFixed(Number(value) % 1 === 0 ? 0 : 2)) + '</strong></div>').join('') + '</div>';
     }
 
-    function renderTransactionBars(rows) {
-      const max = Math.max(...rows.map((row) => Number(row.avg || row['avg'] || 0)), 1);
-      return '<div class="bar-chart">' + rows.map((row) => {
-        const avg = Number(row.avg || row['avg'] || 0);
-        const height = Math.max(6, Math.round((avg / max) * 180));
-        return '<div class="bar-wrap">' +
-          '<div class="bar" style="height:' + height + 'px"></div>' +
-          '<div class="bar-value">' + escapeHtml(avg.toFixed(0)) + ' ms</div>' +
-          '<div class="bar-label">' + escapeHtml(row.transaction) + '</div>' +
-        '</div>';
-      }).join('') + '</div>';
-    }
+    // renderTransactionBars removed — replaced by Chart.js renderBarChart()
 
     function getSelectedRange() {
       return window.__k6PerfRange || { from: reportData.meta.startTime, to: reportData.meta.endTime };

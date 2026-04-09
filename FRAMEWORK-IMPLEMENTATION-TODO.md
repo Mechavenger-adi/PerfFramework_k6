@@ -78,14 +78,18 @@ This checklist tracks the agreed lifecycle, reporting, observability, and CI/CD 
 **Next**
 - Integrate these helpers into execution flow without breaking current behavior
 
-**Lifecycle bridge update**
-- Added shared k6-side lifecycle helper in `core-engine/src/utils/lifecycle.js`
-- Generated and converted scripts now call the shared lifecycle helper instead of invoking `actionPhase(ctx)` directly
-- Helper currently supports:
-  - `ramping-vus` end timing from `K6_PERF_PHASES`
-  - `per-vu-iterations` end timing from total iterations
+**Lifecycle bridge update (overhauled 2026-04-09)**
+- Shared k6-side lifecycle helper in `core-engine/src/utils/lifecycle.js`
+- Generated and converted scripts call the shared lifecycle helper instead of invoking `actionPhase(ctx)` directly
+- Helper uses **instantaneous VU target interpolation** — at any elapsed time `t`, linearly interpolates between stage boundaries to compute the exact target VU count, then compares `vuId > target` to trigger endPhase
+- Helper supports:
+  - `ramping-vus` (load, spike, step, soak, stress) — via interpolation
+  - `constant-vus` — auto-converted to ramping-vus with synthetic ramp-down by `ScenarioBuilder`
+  - `shared-iterations` — auto-converted to ramping-vus with synthetic ramp-down by `ScenarioBuilder`
+  - `per-vu-iterations` — iteration count check
   - action-end pacing via runtime metadata
-  - basic `continue` / `stop_iteration` / `stop_vu` / `abort_test` handling for phase exceptions
+  - `continue` / `stop_iteration` / `stop_vu` / `abort_test` error behavior enforcement
+- `isDecreasing` guard prevents false endPhase triggers during ramp-up stages
 
 ## Task 3: Scenario And Execution Wiring
 
@@ -154,9 +158,45 @@ This checklist tracks the agreed lifecycle, reporting, observability, and CI/CD 
   - all groups stay in `actionPhase(ctx)`
   - `endPhase(ctx)` remains empty
 
-**Still pending**
-- richer per-phase state mapping for converted scripts
-- broader executor support and deeper runtime event integration
+**Completed (2026-04-09)**
+- broader executor support: `computePhaseEnvelope` now handles `ramping-vus`, `constant-vus`, `per-vu-iterations`, `shared-iterations`
+- lifecycle.js `getEndSignal()` uses instantaneous VU target interpolation for all ramping profiles
+- `isDecreasing` guard prevents false triggers during ramp-up
+- richer per-phase state mapping for converted scripts:
+  - Prelude lines classified into categories: correlation setup, data setup, tracking calls, regex declarations, other
+  - `initPhase` gets full data setup with `ctx.data` caching and `trackDataRow` calls
+  - `actionPhase` and `endPhase` get lightweight `ctx.data` references (no re-fetch)
+  - All phases bridge correlation via `const correlation_vars = ctx.correlation`
+  - `let match/regex` declarations only emitted in phases that actually use correlation
+  - Fixed `applyPhaseContract` marker regex to handle optional spacing in `export default function()`
+
+## Cookie Management (Added 2026-04-08)
+
+**Status**
+- Completed on 2026-04-08
+
+**Scope**
+- Fix cookie jar clearing between k6 iterations (root cause of 302 errors on multi-iteration runs)
+- Make cookie persistence configurable at plan and journey level
+- Provide session management utilities for per-journey cookie control
+- Auto-generate cookie clearing and base URL registration in generated/converted scripts
+
+**Dependencies**
+- Task 4 (Generator / Converter UX)
+
+**Delivered**
+- Root cause identified: k6's default `noCookiesReset: false` clears cookie jar after each iteration (LoadRunner preserves cookies by default)
+- Added `noCookiesReset?: boolean` to `TestPlan` and `UserJourney` interfaces in `TestPlanSchema.ts`
+- `ParallelExecutionManager.resolve()` now uses `noCookiesReset: plan.noCookiesReset !== false` (default true)
+- `ReplayRunner` debug path respects `noCookiesReset` from plan config
+- Created `core-engine/src/utils/session.js` with URL registry pattern:
+  - `registerBaseUrl(url)` — tracks base URLs for the VU
+  - `clearCookies(...urls)` — clears jar for given URLs or all registered URLs if no args
+  - `deleteCookie(url, name)` — removes specific cookie
+- `ScriptGenerator` now auto-imports session.js, extracts base URLs from HAR entries, adds `registerBaseUrl()` calls at init, and adds `clearCookies()` as first line of `initPhase`
+- `ScriptConverter` now auto-imports session.js, extracts base URLs from source code via regex, adds `registerBaseUrl()` calls, and adds `clearCookies()` in `initPhase`
+- All three test plan JSONs updated with `noCookiesReset: true`
+- Verified: 5-iteration debug test passes all 49 requests with no 302 errors
 
 ## Task 5: Artifact Persistence
 
@@ -263,7 +303,13 @@ This checklist tracks the agreed lifecycle, reporting, observability, and CI/CD 
 **Still pending**
 - request/response-level runtime event streaming
 - snapshot JSON generation on failed requests
-- exact `stop_iteration` / `stop_vu` / `abort_test` enforcement inside the shared lifecycle wrapper
+
+**Completed (2026-04-09)**
+- `stop_iteration` / `stop_vu` / `abort_test` enforcement: implemented in `lifecycle.js` `handlePhaseError()`
+  - `continue` → returns behavior, iteration continues
+  - `stop_iteration` → returns behavior, `runJourneyLifecycle` skips remaining phases for current iteration
+  - `stop_vu` → sets `state.terminated = true`, VU sleeps on all subsequent iterations
+  - `abort_test` → re-throws error, k6 terminates on uncaught throw
 
 ## Task 8: Host Monitoring
 
@@ -373,8 +419,13 @@ This checklist tracks the agreed lifecycle, reporting, observability, and CI/CD 
 **Still pending**
 - multi-point runtime bucket streaming during execution
 - full cross-tab synchronized filtering
-- richer interactive charting library integration
 - transaction multi-select UX
+
+**Completed (2026-04-09)**
+- Chart.js integration: replaced CSS bar chart with interactive Chart.js horizontal bar chart (Avg/p90/Max datasets) and doughnut chart (Pass/Fail distribution)
+  - Hover tooltips with count, fail, and error% details
+  - Responsive canvas sizing
+  - Chart.js 4.4.7 loaded via CDN
 
 ## Task 11: CI/CD Integration
 

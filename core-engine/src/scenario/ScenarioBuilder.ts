@@ -258,6 +258,7 @@ export class ScenarioBuilder {
       }
     }
 
+    // --- ramping-vus: build timeline directly from stages ---
     if (profile.executor === 'ramping-vus' && profile.stages && profile.stages.length > 0) {
       let cumulativeMs = 0;
       const timeline = profile.stages.map((stage) => {
@@ -275,10 +276,47 @@ export class ScenarioBuilder {
       };
     }
 
+    // --- per-vu-iterations: iteration-count based exit ---
     if (profile.executor === 'per-vu-iterations') {
       return {
         mode: 'per-vu-iterations',
         totalIterations: profile.iterations ?? 1,
+      };
+    }
+
+    // --- constant-vus: auto-convert to ramping-vus with synthetic 1s ramp-down ---
+    // This ensures endPhase runs before k6 terminates VUs at the end of the duration.
+    // Timeline: [hold at vus for (duration - 5s)] → [ramp to 0 over 5s]
+    // The ramp-down starts 5s before the scenario ends to give endPhase time
+    // to run before k6 stops calling the VU function at the duration boundary.
+    if (profile.executor === 'constant-vus' && profile.duration && profile.vus) {
+      const totalMs = this.parseDurationToSeconds(profile.duration) * 1000;
+      const endPhaseBufferMs = Math.min(5000, totalMs * 0.1); // 5s or 10% of duration
+      const holdMs = totalMs - endPhaseBufferMs;
+      return {
+        mode: 'ramping-vus',
+        startVUs: profile.vus,
+        timeline: [
+          { endMs: holdMs, vus: profile.vus },
+          { endMs: totalMs, vus: 0 },
+        ],
+      };
+    }
+
+    // --- shared-iterations: auto-convert to ramping-vus with synthetic ramp-down ---
+    // shared-iterations doesn't have a fixed duration, so we use a generous estimate.
+    // The lifecycle will detect scenario progress via the interpolation check.
+    if (profile.executor === 'shared-iterations' && profile.vus) {
+      // Estimate ~30s per iteration as a generous upper bound for timeline.
+      // The actual exit is governed by k6 finishing all iterations.
+      const estimatedDurationMs = (profile.iterations ?? 1) * 30000;
+      return {
+        mode: 'ramping-vus',
+        startVUs: profile.vus,
+        timeline: [
+          { endMs: estimatedDurationMs, vus: profile.vus },
+          { endMs: estimatedDurationMs + 1000, vus: 0 },
+        ],
       };
     }
 

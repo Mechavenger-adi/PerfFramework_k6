@@ -20,6 +20,7 @@
       }
     ]
   },
+  "noCookiesReset": true,
   "debug": {
     "enabled": false,
     "mode": "diff",

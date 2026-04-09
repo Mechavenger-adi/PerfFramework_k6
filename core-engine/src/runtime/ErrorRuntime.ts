@@ -1,5 +1,5 @@
 import { ErrorBehavior } from '../types/ConfigContracts';
-import { ErrorEvent, WarningEvent, AgentContext, ErrorCause, VariableUsage, SnapshotReference } from '../types/EventContracts';
+import { AgentContext, ErrorCause, ErrorEvent, SnapshotReference, VariableUsage, WarningEvent } from '../types/EventContracts';
 
 export interface ErrorRuntimeContext {
   runId: string;

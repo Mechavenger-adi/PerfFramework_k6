@@ -1437,3 +1437,53 @@ That gives the framework:
 - cleaner onboarding
 - lower risk of unreadable generated scripts
 - lifecycle support without compromising load/endurance suitability
+
+---
+
+## Cookie Persistence Across Iterations (Added 2026-04-08)
+
+### Problem
+
+k6's default behavior (`noCookiesReset: false`) clears the VU's cookie jar after each iteration. This differs from LoadRunner, which preserves cookies across iterations by default. For applications that rely on server-side sessions (e.g., JSESSIONID), this causes authentication failures on iteration 2+.
+
+### Solution
+
+The framework defaults to `noCookiesReset: true` in k6 options, matching LoadRunner behavior. This is configurable at both plan and journey level.
+
+### Config
+
+```json
+{
+  "noCookiesReset": true
+}
+```
+
+- **TestPlan.noCookiesReset** (default `true`): Global cookie persistence setting.
+- **UserJourney.noCookiesReset** (default inherits plan): Per-journey override. Note: k6's `noCookiesReset` is global; per-journey control requires using `clearCookies()` from `session.js` in the journey's `initPhase`.
+
+### session.js Utilities
+
+For per-journey cookie control when the global setting persists cookies:
+
+```javascript
+import { clearCookies, registerBaseUrl, deleteCookie } from '../../../core-engine/src/utils/session.js';
+
+// Register base URLs (auto-called by generated/converted scripts)
+registerBaseUrl('https://myapp.example.com/');
+
+// Clear all registered URLs' cookies
+clearCookies();
+
+// Clear specific URL's cookies
+clearCookies('https://myapp.example.com/');
+
+// Delete a specific cookie
+deleteCookie('https://myapp.example.com/', 'JSESSIONID');
+```
+
+### Generated/Converted Script Behavior
+
+- ScriptGenerator and ScriptConverter auto-import `clearCookies` and `registerBaseUrl` from `session.js`
+- Base URLs are extracted from HAR entries (generator) or regex-scanned from source code (converter)
+- `registerBaseUrl()` calls are emitted at module init scope
+- `clearCookies()` is called as the first line of `initPhase` to ensure a clean cookie state at the start of each VU lifecycle

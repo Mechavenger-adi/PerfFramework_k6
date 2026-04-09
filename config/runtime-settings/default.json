@@ -13,7 +13,7 @@
   },
   "errorBehavior": "continue",
   "reporting": {
-    "transactionStats": ["count", "pass", "fail", "avg", "min", "max", "p(90)", "p(99)"],
+    "transactionStats": ["count", "pass", "fail", "avg", "min", "max", "p(90)", "p(97)"],
     "includeTransactionTable": true,
     "includeErrorTable": true,
     "timeseries": {

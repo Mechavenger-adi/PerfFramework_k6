@@ -260,11 +260,11 @@ program
       '--summary-export', `${safeReportDir}/summary.json`,
       '--out', `web-dashboard=export=${safeReportDir}/TestSummary.html`
     ];
-    
+
     if (opts.out) {
       extraArgs.push('--out', opts.out);
     }
-    
+
     const influxUrl = resolvedConfig.secrets['K6_INFLUXDB_URL'];
     if (influxUrl) {
       extraArgs.push('--out', `influxdb=${influxUrl}`);
@@ -307,15 +307,19 @@ program
       plan,
       resolvedConfig,
       runStatus: runResult.status,
-    hostSnapshots,
-    k6StartTime,
-    k6EndTime,
-  });
+      hostSnapshots,
+      k6StartTime,
+      k6EndTime,
+    });
 
     Logger.pass('Unified report artifacts generated');
     Logger.detail(`Unified HTML report: ${generatedArtifacts.runReportHtml}`);
     Logger.detail(`Transaction metrics: ${generatedArtifacts.transactionMetricsJson}`);
     Logger.detail(`CI summary: ${generatedArtifacts.ciSummaryJson}`);
+
+    if (generatedArtifacts.transactionMetrics) {
+      printTransactionTable(generatedArtifacts.transactionMetrics);
+    }
 
     PipelineRunner.ensureSuccess(runResult);
   });
@@ -373,6 +377,7 @@ function runJourneyDebug(plan: TestPlan, journey: UserJourney, runDir: string) {
     replayLogPath,
     vus: plan.debug?.vus ?? 1,
     iterations: plan.debug?.iterations ?? 1,
+    noCookiesReset: plan.noCookiesReset,
   });
 }
 
@@ -518,6 +523,7 @@ function finalizeRunArtifacts(options: {
   ciSummaryJson: string;
   timeseriesJson: string;
   systemMetricsJson: string;
+  transactionMetrics?: import('../types/ReportingContracts').TransactionMetricsFile;
 } {
   const summaryPath = path.join(options.reportDir, 'summary.json');
   const handleSummaryPath = path.join(options.reportDir, 'handleSummary.json');
@@ -539,6 +545,7 @@ function finalizeRunArtifacts(options: {
       ciSummaryJson: ciSummaryPath,
       timeseriesJson: timeseriesPath,
       systemMetricsJson: systemMetricsPath,
+      transactionMetrics: undefined,
     };
   }
 
@@ -658,6 +665,7 @@ function finalizeRunArtifacts(options: {
     ciSummaryJson: ciSummaryPath,
     timeseriesJson: timeseriesPath,
     systemMetricsJson: systemMetricsPath,
+    transactionMetrics,
   };
 }
 
@@ -667,6 +675,114 @@ function buildReportAgents(eventArtifacts: {
 }): ReportBundle['system']['agents'] {
   const firstAgent = eventArtifacts.errors[0]?.agent ?? eventArtifacts.warnings[0]?.agent;
   return firstAgent ? [firstAgent] : [];
+}
+
+/**
+ * Print a LoadRunner-style transaction metrics table to the console.
+ */
+function printTransactionTable(metrics: import('../types/ReportingContracts').TransactionMetricsFile): void {
+  const rows = metrics.transactions;
+  if (!rows.length) return;
+
+  // Columns: always show these base columns, then the configured stats (minus duplicates)
+  const baseColumns = ['transaction', 'count', 'pass', 'fail', 'errorPct'];
+  const statColumns = metrics.stats.filter((s) => !['count', 'pass', 'fail', 'error %', 'error%', 'errorpct'].includes(s.toLowerCase()));
+  const allColumns = [...baseColumns, ...statColumns];
+
+  // Compute column widths
+  const headerLabels: Record<string, string> = {
+    transaction: 'Transaction',
+    count: 'Count',
+    pass: 'Pass',
+    fail: 'Fail',
+    errorPct: 'Err%',
+    avg: 'Avg(ms)',
+    min: 'Min(ms)',
+    max: 'Max(ms)',
+  };
+  // Add p(N) labels
+  for (const col of statColumns) {
+    if (!headerLabels[col]) {
+      headerLabels[col] = col;
+    }
+  }
+
+  const colWidths = allColumns.map((col) => {
+    const header = headerLabels[col] ?? col;
+    let max = header.length;
+    for (const row of rows) {
+      const val = formatCell(row[col], col);
+      if (val.length > max) max = val.length;
+    }
+    return Math.min(max, 48); // cap column width
+  });
+
+  const c = {
+    dim: process.stdout.isTTY !== false && !process.env.NO_COLOR ? '\x1b[2m' : '',
+    reset: process.stdout.isTTY !== false && !process.env.NO_COLOR ? '\x1b[0m' : '',
+    cyan: process.stdout.isTTY !== false && !process.env.NO_COLOR ? '\x1b[36m' : '',
+    bold: process.stdout.isTTY !== false && !process.env.NO_COLOR ? '\x1b[1m' : '',
+    red: process.stdout.isTTY !== false && !process.env.NO_COLOR ? '\x1b[31m' : '',
+    green: process.stdout.isTTY !== false && !process.env.NO_COLOR ? '\x1b[32m' : '',
+    yellow: process.stdout.isTTY !== false && !process.env.NO_COLOR ? '\x1b[33m' : '',
+  };
+
+  // Header
+  console.log('');
+  console.log(`${c.bold}${c.cyan}  Transaction Metrics Matrix${c.reset}`);
+  const sep = colWidths.map((w) => '─'.repeat(w + 2)).join('┬');
+  console.log(`  ${c.dim}┌${sep}┐${c.reset}`);
+
+  const headerRow = allColumns.map((col, i) => {
+    const label = headerLabels[col] ?? col;
+    return col === 'transaction' ? ` ${label.padEnd(colWidths[i])} ` : ` ${label.padStart(colWidths[i])} `;
+  }).join(`${c.dim}│${c.reset}`);
+  console.log(`  ${c.dim}│${c.reset}${c.bold}${headerRow}${c.reset}${c.dim}│${c.reset}`);
+
+  const headerSep = colWidths.map((w) => '─'.repeat(w + 2)).join('┼');
+  console.log(`  ${c.dim}├${headerSep}┤${c.reset}`);
+
+  // Rows
+  for (const row of rows) {
+    const cells = allColumns.map((col, i) => {
+      const val = formatCell(row[col], col);
+      const truncated = val.length > colWidths[i] ? val.slice(0, colWidths[i] - 1) + '…' : val;
+
+      if (col === 'transaction') {
+        return ` ${truncated.padEnd(colWidths[i])} `;
+      }
+
+      // Color coding for errorPct and fail columns
+      let color = '';
+      if (col === 'errorPct' || col === 'fail') {
+        const numVal = typeof row[col] === 'number' ? row[col] as number : 0;
+        if (numVal > 0) color = c.red;
+      }
+      if (col === 'pass') {
+        const numVal = typeof row[col] === 'number' ? row[col] as number : 0;
+        if (numVal > 0) color = c.green;
+      }
+
+      return ` ${color}${truncated.padStart(colWidths[i])}${color ? c.reset : ''} `;
+    }).join(`${c.dim}│${c.reset}`);
+
+    console.log(`  ${c.dim}│${c.reset}${cells}${c.dim}│${c.reset}`);
+  }
+
+  const bottomSep = colWidths.map((w) => '─'.repeat(w + 2)).join('┴');
+  console.log(`  ${c.dim}└${bottomSep}┘${c.reset}`);
+  console.log('');
+}
+
+function formatCell(value: unknown, column: string): string {
+  if (value == null || value === '') return '-';
+  if (typeof value === 'number') {
+    if (column === 'errorPct') return value.toFixed(1) + '%';
+    if (column === 'count' || column === 'pass' || column === 'fail') return value.toString();
+    // Timing values in ms
+    return Number.isInteger(value) ? value.toString() : value.toFixed(1);
+  }
+  return String(value);
 }
 
 // ---------------------------------------------

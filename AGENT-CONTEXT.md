@@ -7,7 +7,7 @@
 > 4. If you add files, modify architecture, or fix bugs — update the relevant section AND the change log.
 > 5. This file is the single source of truth for resuming work across agents/tools/sessions.
 
-**Last Updated:** 2026-04-05
+**Last Updated:** 2026-04-08
 **Workspace:** d:\repos\K6-PerfFramework
 **Status:** Phase 1-3 complete (54/67 items = 81%), Phase 4 not started
 
@@ -88,7 +88,7 @@ K6-PerfFramework/
 │       ├── debug/                     # ReplayRunner, DiffChecker, HTMLDiffReporter, ExchangeLog, RecordingLogResolver
 │       ├── assertions/                # SLARegistry, ThresholdManager, JourneyAssertionResolver
 │       ├── reporters/                 # ResultTransformer, GrafanaReporter, AzureReporter, CustomUploader
-│       ├── utils/                     # Logger, ProgressBar, PathResolver, transaction.ts/.js, replayLogger.js
+│       ├── utils/                     # Logger, ProgressBar, PathResolver, transaction.ts/.js, replayLogger.js, session.js, lifecycle.js
 │       └── types/                     # ConfigContracts, TestPlanSchema, HARContracts
 ├── scrum-suites/                      # Team test suites
 │   ├── sample-team/                   # 6 test scripts, CSV data, correlation rules, recording logs
@@ -207,6 +207,7 @@ K6-PerfFramework/
 | transaction.ts | `initTransactions`, `startTransaction`, `endTransaction` | LoadRunner-style timing. Creates Trend metrics using the transaction name directly (e.g., `new Trend('Homepage')`) in k6 init context. Records start timestamp → calculates duration → adds to Trend |
 | transaction.js | (same as .ts) | JavaScript version for k6 runtime consumption |
 | replayLogger.js | `logReplayExchange`, `logExchange`, `trackCorrelation`, `trackParameter`, `trackDataRow`, `createVariableEvent` | k6-side logging. Outputs `[k6-perf][replay-log]` JSON with: harEntryId, transaction, iteration, VU, request/response details, headers, cookies, body. `trackCorrelation(name, value, source)` / `trackParameter(name, value, source)` register variables in `_variableRegistry`. `trackDataRow(sourceName, rowObject)` bulk-registers all CSV columns as parameters. `logExchange` auto-detects variable usage by scanning request URL/body/headers for registered values (via `detectVariableEvents()`). Body values stringified defensively (`typeof body === 'object' ? JSON.stringify(body) : String(body)`). **Binary body detection:** `binaryBodyPlaceholder(url, responseHeaders)` checks Content-Type (image/audio/video/font + common binary MIME types) and URL extension (.png/.ttf/.woff2/etc.) — replaces body with `[binary: content-type]` placeholder to prevent JSON serialization failures. Cookie extraction: `extractJarCookies(url)` uses `http.cookieJar().cookiesForURL()` for auto-managed cookies, `extractK6ResponseCookies(resCookies)` for k6's parsed `res.cookies` object. Tracks per-iteration state and request sequencing |
+| session.js | `registerBaseUrl`, `clearCookies`, `deleteCookie` | k6-side cookie management utilities. **URL registry pattern:** `_registeredUrls` Set tracks all known base URLs. `registerBaseUrl(url)` adds a URL to the registry (called automatically by generated/converted scripts at module init). `clearCookies(...urls)` clears the VU's cookie jar — with no arguments, clears all registered URLs; with arguments, clears only the given URLs. `deleteCookie(url, name)` removes a specific named cookie. Used by framework to support per-journey cookie control when `noCookiesReset` is true globally but individual journeys need session resets. |
 
 ### 11. TYPES (`core-engine/src/types/`)
 
@@ -230,6 +231,7 @@ K6-PerfFramework/
   user_journeys: UserJourney[];
   global_sla?: SLADefinition;
   debug?: DebugSettings;
+  noCookiesReset?: boolean;         // default true — cookies persist across iterations
 }
 ```
 
@@ -243,6 +245,7 @@ K6-PerfFramework/
   load_profile?: GlobalLoadProfile; // journey-specific profile
   tags?: Record<string, string>;
   recordingLogPath?: string;        // for debug replay
+  noCookiesReset?: boolean;         // per-journey cookie override (uses session.js)
 }
 ```
 
@@ -308,7 +311,7 @@ K6-PerfFramework/
 - **Target APIs:** https://test-api.k6.io (crocodile API), https://test.k6.io (web UI), httpbin.org (correlation demo)
 
 ### jpet-team (Real Site Recording)
-- **Scripts (4):** jpet-login-test.js, jpetstore.aspectran.com_buydog.js (~539 lines each, HAR-generated with replay metadata), buyanimal_new.js (converted from k6 Studio buy_animals.js via ScriptConverter — 20 requests across 9 groups, CSV parameterization + 2 correlation extractions), buyanimal_raw.js (HAR-generated via `generate` command — 29 requests across 9 transactions, full buy-a-dog flow including static assets like .gif images)
+- **Scripts (5):** jpet-login-test.js, jpetstore.aspectran.com_buydog.js (~539 lines each, HAR-generated with replay metadata), buyanimal_new.js (converted from k6 Studio buy_animals.js via ScriptConverter — 20 requests across 9 groups, CSV parameterization + 2 correlation extractions), buyanimal_raw.js (HAR-generated via `generate` command — 29 requests across 9 transactions, full buy-a-dog flow including static assets like .gif images), buyanimal_1_framework_lifecycle.js (framework lifecycle script with initPhase/actionPhase/endPhase — login in init, buy flow in action, logout in end, CSV parameterization + correlation + `cookies: {}` params)
 - **Transactions:** t01_launch, t02_login, search_animal, select_product, add_to_cart, increase_quantity_to_2_and_proceed_to_checkout, click_continue, click_confirm, logout
 - **Data files:** Data/userdetails.csv (p_username, p_password), Data/pet.csv (p_pet)
 - **HAR recordings:** jpetstore.aspectran.com_buydog.har, jpetstore.aspectran.com - login logout.har
@@ -364,6 +367,7 @@ For each journey in test plan:
 - **Recording index:** `.recording-index.json` in each team's recordings/ dir
 - **Script resolution:** PathResolver searches `scrum-suites/` recursively if direct path fails
 - **Config auto-resolution:** Environment config from `config/environments/{plan.environment}.json`
+- **Cookie management:** `noCookiesReset: true` (default) persists cookies across k6 VU iterations (like LoadRunner). Per-journey cookie control via `session.js` utilities (`clearCookies()`, `deleteCookie()`). Generated/converted scripts auto-import `registerBaseUrl` and call `clearCookies()` in `initPhase`.
 - **Team folder structure:** `scrum-suites/{team}/tests/`, `scrum-suites/{team}/recordings/`, `scrum-suites/{team}/data/`, `scrum-suites/{team}/results/`
 
 ---
@@ -392,20 +396,23 @@ For each journey in test plan:
   "name": "Sample Debug Test",
   "environment": "dev",
   "execution_mode": "parallel",
+  "noCookiesReset": true,
   "global_load_profile": { "executor": "ramping-vus", "startVUs": 0, "stages": [...] },
-  "debug": { "enabled": true, "mode": "diff", "vus": 1, "iterations": 1, "reportDir": "results/debug", "failOnMissingRecordingLog": false },
-  "user_journeys": [{ "name": "buyanimal_new", "scriptPath": "buyanimal_new.js" }]
+  "debug": { "enabled": true, "mode": "diff", "vus": 1, "iterations": 5, "reportDir": "results/debug", "failOnMissingRecordingLog": false },
+  "user_journeys": [{ "name": "buyanimal_1_framework_lifecycle", "scriptPath": "buyanimal_1_framework_lifecycle.js" }]
 }
 ```
 
 ### config/test-plans/load-test.json
+- noCookiesReset: true
 - ramping-vus: 0→5 (10s), steady 5 (30s), 5→0 (10s)
 - Journeys: browse_crocodiles (50%), checkout_crocodiles (50%)
 - SLA: p95 < 3000ms, errorRate < 40%
 
 ### config/test-plans/webui-load-test.json
+- noCookiesReset: true
 - ramping-vus: 0→10 (15s), steady 10 (1m), 10→0 (15s)
-- Journeys: homepage_browsing (60%), login_flow (40%)
+- Journeys: buyanimal_1_framework_lifecycle (100%)
 - SLA: p95 < 2000ms, errorRate < 10%
 
 ---
@@ -1279,3 +1286,95 @@ npm run cli -- run --plan config/test-plans/debug-test.json
   - `dist/config/RuntimeConfigManager.js`
 - **Why:** `tsx core-engine/src/cli/run.ts run --plan config/test-plans/webui-load-test.json` was crashing in `getTransactionStats()` with `transactionStats is not iterable`.
 - **Verification outcome:** The crash is resolved; the run now proceeds into k6 execution. Remaining failures observed are run-environment/network related (blocked outbound access to `jpetstore.aspectran.com`) and report-path polish, not runtime-config accessor crashes.
+
+### 2026-04-08 - Cookie Persistence Fix: noCookiesReset (Root Cause of 302 Errors)
+- **What:** Identified and fixed the root cause of HTTP 302 redirect errors on order endpoints (newOrderForm, newOrder, submitOrder, viewOrder) in iterations 2+ of the jpetstore buy flow.
+- **Root cause:** k6's default behavior (`noCookiesReset: false`) clears the VU's cookie jar after each iteration. This wiped the JSESSIONID between iterations, causing unauthenticated requests. LoadRunner preserves cookies across iterations by default.
+- **Files modified:**
+  - `core-engine/src/execution/ParallelExecutionManager.ts` — both `resolve()` return paths now use `noCookiesReset: plan.noCookiesReset !== false` (default true)
+  - `core-engine/src/debug/ReplayRunner.ts` — `DebugReplayOptions` interface gained `noCookiesReset?: boolean`; k6Options uses `options.noCookiesReset !== false`
+  - `core-engine/src/cli/run.ts` — `runJourneyDebug()` passes `plan.noCookiesReset` to ReplayRunner
+  - `core-engine/src/types/TestPlanSchema.ts` — Added `noCookiesReset?: boolean` to both `TestPlan` and `UserJourney` interfaces
+- **Verification:** Debug test (1 VU, 5 iterations) confirmed all 49 requests pass across all iterations with no 302 errors.
+
+### 2026-04-08 - session.js: Cookie Management Utilities
+- **What:** Created `core-engine/src/utils/session.js` — k6-side cookie management utilities.
+- **Design:** URL registry pattern. `_registeredUrls` Set tracks base URLs. `registerBaseUrl(url)` adds to registry. `clearCookies(...urls)` clears jar for given URLs or all registered URLs if none given. `deleteCookie(url, name)` removes specific cookie.
+- **Purpose:** Enables per-journey cookie control when `noCookiesReset: true` globally but individual journeys need session resets in their initPhase.
+
+### 2026-04-08 - Auto-Cookie-Clear in Generated/Converted Scripts
+- **What:** Updated ScriptGenerator.ts and ScriptConverter.ts to auto-add cookie clearing and base URL registration in generated/converted scripts.
+- **ScriptGenerator.ts changes:**
+  - Added `import { clearCookies, registerBaseUrl } from session.js`
+  - New `extractBaseUrls(groups)` helper extracts unique origins from all HAR entry URLs
+  - Generates `registerBaseUrl()` calls at module init for each discovered base URL
+  - Added `clearCookies()` as first line of `initPhase` in `buildPhaseFunction`
+- **ScriptConverter.ts changes:**
+  - Added session.js import in `buildImportBlock()`
+  - New `extractBaseUrlsFromSource(source)` helper uses regex to extract URL origins from source code
+  - Generates `registerBaseUrl()` calls before lifecycle store in `applyPhaseContract()`
+  - Added `clearCookies()` as first line of `initPhase` in `renderPhaseFunction`
+
+### 2026-04-08 - Test Plan JSON Files Updated
+- **What:** Added `noCookiesReset: true` to all three test plan JSON files.
+- **Files modified:**
+  - `config/test-plans/webui-load-test.json` — added `noCookiesReset: true`
+  - `config/test-plans/debug-test.json` — added `noCookiesReset: true`
+  - `config/test-plans/load-test.json` — added `noCookiesReset: true`
+- **Note:** `debug-test.json` points to `buyanimal_1_framework_lifecycle.js` (framework lifecycle script) with 5 iterations. `webui-load-test.json` also uses this script for load testing.
+
+### 2026-04-08 — Fix p(99) Percentile Not Showing in Results
+- **Root cause:** Two bugs prevented `p(99)` from appearing despite being configured in `default.json`:
+  1. **`ConfigurationManager.deepMerge()` array handling bug:** Arrays are typeof `object` in JS, so `deepMerge()` treated them as plain objects, spreading indices as keys (`{0: 'count', 1: 'pass', ...}`). The result lost its Array prototype, so `Array.isArray()` returned false in `RuntimeConfigManager.getTransactionStats()`, which then fell back to FRAMEWORK_DEFAULTS (which has `p(95)` not `p(99)`).
+  2. **k6 `--config` JSON doesn't reliably apply `summaryTrendStats`:** Initial fix placed `summaryTrendStats` in the k6Options JSON config file passed via `--config`. k6 ignored it. Switched to the `--summary-trend-stats` CLI flag which has higher precedence.
+- **Files modified:**
+  - `core-engine/src/config/ConfigurationManager.ts` — Added `Array.isArray(source)` check to `deepMerge()` so arrays are replaced wholesale instead of being deep-merged as objects
+  - `core-engine/src/cli/run.ts` — Changed from setting `k6Options.summaryTrendStats` (JSON config) to passing `--summary-trend-stats` as a CLI flag via `extraArgs`. Extracts extra percentiles from `transactionStats` config, builds comma-separated stat list including k6 defaults + extras.
+- **Verified:** `p(99)` now appears in terminal output, `handleSummary.json`, `transaction-metrics.json`, and `RunReport.html`
+
+### 2026-04-08 — Dynamic SLA System (Replaces Hardcoded Percentiles)
+- **Problem:** `SLADefinition` hardcoded `p90`/`p95`/`p99` fields — adding any new percentile (p75, p99.9, etc.) required code changes in the type, ThresholdManager, and run.ts. Also `journey_slas` in TestPlan was defined but never consumed (dead config). No `transaction_slas` support existed.
+- **Files modified:**
+  - `core-engine/src/types/TestPlanSchema.ts` — `SLADefinition` now uses index signature `[key: string]: number | undefined` with regex-matched percentile keys (any `pNN` or `pNN.N` pattern). Added `transaction_slas?: Record<string, SLADefinition>` to `TestPlan`.
+  - `core-engine/src/assertions/ThresholdManager.ts` — Fully rewritten. `apply()` now dynamically iterates SLA keys matching `/^p(\d+(?:\.\d+)?)$/` instead of hardcoding p90/p95/p99. Consumes all three SLA tiers: `global_sla` → `http_req_duration`, `journey_slas` → `http_req_duration{scenario:name}` + `http_req_failed{scenario:name}`, `transaction_slas` → Trend metric by name. New `collectPercentiles(plan)` method returns all percentile values from all SLA definitions.
+  - `core-engine/src/cli/run.ts` — `summaryTrendStats` now collects percentiles from BOTH `transactionStats` config AND `ThresholdManager.collectPercentiles(plan)`, ensuring k6 computes any percentile referenced in SLAs.
+  - `config/test-plans/webui-load-test.json` — Added example `journey_slas` and `transaction_slas` sections.
+- **SLA tiers (all config-driven, no code changes needed for new percentiles):**
+  1. `global_sla` — applies to all HTTP requests globally
+  2. `journey_slas` — per-scenario (keyed by journey name)  
+  3. `transaction_slas` — per-transaction Trend metric (keyed by transaction name)
+- **Verified:** All three SLA tiers generate correct k6 thresholds. k6 reports breach on each tier independently.
+
+### 2026-04-09 — Fix: Transaction Metrics Missing in Reports & Console
+- **What:** Modified `core-engine/src/execution/ParallelExecutionManager.ts`, `core-engine/src/cli/run.ts`
+- **Why:** Two issues: (1) Custom percentiles like `p(97)` configured in `reporting.transactionStats` were missing from `transaction-metrics.json` and HTML reports — k6 only computes percentiles listed in `summaryTrendStats` (default: `avg/min/med/max/p(90)/p(95)`), so unlisted percentiles were never calculated. (2) No console transaction metrics table was printed after load runs — users had to open JSON/HTML files to see results.
+- **ParallelExecutionManager.ts changes:**
+  - Added `summaryTrendStats` to `K6Options` interface
+  - New `buildSummaryTrendStats()` private method: merges k6 defaults with any percentiles from `reporting.transactionStats` (detects `p(N)` and `pN` notation). Injects result into k6 options JSON
+  - Both weighted and non-weighted resolve paths now include `summaryTrendStats`
+- **run.ts changes:**
+  - `finalizeRunArtifacts()` now returns `transactionMetrics` data alongside file paths
+  - New `printTransactionTable()` function: LoadRunner-style box-drawing table with Unicode borders, ANSI color-coded pass/fail/error columns, auto-sized column widths, truncation for long names
+  - New `formatCell()` helper: formats numbers with appropriate precision (ms for timing, % for errorPct, int for counts)
+  - Called after `finalizeRunArtifacts` in the run command action
+- **Result:** `p(97)` values now populated in `transaction-metrics.json`, `handleSummary.json`, `ci-summary.json`, HTML report, and console output. Console table matches configured `transactionStats` columns.
+
+### 2026-04-09 — Lifecycle Overhaul: Instantaneous VU Target Interpolation
+- **What:** Rewrote `core-engine/src/utils/lifecycle.js` `getEndSignal()` and extended `core-engine/src/scenario/ScenarioBuilder.ts` `computePhaseEnvelope()`
+- **Why:** The previous endPhase detection scanned for a single ramp-down stage and only handled simple 3-stage profiles. This broke for spike (multiple ramp-down segments), step/staircase (VU count changes at multiple levels), and `constant-vus` / `shared-iterations` (returned `unsupported`, endPhase never ran).
+- **New approach — Instantaneous VU Target Interpolation:**
+  - `getInstantaneousTargetVUs(phases)`: At any elapsed time `t`, linearly interpolates between stage boundaries to compute the exact fractional target VU count. Formula: `previousVUs + progress * (stageVUs - previousVUs)` where `progress = (t - stageStart) / (stageEnd - stageStart)`.
+  - `getEndSignal()`: Compares `exec.vu.idInInstance > Math.ceil(instantTarget)`. k6 removes highest-numbered VUs first, so this correctly identifies which VUs should transition to endPhase at any given moment.
+  - Handles **all** load profile types with one algorithm: load, spike, step, soak, stress
+- **ScenarioBuilder.ts — auto-conversion to ramping-vus:**
+  - `constant-vus` → synthetic timeline: `[hold at vus for duration] → [ramp to 0 over 1s]`
+  - `shared-iterations` → synthetic timeline: `[hold at vus for estimated duration] → [ramp to 0 over 1s]`
+  - This eliminates the need for buffer-time guessing; the lifecycle uses the same interpolation algorithm for all profile types
+- **Profile coverage:**
+  | Profile | Detection Method |
+  |---------|-----------------|
+  | ramping-vus (load/spike/step/soak/stress) | VU target interpolation |
+  | constant-vus | Auto-converted to ramping-vus with 1s ramp-down |
+  | per-vu-iterations | Iteration count check (unchanged) |
+  | shared-iterations | Auto-converted to ramping-vus with 1s ramp-down |
+- **Verified:** 10-VU test: 188 action iterations during 30s steady state, 6 VUs ran logout (the 6 that completed full init), 0 interrupted iterations, exit code 0.

@@ -504,6 +504,9 @@ export class ScriptConverter {
     lines.push(
       `import { createJourneyLifecycleStore, runJourneyLifecycle } from '../../../core-engine/src/utils/lifecycle.js';`,
     );
+    lines.push(
+      `import { clearCookies, registerBaseUrl } from '../../../core-engine/src/utils/session.js';`,
+    );
 
     // Preserve any other imports (CorrelationEngine, RuleProcessor, etc.)
     const srcLines = source.split('\n');
@@ -853,11 +856,12 @@ export class ScriptConverter {
   }
 
   private static applyPhaseContract(source: string, lifecycle?: LifecycleSelection): string {
-    const marker = 'export default function () {';
-    const defaultStart = source.indexOf(marker);
-    if (defaultStart === -1) {
+    // Match both `export default function () {` and `export default function() {`
+    const markerMatch = source.match(/export\s+default\s+function\s*\(\s*\)\s*\{/);
+    if (!markerMatch) {
       return source;
     }
+    const defaultStart = markerMatch.index!;
 
     const bodyStart = source.indexOf('{', defaultStart);
     const bodyEnd = this.findMatchingBrace(source, bodyStart);
@@ -875,7 +879,12 @@ export class ScriptConverter {
       beforeDefault += `\nimport { createJourneyLifecycleStore, runJourneyLifecycle } from '../../../core-engine/src/utils/lifecycle.js';\n`;
     }
 
+    // Extract and register base URLs from the source script
+    const baseUrls = this.extractBaseUrlsFromSource(source);
+    const registerBlock = baseUrls.map(u => `registerBaseUrl(${JSON.stringify(u)});`).join('\n');
+
     return beforeDefault
+      + (registerBlock ? registerBlock + '\n' : '')
       + `const __journeyLifecycleStore = createJourneyLifecycleStore();\n\n`
       + this.renderPhaseFunction('initPhase', grouped.initPrelude, grouped.initGroups)
       + `\n`
@@ -891,6 +900,10 @@ export class ScriptConverter {
 
   private static renderPhaseFunction(name: string, preludeLines: string[], groupStatements: string[]): string {
     let out = `export function ${name}(ctx) {\n`;
+    // Clear cookies at the start of initPhase so each VU starts with a clean session
+    if (name === 'initPhase') {
+      out += `  clearCookies();\n\n`;
+    }
     for (const line of preludeLines) {
       out += `  ${line.trim()}\n`;
     }
@@ -917,25 +930,108 @@ export class ScriptConverter {
   } {
     const initSet = new Set(lifecycle.initGroups ?? []);
     const endSet = new Set(lifecycle.endGroups ?? []);
-    const preludeLines: string[] = [];
     const groupStatements: Array<{ name: string; statement: string }> = [];
+
+    // Classify prelude lines by category
+    const correlationSetup: string[] = [];   // const correlation_vars = ... → ctx.correlation bridge
+    const dataSetup: string[] = [];          // getUniqueItem(FILES[...]) assignments → initPhase only
+    const trackCalls: string[] = [];         // trackDataRow / trackParameter → initPhase only
+    const regexDecls: string[] = [];         // let match; let regex; → phases using correlation
+    const otherPrelude: string[] = [];       // everything else → all phases
 
     for (const statement of statements) {
       const name = this.extractGroupName(statement);
       if (name) {
         groupStatements.push({ name, statement });
-      } else if (statement.trim()) {
-        preludeLines.push(...statement.split('\n').map((line) => line.trim()).filter(Boolean));
+        continue;
+      }
+
+      if (!statement.trim()) continue;
+
+      // Split multi-line statements into individual lines for classification
+      const lines = statement.split('\n').map((l) => l.trim()).filter(Boolean);
+      for (const line of lines) {
+        if (/^\s*const\s+correlation_vars\s*=/.test(line)) {
+          correlationSetup.push(line);
+        } else if (/^\s*let\s+(match|regex)\s*;/.test(line)) {
+          regexDecls.push(line);
+        } else if (/getUniqueItem\s*\(/.test(line) || /^\s*(const|let|var)\s+\w+\s*=\s*.*FILES\b/.test(line)) {
+          dataSetup.push(line);
+        } else if (/^\s*trackDataRow\s*\(/.test(line) || /^\s*trackParameter\s*\(/.test(line)) {
+          trackCalls.push(line);
+        } else {
+          otherPrelude.push(line);
+        }
       }
     }
 
+    // Determine which phases use correlation (have groups with correlation_vars references)
+    const initGroupStmts = groupStatements.filter((g) => initSet.has(g.name)).map((g) => g.statement);
+    const actionGroupStmts = groupStatements.filter((g) => !initSet.has(g.name) && !endSet.has(g.name)).map((g) => g.statement);
+    const endGroupStmts = groupStatements.filter((g) => endSet.has(g.name)).map((g) => g.statement);
+
+    const usesCorrelation = (stmts: string[]) => stmts.some((s) => /correlation_vars/.test(s));
+
+    // Build per-phase preludes
+    // initPhase: correlation bridge + data setup + tracking + regex (if needed) + other
+    const initPrelude: string[] = [];
+    initPrelude.push('const correlation_vars = ctx.correlation;');
+    for (const line of dataSetup) {
+      // Convert direct data assignment to ctx.data caching:
+      // `const userdetails = getUniqueItem(FILES["userdetails"]);`
+      // → `ctx.data.userdetails = ctx.data.userdetails || getUniqueItem(FILES["userdetails"]);`
+      // → `const userdetails = ctx.data.userdetails;`
+      const dataMatch = line.match(/^\s*(?:const|let|var)\s+(\w+)\s*=\s*(.+?)\s*;?\s*$/);
+      if (dataMatch) {
+        const varName = dataMatch[1];
+        const expr = dataMatch[2].replace(/;$/, '');
+        initPrelude.push(`ctx.data.${varName} = ctx.data.${varName} || ${expr};`);
+        initPrelude.push(`const ${varName} = ctx.data.${varName};`);
+      } else {
+        initPrelude.push(line);
+      }
+    }
+    initPrelude.push(...trackCalls);
+    if (usesCorrelation(initGroupStmts)) {
+      initPrelude.push(...regexDecls);
+    }
+    initPrelude.push(...otherPrelude);
+
+    // actionPhase: correlation bridge + local data refs from ctx.data + regex (if needed)
+    const actionPrelude: string[] = [];
+    actionPrelude.push('const correlation_vars = ctx.correlation;');
+    // Make data vars available from ctx.data
+    for (const line of dataSetup) {
+      const dataMatch = line.match(/^\s*(?:const|let|var)\s+(\w+)\s*=\s*.+$/);
+      if (dataMatch) {
+        actionPrelude.push(`const ${dataMatch[1]} = ctx.data.${dataMatch[1]};`);
+      }
+    }
+    if (usesCorrelation(actionGroupStmts)) {
+      actionPrelude.push(...regexDecls);
+    }
+    actionPrelude.push(...otherPrelude);
+
+    // endPhase: correlation bridge + local data refs + regex (if needed)
+    const endPrelude: string[] = [];
+    endPrelude.push('const correlation_vars = ctx.correlation;');
+    for (const line of dataSetup) {
+      const dataMatch = line.match(/^\s*(?:const|let|var)\s+(\w+)\s*=\s*.+$/);
+      if (dataMatch) {
+        endPrelude.push(`const ${dataMatch[1]} = ctx.data.${dataMatch[1]};`);
+      }
+    }
+    if (usesCorrelation(endGroupStmts)) {
+      endPrelude.push(...regexDecls);
+    }
+
     return {
-      initPrelude: preludeLines,
-      actionPrelude: preludeLines,
-      endPrelude: preludeLines,
-      initGroups: groupStatements.filter((group) => initSet.has(group.name)).map((group) => group.statement),
-      actionGroups: groupStatements.filter((group) => !initSet.has(group.name) && !endSet.has(group.name)).map((group) => group.statement),
-      endGroups: groupStatements.filter((group) => endSet.has(group.name)).map((group) => group.statement),
+      initPrelude,
+      actionPrelude,
+      endPrelude,
+      initGroups: initGroupStmts,
+      actionGroups: actionGroupStmts,
+      endGroups: endGroupStmts,
     };
   }
 
@@ -989,5 +1085,19 @@ export class ScriptConverter {
       .split('\n')
       .map((line) => `${indent}${line}`)
       .join('\n');
+  }
+
+  /** Extract unique base URLs (origin) from URL literals in source code. */
+  private static extractBaseUrlsFromSource(source: string): string[] {
+    const origins = new Set<string>();
+    const urlRe = /https?:\/\/[^\s`'"\\)]+/g;
+    let match: RegExpExecArray | null;
+    while ((match = urlRe.exec(source)) !== null) {
+      try {
+        const u = new URL(match[0]);
+        origins.add(u.origin + '/');
+      } catch { /* skip malformed */ }
+    }
+    return [...origins];
   }
 }

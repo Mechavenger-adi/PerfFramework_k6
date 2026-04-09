@@ -6,15 +6,15 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { EnvResolver } from './EnvResolver';
-import { SchemaValidator } from './SchemaValidator';
 import {
   EnvironmentConfig,
-  RuntimeSettings,
-  ResolvedConfig,
   FRAMEWORK_DEFAULTS,
+  ResolvedConfig,
+  RuntimeSettings,
 } from '../types/ConfigContracts';
 import { TestPlan } from '../types/TestPlanSchema';
+import { EnvResolver } from './EnvResolver';
+import { SchemaValidator } from './SchemaValidator';
 
 export class ConfigurationManager {
   private readonly envResolver: EnvResolver;
@@ -123,7 +123,8 @@ export class ConfigurationManager {
       typeof target !== 'object' ||
       target === null ||
       typeof source !== 'object' ||
-      source === null
+      source === null ||
+      Array.isArray(source)
     ) {
       return source ?? target;
     }
