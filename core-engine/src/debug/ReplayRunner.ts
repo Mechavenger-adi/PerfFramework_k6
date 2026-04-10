@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as readline from 'readline';
 import { PipelineRunner } from '../execution/PipelineRunner';
+import { ScenarioBuilder } from '../scenario/ScenarioBuilder';
 import { Logger } from '../utils/logger';
 import { createSpinner } from '../utils/ProgressBar';
 import { DiffChecker, DiffResult } from './DiffChecker';
@@ -76,9 +77,18 @@ export class ReplayRunner {
         noCookiesReset: options.noCookiesReset !== false,
         scenarios: {
           debug_replay: {
-            executor: 'shared-iterations',
+            executor: 'per-vu-iterations',
             vus,
             iterations,
+            env: {
+              K6_PERF_PHASES: JSON.stringify(
+                ScenarioBuilder.computeDebugPhaseEnvelope({
+                  executor: 'per-vu-iterations',
+                  vus,
+                  iterations,
+                }),
+              ),
+            },
           }
         }
       },
@@ -124,6 +134,15 @@ export class ReplayRunner {
     });
     HTMLDiffReporter.generateReport(diffResults, absHtmlPath, { k6Errors, k6Metrics });
     reportSpinner.done('Diff report generated');
+    
+    // Print k6 standard output (which contains the metrics summary) to the terminal
+    const stdoutContent = runResult.stdoutPath && fs.existsSync(runResult.stdoutPath) 
+      ? fs.readFileSync(runResult.stdoutPath, 'utf8') 
+      : (runResult.stdout || '');
+    
+    if (stdoutContent) {
+      console.log(`\n${stdoutContent.trim()}\n`);
+    }
 
     PipelineRunner.ensureSuccess(runResult);
 

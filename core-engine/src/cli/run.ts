@@ -160,7 +160,7 @@ program
   .option('--runtime <path>', 'Path to the runtime-settings JSON file', 'config/runtime-settings/default.json')
   .option('--env-file <path>', 'Path to .env file', '.env')
   .option('--data-root <path>', 'Root directory for data files', 'scrum-suites')
-  .option('--debug', 'Enable debug mode (prints resolved config)', false)
+  .option('--debug', 'Enable debug mode (prints resolved config)')
   .option('--out <k6-output>', 'k6 --out flag value (e.g. json=results.json)')
   .action(async (opts) => {
     Logger.header('k6 Performance Framework – RUN');
@@ -186,7 +186,9 @@ program
       resolvedConfig = configManager.resolve({
         environmentConfigPath: envConfigPath,
         runtimeSettingsPath: opts.runtime,
-        cliOverrides: { debugMode: opts.debug },
+        cliOverrides: { 
+          debugMode: opts.debug !== undefined ? opts.debug : (plan.debug?.enabled ? true : undefined) 
+        },
       });
       Logger.pass(`Config resolved for environment: ${resolvedConfig.environment.name}`);
     } catch (err) {
@@ -232,8 +234,8 @@ program
     // Solution: Generate a temporary combined entry script that re-exports
     // each journey's default function under its scenario exec name.
 
-    const tempDir = path.join(process.cwd(), '.k6-temp');
-    fs.mkdirSync(tempDir, { recursive: true });
+    const entryScriptDir = getEntryScriptDirectory(plan.user_journeys);
+    fs.mkdirSync(entryScriptDir, { recursive: true });
 
     let entryCode = '';
     // k6-reporter: generates a standalone 3rd-party HTML report for validation
@@ -241,9 +243,8 @@ program
     entryCode += `import { textSummary } from "https://jslib.k6.io/k6-summary/0.0.1/index.js";\n`;
     for (const journey of plan.user_journeys) {
       const execName = journey.name.replace(/[^a-zA-Z0-9_]/g, '_');
-      // Use the resolved absolute path from Gatekeeper
-      const absPath = path.resolve(process.cwd(), journey.scriptPath).replace(/\\/g, '/');
-      entryCode += `export { default as ${execName} } from '${absPath}';\n`;
+      const importPath = toImportSpecifier(entryScriptDir, journey.scriptPath);
+      entryCode += `export { default as ${execName} } from '${importPath}';\n`;
     }
     entryCode += `\nexport function handleSummary(data) {\n`;
     entryCode += `  return {\n`;
@@ -253,8 +254,30 @@ program
     entryCode += `  };\n`;
     entryCode += `}\n`;
 
-    const entryScriptPath = path.join(tempDir, 'entry.js');
+    const entryScriptPath = path.join(
+      entryScriptDir,
+      `.k6-perf-entry-${runId.replace(/[^a-zA-Z0-9_\-]/g, '_')}.js`,
+    );
     fs.writeFileSync(entryScriptPath, entryCode, 'utf-8');
+
+    // Robust cleanup handlers for the generated orchestration file
+    const cleanupEntryScript = () => {
+      try {
+        if (fs.existsSync(entryScriptPath)) {
+          fs.unlinkSync(entryScriptPath);
+        }
+      } catch {
+        // Silent best-effort fail
+      }
+    };
+    const forceExitHandler = () => {
+      cleanupEntryScript();
+      process.exit(130);
+    };
+
+    process.on('exit', cleanupEntryScript);
+    process.once('SIGINT', forceExitHandler);
+    process.once('SIGTERM', forceExitHandler);
 
     const extraArgs: string[] = [
       '--summary-export', `${safeReportDir}/summary.json`,
@@ -298,6 +321,10 @@ program
       if (resolvedConfig.runtime.monitoring.enabled) {
         hostSnapshots.push(await HostMonitor.captureSnapshot());
       }
+      cleanupEntryScript();
+      process.removeListener('exit', cleanupEntryScript);
+      process.removeListener('SIGINT', forceExitHandler);
+      process.removeListener('SIGTERM', forceExitHandler);
     }
     const k6EndTime = new Date().toISOString();
 
@@ -391,6 +418,23 @@ function resolveRecordingLogForStandaloneDebug(scriptPath: string): string | und
   }
 
   return resolution.resolvedPath;
+}
+
+function getEntryScriptDirectory(journeys: UserJourney[]): string {
+  const scriptDirs = Array.from(
+    new Set(journeys.map((journey) => path.dirname(path.resolve(process.cwd(), journey.scriptPath)))),
+  );
+
+  if (scriptDirs.length === 1) {
+    return scriptDirs[0];
+  }
+
+  return path.join(process.cwd(), '.k6-temp');
+}
+
+function toImportSpecifier(fromDir: string, targetPath: string): string {
+  const relativePath = path.relative(fromDir, path.resolve(process.cwd(), targetPath)).replace(/\\/g, '/');
+  return relativePath.startsWith('.') ? relativePath : `./${relativePath}`;
 }
 
 function prepareRunArtifacts(plan: TestPlan, resolvedConfig: ResolvedConfig): {

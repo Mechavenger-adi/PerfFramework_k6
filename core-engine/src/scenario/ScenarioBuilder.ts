@@ -46,9 +46,10 @@ export interface ScenarioRuntimeMetadata {
 }
 
 interface ScenarioPhaseEnvelope {
-  mode: 'ramping-vus' | 'per-vu-iterations' | 'unsupported';
+  mode: 'ramping-vus' | 'per-vu-iterations' | 'shared-iterations' | 'unsupported';
   startVUs?: number;
   totalIterations?: number;
+  vus?: number;
   timeline?: Array<{
     endMs: number;
     vus: number;
@@ -303,26 +304,22 @@ export class ScenarioBuilder {
       };
     }
 
-    // --- shared-iterations: auto-convert to ramping-vus with synthetic ramp-down ---
-    // shared-iterations doesn't have a fixed duration, so we use a generous estimate.
-    // The lifecycle will detect scenario progress via the interpolation check.
+    // --- shared-iterations: explicit iteration metadata for per-VU lifecycle exit ---
     if (profile.executor === 'shared-iterations' && profile.vus) {
-      // Estimate ~30s per iteration as a generous upper bound for timeline.
-      // The actual exit is governed by k6 finishing all iterations.
-      const estimatedDurationMs = (profile.iterations ?? 1) * 30000;
       return {
-        mode: 'ramping-vus',
-        startVUs: profile.vus,
-        timeline: [
-          { endMs: estimatedDurationMs, vus: profile.vus },
-          { endMs: estimatedDurationMs + 1000, vus: 0 },
-        ],
+        mode: 'shared-iterations',
+        vus: profile.vus,
+        totalIterations: profile.iterations ?? 1,
       };
     }
 
     return {
       mode: 'unsupported',
     };
+  }
+
+  static computeDebugPhaseEnvelope(profile: GlobalLoadProfile): ScenarioPhaseEnvelope {
+    return this.computePhaseEnvelope(profile);
   }
 
   /** Estimate total duration of a load profile in seconds */

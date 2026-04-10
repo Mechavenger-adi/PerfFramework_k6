@@ -6,8 +6,9 @@
 > 3. DO NOT ask the user to re-explain the project. Everything is documented here.
 > 4. If you add files, modify architecture, or fix bugs — update the relevant section AND the change log.
 > 5. This file is the single source of truth for resuming work across agents/tools/sessions.
+> 6. KEEP THE STRUCTURAL FLOW MAP UPDATED - treat it as a Tree-sitter-backed structural map of the codebase. When files, imports, module boundaries, execution flow, or ownership change, update the diagram and summary so future AI assistants get precise incremental context quickly.
 
-**Last Updated:** 2026-04-08
+**Last Updated:** 2026-04-10
 **Workspace:** d:\repos\K6-PerfFramework
 **Status:** Phase 1-3 complete (54/67 items = 81%), Phase 4 not started
 
@@ -99,6 +100,115 @@ K6-PerfFramework/
 ├── results/                           # Debug HTML diff reports
 └── *.md                               # 14 documentation files (see DOCUMENTATION section)
 ```
+
+---
+
+## STRUCTURAL FLOW MAP (TREE-SITTER CONTEXT)
+
+**Purpose:** This section is the high-signal structural map for AI assistants. It should mirror the current code graph closely enough that a Tree-sitter-based symbol/indexing pass can track changes incrementally, reduce repo re-discovery work, and provide precise context before deeper file reads.
+
+**Keep this updated when:**
+- CLI entrypoints change
+- module boundaries move
+- imports/exports are rewired
+- new engine layers are introduced
+- reporting/debug/generation flow changes
+- team suite layout changes in ways that affect execution or data resolution
+
+```mermaid
+flowchart TD
+  AGENT[AGENT-CONTEXT.md]
+  PLAN[config/test-plans/*.json]
+  ENV[config/environments/*.json]
+  RUNTIME[config/runtime-settings/*.json]
+  SUITES[scrum-suites/<team>/]
+
+  CLI[core-engine/src/cli/]
+  CFG[core-engine/src/config/]
+  SCENARIO[core-engine/src/scenario/]
+  EXEC[core-engine/src/execution/]
+  DATA[core-engine/src/data/]
+  CORR[core-engine/src/correlation/]
+  RECORD[core-engine/src/recording/]
+  DEBUG[core-engine/src/debug/]
+  ASSERT[core-engine/src/assertions/]
+  REPORT[core-engine/src/reporting/]
+  UTILS[core-engine/src/utils/ + types/]
+
+  RUN[run.ts]
+  VALIDATE[validate.ts]
+  GENERATE[generate.ts]
+  CONVERT[convert.ts]
+  INIT[init.ts / generate-byos.ts]
+
+  AGENT --> CLI
+  AGENT --> CFG
+  AGENT --> RECORD
+  AGENT --> DEBUG
+  AGENT --> REPORT
+
+  PLAN --> RUN
+  PLAN --> VALIDATE
+  ENV --> CFG
+  RUNTIME --> CFG
+  SUITES --> RUN
+  SUITES --> VALIDATE
+  SUITES --> GENERATE
+  SUITES --> CONVERT
+
+  CLI --> RUN
+  CLI --> VALIDATE
+  CLI --> GENERATE
+  CLI --> CONVERT
+  CLI --> INIT
+
+  RUN --> CFG
+  RUN --> SCENARIO
+  RUN --> EXEC
+  RUN --> ASSERT
+  RUN --> REPORT
+  RUN --> DEBUG
+
+  VALIDATE --> CFG
+  VALIDATE --> DATA
+  VALIDATE --> DEBUG
+
+  GENERATE --> RECORD
+  GENERATE --> DEBUG
+  CONVERT --> RECORD
+  INIT --> SUITES
+
+  CFG --> SCENARIO
+  CFG --> EXEC
+  CFG --> DATA
+  CFG --> REPORT
+
+  SCENARIO --> EXEC
+  ASSERT --> EXEC
+  EXEC --> REPORT
+  DEBUG --> EXEC
+  DEBUG --> REPORT
+
+  RECORD --> CORR
+  RECORD --> UTILS
+  DATA --> UTILS
+  CORR --> UTILS
+  REPORT --> UTILS
+  EXEC --> UTILS
+
+  SUITES -->|tests/*.js| EXEC
+  SUITES -->|data/*.csv, *.json| DATA
+  SUITES -->|recordings/*.har, *.recording-log.json| RECORD
+  SUITES -->|correlation-rules/*.json| CORR
+```
+
+**Reading order for AI assistants:**
+1. `AGENT-CONTEXT.md`
+2. `config/test-plans/*.json` for active execution shape
+3. `core-engine/src/cli/run.ts` for top-level orchestration
+4. `core-engine/src/config/`, `scenario/`, `execution/` for runtime flow
+5. `core-engine/src/debug/`, `recording/`, `reporting/` for specialized paths
+6. `scrum-suites/<team>/tests`, `data`, `recordings` for suite-specific behavior
 
 ---
 
@@ -1345,6 +1455,13 @@ npm run cli -- run --plan config/test-plans/debug-test.json
   3. `transaction_slas` — per-transaction Trend metric (keyed by transaction name)
 - **Verified:** All three SLA tiers generate correct k6 thresholds. k6 reports breach on each tier independently.
 
+### 2026-04-10 - Load Run Entry Script Path Resolution Fix For Relative Data Files
+- **What:** Fixed normal `run` mode so generated k6 entry scripts are created in the shared journey script directory when all journeys use the same folder, instead of always under `.k6-temp`.
+- **Files modified:**
+  - `core-engine/src/cli/run.ts` — added shared script-directory selection for generated entry scripts, switched generated journey exports to relative import specifiers, and added best-effort cleanup for the temporary entry file after execution.
+- **Why:** Some journeys load CSV files with relative `k6/experimental/fs.open("../Data/...")` paths. Debug mode worked because it runs the journey script directly, but normal load runs failed because the framework-generated main entry script lived in `.k6-temp`, causing relative file paths to resolve against `.k6-temp` instead of the journey `tests/` folder.
+- **Result:** Single-folder load plans now resolve relative data files the same way as debug runs and avoid the absolute-import warning for those journeys.
+
 ### 2026-04-09 — Fix: Transaction Metrics Missing in Reports & Console
 - **What:** Modified `core-engine/src/execution/ParallelExecutionManager.ts`, `core-engine/src/cli/run.ts`
 - **Why:** Two issues: (1) Custom percentiles like `p(97)` configured in `reporting.transactionStats` were missing from `transaction-metrics.json` and HTML reports — k6 only computes percentiles listed in `summaryTrendStats` (default: `avg/min/med/max/p(90)/p(95)`), so unlisted percentiles were never calculated. (2) No console transaction metrics table was printed after load runs — users had to open JSON/HTML files to see results.
@@ -1378,3 +1495,28 @@ npm run cli -- run --plan config/test-plans/debug-test.json
   | per-vu-iterations | Iteration count check (unchanged) |
   | shared-iterations | Auto-converted to ramping-vus with 1s ramp-down |
 - **Verified:** 10-VU test: 188 action iterations during 30s steady state, 6 VUs ran logout (the 6 that completed full init), 0 interrupted iterations, exit code 0.
+
+### 2026-04-10 - Structural Flow Map Added For AI Context
+- **What:** Added a dedicated `STRUCTURAL FLOW MAP (TREE-SITTER CONTEXT)` section near the top of this file.
+- **Why:** The repo now has enough moving parts that a compact structural graph provides much faster orientation than prose alone. The map is intended to function like a Tree-sitter-aligned code structure snapshot that can be maintained incrementally as code changes.
+- **What it covers:**
+  - config inputs (`test-plans`, `environments`, `runtime-settings`)
+  - CLI entrypoints
+  - engine layers (`config`, `scenario`, `execution`, `data`, `correlation`, `recording`, `debug`, `assertions`, `reporting`, `utils/types`)
+  - suite assets (`tests`, `data`, `recordings`, `correlation-rules`)
+  - primary orchestration paths (`run`, `validate`, `generate`, `convert`, `debug/reporting`)
+- **Instruction added:** Future agents must keep the Structural Flow Map updated so AI assistants get precise incremental context quickly.
+
+### 2026-04-10 - Lifecycle Fix: endPhase Runs After Final Action In Iteration-Based Flows
+- **What:** Fixed lifecycle end detection for iteration-based execution and debug replay so `endPhase` runs once after the final action cycle instead of being skipped or firing too early.
+- **Files modified:**
+  - `core-engine/src/utils/lifecycle.js` - changed `per-vu-iterations` logic to trigger `endPhase` only after the last `actionPhase`, and added explicit `shared-iterations` handling so each VU can end cleanly after its assigned iterations.
+  - `core-engine/src/scenario/ScenarioBuilder.ts` - added explicit `shared-iterations` phase metadata instead of treating it as a synthetic ramp-down envelope.
+  - `core-engine/src/debug/ReplayRunner.ts` - debug replay now injects `K6_PERF_PHASES` for the `shared-iterations` debug scenario so lifecycle logic is active in debug mode too.
+- **Expected behavior now:**
+  - `per-vu-iterations` example with `vus=2`, `iterations=5`:
+    - each VU runs `initPhase` once
+    - each VU runs `actionPhase` 5 times
+    - each VU runs `endPhase` once
+  - debug replay now has phase metadata, so logout/end transactions can run during debug flows instead of being skipped due to `unsupported` phase mode.
+- **Verification:** `cmd /c npm exec tsc -- --noEmit` passed.

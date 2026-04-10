@@ -112,8 +112,30 @@ function getEndSignal(phases) {
   // --- Per-VU Iterations ---
   if (phases.mode === 'per-vu-iterations') {
     const totalIterations = Math.max(Number(phases.totalIterations || 1), 1);
-    const done = exec.vu.iterationInScenario >= totalIterations - 1;
-    return { beforeAction: done, afterAction: done };
+    const completedIterations = exec.vu.iterationInScenario;
+    const willCompleteAfterThisAction = completedIterations >= totalIterations - 1;
+    return { beforeAction: false, afterAction: willCompleteAfterThisAction };
+  }
+
+  // --- Shared Iterations ---
+  if (phases.mode === 'shared-iterations') {
+    const totalIterations = Math.max(Number(phases.totalIterations || 1), 1);
+    const vus = Math.max(Number(phases.vus || 1), 1);
+    const iterationsAssignedToThisVu = Math.max(
+      Math.ceil((totalIterations - (exec.vu.idInInstance - 1)) / vus),
+      0,
+    );
+
+    if (iterationsAssignedToThisVu <= 0) {
+      return {
+        beforeAction: exec.vu.iterationInScenario === 0,
+        afterAction: false,
+      };
+    }
+
+    const completedIterations = exec.vu.iterationInScenario;
+    const willCompleteAfterThisAction = completedIterations >= iterationsAssignedToThisVu - 1;
+    return { beforeAction: false, afterAction: willCompleteAfterThisAction };
   }
 
   // --- Ramping VUs (handles load, spike, step, soak, stress, constant-vus) ---
@@ -147,7 +169,7 @@ function handlePhaseError(store, error, phaseName, runtime) {
   }
 
   if (behavior === 'abort_test') {
-    throw error;
+    exec.test.abort(`[k6-perf][${phaseName}] Aborting test due to error: ${error && error.message ? error.message : String(error)}`);
   }
 
   return behavior;

@@ -35,5 +35,5 @@
     "memoryWarningPercent": 80,
     "sampleIntervalSeconds": 10
   },
-  "debugMode": false
+  "debugMode": true
 }

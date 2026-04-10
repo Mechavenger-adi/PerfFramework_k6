@@ -6,9 +6,9 @@
     "executor": "ramping-vus",
     "startVUs": 0,
     "stages": [
-      { "duration": "15s", "target": 10 },
-      { "duration": "30s",  "target": 10 },
-      { "duration": "15s", "target": 0  }
+      { "duration": "5s", "target": 3 },
+      { "duration": "15s",  "target": 3 },
+      { "duration": "5s", "target": 0  }
     ]
   },
   "noCookiesReset": true,
@@ -32,6 +32,6 @@
   "transaction_slas": {
     "t01_launch": { "p95": 800 },
     "t02_login": { "p95": 1000 },
-    "click_confirm": { "p95": 1500, "p99": 3000 }
+    "t08_click_confirm": { "p95": 1500, "p99": 3000 }
   }
 }

@@ -11,6 +11,7 @@ node_modules/
 
 # ── k6 temp files ──────────────────────────────
 .k6-temp/
+.k6-perf-entry-*.js
 
 # ── Test results ───────────────────────────────
 **/results/**/*.json
