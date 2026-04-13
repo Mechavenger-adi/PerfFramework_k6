@@ -8,7 +8,7 @@
 > 5. This file is the single source of truth for resuming work across agents/tools/sessions.
 > 6. KEEP THE STRUCTURAL FLOW MAP UPDATED - treat it as a Tree-sitter-backed structural map of the codebase. When files, imports, module boundaries, execution flow, or ownership change, update the diagram and summary so future AI assistants get precise incremental context quickly.
 
-**Last Updated:** 2026-04-10
+**Last Updated:** 2026-04-13
 **Workspace:** d:\repos\K6-PerfFramework
 **Status:** Phase 1-3 complete (54/67 items = 81%), Phase 4 not started
 
@@ -17,12 +17,17 @@
 ## PROJECT OVERVIEW
 
 Enterprise-grade k6 performance testing framework with:
-- **HAR-to-Script generation** with domain filtering & static asset exclusion
-- **Auto-correlation** engine for dynamic tokens (CSRF, bearer, session, etc.)
-- **Debug replay** system comparing recorded vs live HTTP exchanges
-- **Multi-team support** via `scrum-suites/` folder structure
-- **Configuration-driven execution** (test plans, environments, runtime settings)
-- **LoadRunner-style transactions** (timing via k6 Trend metrics)
+- **Phase-based journey lifecycle** via `initPhase(ctx)`, `actionPhase(ctx)`, and `endPhase(ctx)` backed by shared lifecycle helpers
+- **HAR-to-script generation** with domain filtering, static asset exclusion, recording-log registration, and generated framework lifecycle wiring
+- **Conventional k6-to-framework conversion** with transaction wrapping, replay logging, correlation tracking, and lifecycle reshaping
+- **Debug replay and diff reporting** comparing recorded vs live HTTP exchanges with interactive HTML analysis
+- **Configuration-driven execution** using layered environment, runtime, test plan, CLI, and `.env` inputs
+- **Artifact-first reporting** with `RunReport.html`, `ci-summary.json`, `transaction-metrics.json`, `timeseries.json`, `errors.ndjson`, `warnings.ndjson`, `system-metrics.json`, and `run-manifest.json`
+- **Dynamic SLA and threshold support** across global, journey, and transaction scopes with arbitrary percentile keys
+- **Session and cookie control** including `noCookiesReset`, `session.js`, and auto-cookie-clear behavior in generated/converted scripts
+- **Host monitoring and periodic sampling** for normal runs with system metrics surfaced in artifacts and the unified report
+- **Multi-team suite support** via `scrum-suites/` team folders containing tests, data, recordings, and correlation assets
+- **LoadRunner-style transactions** using k6 Trend metrics and console transaction summaries after load runs
 
 ---
 
@@ -51,17 +56,68 @@ npm run cli -- debug --script <path>           # Debug replay
 ```
 
 ### Run Command Options
-- `--plan <path>` (required) - Test plan JSON
-- `--env-config <path>` - Environment config (auto-resolved from plan.environment)
-- `--runtime <path>` - Runtime settings (default: config/runtime-settings/default.json)
-- `--env-file <path>` - .env file path
-- `--data-root <path>` - Data root (default: scrum-suites)
-- `--debug` - Enable debug mode
-- `--out <k6-output>` - k6 --out flag
+- `--plan <path>` (required) - Test plan JSON file for normal execution
+- `--env-config <path>` - Environment config JSON (auto-resolved from `plan.environment` if omitted)
+- `--runtime <path>` - Runtime settings JSON (default: `config/runtime-settings/default.json`)
+- `--env-file <path>` - `.env` file path (default: `.env`)
+- `--data-root <path>` - Root directory used by validation/data discovery (default: `scrum-suites`)
+- `--debug` - Print resolved configuration and other debug-oriented execution detail during `run`
+- `--out <k6-output>` - Additional k6 `--out` sink (for example `json=results.json`)
+
+### Debug Command Options
+- `--script <path>` (required) - Journey script to replay in debug mode
+- `--recording-log <path>` - Explicit normalized recording-log JSON path
+- `--out <path>` - HTML diff report output path (default: `results/debug-diff.html`)
+- `--replay-log <path>` - Optional output path for captured replay-log JSON
 
 ---
 
 ## DIRECTORY STRUCTURE
+
+**Current structural snapshot (2026-04-13):** This supersedes older tree notes if they disagree.
+
+```text
+K6-PerfFramework/
+|- package.json, package-lock.json, tsconfig.json
+|- AGENT-CONTEXT.md                    # This file - read first and keep updated
+|- .tmp-init-check/                    # Init-scaffold verification snapshot
+|- config/
+|  |- environments/                    # Environment JSON files
+|  |- runtime-settings/                # Runtime, reporting, error, monitoring defaults
+|  |- test-plans/                      # debug-test.json, load-test.json, webui-load-test.json
+|  `- correlation-rules/               # Reserved global rules folder
+|- core-engine/
+|  |- DOCS_METHODS.md                  # API reference
+|  `- src/
+|     |- index.ts                      # Barrel export
+|     |- cli/                          # run.ts, init.ts, generate.ts, generate-byos.ts, convert.ts, validate.ts
+|     |- config/                       # Config loading, merge, validation, gatekeeping
+|     |- scenario/                     # Workload models, executors, scenario envelopes
+|     |- execution/                    # k6 execution, VU allocation, host monitoring
+|     |- data/                         # CSV/JSON loading, pooling, validation, dynamic values
+|     |- correlation/                  # Correlation engine and extractor registry
+|     |- recording/                    # HAR parsing, grouping, generation, conversion
+|     |- debug/                        # Replay execution, diffing, HTML replay report
+|     |- assertions/                   # SLA registry, threshold generation, assertions
+|     |- reporting/                    # Run artifact builders and unified report generation
+|     |- reporters/                    # External/report sink adapters and stubs
+|     |- runtime/                      # Lifecycle, metrics, error, snapshot, timeseries runtime helpers
+|     |- utils/                        # Logger, progress, path, transaction, replay/session/lifecycle JS helpers
+|     `- types/                        # Config, test-plan, event, reporting, HAR contracts
+|- dist/                               # Transpiled JS output
+|- scrum-suites/
+|  |- sample-team/                     # Sample journeys, data, recordings, rules
+|  |- jpet-team/                       # JPetStore journeys, CSV data, HAR/recording logs
+|  |- my-team/                         # Team-specific journeys
+|  |- testpro/                         # Conversion/check scripts
+|  |- webui-team/                      # Web UI journeys and guide
+|  `- results/                         # Suite-level outputs
+|- results/                            # Generated run/debug outputs
+|- node_modules/                       # Installed dependencies
+`- *.md                                # Architecture, implementation, and how-to docs
+```
+
+**Legacy tree snapshot below is retained for historical context only. Use the current snapshot above if anything conflicts.**
 
 ```
 K6-PerfFramework/
@@ -114,6 +170,100 @@ K6-PerfFramework/
 - new engine layers are introduced
 - reporting/debug/generation flow changes
 - team suite layout changes in ways that affect execution or data resolution
+
+**Current structural map (2026-04-13):** This supersedes older relationships if they conflict.
+
+```mermaid
+flowchart TD
+  AGENT[AGENT-CONTEXT.md]
+  PLAN[config/test-plans/*.json]
+  ENV[config/environments/*.json]
+  RUNTIMECFG[config/runtime-settings/*.json]
+  SUITES[scrum-suites/<team>/]
+
+  CLI[cli]
+  CFG[config]
+  SCENARIO[scenario]
+  EXEC[execution]
+  DATA[data]
+  CORR[correlation]
+  RECORD[recording]
+  DEBUG[debug]
+  ASSERT[assertions]
+  RUNTIME[runtime]
+  REPORTING[reporting]
+  REPORTERS[reporters]
+  UTILS[utils + types]
+
+  RUN[run.ts]
+  VALIDATE[validate.ts]
+  GENERATE[generate.ts]
+  CONVERT[convert.ts]
+  INIT[init.ts / generate-byos.ts]
+
+  AGENT --> RUN
+  AGENT --> CFG
+  AGENT --> REPORTING
+  AGENT --> DEBUG
+
+  PLAN --> RUN
+  PLAN --> VALIDATE
+  ENV --> CFG
+  RUNTIMECFG --> CFG
+  SUITES --> RUN
+  SUITES --> VALIDATE
+  SUITES --> GENERATE
+  SUITES --> CONVERT
+
+  CLI --> RUN
+  CLI --> VALIDATE
+  CLI --> GENERATE
+  CLI --> CONVERT
+  CLI --> INIT
+
+  RUN --> CFG
+  RUN --> SCENARIO
+  RUN --> EXEC
+  RUN --> ASSERT
+  RUN --> REPORTING
+  RUN --> DEBUG
+
+  VALIDATE --> CFG
+  VALIDATE --> DATA
+  VALIDATE --> DEBUG
+
+  GENERATE --> RECORD
+  GENERATE --> CORR
+  GENERATE --> UTILS
+  CONVERT --> RECORD
+  CONVERT --> UTILS
+  INIT --> SUITES
+
+  SCENARIO --> EXEC
+  SCENARIO --> RUNTIME
+  ASSERT --> EXEC
+  EXEC --> REPORTING
+  EXEC --> REPORTERS
+  EXEC --> UTILS
+  DEBUG --> EXEC
+  DEBUG --> REPORTING
+  REPORTING --> REPORTERS
+  REPORTING --> UTILS
+  RUNTIME --> REPORTING
+  RUNTIME --> UTILS
+
+  RECORD --> CORR
+  RECORD --> UTILS
+  DATA --> UTILS
+  CORR --> UTILS
+
+  SUITES -->|tests/*.js| RUNTIME
+  SUITES -->|data/*.csv, *.json| DATA
+  SUITES -->|recordings/*.har, *.recording-log.json| RECORD
+  SUITES -->|correlation-rules/*.json| CORR
+```
+
+**Legacy structural map below is retained for history only. Use the current structural map above if anything conflicts.**
 
 ```mermaid
 flowchart TD
@@ -212,7 +362,10 @@ flowchart TD
 
 ---
 
-## CORE ENGINE ARCHITECTURE (11 Layers)
+## CORE ENGINE ARCHITECTURE (13 Layers)
+
+**Current architecture note (2026-04-13):** Treat the layer descriptions below as the live source of truth. The codebase now has distinct `runtime/` and `reporting/` layers in addition to `reporters/`, and normal run flow is:
+`CLI run.ts -> ConfigurationManager/Gatekeeper -> ScenarioBuilder/ThresholdManager -> ParallelExecutionManager/PipelineRunner -> reporting artifact builders`.
 
 ### 1. CONFIG LAYER (`core-engine/src/config/`)
 
@@ -228,6 +381,8 @@ flowchart TD
 
 ### 2. SCENARIO LAYER (`core-engine/src/scenario/`)
 
+**Current layer note:** This layer now does more than executor translation. It injects `K6_PERF_RUNTIME_METADATA`, `K6_PERF_SCENARIO_METADATA`, and `K6_PERF_PHASES` into scenario env, and `computePhaseEnvelope()` now includes explicit `shared-iterations` metadata for lifecycle-aware iteration flows.
+
 | File | Class | Purpose |
 |------|-------|---------|
 | WorkloadModels.ts | (functions) | `buildLoadProfile()` (ramp-up → steady → ramp-down), `buildStressProfile()` (aggressive ramp), `buildSoakProfile()` (low sustained), `buildSpikeProfile()` (sudden surge), `buildIterationProfile()` (fixed iterations), `toK6ExecutorConfig()` (translates to k6-native) |
@@ -236,6 +391,8 @@ flowchart TD
 | ScenarioBuilder.ts | `ScenarioBuilder` | `build(plan)` → K6ScenariosMap. Routes to `buildParallel()`, `buildSequential()` (startTime offsets), `buildHybrid()` (mixed groups). Helpers: `sanitizeExecName()`, `estimateTotalDurationSeconds()`, `parseDurationToSeconds()` |
 
 ### 3. EXECUTION LAYER (`core-engine/src/execution/`)
+
+**Current layer note:** Normal load runs use `PipelineRunner.executeAsync()`, while debug replay still uses sync `execute()` with captured output. `HostMonitor.ts` also belongs to this layer and provides start/end snapshots plus periodic CPU/memory sampling for run artifacts and the unified report.
 
 | File | Class | Purpose |
 |------|-------|---------|
@@ -296,7 +453,28 @@ flowchart TD
 | ThresholdManager.ts | `ThresholdManager` | `apply(plan)` → translates global + per-journey SLAs to k6-native thresholds. Transaction names used directly as Trend metric keys. Scenario metrics: `http_req_duration{scenario:X}` for p90/p95/avg, `http_req_failed{scenario:X}` for errorRate. Returns `Record<string, string[]>` |
 | JourneyAssertionResolver.ts | `JourneyAssertionResolver` | `printReport(metrics)` → evaluates k6 end-of-test summary, prints pass/fail for check rates and SLA breaches |
 
-### 9. REPORTERS LAYER (`core-engine/src/reporters/`)
+### 9. RUNTIME LAYER (`core-engine/src/runtime/`)
+
+| File | Export | Purpose |
+|------|--------|---------|
+| LifecycleRuntime.ts | `LifecycleRuntime` | TypeScript-side lifecycle contracts and orchestration primitives for phase-based journeys |
+| ErrorRuntime.ts | `ErrorRuntime` | Runtime-side error handling helpers and context types for structured failure behavior |
+| MetricsRuntime.ts | `MetricsRuntime` | Transaction aggregation and runtime metric helpers used by reporting contracts |
+| SnapshotRuntime.ts | `SnapshotRuntime` | Runtime snapshot helpers used for failure/system artifact capture |
+| TimeseriesRuntime.ts | `TimeseriesRuntime` | Runtime-side timeseries helpers feeding persisted timeseries artifacts |
+
+### 10. REPORTING LAYER (`core-engine/src/reporting/`)
+
+| File | Class | Purpose |
+|------|-------|---------|
+| ArtifactWriter.ts | `ArtifactWriter` | Writes JSON/NDJSON artifact files into the run folder |
+| EventArtifactBuilder.ts | `EventArtifactBuilder` | Builds structured `errors.ndjson` and `warnings.ndjson` payloads from run/debug output |
+| TransactionMetricsBuilder.ts | `TransactionMetricsBuilder` | Produces transaction-level metrics JSON and console-friendly transaction summaries |
+| RunSummaryBuilder.ts | `RunSummaryBuilder` | Produces CI-focused summary payloads (`ci-summary.json`) from k6 summary data |
+| RunReportGenerator.ts | `RunReportGenerator` | Builds the unified `RunReport.html` artifact and its tabs/sections |
+| TimeseriesArtifactBuilder.ts | `TimeseriesArtifactBuilder` | Builds persisted `timeseries.json` data for graphs, events, and system-series support |
+
+### 11. REPORTERS LAYER (`core-engine/src/reporters/`)
 
 | File | Class | Purpose |
 |------|-------|---------|
@@ -307,7 +485,7 @@ flowchart TD
 
 > **Note:** Reporters are currently placeholder/stub implementations — they log actions but don't actually push data.
 
-### 10. UTILS LAYER (`core-engine/src/utils/`)
+### 12. UTILS LAYER (`core-engine/src/utils/`)
 
 | File | Export | Purpose |
 |------|--------|---------|
@@ -319,7 +497,7 @@ flowchart TD
 | replayLogger.js | `logReplayExchange`, `logExchange`, `trackCorrelation`, `trackParameter`, `trackDataRow`, `createVariableEvent` | k6-side logging. Outputs `[k6-perf][replay-log]` JSON with: harEntryId, transaction, iteration, VU, request/response details, headers, cookies, body. `trackCorrelation(name, value, source)` / `trackParameter(name, value, source)` register variables in `_variableRegistry`. `trackDataRow(sourceName, rowObject)` bulk-registers all CSV columns as parameters. `logExchange` auto-detects variable usage by scanning request URL/body/headers for registered values (via `detectVariableEvents()`). Body values stringified defensively (`typeof body === 'object' ? JSON.stringify(body) : String(body)`). **Binary body detection:** `binaryBodyPlaceholder(url, responseHeaders)` checks Content-Type (image/audio/video/font + common binary MIME types) and URL extension (.png/.ttf/.woff2/etc.) — replaces body with `[binary: content-type]` placeholder to prevent JSON serialization failures. Cookie extraction: `extractJarCookies(url)` uses `http.cookieJar().cookiesForURL()` for auto-managed cookies, `extractK6ResponseCookies(resCookies)` for k6's parsed `res.cookies` object. Tracks per-iteration state and request sequencing |
 | session.js | `registerBaseUrl`, `clearCookies`, `deleteCookie` | k6-side cookie management utilities. **URL registry pattern:** `_registeredUrls` Set tracks all known base URLs. `registerBaseUrl(url)` adds a URL to the registry (called automatically by generated/converted scripts at module init). `clearCookies(...urls)` clears the VU's cookie jar — with no arguments, clears all registered URLs; with arguments, clears only the given URLs. `deleteCookie(url, name)` removes a specific named cookie. Used by framework to support per-journey cookie control when `noCookiesReset` is true globally but individual journeys need session resets. |
 
-### 11. TYPES (`core-engine/src/types/`)
+### 13. TYPES (`core-engine/src/types/`)
 
 | File | Key Exports |
 |------|-------------|
@@ -1520,3 +1698,19 @@ npm run cli -- run --plan config/test-plans/debug-test.json
     - each VU runs `endPhase` once
   - debug replay now has phase metadata, so logout/end transactions can run during debug flows instead of being skipped due to `unsupported` phase mode.
 - **Verification:** `cmd /c npm exec tsc -- --noEmit` passed.
+
+### 2026-04-13 - Agent Context Structural Refresh
+- **What:** Refreshed stale documentation in `AGENT-CONTEXT.md` after auditing the live repository structure and CLI/runtime flow.
+- **Sections refreshed:**
+  - `PROJECT OVERVIEW`
+  - `Run Command Options`
+  - `DIRECTORY STRUCTURE`
+  - `STRUCTURAL FLOW MAP (TREE-SITTER CONTEXT)`
+  - `CORE ENGINE ARCHITECTURE`
+- **Key updates made:**
+  - documented phase-based lifecycle, artifact-first reporting, host monitoring, session/cookie control, and dynamic SLA support in the overview
+  - updated run/debug command options to match the current CLI in `core-engine/src/cli/run.ts`
+  - added a current repo tree snapshot including `.tmp-init-check`, `dist`, `reporting/`, `reporters/`, `runtime/`, and `scrum-suites/testpro`
+  - added a newer structural flow map that includes the `runtime`, `reporting`, and `reporters` layers
+  - updated architecture from 11 layers to 13 layers and documented the distinct runtime/reporting layers
+- **Note:** New “current snapshot/map” blocks should be treated as authoritative if older legacy text nearby disagrees.
