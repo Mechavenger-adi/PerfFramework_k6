@@ -177,104 +177,124 @@ K6-PerfFramework/
 **Authoritative structural map (2026-04-13):** This is the single source of truth for repo flow. Replace this map when architecture changes; do not keep parallel legacy diagrams.
 
 ```mermaid
-flowchart TD
-  AGENT[AGENT-CONTEXT.md]
-  OVERVIEW[Project Overview]
-  MAP[Structural Flow Map]
-  ARCH[Core Engine Architecture]
+flowchart LR
+  subgraph Docs["AI Orientation"]
+    direction TB
+    AGENT["AGENT-CONTEXT.md"]
+    OVERVIEW["Project Overview"]
+    MAP["Structural Flow Map"]
+    ARCH["Core Engine Architecture"]
+  end
 
-  PLAN[config/test-plans/*.json]
-  ENV[config/environments/*.json]
-  RUNTIMECFG[config/runtime-settings/*.json]
-  ENVFILE[.env / secrets]
-  SUITES[scrum-suites/<team>/]
-  TESTS[tests/*.js]
-  SUITEDATA[data/*.csv|*.json]
-  RECORDINGS[recordings/*.har|*.recording-log.json]
-  RULES[correlation-rules/*.json]
+  subgraph Inputs["Inputs And Suite Assets"]
+    direction TB
+    PLAN["config/test-plans/*.json"]
+    ENV["config/environments/*.json"]
+    RUNTIMECFG["config/runtime-settings/*.json"]
+    ENVFILE[".env / secrets"]
+    SUITES["scrum-suites/<team>/"]
+    TESTS["tests/*.js"]
+    SUITEDATA["data files (.csv, .json)"]
+    RECORDINGS["recordings (.har, .recording-log.json)"]
+    RULES["correlation-rules/*.json"]
+  end
 
-  CLI[core-engine/src/cli]
-  RUN[run.ts]
-  VALIDATE[validate.ts]
-  DEBUGCLI[debug command]
-  GENERATE[generate.ts]
-  CONVERT[convert.ts]
-  INIT[init.ts / generate-byos.ts]
+  subgraph CLI["CLI Entry Points"]
+    direction TB
+    RUN["run.ts"]
+    VALIDATE["validate.ts"]
+    DEBUGCLI["debug command"]
+    GENERATE["generate.ts"]
+    CONVERT["convert.ts"]
+    INIT["init.ts / generate-byos.ts"]
+  end
 
-  CFG[config layer]
-  CM[ConfigurationManager]
-  GV[GatekeeperValidator]
-  RV[RuntimeConfigManager]
-  SV[SchemaValidator]
-  ER[EnvResolver]
+  subgraph Config["Config Layer"]
+    direction TB
+    CM["ConfigurationManager"]
+    GV["GatekeeperValidator"]
+    RV["RuntimeConfigManager"]
+    SV["SchemaValidator"]
+    ER["EnvResolver"]
+  end
 
-  SCENARIO[scenario layer]
-  TL[TestPlanLoader]
-  SB[ScenarioBuilder]
-  EF[ExecutorFactory]
-  WM[WorkloadModels]
+  subgraph Scenario["Scenario And Assertions"]
+    direction TB
+    TL["TestPlanLoader"]
+    SB["ScenarioBuilder"]
+    EF["ExecutorFactory"]
+    WM["WorkloadModels"]
+    TM["ThresholdManager"]
+    SLA["SLARegistry + JourneyAssertionResolver"]
+  end
 
-  ASSERT[assertions layer]
-  TM[ThresholdManager]
-  SLA[SLARegistry / JourneyAssertionResolver]
+  subgraph Execution["Execution Layer"]
+    direction TB
+    PEM["ParallelExecutionManager"]
+    JA["JourneyAllocator"]
+    PR["PipelineRunner"]
+    HM["HostMonitor"]
+  end
 
-  EXEC[execution layer]
-  PEM[ParallelExecutionManager]
-  JA[JourneyAllocator]
-  PR[PipelineRunner]
-  HM[HostMonitor]
+  subgraph Runtime["Runtime + Suite Runtime Helpers"]
+    direction TB
+    LCR["LifecycleRuntime + lifecycle.js"]
+    ERRRT["ErrorRuntime"]
+    METRT["MetricsRuntime"]
+    SNAPRT["SnapshotRuntime"]
+    TSRT["TimeseriesRuntime"]
+    K6UTIL["k6 runtime helpers (transaction.js, replayLogger.js, session.js)"]
+  end
 
-  RUNTIME[runtime layer]
-  LCR[LifecycleRuntime / lifecycle.js]
-  ERRRT[ErrorRuntime]
-  METRT[MetricsRuntime]
-  SNAPRT[SnapshotRuntime]
-  TSRT[TimeseriesRuntime]
+  subgraph DataCorr["Data + Correlation"]
+    direction TB
+    DF["DataFactory"]
+    DP["DataPoolManager"]
+    DV["DataValidator"]
+    DYN["DynamicValueFactory"]
+    CE["CorrelationEngine"]
+    EXTR["ExtractorRegistry"]
+    FH["FallbackHandler"]
+    RP["RuleProcessor"]
+  end
 
-  DATA[data layer]
-  DF[DataFactory]
-  DP[DataPoolManager]
-  DV[DataValidator]
-  DYN[DynamicValueFactory]
+  subgraph Recording["Recording + Conversion"]
+    direction TB
+    HAR["HARParser"]
+    DG["DomainFilter"]
+    TG["TransactionGrouper"]
+    SG["ScriptGenerator"]
+    SC["ScriptConverter"]
+  end
 
-  RECORD[recording layer]
-  HAR[HARParser]
-  DG[DomainFilter]
-  TG[TransactionGrouper]
-  SG[ScriptGenerator]
-  SC[ScriptConverter]
+  subgraph Debug["Debug Layer"]
+    direction TB
+    RR["ReplayRunner"]
+    DC["DiffChecker"]
+    HDR["HTMLDiffReporter"]
+    EL["ExchangeLogBuilder"]
+    RLR["RecordingLogResolver"]
+  end
 
-  CORR[correlation layer]
-  CE[CorrelationEngine]
-  EXTR[ExtractorRegistry]
-  FH[FallbackHandler]
-  RP[RuleProcessor]
+  subgraph Reporting["Reporting + Reporters"]
+    direction TB
+    AW["ArtifactWriter"]
+    EAB["EventArtifactBuilder"]
+    TMB["TransactionMetricsBuilder"]
+    RSB["RunSummaryBuilder"]
+    RRG["RunReportGenerator"]
+    TAB["TimeseriesArtifactBuilder"]
+    RT["ResultTransformer"]
+    GR["GrafanaReporter"]
+    AZ["AzureReporter"]
+    CU["CustomUploader"]
+  end
 
-  DEBUG[debug layer]
-  RR[ReplayRunner]
-  DC[DiffChecker]
-  HDR[HTMLDiffReporter]
-  EL[ExchangeLogBuilder]
-  RLR[RecordingLogResolver]
-
-  REPORTING[reporting layer]
-  AW[ArtifactWriter]
-  EAB[EventArtifactBuilder]
-  TMB[TransactionMetricsBuilder]
-  RSB[RunSummaryBuilder]
-  RRG[RunReportGenerator]
-  TAB[TimeseriesArtifactBuilder]
-
-  REPORTERS[reporters layer]
-  RT[ResultTransformer]
-  GR[GrafanaReporter]
-  AZ[AzureReporter]
-  CU[CustomUploader]
-
-  UTILS[utils + types]
-  LOG[logger / ProgressBar / PathResolver]
-  K6UTIL[transaction.js|replayLogger.js|session.js]
-  TYPES[ConfigContracts / TestPlanSchema / EventContracts / ReportingContracts / HARContracts]
+  subgraph Utils["Shared Utils + Types"]
+    direction TB
+    LOG["logger / ProgressBar / PathResolver"]
+    TYPES["contracts: config / test plan / event / reporting / HAR"]
+  end
 
   AGENT --> OVERVIEW
   AGENT --> MAP
@@ -287,18 +307,10 @@ flowchart TD
   ENV --> CM
   RUNTIMECFG --> CM
   ENVFILE --> ER
-
   SUITES --> TESTS
   SUITES --> SUITEDATA
   SUITES --> RECORDINGS
   SUITES --> RULES
-
-  CLI --> RUN
-  CLI --> VALIDATE
-  CLI --> DEBUGCLI
-  CLI --> GENERATE
-  CLI --> CONVERT
-  CLI --> INIT
 
   VALIDATE --> TL
   VALIDATE --> GV
@@ -336,7 +348,6 @@ flowchart TD
 
   CONVERT --> SC
   CONVERT --> K6UTIL
-
   INIT --> TESTS
   INIT --> K6UTIL
 
@@ -344,20 +355,13 @@ flowchart TD
   CM --> ER
   GV --> DV
   GV --> RLR
-
   SB --> EF
   SB --> WM
   SB --> LCR
   TM --> SLA
-
   PEM --> JA
   PEM --> PR
   PR --> HM
-
-  LCR --> ERRRT
-  LCR --> METRT
-  LCR --> SNAPRT
-  LCR --> TSRT
 
   TESTS --> LCR
   TESTS --> K6UTIL
@@ -368,14 +372,19 @@ flowchart TD
   SUITEDATA --> DP
   SUITEDATA --> DV
   SUITEDATA --> DYN
-
-  RECORDINGS --> HAR
-  RECORDINGS --> EL
-  RECORDINGS --> RLR
   RULES --> RP
   RP --> CE
   CE --> EXTR
   CE --> FH
+
+  RECORDINGS --> HAR
+  RECORDINGS --> EL
+  RECORDINGS --> RLR
+
+  LCR --> ERRRT
+  LCR --> METRT
+  LCR --> SNAPRT
+  LCR --> TSRT
 
   AW --> RRG
   EAB --> RRG
@@ -387,57 +396,7 @@ flowchart TD
   RT --> AZ
   RT --> CU
 
-  CFG --> CM
-  CFG --> GV
-  CFG --> RV
-  CFG --> SV
-  CFG --> ER
-  SCENARIO --> TL
-  SCENARIO --> SB
-  SCENARIO --> EF
-  SCENARIO --> WM
-  ASSERT --> TM
-  ASSERT --> SLA
-  EXEC --> PEM
-  EXEC --> JA
-  EXEC --> PR
-  EXEC --> HM
-  DATA --> DF
-  DATA --> DP
-  DATA --> DV
-  DATA --> DYN
-  RECORD --> HAR
-  RECORD --> DG
-  RECORD --> TG
-  RECORD --> SG
-  RECORD --> SC
-  CORR --> CE
-  CORR --> EXTR
-  CORR --> FH
-  CORR --> RP
-  DEBUG --> RR
-  DEBUG --> DC
-  DEBUG --> HDR
-  DEBUG --> EL
-  DEBUG --> RLR
-  REPORTING --> AW
-  REPORTING --> EAB
-  REPORTING --> TMB
-  REPORTING --> RSB
-  REPORTING --> RRG
-  REPORTING --> TAB
-  REPORTERS --> RT
-  REPORTERS --> GR
-  REPORTERS --> AZ
-  REPORTERS --> CU
-  RUNTIME --> LCR
-  RUNTIME --> ERRRT
-  RUNTIME --> METRT
-  RUNTIME --> SNAPRT
-  RUNTIME --> TSRT
-  UTILS --> LOG
-  UTILS --> K6UTIL
-  UTILS --> TYPES
+  LOG --> TYPES
 ```
 
 **Reading order for AI assistants:**
