@@ -7,6 +7,7 @@
 > 4. If you add files, modify architecture, or fix bugs — update the relevant section AND the change log.
 > 5. This file is the single source of truth for resuming work across agents/tools/sessions.
 > 6. KEEP THE STRUCTURAL FLOW MAP UPDATED - treat it as a Tree-sitter-backed structural map of the codebase. When files, imports, module boundaries, execution flow, or ownership change, update the diagram and summary so future AI assistants get precise incremental context quickly.
+> 7. KEEP AGENT-CONTEXT AND THE FLOW DIAGRAM SYNCHRONIZED - if one changes, review the other in the same pass so AI models can use this file as a token-saving orientation layer instead of rediscovering the repo from scratch.
 
 **Last Updated:** 2026-04-13
 **Workspace:** d:\repos\K6-PerfFramework
@@ -170,186 +171,273 @@ K6-PerfFramework/
 - new engine layers are introduced
 - reporting/debug/generation flow changes
 - team suite layout changes in ways that affect execution or data resolution
+ 
+**AI maintenance rule:** Keep this diagram detailed, connected, and token-efficient. The goal is that future AI models can traverse this map first, understand the codebase shape quickly, and save tokens by opening only the modules that are relevant to the current task.
 
-**Current structural map (2026-04-13):** This supersedes older relationships if they conflict.
+**Authoritative structural map (2026-04-13):** This is the single source of truth for repo flow. Replace this map when architecture changes; do not keep parallel legacy diagrams.
 
 ```mermaid
 flowchart TD
   AGENT[AGENT-CONTEXT.md]
+  OVERVIEW[Project Overview]
+  MAP[Structural Flow Map]
+  ARCH[Core Engine Architecture]
+
   PLAN[config/test-plans/*.json]
   ENV[config/environments/*.json]
   RUNTIMECFG[config/runtime-settings/*.json]
+  ENVFILE[.env / secrets]
   SUITES[scrum-suites/<team>/]
+  TESTS[tests/*.js]
+  SUITEDATA[data/*.csv|*.json]
+  RECORDINGS[recordings/*.har|*.recording-log.json]
+  RULES[correlation-rules/*.json]
 
-  CLI[cli]
-  CFG[config]
-  SCENARIO[scenario]
-  EXEC[execution]
-  DATA[data]
-  CORR[correlation]
-  RECORD[recording]
-  DEBUG[debug]
-  ASSERT[assertions]
-  RUNTIME[runtime]
-  REPORTING[reporting]
-  REPORTERS[reporters]
+  CLI[core-engine/src/cli]
+  RUN[run.ts]
+  VALIDATE[validate.ts]
+  DEBUGCLI[debug command]
+  GENERATE[generate.ts]
+  CONVERT[convert.ts]
+  INIT[init.ts / generate-byos.ts]
+
+  CFG[config layer]
+  CM[ConfigurationManager]
+  GV[GatekeeperValidator]
+  RV[RuntimeConfigManager]
+  SV[SchemaValidator]
+  ER[EnvResolver]
+
+  SCENARIO[scenario layer]
+  TL[TestPlanLoader]
+  SB[ScenarioBuilder]
+  EF[ExecutorFactory]
+  WM[WorkloadModels]
+
+  ASSERT[assertions layer]
+  TM[ThresholdManager]
+  SLA[SLARegistry / JourneyAssertionResolver]
+
+  EXEC[execution layer]
+  PEM[ParallelExecutionManager]
+  JA[JourneyAllocator]
+  PR[PipelineRunner]
+  HM[HostMonitor]
+
+  RUNTIME[runtime layer]
+  LCR[LifecycleRuntime / lifecycle.js]
+  ERRRT[ErrorRuntime]
+  METRT[MetricsRuntime]
+  SNAPRT[SnapshotRuntime]
+  TSRT[TimeseriesRuntime]
+
+  DATA[data layer]
+  DF[DataFactory]
+  DP[DataPoolManager]
+  DV[DataValidator]
+  DYN[DynamicValueFactory]
+
+  RECORD[recording layer]
+  HAR[HARParser]
+  DG[DomainFilter]
+  TG[TransactionGrouper]
+  SG[ScriptGenerator]
+  SC[ScriptConverter]
+
+  CORR[correlation layer]
+  CE[CorrelationEngine]
+  EXTR[ExtractorRegistry]
+  FH[FallbackHandler]
+  RP[RuleProcessor]
+
+  DEBUG[debug layer]
+  RR[ReplayRunner]
+  DC[DiffChecker]
+  HDR[HTMLDiffReporter]
+  EL[ExchangeLogBuilder]
+  RLR[RecordingLogResolver]
+
+  REPORTING[reporting layer]
+  AW[ArtifactWriter]
+  EAB[EventArtifactBuilder]
+  TMB[TransactionMetricsBuilder]
+  RSB[RunSummaryBuilder]
+  RRG[RunReportGenerator]
+  TAB[TimeseriesArtifactBuilder]
+
+  REPORTERS[reporters layer]
+  RT[ResultTransformer]
+  GR[GrafanaReporter]
+  AZ[AzureReporter]
+  CU[CustomUploader]
+
   UTILS[utils + types]
+  LOG[logger / ProgressBar / PathResolver]
+  K6UTIL[transaction.js|replayLogger.js|session.js]
+  TYPES[ConfigContracts / TestPlanSchema / EventContracts / ReportingContracts / HARContracts]
 
-  RUN[run.ts]
-  VALIDATE[validate.ts]
-  GENERATE[generate.ts]
-  CONVERT[convert.ts]
-  INIT[init.ts / generate-byos.ts]
-
+  AGENT --> OVERVIEW
+  AGENT --> MAP
+  AGENT --> ARCH
+  AGENT --> PLAN
   AGENT --> RUN
-  AGENT --> CFG
-  AGENT --> REPORTING
-  AGENT --> DEBUG
 
-  PLAN --> RUN
-  PLAN --> VALIDATE
-  ENV --> CFG
-  RUNTIMECFG --> CFG
-  SUITES --> RUN
-  SUITES --> VALIDATE
-  SUITES --> GENERATE
-  SUITES --> CONVERT
+  PLAN --> TL
+  PLAN --> GV
+  ENV --> CM
+  RUNTIMECFG --> CM
+  ENVFILE --> ER
+
+  SUITES --> TESTS
+  SUITES --> SUITEDATA
+  SUITES --> RECORDINGS
+  SUITES --> RULES
 
   CLI --> RUN
   CLI --> VALIDATE
+  CLI --> DEBUGCLI
   CLI --> GENERATE
   CLI --> CONVERT
   CLI --> INIT
 
-  RUN --> CFG
-  RUN --> SCENARIO
-  RUN --> EXEC
-  RUN --> ASSERT
-  RUN --> REPORTING
-  RUN --> DEBUG
+  VALIDATE --> TL
+  VALIDATE --> GV
+  VALIDATE --> DV
+  VALIDATE --> RLR
 
-  VALIDATE --> CFG
-  VALIDATE --> DATA
-  VALIDATE --> DEBUG
+  RUN --> TL
+  RUN --> CM
+  RUN --> GV
+  RUN --> RV
+  RUN --> SB
+  RUN --> TM
+  RUN --> PEM
+  RUN --> PR
+  RUN --> HM
+  RUN --> AW
+  RUN --> EAB
+  RUN --> TMB
+  RUN --> RSB
+  RUN --> RRG
+  RUN --> TAB
 
-  GENERATE --> RECORD
-  GENERATE --> CORR
-  GENERATE --> UTILS
-  CONVERT --> RECORD
-  CONVERT --> UTILS
-  INIT --> SUITES
+  DEBUGCLI --> RR
+  RR --> PR
+  RR --> DC
+  RR --> HDR
+  RR --> EL
+  RR --> RLR
 
-  SCENARIO --> EXEC
-  SCENARIO --> RUNTIME
-  ASSERT --> EXEC
-  EXEC --> REPORTING
-  EXEC --> REPORTERS
-  EXEC --> UTILS
-  DEBUG --> EXEC
-  DEBUG --> REPORTING
-  REPORTING --> REPORTERS
-  REPORTING --> UTILS
-  RUNTIME --> REPORTING
-  RUNTIME --> UTILS
+  GENERATE --> HAR
+  GENERATE --> DG
+  GENERATE --> TG
+  GENERATE --> SG
+  GENERATE --> RLR
 
-  RECORD --> CORR
-  RECORD --> UTILS
-  DATA --> UTILS
-  CORR --> UTILS
+  CONVERT --> SC
+  CONVERT --> K6UTIL
 
-  SUITES -->|tests/*.js| RUNTIME
-  SUITES -->|data/*.csv, *.json| DATA
-  SUITES -->|recordings/*.har, *.recording-log.json| RECORD
-  SUITES -->|correlation-rules/*.json| CORR
-```
+  INIT --> TESTS
+  INIT --> K6UTIL
 
-**Legacy structural map below is retained for history only. Use the current structural map above if anything conflicts.**
+  CM --> SV
+  CM --> ER
+  GV --> DV
+  GV --> RLR
 
-```mermaid
-flowchart TD
-  AGENT[AGENT-CONTEXT.md]
-  PLAN[config/test-plans/*.json]
-  ENV[config/environments/*.json]
-  RUNTIME[config/runtime-settings/*.json]
-  SUITES[scrum-suites/<team>/]
+  SB --> EF
+  SB --> WM
+  SB --> LCR
+  TM --> SLA
 
-  CLI[core-engine/src/cli/]
-  CFG[core-engine/src/config/]
-  SCENARIO[core-engine/src/scenario/]
-  EXEC[core-engine/src/execution/]
-  DATA[core-engine/src/data/]
-  CORR[core-engine/src/correlation/]
-  RECORD[core-engine/src/recording/]
-  DEBUG[core-engine/src/debug/]
-  ASSERT[core-engine/src/assertions/]
-  REPORT[core-engine/src/reporting/]
-  UTILS[core-engine/src/utils/ + types/]
+  PEM --> JA
+  PEM --> PR
+  PR --> HM
 
-  RUN[run.ts]
-  VALIDATE[validate.ts]
-  GENERATE[generate.ts]
-  CONVERT[convert.ts]
-  INIT[init.ts / generate-byos.ts]
+  LCR --> ERRRT
+  LCR --> METRT
+  LCR --> SNAPRT
+  LCR --> TSRT
 
-  AGENT --> CLI
-  AGENT --> CFG
-  AGENT --> RECORD
-  AGENT --> DEBUG
-  AGENT --> REPORT
+  TESTS --> LCR
+  TESTS --> K6UTIL
+  TESTS --> SUITEDATA
+  TESTS --> RULES
 
-  PLAN --> RUN
-  PLAN --> VALIDATE
-  ENV --> CFG
-  RUNTIME --> CFG
-  SUITES --> RUN
-  SUITES --> VALIDATE
-  SUITES --> GENERATE
-  SUITES --> CONVERT
+  SUITEDATA --> DF
+  SUITEDATA --> DP
+  SUITEDATA --> DV
+  SUITEDATA --> DYN
 
-  CLI --> RUN
-  CLI --> VALIDATE
-  CLI --> GENERATE
-  CLI --> CONVERT
-  CLI --> INIT
+  RECORDINGS --> HAR
+  RECORDINGS --> EL
+  RECORDINGS --> RLR
+  RULES --> RP
+  RP --> CE
+  CE --> EXTR
+  CE --> FH
 
-  RUN --> CFG
-  RUN --> SCENARIO
-  RUN --> EXEC
-  RUN --> ASSERT
-  RUN --> REPORT
-  RUN --> DEBUG
+  AW --> RRG
+  EAB --> RRG
+  TMB --> RRG
+  RSB --> RRG
+  TAB --> RRG
+  RRG --> RT
+  RT --> GR
+  RT --> AZ
+  RT --> CU
 
-  VALIDATE --> CFG
-  VALIDATE --> DATA
-  VALIDATE --> DEBUG
-
-  GENERATE --> RECORD
-  GENERATE --> DEBUG
-  CONVERT --> RECORD
-  INIT --> SUITES
-
-  CFG --> SCENARIO
-  CFG --> EXEC
-  CFG --> DATA
-  CFG --> REPORT
-
-  SCENARIO --> EXEC
-  ASSERT --> EXEC
-  EXEC --> REPORT
-  DEBUG --> EXEC
-  DEBUG --> REPORT
-
-  RECORD --> CORR
-  RECORD --> UTILS
-  DATA --> UTILS
-  CORR --> UTILS
-  REPORT --> UTILS
-  EXEC --> UTILS
-
-  SUITES -->|tests/*.js| EXEC
-  SUITES -->|data/*.csv, *.json| DATA
-  SUITES -->|recordings/*.har, *.recording-log.json| RECORD
-  SUITES -->|correlation-rules/*.json| CORR
+  CFG --> CM
+  CFG --> GV
+  CFG --> RV
+  CFG --> SV
+  CFG --> ER
+  SCENARIO --> TL
+  SCENARIO --> SB
+  SCENARIO --> EF
+  SCENARIO --> WM
+  ASSERT --> TM
+  ASSERT --> SLA
+  EXEC --> PEM
+  EXEC --> JA
+  EXEC --> PR
+  EXEC --> HM
+  DATA --> DF
+  DATA --> DP
+  DATA --> DV
+  DATA --> DYN
+  RECORD --> HAR
+  RECORD --> DG
+  RECORD --> TG
+  RECORD --> SG
+  RECORD --> SC
+  CORR --> CE
+  CORR --> EXTR
+  CORR --> FH
+  CORR --> RP
+  DEBUG --> RR
+  DEBUG --> DC
+  DEBUG --> HDR
+  DEBUG --> EL
+  DEBUG --> RLR
+  REPORTING --> AW
+  REPORTING --> EAB
+  REPORTING --> TMB
+  REPORTING --> RSB
+  REPORTING --> RRG
+  REPORTING --> TAB
+  REPORTERS --> RT
+  REPORTERS --> GR
+  REPORTERS --> AZ
+  REPORTERS --> CU
+  RUNTIME --> LCR
+  RUNTIME --> ERRRT
+  RUNTIME --> METRT
+  RUNTIME --> SNAPRT
+  RUNTIME --> TSRT
+  UTILS --> LOG
+  UTILS --> K6UTIL
+  UTILS --> TYPES
 ```
 
 **Reading order for AI assistants:**
@@ -1714,3 +1802,15 @@ npm run cli -- run --plan config/test-plans/debug-test.json
   - added a newer structural flow map that includes the `runtime`, `reporting`, and `reporters` layers
   - updated architecture from 11 layers to 13 layers and documented the distinct runtime/reporting layers
 - **Note:** New “current snapshot/map” blocks should be treated as authoritative if older legacy text nearby disagrees.
+
+### 2026-04-13 - Structural Flow Diagram Upgraded For AI Orientation
+- **What:** Replaced the competing old/new flow diagrams with one detailed authoritative structural flow diagram under `STRUCTURAL FLOW MAP (TREE-SITTER CONTEXT)`.
+- **Why:** The previous section still had multiple diagrams and mixed levels of abstraction. The new map is intended to let AI models traverse the framework structure quickly, save tokens, and open only the modules relevant to the current task.
+- **What the new map now shows:**
+  - top-level orientation from `AGENT-CONTEXT.md` into overview/map/architecture
+  - config inputs (`test-plans`, `environments`, `runtime-settings`, `.env`)
+  - suite assets (`tests`, `data`, `recordings`, `correlation-rules`)
+  - CLI entrypoints (`run`, `validate`, `debug`, `generate`, `convert`, `init`)
+  - detailed layer-to-module relationships across `config`, `scenario`, `assertions`, `execution`, `runtime`, `data`, `recording`, `correlation`, `debug`, `reporting`, `reporters`, and `utils/types`
+  - end-to-end runtime flow from plan loading through reporting/artifact generation
+- **Instruction added:** Future agents should update both the flow diagram and surrounding agent context together so this file stays usable as a token-saving orientation layer for AI assistants.
