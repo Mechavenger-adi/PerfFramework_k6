@@ -1,0 +1,256 @@
+# Framework Implementation TODO
+
+This checklist tracks the agreed lifecycle, reporting, observability, and CI/CD work.
+
+## Ground Rules
+
+- Existing framework functionality must not break.
+- Update this file and `AGENT-CONTEXT.md` as each task moves forward.
+- Prefer incremental, verifiable changes over large rewrites.
+- Keep user-facing script authoring simple.
+
+## Task 1: Runtime Contracts And Config
+
+**Scope**
+- Extend runtime config contracts for:
+  - `errorBehavior`
+  - reporting
+  - errors
+  - monitoring
+  - timeseries
+- Add reporting/event TypeScript contracts
+- Update schema validation and runtime config accessors
+
+**Dependencies**
+- None
+
+**Expected outputs**
+- `ConfigContracts.ts` updated
+- `SchemaValidator.ts` updated
+- `RuntimeConfigManager.ts` updated
+- new `EventContracts.ts`
+- new `ReportingContracts.ts`
+- config schema supports new sections
+
+## Task 2: Shared Runtime Foundation
+
+**Scope**
+- Build shared runtime helpers for:
+  - lifecycle execution
+  - error handling
+  - metrics collection
+  - snapshot capture
+  - timeseries aggregation
+
+**Dependencies**
+- Task 1
+
+**Expected outputs**
+- new runtime helper files under `core-engine/src/runtime/`
+- hidden lifecycle wrapper skeleton
+- structured error/warning event creation
+- transaction metric helper
+- bucketed timeseries helper
+
+## Task 3: Scenario And Execution Wiring
+
+**Scope**
+- Inject lifecycle/runtime metadata into scenarios
+- Wire the run path to use shared runtime wrapper
+- Prepare run output directories and artifact wiring
+
+**Dependencies**
+- Task 2
+
+**Expected outputs**
+- `ScenarioBuilder.ts` updated
+- `run.ts` updated
+- `PipelineRunner.ts` updated
+- run metadata and output orchestration ready
+
+## Task 4: Generator And Converter UX
+
+**Scope**
+- Update generator and converter to emit:
+  - `initPhase(ctx)`
+  - `actionPhase(ctx)`
+  - `endPhase(ctx)`
+- Prompt users for init/end group selection
+- Support skip option with empty init/end functions
+
+**Dependencies**
+- Task 2
+- Task 3
+
+**Expected outputs**
+- `ScriptGenerator.ts` updated
+- `ScriptConverter.ts` updated
+- `generate.ts` updated
+- `convert.ts` updated
+- stable simple author-facing scripts
+
+## Task 5: Artifact Persistence
+
+**Scope**
+- Persist structured run artifacts:
+  - `errors.ndjson`
+  - `warnings.ndjson`
+  - `transaction-metrics.json`
+  - `ci-summary.json`
+  - `timeseries.json`
+
+**Dependencies**
+- Task 2
+- Task 3
+
+**Expected outputs**
+- new reporting/artifact writer helpers
+- structured artifact persistence working
+- CI-friendly outputs available after run
+
+## Task 6: Transaction Metrics Matrix
+
+**Scope**
+- Implement transaction duration + pass/fail collection
+- Support configurable visible stats:
+  - `avg`
+  - `min`
+  - `max`
+  - `p(90)`
+  - `p(95)`
+  - `p(99)`
+  - pass/fail counts
+
+**Dependencies**
+- Task 2
+- Task 5
+
+**Expected outputs**
+- transaction metric collection working
+- `transaction-metrics.json` contains configured columns
+- summary/gate logic can use transaction data
+
+## Task 7: Error, Warning, And Snapshot Flow
+
+**Scope**
+- Implement structured error/warning event emission
+- Implement `errorBehavior` flow:
+  - `continue`
+  - `stop_iteration`
+  - `stop_vu`
+  - `abort_test`
+- Implement snapshot capture-on-failure
+
+**Dependencies**
+- Task 2
+- Task 5
+
+**Expected outputs**
+- `errors.ndjson` schema working
+- `warnings.ndjson` schema working
+- snapshot files written when enabled
+- errorBehavior enforced by shared runtime
+
+## Task 8: Host Monitoring
+
+**Scope**
+- Implement CPU/memory sampling
+- Emit warning events on threshold breach
+- Feed system time-series and system report tab
+
+**Dependencies**
+- Task 5
+
+**Expected outputs**
+- `HostMonitor.ts` or equivalent created
+- system warnings emitted
+- system metrics available for reports
+
+## Task 9: Unified HTML Report
+
+**Scope**
+- Build single `RunReport.html`
+- Tabs:
+  - Summary
+  - Graphs
+  - Transactions
+  - Errors
+  - Warnings
+  - Snapshots
+  - System
+
+**Dependencies**
+- Task 5
+- Task 6
+- Task 7
+- Task 8
+
+**Expected outputs**
+- unified tabbed HTML report
+- JSON/NDJSON-driven rendering
+- no split report dependency
+
+## Task 10: Interactive Graphs And Global Time Filter
+
+**Scope**
+- Add `timeseries.json` driven graphs
+- Add one global time filter
+- Add synchronized drill-down behavior across tabs
+- Add transaction response-time graph + attached table
+
+**Dependencies**
+- Task 5
+- Task 6
+- Task 8
+- Task 9
+
+**Expected outputs**
+- `Graphs` tab fully interactive
+- global time filter works across report
+- top-5/all transaction toggle
+- transaction search/filter/multi-select
+- attached table recalculates per selected time window
+
+## Task 11: CI/CD Integration
+
+**Scope**
+- Finalize `ci-summary.json`
+- Document pipeline consumption model
+- Ensure console remains concise while artifacts remain rich
+
+**Dependencies**
+- Task 5
+- Task 6
+- Task 7
+
+**Expected outputs**
+- reliable CI gate artifact
+- documented pipeline usage
+- artifact-first CI model
+
+## Task 12: Documentation And Templates
+
+**Scope**
+- Update framework docs
+- Update init/BYOS templates
+- Add sample plans/examples for lifecycle/reporting
+
+**Dependencies**
+- Task 4
+- Task 9
+- Task 10
+- Task 11
+
+**Expected outputs**
+- updated guides and templates
+- examples aligned with final architecture
+
+## Verification Checklist
+
+- Existing CLI commands still work
+- Existing non-lifecycle test execution still works
+- Existing debug replay still works
+- New lifecycle path works
+- New reporting artifacts are generated correctly
+- Unified HTML report opens and filters correctly
+- CI gate can run from `ci-summary.json`

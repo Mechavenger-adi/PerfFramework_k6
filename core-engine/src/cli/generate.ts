@@ -5,9 +5,10 @@ import { stdin as input, stdout as output } from 'node:process';
 import { HARParser } from '../recording/HARParser';
 import { DomainFilter } from '../recording/DomainFilter';
 import { TransactionGrouper } from '../recording/TransactionGrouper';
-import { ScriptGenerator } from '../recording/ScriptGenerator';
+import { LifecycleSelection, ScriptGenerator } from '../recording/ScriptGenerator';
 import { ExchangeLogBuilder } from '../debug/ExchangeLog';
 import { RecordingLogResolver } from '../debug/RecordingLogResolver';
+import { promptForLifecycleSelection } from './LifecyclePrompt';
 
 export async function runGenerate(harPath: string, teamName: string, outName: string): Promise<void> {
   const absoluteHarPath = path.resolve(process.cwd(), harPath);
@@ -23,19 +24,21 @@ export async function runGenerate(harPath: string, teamName: string, outName: st
   const rl = createInterface({ input, output });
   let allowedDomains: string[];
   let excludeStaticAssets: boolean;
+  let lifecycleSelection: LifecycleSelection = { initGroups: [], endGroups: [] };
+  let groups;
   try {
     allowedDomains = await promptForDomains(rl, domainStats);
     excludeStaticAssets = await promptForStaticAssetPreference(rl);
+    const entries = HARParser.parse(absoluteHarPath, {
+      allowedDomains,
+      excludeStaticAssets,
+    });
+    groups = TransactionGrouper.group(entries);
+    lifecycleSelection = await promptForLifecycleSelection(rl, groups.map((group) => group.name));
   } finally {
     rl.close();
   }
-
-  const entries = HARParser.parse(absoluteHarPath, {
-    allowedDomains,
-    excludeStaticAssets,
-  });
-  const groups = TransactionGrouper.group(entries);
-  const scriptContent = ScriptGenerator.generate(groups);
+  const scriptContent = ScriptGenerator.generate(groups, lifecycleSelection);
   const recordingLog = ExchangeLogBuilder.fromGroups(groups);
 
   const suiteDir = path.join(process.cwd(), 'scrum-suites', teamName);

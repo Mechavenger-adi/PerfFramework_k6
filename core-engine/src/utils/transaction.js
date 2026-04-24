@@ -1,18 +1,23 @@
-import { Trend } from 'k6/metrics';
+import { Counter, Trend } from 'k6/metrics';
 
 const txnStarts = {};
 const txnTrends = {};
+const txnCounters = {};
 
 export function initTransactions(names) {
   names.forEach((name) => {
     if (!txnTrends[name]) {
       txnTrends[name] = new Trend(`${name}`);
+      txnCounters[name] = new Counter(`${name}_count`);
     }
   });
 }
 
 export function startTransaction(name) {
   txnStarts[name] = Date.now();
+  if (txnCounters[name]) {
+    txnCounters[name].add(1);
+  }
 }
 
 export function endTransaction(name) {

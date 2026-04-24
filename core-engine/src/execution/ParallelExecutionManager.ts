@@ -4,14 +4,15 @@
  * and produces the final k6 options object ready for injection.
  */
 
-import { TestPlan } from '../types/TestPlanSchema';
-import { ScenarioBuilder, K6ScenariosMap } from '../scenario/ScenarioBuilder';
-import { JourneyAllocator } from './JourneyAllocator';
 import { ThresholdManager } from '../assertions/ThresholdManager';
+import { K6ScenariosMap, ScenarioBuilder, ScenarioRuntimeMetadata } from '../scenario/ScenarioBuilder';
+import { TestPlan } from '../types/TestPlanSchema';
+import { JourneyAllocator } from './JourneyAllocator';
 
 export interface K6Options {
   scenarios: K6ScenariosMap;
   thresholds?: Record<string, string[]>;
+  summaryTrendStats?: string[];
   tags?: Record<string, string>;
   [key: string]: unknown;
 }
@@ -21,7 +22,9 @@ export class ParallelExecutionManager {
    * Resolve the full k6 options object from a test plan.
    * Handles VU allocation for parallel weighted journeys.
    */
-  static resolve(plan: TestPlan): K6Options {
+  static resolve(plan: TestPlan, runtimeMetadata?: ScenarioRuntimeMetadata): K6Options {
+    const summaryTrendStats = this.buildSummaryTrendStats(runtimeMetadata);
+
     // For parallel execution with weights, we recalculate per-journey VUs
     if (plan.execution_mode === 'parallel') {
       const maxVUs = this.extractMaxVUs(plan);
@@ -48,14 +51,18 @@ export class ParallelExecutionManager {
         };
 
         return { 
-          scenarios: ScenarioBuilder.build(modifiedPlan),
+          noCookiesReset: plan.noCookiesReset !== false,
+          summaryTrendStats,
+          scenarios: ScenarioBuilder.build(modifiedPlan, runtimeMetadata),
           thresholds: ThresholdManager.apply(modifiedPlan)
         };
       }
     }
 
     return { 
-      scenarios: ScenarioBuilder.build(plan),
+      noCookiesReset: plan.noCookiesReset !== false,
+      summaryTrendStats,
+      scenarios: ScenarioBuilder.build(plan, runtimeMetadata),
       thresholds: ThresholdManager.apply(plan)
     };
   }
@@ -97,5 +104,27 @@ export class ParallelExecutionManager {
     }
 
     return { ...profile, vus: allocatedVUs };
+  }
+
+  /**
+   * Build the summaryTrendStats array for k6 options.
+   * Merges the k6 defaults (avg, min, med, max, p(90), p(95)) with any
+   * additional percentiles configured in runtime reporting.transactionStats.
+   * Without this, k6 wouldn't compute custom percentiles like p(97) or p(99).
+   */
+  private static buildSummaryTrendStats(runtimeMetadata?: ScenarioRuntimeMetadata): string[] {
+    const k6Defaults = ['avg', 'min', 'med', 'max', 'p(90)', 'p(95)'];
+    const configured = runtimeMetadata?.runtime?.reporting?.transactionStats ?? [];
+
+    const extraPercentiles = configured
+      .map((s) => {
+        // Match p(N) or pN notation
+        const match = s.trim().toLowerCase().match(/^p\(?(\d+(?:\.\d+)?)\)?$/);
+        return match ? `p(${match[1]})` : null;
+      })
+      .filter((p): p is string => p !== null);
+
+    const merged = new Set([...k6Defaults, ...extraPercentiles]);
+    return [...merged];
   }
 }

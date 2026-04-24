@@ -1,0 +1,22 @@
+{
+  "name": "BuyAnimal Framework Smoke",
+  "environment": "dev",
+  "execution_mode": "parallel",
+  "global_load_profile": {
+    "executor": "shared-iterations",
+    "vus": 1,
+    "iterations": 1,
+    "maxDuration": "1m"
+  },
+  "user_journeys": [
+    {
+      "name": "buyanimal",
+      "scriptPath": "scrum-suites/jpet-team/tests/buyanimal_1.framework-lifecycle.js",
+      "weight": 100
+    }
+  ],
+  "global_sla": {
+    "p95": 3000,
+    "errorRate": 1
+  }
+}

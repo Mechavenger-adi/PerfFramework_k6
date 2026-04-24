@@ -1,4 +1,5 @@
 import * as fs from 'fs';
+import { LifecycleSelection } from './ScriptGenerator';
 
 /**
  * ScriptConverter
@@ -20,20 +21,20 @@ export class ScriptConverter {
   /**
    * Read a script file and return the converted source.
    */
-  static convertFile(filePath: string): string {
+  static convertFile(filePath: string, lifecycle?: LifecycleSelection): string {
     const source = fs.readFileSync(filePath, 'utf-8');
-    return this.convert(source);
+    return this.convert(source, lifecycle);
   }
 
   /**
    * Convert a raw k6 script string to a framework-compatible script.
    */
-  static convert(source: string): string {
+  static convert(source: string, lifecycle?: LifecycleSelection): string {
     const lines = source.split('\n');
 
     const hasLogExchange = /import\s+\{[^}]*logExchange[^}]*\}/.test(source);
     if (hasLogExchange) {
-      return source; // already converted
+      return this.applyPhaseContract(source, lifecycle); // already converted
     }
 
     const hasTransactionImport = /import\s+\{[^}]*initTransactions[^}]*\}/.test(source);
@@ -457,12 +458,12 @@ export class ScriptConverter {
       i++;
     }
 
-    return result.join('\n');
+    return this.applyPhaseContract(result.join('\n'), lifecycle);
   }
 
   // ── Helpers ──────────────────────────────────────────────────
 
-  private static extractGroupNames(source: string): string[] {
+  static extractGroupNames(source: string): string[] {
     const names: string[] = [];
     const regex = /group\s*\(\s*['"`]([^'"`]+)['"`]/g;
     let match;
@@ -499,6 +500,12 @@ export class ScriptConverter {
     // logExchange + trackCorrelation + trackParameter + trackDataRow
     lines.push(
       `import { logExchange, trackCorrelation, trackParameter, trackDataRow } from '../../../core-engine/src/utils/replayLogger.js';`,
+    );
+    lines.push(
+      `import { createJourneyLifecycleStore, runJourneyLifecycle } from '../../../core-engine/src/utils/lifecycle.js';`,
+    );
+    lines.push(
+      `import { clearCookies, registerBaseUrl } from '../../../core-engine/src/utils/session.js';`,
     );
 
     // Preserve any other imports (CorrelationEngine, RuleProcessor, etc.)
@@ -846,5 +853,251 @@ export class ScriptConverter {
       sanitized = '_' + sanitized;
     }
     return sanitized.slice(0, 128);
+  }
+
+  private static applyPhaseContract(source: string, lifecycle?: LifecycleSelection): string {
+    // Match both `export default function () {` and `export default function() {`
+    const markerMatch = source.match(/export\s+default\s+function\s*\(\s*\)\s*\{/);
+    if (!markerMatch) {
+      return source;
+    }
+    const defaultStart = markerMatch.index!;
+
+    const bodyStart = source.indexOf('{', defaultStart);
+    const bodyEnd = this.findMatchingBrace(source, bodyStart);
+    if (bodyStart === -1 || bodyEnd === -1) {
+      return source;
+    }
+
+    let beforeDefault = source.slice(0, defaultStart);
+    const defaultBody = source.slice(bodyStart + 1, bodyEnd);
+    const afterDefault = source.slice(bodyEnd + 1);
+    const statements = this.splitTopLevelStatements(defaultBody);
+    const grouped = this.partitionLifecycleStatements(statements, lifecycle ?? { initGroups: [], endGroups: [] });
+
+    if (!/createJourneyLifecycleStore/.test(beforeDefault)) {
+      beforeDefault += `\nimport { createJourneyLifecycleStore, runJourneyLifecycle } from '../../../core-engine/src/utils/lifecycle.js';\n`;
+    }
+
+    // Extract and register base URLs from the source script
+    const baseUrls = this.extractBaseUrlsFromSource(source);
+    const registerBlock = baseUrls.map(u => `registerBaseUrl(${JSON.stringify(u)});`).join('\n');
+
+    return beforeDefault
+      + (registerBlock ? registerBlock + '\n' : '')
+      + `const __journeyLifecycleStore = createJourneyLifecycleStore();\n\n`
+      + this.renderPhaseFunction('initPhase', grouped.initPrelude, grouped.initGroups)
+      + `\n`
+      + this.renderPhaseFunction('actionPhase', grouped.actionPrelude, grouped.actionGroups)
+      + `\n`
+      + this.renderPhaseFunction('endPhase', grouped.endPrelude, grouped.endGroups)
+      + `\n`
+      + `export default function () {\n`
+      + `  runJourneyLifecycle(__journeyLifecycleStore, { initPhase, actionPhase, endPhase });\n`
+      + `}\n`
+      + afterDefault;
+  }
+
+  private static renderPhaseFunction(name: string, preludeLines: string[], groupStatements: string[]): string {
+    let out = `export function ${name}(ctx) {\n`;
+    // Clear cookies at the start of initPhase so each VU starts with a clean session
+    if (name === 'initPhase') {
+      out += `  clearCookies();\n\n`;
+    }
+    for (const line of preludeLines) {
+      out += `  ${line.trim()}\n`;
+    }
+    if (preludeLines.length > 0 && groupStatements.length > 0) {
+      out += `\n`;
+    }
+    for (const statement of groupStatements) {
+      out += this.indentBlock(statement.trim(), 2) + `\n\n`;
+    }
+    out += `}\n`;
+    return out;
+  }
+
+  private static partitionLifecycleStatements(
+    statements: string[],
+    lifecycle: LifecycleSelection,
+  ): {
+    initPrelude: string[];
+    actionPrelude: string[];
+    endPrelude: string[];
+    initGroups: string[];
+    actionGroups: string[];
+    endGroups: string[];
+  } {
+    const initSet = new Set(lifecycle.initGroups ?? []);
+    const endSet = new Set(lifecycle.endGroups ?? []);
+    const groupStatements: Array<{ name: string; statement: string }> = [];
+
+    // Classify prelude lines by category
+    const correlationSetup: string[] = [];   // const correlation_vars = ... → ctx.correlation bridge
+    const dataSetup: string[] = [];          // getUniqueItem(FILES[...]) assignments → initPhase only
+    const trackCalls: string[] = [];         // trackDataRow / trackParameter → initPhase only
+    const regexDecls: string[] = [];         // let match; let regex; → phases using correlation
+    const otherPrelude: string[] = [];       // everything else → all phases
+
+    for (const statement of statements) {
+      const name = this.extractGroupName(statement);
+      if (name) {
+        groupStatements.push({ name, statement });
+        continue;
+      }
+
+      if (!statement.trim()) continue;
+
+      // Split multi-line statements into individual lines for classification
+      const lines = statement.split('\n').map((l) => l.trim()).filter(Boolean);
+      for (const line of lines) {
+        if (/^\s*const\s+correlation_vars\s*=/.test(line)) {
+          correlationSetup.push(line);
+        } else if (/^\s*let\s+(match|regex)\s*;/.test(line)) {
+          regexDecls.push(line);
+        } else if (/getUniqueItem\s*\(/.test(line) || /^\s*(const|let|var)\s+\w+\s*=\s*.*FILES\b/.test(line)) {
+          dataSetup.push(line);
+        } else if (/^\s*trackDataRow\s*\(/.test(line) || /^\s*trackParameter\s*\(/.test(line)) {
+          trackCalls.push(line);
+        } else {
+          otherPrelude.push(line);
+        }
+      }
+    }
+
+    // Determine which phases use correlation (have groups with correlation_vars references)
+    const initGroupStmts = groupStatements.filter((g) => initSet.has(g.name)).map((g) => g.statement);
+    const actionGroupStmts = groupStatements.filter((g) => !initSet.has(g.name) && !endSet.has(g.name)).map((g) => g.statement);
+    const endGroupStmts = groupStatements.filter((g) => endSet.has(g.name)).map((g) => g.statement);
+
+    const usesCorrelation = (stmts: string[]) => stmts.some((s) => /correlation_vars/.test(s));
+
+    // Build per-phase preludes
+    // initPhase: correlation bridge + data setup + tracking + regex (if needed) + other
+    const initPrelude: string[] = [];
+    initPrelude.push('const correlation_vars = ctx.correlation;');
+    for (const line of dataSetup) {
+      // Convert direct data assignment to ctx.data caching:
+      // `const userdetails = getUniqueItem(FILES["userdetails"]);`
+      // → `ctx.data.userdetails = ctx.data.userdetails || getUniqueItem(FILES["userdetails"]);`
+      // → `const userdetails = ctx.data.userdetails;`
+      const dataMatch = line.match(/^\s*(?:const|let|var)\s+(\w+)\s*=\s*(.+?)\s*;?\s*$/);
+      if (dataMatch) {
+        const varName = dataMatch[1];
+        const expr = dataMatch[2].replace(/;$/, '');
+        initPrelude.push(`ctx.data.${varName} = ctx.data.${varName} || ${expr};`);
+        initPrelude.push(`const ${varName} = ctx.data.${varName};`);
+      } else {
+        initPrelude.push(line);
+      }
+    }
+    initPrelude.push(...trackCalls);
+    if (usesCorrelation(initGroupStmts)) {
+      initPrelude.push(...regexDecls);
+    }
+    initPrelude.push(...otherPrelude);
+
+    // actionPhase: correlation bridge + local data refs from ctx.data + regex (if needed)
+    const actionPrelude: string[] = [];
+    actionPrelude.push('const correlation_vars = ctx.correlation;');
+    // Make data vars available from ctx.data
+    for (const line of dataSetup) {
+      const dataMatch = line.match(/^\s*(?:const|let|var)\s+(\w+)\s*=\s*.+$/);
+      if (dataMatch) {
+        actionPrelude.push(`const ${dataMatch[1]} = ctx.data.${dataMatch[1]};`);
+      }
+    }
+    if (usesCorrelation(actionGroupStmts)) {
+      actionPrelude.push(...regexDecls);
+    }
+    actionPrelude.push(...otherPrelude);
+
+    // endPhase: correlation bridge + local data refs + regex (if needed)
+    const endPrelude: string[] = [];
+    endPrelude.push('const correlation_vars = ctx.correlation;');
+    for (const line of dataSetup) {
+      const dataMatch = line.match(/^\s*(?:const|let|var)\s+(\w+)\s*=\s*.+$/);
+      if (dataMatch) {
+        endPrelude.push(`const ${dataMatch[1]} = ctx.data.${dataMatch[1]};`);
+      }
+    }
+    if (usesCorrelation(endGroupStmts)) {
+      endPrelude.push(...regexDecls);
+    }
+
+    return {
+      initPrelude,
+      actionPrelude,
+      endPrelude,
+      initGroups: initGroupStmts,
+      actionGroups: actionGroupStmts,
+      endGroups: endGroupStmts,
+    };
+  }
+
+  private static splitTopLevelStatements(body: string): string[] {
+    const statements: string[] = [];
+    const lines = body.split('\n');
+    let current: string[] = [];
+    let depth = 0;
+
+    for (const line of lines) {
+      current.push(line);
+      for (const ch of line) {
+        if (ch === '{') depth++;
+        if (ch === '}') depth--;
+      }
+
+      if (depth === 0 && (line.trim().endsWith(';') || line.trim().endsWith('})') || line.trim() === '}')) {
+        const statement = current.join('\n').trim();
+        if (statement) statements.push(statement);
+        current = [];
+      }
+    }
+
+    const trailing = current.join('\n').trim();
+    if (trailing) statements.push(trailing);
+
+    return statements;
+  }
+
+  private static extractGroupName(statement: string): string | null {
+    const match = statement.match(/group\s*\(\s*['"`]([^'"`]+)['"`]/);
+    return match ? match[1] : null;
+  }
+
+  private static findMatchingBrace(source: string, startIndex: number): number {
+    let depth = 0;
+    for (let i = startIndex; i < source.length; i++) {
+      const ch = source[i];
+      if (ch === '{') depth++;
+      if (ch === '}') {
+        depth--;
+        if (depth === 0) return i;
+      }
+    }
+    return -1;
+  }
+
+  private static indentBlock(block: string, spaces: number): string {
+    const indent = ' '.repeat(spaces);
+    return block
+      .split('\n')
+      .map((line) => `${indent}${line}`)
+      .join('\n');
+  }
+
+  /** Extract unique base URLs (origin) from URL literals in source code. */
+  private static extractBaseUrlsFromSource(source: string): string[] {
+    const origins = new Set<string>();
+    const urlRe = /https?:\/\/[^\s`'"\\)]+/g;
+    let match: RegExpExecArray | null;
+    while ((match = urlRe.exec(source)) !== null) {
+      try {
+        const u = new URL(match[0]);
+        origins.add(u.origin + '/');
+      } catch { /* skip malformed */ }
+    }
+    return [...origins];
   }
 }

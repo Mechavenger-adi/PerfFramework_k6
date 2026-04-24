@@ -64,6 +64,14 @@ export interface UserJourney {
   loadProfile?: GlobalLoadProfile;
   /** Tags attached to this journey in results */
   tags?: Record<string, string>;
+  /**
+   * Per-journey cookie reset override.
+   * - true (default): cookies persist across iterations for this journey.
+   * - false: cookies are cleared at the start of each iteration.
+   * Note: k6 noCookiesReset is global; per-journey control requires using
+   * clearCookies() from core-engine/src/utils/session.js in initPhase/actionPhase.
+   */
+  noCookiesReset?: boolean;
 }
 
 // ---------------------------------------------
@@ -80,14 +88,16 @@ export interface HybridGroup {
 // ---------------------------------------------
 
 export interface SLADefinition {
-  /** P95 response time threshold in milliseconds */
-  p95?: number;
-  /** P90 response time threshold in milliseconds */
-  p90?: number;
   /** Max error rate percent (0–100) */
   errorRate?: number;
   /** Max average response time in milliseconds */
   avgResponseTime?: number;
+  /**
+   * Percentile thresholds in milliseconds.
+   * Any key matching /^p\d+(\.\d+)?$/ is treated as a percentile SLA.
+   * Examples: p50, p75, p90, p95, p99, p99.9
+   */
+  [key: string]: number | undefined;
 }
 
 // ---------------------------------------------
@@ -127,10 +137,17 @@ export interface TestPlan {
   hybrid_groups?: HybridGroup[];
   /** Global SLA defaults applied to all journeys */
   global_sla?: SLADefinition;
-  /** Per-journey SLA overrides keyed by journey name */
+  /** Per-journey SLA overrides keyed by journey name (applies to http_req_duration{scenario:name}) */
   journey_slas?: Record<string, SLADefinition>;
+  /** Per-transaction SLA overrides keyed by transaction name (applies to the Trend metric directly) */
+  transaction_slas?: Record<string, SLADefinition>;
   /** Max total VUs allowed across all journeys */
   max_total_vus?: number;
   /** Optional debug execution settings */
   debug?: DebugSettings;
+  /**
+   * When true (default), cookies persist across VU iterations.
+   * Set to false to clear the cookie jar after each iteration.
+   */
+  noCookiesReset?: boolean;
 }

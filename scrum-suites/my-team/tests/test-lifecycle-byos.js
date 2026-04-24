@@ -1,0 +1,41 @@
+import http from 'k6/http';
+import { check, sleep, group } from 'k6';
+import { initTransactions, startTransaction, endTransaction } from '../../../core-engine/src/utils/transaction.js';
+import { createJourneyLifecycleStore, runJourneyLifecycle } from '../../../core-engine/src/utils/lifecycle.js';
+import { logExchange } from '../../../core-engine/src/utils/replayLogger.js';
+
+initTransactions(['BYOS_Custom_Logic']);
+const lifecycleStore = createJourneyLifecycleStore();
+
+export function initPhase(ctx) {
+}
+
+export function actionPhase(ctx) {
+  group('BYOS Custom Logic', function () {
+    startTransaction('BYOS_Custom_Logic');
+    
+    // ==========================================================
+    //   PASTE YOUR GRAFANA STUDIO / CUSTOM K6 SCRIPT BELOW  
+    // ==========================================================
+
+    /* 
+    const res = http.get('https://test-api.k6.io/public/crocodiles/');
+    check(res, { 'status 200': (r) => r.status === 200 });
+    */
+
+    // ==========================================================
+    //   PASTE YOUR GRAFANA STUDIO / CUSTOM K6 SCRIPT ABOVE  
+    // ==========================================================
+
+    endTransaction('BYOS_Custom_Logic');
+  });
+
+  sleep(1); // think time between business steps if needed
+}
+
+export function endPhase(ctx) {
+}
+
+export default function () {
+  runJourneyLifecycle(lifecycleStore, { initPhase, actionPhase, endPhase });
+}

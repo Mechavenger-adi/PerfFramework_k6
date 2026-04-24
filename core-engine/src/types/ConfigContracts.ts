@@ -20,7 +20,7 @@ export interface EnvironmentConfig {
 // Runtime Settings
 // ---------------------------------------------
 
-export type ErrorBehavior = 'continue' | 'stop_iteration' | 'stop_test';
+export type ErrorBehavior = 'continue' | 'stop_iteration' | 'stop_vu' | 'abort_test';
 export type ThinkTimeMode = 'fixed' | 'random';
 
 export interface ThinkTimeConfig {
@@ -49,11 +49,54 @@ export interface HttpConfig {
   throwOnError: boolean;
 }
 
+export interface TimeSeriesReportingConfig {
+  /** Enable bucketed timeseries collection for interactive reports */
+  enabled: boolean;
+  /** Bucket size in seconds for aggregated timeseries points */
+  bucketSizeSeconds?: number;
+}
+
+export interface ReportingConfig {
+  /** Visible transaction stats/columns in reports */
+  transactionStats: string[];
+  /** Include transaction table in generated reports */
+  includeTransactionTable: boolean;
+  /** Include error table in generated reports */
+  includeErrorTable: boolean;
+  /** Timeseries config for unified HTML graphs */
+  timeseries: TimeSeriesReportingConfig;
+}
+
+export interface ErrorCaptureConfig {
+  /** Capture snapshots for supported failures */
+  captureSnapshotOnFailure: boolean;
+  /** Limit snapshot volume per run */
+  maxSnapshotsPerRun: number;
+  includeRequestHeaders: boolean;
+  includeRequestBody: boolean;
+  includeResponseHeaders: boolean;
+  includeResponseBody: boolean;
+}
+
+export interface MonitoringConfig {
+  /** Enable runner-side host monitoring */
+  enabled: boolean;
+  /** CPU warning threshold in percent */
+  cpuWarningPercent: number;
+  /** Memory warning threshold in percent */
+  memoryWarningPercent: number;
+  /** Sampling interval in seconds */
+  sampleIntervalSeconds: number;
+}
+
 export interface RuntimeSettings {
   thinkTime: ThinkTimeConfig;
   pacing: PacingConfig;
   http: HttpConfig;
   errorBehavior: ErrorBehavior;
+  reporting: ReportingConfig;
+  errors: ErrorCaptureConfig;
+  monitoring: MonitoringConfig;
   /** Debug mode – prints resolved config; enables verbose logging */
   debugMode: boolean;
 }
@@ -67,6 +110,29 @@ export const FRAMEWORK_DEFAULTS: RuntimeSettings = {
   pacing: { enabled: false },
   http: { timeoutSeconds: 60, maxRedirects: 10, throwOnError: false },
   errorBehavior: 'continue',
+  reporting: {
+    transactionStats: ['count', 'pass', 'fail', 'avg', 'min', 'max', 'p(90)', 'p(95)'],
+    includeTransactionTable: true,
+    includeErrorTable: true,
+    timeseries: {
+      enabled: true,
+      bucketSizeSeconds: 10,
+    },
+  },
+  errors: {
+    captureSnapshotOnFailure: true,
+    maxSnapshotsPerRun: 20,
+    includeRequestHeaders: true,
+    includeRequestBody: true,
+    includeResponseHeaders: true,
+    includeResponseBody: false,
+  },
+  monitoring: {
+    enabled: false,
+    cpuWarningPercent: 80,
+    memoryWarningPercent: 80,
+    sampleIntervalSeconds: 10,
+  },
   debugMode: false,
 };
 

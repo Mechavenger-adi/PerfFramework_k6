@@ -24,6 +24,7 @@ const RUNTIME_SETTINGS_SCHEMA = {
     thinkTime: {
       type: 'object',
       required: ['mode'],
+      additionalProperties: false,
       properties: {
         mode: { type: 'string', enum: ['fixed', 'random'] },
         fixed: { type: 'number', minimum: 0 },
@@ -34,6 +35,7 @@ const RUNTIME_SETTINGS_SCHEMA = {
     pacing: {
       type: 'object',
       required: ['enabled'],
+      additionalProperties: false,
       properties: {
         enabled: { type: 'boolean' },
         targetIntervalSeconds: { type: 'number', minimum: 0 },
@@ -42,13 +44,57 @@ const RUNTIME_SETTINGS_SCHEMA = {
     http: {
       type: 'object',
       required: ['timeoutSeconds', 'maxRedirects', 'throwOnError'],
+      additionalProperties: false,
       properties: {
         timeoutSeconds: { type: 'number', minimum: 1 },
         maxRedirects: { type: 'number', minimum: 0 },
         throwOnError: { type: 'boolean' },
       },
     },
-    errorBehavior: { type: 'string', enum: ['continue', 'stop_iteration', 'stop_test'] },
+    errorBehavior: { type: 'string', enum: ['continue', 'stop_iteration', 'stop_vu', 'abort_test'] },
+    reporting: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        transactionStats: {
+          type: 'array',
+          minItems: 1,
+          items: { type: 'string', minLength: 1 },
+        },
+        includeTransactionTable: { type: 'boolean' },
+        includeErrorTable: { type: 'boolean' },
+        timeseries: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            enabled: { type: 'boolean' },
+            bucketSizeSeconds: { type: 'number', minimum: 1 },
+          },
+        },
+      },
+    },
+    errors: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        captureSnapshotOnFailure: { type: 'boolean' },
+        maxSnapshotsPerRun: { type: 'number', minimum: 0 },
+        includeRequestHeaders: { type: 'boolean' },
+        includeRequestBody: { type: 'boolean' },
+        includeResponseHeaders: { type: 'boolean' },
+        includeResponseBody: { type: 'boolean' },
+      },
+    },
+    monitoring: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        enabled: { type: 'boolean' },
+        cpuWarningPercent: { type: 'number', minimum: 0, maximum: 100 },
+        memoryWarningPercent: { type: 'number', minimum: 0, maximum: 100 },
+        sampleIntervalSeconds: { type: 'number', minimum: 1 },
+      },
+    },
     debugMode: { type: 'boolean' },
   },
 };

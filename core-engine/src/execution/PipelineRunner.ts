@@ -23,6 +23,12 @@ export interface RunOptions {
   env?: Record<string, string>;
   /** Capture stdout/stderr instead of inheriting them */
   captureOutput?: boolean;
+  /** Logical run identifier for metadata/artifact naming */
+  runId?: string;
+  /** Report directory prepared by the CLI */
+  reportDir?: string;
+  /** Path to the generated run-manifest.json */
+  runManifestPath?: string;
 }
 
 export interface PipelineRunResult {
@@ -31,6 +37,10 @@ export interface PipelineRunResult {
   stderr: string;
   stdoutPath?: string;
   stderrPath?: string;
+  optionsPath?: string;
+  reportDir?: string;
+  runId?: string;
+  runManifestPath?: string;
 }
 
 export class PipelineRunner {
@@ -49,7 +59,17 @@ export class PipelineRunner {
    * Execute k6 and return the process result. Useful for debug flows that need captured logs.
    */
   static execute(options: RunOptions): PipelineRunResult {
-    const { scriptPath, k6Options, extraK6Args = [], cwd = process.cwd(), env = {}, captureOutput = false } = options;
+    const {
+      scriptPath,
+      k6Options,
+      extraK6Args = [],
+      cwd = process.cwd(),
+      env = {},
+      captureOutput = false,
+      runId,
+      reportDir,
+      runManifestPath,
+    } = options;
 
     const absScript = path.resolve(cwd, scriptPath);
     if (!fs.existsSync(absScript)) {
@@ -59,7 +79,10 @@ export class PipelineRunner {
     // Write options to a temp JSON file for k6 --config
     const tempDir = path.join(cwd, '.k6-temp');
     fs.mkdirSync(tempDir, { recursive: true });
-    const optionsFile = path.join(tempDir, 'resolved-options.json');
+    const optionsFileName = runId
+      ? `resolved-options-${runId.replace(/[^a-zA-Z0-9_\-]/g, '_')}.json`
+      : 'resolved-options.json';
+    const optionsFile = path.join(tempDir, optionsFileName);
     fs.writeFileSync(optionsFile, JSON.stringify(k6Options, null, 2), 'utf-8');
 
     if (!captureOutput) {
@@ -125,7 +148,92 @@ export class PipelineRunner {
       stderr: captureOutput ? '' : String(result.stderr ?? ''),
       stdoutPath,
       stderrPath,
+      optionsPath: optionsFile,
+      reportDir,
+      runId,
+      runManifestPath,
     };
+  }
+
+  static executeAsync(options: RunOptions): Promise<PipelineRunResult> {
+    const {
+      scriptPath,
+      k6Options,
+      extraK6Args = [],
+      cwd = process.cwd(),
+      env = {},
+      captureOutput = false,
+      runId,
+      reportDir,
+      runManifestPath,
+    } = options;
+
+    const absScript = path.resolve(cwd, scriptPath);
+    if (!fs.existsSync(absScript)) {
+      return Promise.reject(new Error(`[PipelineRunner] Script not found: ${absScript}`));
+    }
+
+    const tempDir = path.join(cwd, '.k6-temp');
+    fs.mkdirSync(tempDir, { recursive: true });
+    const optionsFileName = runId
+      ? `resolved-options-${runId.replace(/[^a-zA-Z0-9_\-]/g, '_')}.json`
+      : 'resolved-options.json';
+    const optionsFile = path.join(tempDir, optionsFileName);
+    fs.writeFileSync(optionsFile, JSON.stringify(k6Options, null, 2), 'utf-8');
+
+    if (!captureOutput) {
+      Logger.info(`[PipelineRunner] Starting k6 execution...`);
+      Logger.info(`  Script  : ${absScript}`);
+      Logger.info(`  Journeys: ${Object.keys(k6Options.scenarios ?? {}).join(', ')}\n`);
+    }
+
+    const k6Args = ['run', absScript, '--config', optionsFile, ...extraK6Args];
+
+    return new Promise((resolve, reject) => {
+      const child = childProcess.spawn('k6', k6Args, {
+        stdio: captureOutput ? 'pipe' : 'inherit',
+        cwd,
+        env: {
+          ...process.env,
+          ...env,
+        },
+      });
+
+      let stdout = '';
+      let stderr = '';
+
+      if (captureOutput && child.stdout) {
+        child.stdout.on('data', (chunk) => {
+          stdout += chunk.toString();
+        });
+      }
+
+      if (captureOutput && child.stderr) {
+        child.stderr.on('data', (chunk) => {
+          stderr += chunk.toString();
+        });
+      }
+
+      child.on('error', (error) => {
+        reject(new Error(`[PipelineRunner] Failed to start k6: ${error.message}\nMake sure k6 is installed and available in PATH.`));
+      });
+
+      child.on('close', (code) => {
+        if (!captureOutput) {
+          try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch { /* ignore */ }
+        }
+
+        resolve({
+          status: code ?? 1,
+          stdout,
+          stderr,
+          optionsPath: optionsFile,
+          reportDir,
+          runId,
+          runManifestPath,
+        });
+      });
+    });
   }
 
   static printCapturedOutput(result: PipelineRunResult): void {
