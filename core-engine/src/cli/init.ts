@@ -229,9 +229,9 @@ testuser003,P@ssw0rd3,testuser003@perf-test.local
     path.join(projectDir, 'scrum-suites/sample-team/tests/browse-journey.js'),
     `import http from 'k6/http';
 import { check, sleep, group } from 'k6';
-import { initTransactions, startTransaction, endTransaction } from '../../../core-engine/src/utils/transaction.js';
-import { createJourneyLifecycleStore, runJourneyLifecycle } from '../../../core-engine/src/utils/lifecycle.js';
-import { logExchange } from '../../../core-engine/src/utils/replayLogger.js';
+import { initTransactions, startTransaction, endTransaction } from '../../../dist/utils/transaction.js';
+import { createJourneyLifecycleStore, runJourneyLifecycle } from '../../../dist/utils/lifecycle.js';
+import { logExchange } from '../../../dist/utils/replayLogger.js';
 
 initTransactions(['Homepage', 'Product_List']);
 const lifecycleStore = createJourneyLifecycleStore();
@@ -275,9 +275,9 @@ export default function () {
     path.join(projectDir, 'scrum-suites/sample-team/tests/checkout-journey.js'),
     `import http from 'k6/http';
 import { check, sleep, group } from 'k6';
-import { initTransactions, startTransaction, endTransaction } from '../../../core-engine/src/utils/transaction.js';
-import { createJourneyLifecycleStore, runJourneyLifecycle } from '../../../core-engine/src/utils/lifecycle.js';
-import { logExchange } from '../../../core-engine/src/utils/replayLogger.js';
+import { initTransactions, startTransaction, endTransaction } from '../../../dist/utils/transaction.js';
+import { createJourneyLifecycleStore, runJourneyLifecycle } from '../../../dist/utils/lifecycle.js';
+import { logExchange } from '../../../dist/utils/replayLogger.js';
 
 initTransactions(['Login', 'Add_To_Cart', 'Checkout']);
 const lifecycleStore = createJourneyLifecycleStore();

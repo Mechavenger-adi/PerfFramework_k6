@@ -1,0 +1,1 @@
+{"version":3,"file":"FallbackHandler.d.ts","sourceRoot":"","sources":["../../core-engine/src/correlation/FallbackHandler.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,eAAe,EAAE,MAAM,iBAAiB,CAAC;AAGlD,qBAAa,eAAe;IAC1B;;OAEG;IACH,MAAM,CAAC,MAAM,CAAC,IAAI,EAAE,eAAe,GAAG,MAAM;CAY7C"}

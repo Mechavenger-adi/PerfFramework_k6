@@ -1,0 +1,111 @@
+{
+  "status": "failed",
+  "runId": "Run_2026-04-09T01-53-06-314Z",
+  "plan": "WebUI Load Test - test.k6.io",
+  "environment": "dev",
+  "thresholdFailures": 5,
+  "errorCount": 2,
+  "warningCount": 5,
+  "aborted": false,
+  "transactions": [
+    {
+      "name": "add to cart",
+      "count": 114,
+      "pass": 113,
+      "fail": 1,
+      "errorPct": 0.88,
+      "avg": 899.9823008849557,
+      "min": 384,
+      "max": 15806
+    },
+    {
+      "name": "click confirm",
+      "count": 113,
+      "pass": 88,
+      "fail": 25,
+      "errorPct": 22.12,
+      "avg": 1073.3274336283187,
+      "min": 430,
+      "max": 32041
+    },
+    {
+      "name": "click continue",
+      "count": 113,
+      "pass": 113,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 522.5486725663717,
+      "min": 195,
+      "max": 7462
+    },
+    {
+      "name": "increase quantity to 2 and proceed to checkout",
+      "count": 113,
+      "pass": 113,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 1226.6637168141592,
+      "min": 387,
+      "max": 31999
+    },
+    {
+      "name": "logout",
+      "count": 8,
+      "pass": 8,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 1546,
+      "min": 385,
+      "max": 7573
+    },
+    {
+      "name": "search_animal",
+      "count": 114,
+      "pass": 114,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 415.3859649122807,
+      "min": 194,
+      "max": 15580
+    },
+    {
+      "name": "select product",
+      "count": 114,
+      "pass": 114,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 309.280701754386,
+      "min": 193,
+      "max": 3243
+    },
+    {
+      "name": "t01_launch",
+      "count": 10,
+      "pass": 10,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 871.3,
+      "min": 229,
+      "max": 1654
+    },
+    {
+      "name": "t02_login",
+      "count": 10,
+      "pass": 10,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 1615.1,
+      "min": 576,
+      "max": 4638
+    }
+  ],
+  "gate": {
+    "failedRules": [
+      "t01_launch:p(95)<800",
+      "click_confirm:p(95)<1500",
+      "click_confirm:p(99)<3000",
+      "http_req_duration:p(99)<2000",
+      "t02_login:p(95)<1000"
+    ]
+  }
+}

@@ -1,0 +1,410 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>k6 Debug Replay Diff</title>
+    <style>
+      :root {
+        --bg: #f4f1ea;
+        --surface: #fffdf8;
+        --surface-strong: #f8f4ec;
+        --ink: #1f2937;
+        --muted: #5b6574;
+        --border: #d8d1c3;
+        --good: #2e7d32;
+        --warn: #c77d00;
+        --bad: #c0392b;
+        --accent: #255f85;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        padding: 32px;
+        background: linear-gradient(180deg, #f7f4ee 0%, #efe8dc 100%);
+        color: var(--ink);
+        font-family: Georgia, "Times New Roman", serif;
+      }
+      .shell {
+        max-width: 1400px;
+        margin: 0 auto;
+      }
+      .hero {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        padding: 24px;
+        box-shadow: 0 12px 30px rgba(62, 45, 23, 0.08);
+      }
+      h1, h2, h3, h4 { margin: 0; }
+      h1 { font-size: 32px; margin-bottom: 6px; }
+      p { color: var(--muted); }
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 14px;
+        margin-top: 22px;
+      }
+      .stat {
+        background: var(--surface-strong);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 14px 16px;
+      }
+      .stat .label {
+        display: block;
+        color: var(--muted);
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+      .stat .value {
+        display: block;
+        margin-top: 6px;
+        font-size: 28px;
+        font-weight: bold;
+      }
+      .transaction {
+        margin-top: 24px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        overflow: hidden;
+        box-shadow: 0 12px 30px rgba(62, 45, 23, 0.08);
+      }
+      .transaction-header {
+        padding: 18px 22px;
+        border-bottom: 1px solid var(--border);
+        background: linear-gradient(90deg, rgba(37,95,133,0.08), rgba(255,255,255,0));
+      }
+      .transaction-meta {
+        color: var(--muted);
+        margin-top: 6px;
+      }
+      .step {
+        padding: 20px 22px;
+        border-top: 1px solid rgba(216, 209, 195, 0.55);
+      }
+      .step:first-child {
+        border-top: 0;
+      }
+      .step-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      .score {
+        padding: 6px 10px;
+        border-radius: 999px;
+        color: white;
+        font-weight: bold;
+        min-width: 70px;
+        text-align: center;
+      }
+      .score.good { background: var(--good); }
+      .score.warn { background: var(--warn); }
+      .score.bad { background: var(--bad); }
+      .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 10px;
+      }
+      .chip {
+        border-radius: 999px;
+        padding: 6px 10px;
+        font-size: 12px;
+        border: 1px solid var(--border);
+        background: var(--surface-strong);
+      }
+      .chip.good { color: var(--good); }
+      .chip.bad { color: var(--bad); }
+      .chip.warn { color: var(--warn); }
+      .chip.neutral { color: var(--accent); }
+      .banner {
+        margin-top: 10px;
+        padding: 10px 12px;
+        border-radius: 10px;
+        font-size: 13px;
+        border: 1px solid var(--border);
+        background: #f6efe1;
+        color: var(--muted);
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 18px;
+        margin-top: 18px;
+      }
+      .panel {
+        background: var(--surface-strong);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 14px;
+      }
+      .panel h4 {
+        margin-bottom: 10px;
+      }
+      .body-compare {
+        margin-top: 18px;
+      }
+      .body-section {
+        margin-top: 16px;
+        background: var(--surface-strong);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 14px;
+      }
+      .body-section h4 {
+        margin-bottom: 6px;
+      }
+      .body-summary {
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .body-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+        margin-top: 12px;
+      }
+      .body-card {
+        min-width: 0;
+      }
+      .body-card .transaction-meta {
+        margin-top: 0;
+        margin-bottom: 6px;
+      }
+      .kv {
+        display: grid;
+        grid-template-columns: 110px 1fr;
+        gap: 8px 10px;
+        margin-bottom: 12px;
+        font-size: 14px;
+      }
+      .kv .key {
+        color: var(--muted);
+        font-weight: bold;
+      }
+      details {
+        margin-top: 12px;
+        border-top: 1px dashed var(--border);
+        padding-top: 12px;
+      }
+      summary {
+        cursor: pointer;
+        font-weight: bold;
+      }
+      pre {
+        margin: 10px 0 0;
+        white-space: pre-wrap;
+        word-break: break-word;
+        background: #f2ecdf;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 12px;
+        font-size: 12px;
+        line-height: 1.45;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+        font-size: 13px;
+      }
+      th, td {
+        border-bottom: 1px solid var(--border);
+        text-align: left;
+        vertical-align: top;
+        padding: 8px 6px;
+      }
+      th { color: var(--muted); }
+      .diff-match { color: var(--good); }
+      .diff-mismatch, .diff-missing { color: var(--bad); }
+      .diff-extra { color: var(--warn); }
+      @media (max-width: 960px) {
+        body { padding: 16px; }
+        .grid { grid-template-columns: 1fr; }
+        .body-grid { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <section class="hero">
+        <h1>Debug Replay Diff Report</h1>
+        <p>Recorded HAR traffic vs replayed execution, grouped by transaction and expanded by request/response details.</p>
+        <div class="stats">
+          <div class="stat">
+            <span class="label">Overall Score</span>
+            <span class="value">67%</span>
+          </div>
+          <div class="stat">
+            <span class="label">Compared Steps</span>
+            <span class="value">1</span>
+          </div>
+          <div class="stat">
+            <span class="label">Transactions</span>
+            <span class="value">1</span>
+          </div>
+          <div class="stat">
+            <span class="label">High Mismatch Steps</span>
+            <span class="value">1</span>
+          </div>
+        </div>
+      </section>
+      <section class="transaction">
+      <div class="transaction-header">
+        <h2>T01_Login</h2>
+        <div class="transaction-meta">1 step(s), average match 67%</div>
+      </div>
+      <article class="step">
+      <div class="step-header">
+        <div>
+          <h3>req_1</h3>
+          <div class="transaction-meta">POST https://api.example.com/auth/login</div>
+        </div>
+        <div class="score bad">67%</div>
+      </div>
+      <div class="chips">
+        <span class="chip good">Matched</span>
+        <span class="chip good">Method match</span>
+        <span class="chip good">URL match</span>
+        <span class="chip bad">Status diff</span>
+        <span class="chip good">Request headers match</span>
+        <span class="chip good">Response headers match</span>
+        <span class="chip good">Request body 98%</span>
+        <span class="chip warn">Response body 50%</span>
+      </div>
+      
+      <div class="grid">
+        <section class="panel">
+          <h4>Recorded</h4>
+          <div class="kv">
+      <div class="key">Method</div><div>POST</div>
+      <div class="key">URL</div><div>https://api.example.com/auth/login</div>
+      <div class="key">Status</div><div>200</div>
+      <div class="key">Req Headers</div><div>1</div>
+      <div class="key">Resp Headers</div><div>1</div>
+    </div>
+    <details>
+      <summary>Request Headers</summary>
+      <pre>Content-Type: application/json</pre>
+    </details>
+    <details>
+      <summary>Response Headers</summary>
+      <pre>content-type: application/json</pre>
+    </details>
+        </section>
+        <section class="panel">
+          <h4>Replayed</h4>
+          <div class="kv">
+      <div class="key">Method</div><div>POST</div>
+      <div class="key">URL</div><div>https://api.example.com/auth/login</div>
+      <div class="key">Status</div><div>401</div>
+      <div class="key">Req Headers</div><div>1</div>
+      <div class="key">Resp Headers</div><div>1</div>
+    </div>
+    <details>
+      <summary>Request Headers</summary>
+      <pre>Content-Type: application/json</pre>
+    </details>
+    <details>
+      <summary>Response Headers</summary>
+      <pre>content-type: application/json</pre>
+    </details>
+        </section>
+      </div>
+      <section class="body-compare">
+        <section class="body-section">
+      <h4>Request Body</h4>
+      <div class="body-summary">Length delta 1 chars. Similarity 98%.</div>
+      <div class="body-grid">
+        <div class="body-card">
+          <div class="transaction-meta">Recorded</div>
+          <pre>{&quot;username&quot;:&quot;user&quot;,&quot;password&quot;:&quot;secret&quot;}</pre>
+        </div>
+        <div class="body-card">
+          <div class="transaction-meta">Replayed</div>
+          <pre>{&quot;username&quot;:&quot;user&quot;,&quot;password&quot;:&quot;secret2&quot;}</pre>
+        </div>
+      </div>
+    </section>
+        <section class="body-section">
+      <h4>Response Body</h4>
+      <div class="body-summary">Length delta 6 chars. Similarity 50%.</div>
+      <div class="body-grid">
+        <div class="body-card">
+          <div class="transaction-meta">Recorded</div>
+          <pre>{&quot;session&quot;:&quot;xyz&quot;,&quot;token&quot;:&quot;good&quot;}</pre>
+        </div>
+        <div class="body-card">
+          <div class="transaction-meta">Replayed</div>
+          <pre>{&quot;error&quot;:&quot;unauthorized&quot;,&quot;token&quot;:&quot;bad&quot;}</pre>
+        </div>
+      </div>
+    </section>
+      </section>
+      <details>
+        <summary>Request Diff Details</summary>
+        <div class="grid">
+          <section class="panel">
+            <h4>Request Header Diff</h4>
+            <table>
+      <thead>
+        <tr>
+          <th>Header</th>
+          <th>Recorded</th>
+          <th>Replayed</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+        <td>content-type</td>
+        <td>application/json</td>
+        <td>application/json</td>
+        <td class="diff-match">match</td>
+      </tr></tbody>
+    </table>
+          </section>
+          <section class="panel">
+            <h4>Request Body Summary</h4>
+            <p>Length delta 1 chars. Similarity 98%.</p>
+          </section>
+        </div>
+      </details>
+      <details>
+        <summary>Response Diff Details</summary>
+        <div class="grid">
+          <section class="panel">
+            <h4>Response Header Diff</h4>
+            <table>
+      <thead>
+        <tr>
+          <th>Header</th>
+          <th>Recorded</th>
+          <th>Replayed</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+        <td>content-type</td>
+        <td>application/json</td>
+        <td>application/json</td>
+        <td class="diff-match">match</td>
+      </tr></tbody>
+    </table>
+          </section>
+          <section class="panel">
+            <h4>Response Body Summary</h4>
+            <p>Length delta 6 chars. Similarity 50%.</p>
+          </section>
+        </div>
+      </details>
+    </article>
+    </section>
+    </div>
+  </body>
+</html>

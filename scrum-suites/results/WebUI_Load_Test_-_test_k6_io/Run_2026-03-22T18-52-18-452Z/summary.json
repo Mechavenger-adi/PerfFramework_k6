@@ -1,0 +1,390 @@
+{
+    "root_group": {
+        "checks": {},
+        "name": "",
+        "path": "",
+        "id": "d41d8cd98f00b204e9800998ecf8427e",
+        "groups": {
+                "T01_HomePage": {
+                    "groups": {},
+                    "checks": {
+                            "HomePage: status 200": {
+                                "path": "::T01_HomePage::HomePage: status 200",
+                                "id": "d1a8976a521d0f99a61ba81318b3cbb7",
+                                "passes": 54,
+                                "fails": 0,
+                                "name": "HomePage: status 200"
+                            },
+                            "HomePage: has title": {
+                                "name": "HomePage: has title",
+                                "path": "::T01_HomePage::HomePage: has title",
+                                "id": "8afd63f9d4f26297e4c891ce8e48971d",
+                                "passes": 54,
+                                "fails": 0
+                            },
+                            "HomePage: body size > 0": {
+                                "name": "HomePage: body size > 0",
+                                "path": "::T01_HomePage::HomePage: body size > 0",
+                                "id": "983d8dce3c4987e5e2de5e6545d65a57",
+                                "passes": 54,
+                                "fails": 0
+                            }
+                        },
+                    "name": "T01_HomePage",
+                    "path": "::T01_HomePage",
+                    "id": "f90135b4159ace4f938f71b5c54a4553"
+                },
+                "T01_LoginPage": {
+                    "name": "T01_LoginPage",
+                    "path": "::T01_LoginPage",
+                    "id": "cff8fd5d17ebef40de0a3b04fbc34b40",
+                    "groups": {},
+                    "checks": {
+                            "LoginPage: status 200": {
+                                "passes": 29,
+                                "fails": 0,
+                                "name": "LoginPage: status 200",
+                                "path": "::T01_LoginPage::LoginPage: status 200",
+                                "id": "19d6e00af582b8555b60429bae3a1bd4"
+                            },
+                            "LoginPage: has login form": {
+                                "path": "::T01_LoginPage::LoginPage: has login form",
+                                "id": "0d369e7d9325160ea195806771eca517",
+                                "passes": 29,
+                                "fails": 0,
+                                "name": "LoginPage: has login form"
+                            }
+                        }
+                },
+                "T02_NewsPage": {
+                    "name": "T02_NewsPage",
+                    "path": "::T02_NewsPage",
+                    "id": "02f688b693ac7283aafe0f0e3b41ac88",
+                    "groups": {},
+                    "checks": {
+                            "NewsPage: status 200": {
+                                "fails": 0,
+                                "name": "NewsPage: status 200",
+                                "path": "::T02_NewsPage::NewsPage: status 200",
+                                "id": "3edab60c0b4d2f7f8c531ef34cff12a6",
+                                "passes": 54
+                            },
+                            "NewsPage: contains news content": {
+                                "name": "NewsPage: contains news content",
+                                "path": "::T02_NewsPage::NewsPage: contains news content",
+                                "id": "103f7ed19204e500834594419f93424b",
+                                "passes": 54,
+                                "fails": 0
+                            }
+                        }
+                },
+                "T02_LoginSubmit": {
+                    "id": "8f023a8a36a9beed49c76d0fb114d7c5",
+                    "groups": {},
+                    "checks": {
+                            "LoginSubmit: status 200": {
+                                "name": "LoginSubmit: status 200",
+                                "path": "::T02_LoginSubmit::LoginSubmit: status 200",
+                                "id": "8b8afc4ec90044ee2a552034c65f0f6c",
+                                "passes": 0,
+                                "fails": 29
+                            },
+                            "LoginSubmit: login successful": {
+                                "path": "::T02_LoginSubmit::LoginSubmit: login successful",
+                                "id": "a1f7550947cc2e0ff1a94a7bc0f7e2b5",
+                                "passes": 0,
+                                "fails": 29,
+                                "name": "LoginSubmit: login successful"
+                            }
+                        },
+                    "name": "T02_LoginSubmit",
+                    "path": "::T02_LoginSubmit"
+                },
+                "T03_ContactsPage": {
+                    "id": "08295cf4053fed5acca1c6745c403b19",
+                    "groups": {},
+                    "checks": {
+                            "ContactsPage: status 200": {
+                                "fails": 0,
+                                "name": "ContactsPage: status 200",
+                                "path": "::T03_ContactsPage::ContactsPage: status 200",
+                                "id": "8cc7b3b7f1e65d5aa3e758e9f1bb846a",
+                                "passes": 54
+                            },
+                            "ContactsPage: has form": {
+                                "id": "9c2fe9fbdb7c2b63871b25139c35b1cc",
+                                "passes": 0,
+                                "fails": 54,
+                                "name": "ContactsPage: has form",
+                                "path": "::T03_ContactsPage::ContactsPage: has form"
+                            }
+                        },
+                    "name": "T03_ContactsPage",
+                    "path": "::T03_ContactsPage"
+                },
+                "T04_PiPage": {
+                    "checks": {
+                        "PiPage: status 200": {
+                            "name": "PiPage: status 200",
+                            "path": "::T04_PiPage::PiPage: status 200",
+                            "id": "67968802e33c9293eaa66f4409342f8d",
+                            "passes": 54,
+                            "fails": 0
+                        },
+                        "PiPage: returns PI value": {
+                            "name": "PiPage: returns PI value",
+                            "path": "::T04_PiPage::PiPage: returns PI value",
+                            "id": "adb1f7895223d6a26fccb30c7a431f6e",
+                            "passes": 54,
+                            "fails": 0
+                        }
+                    },
+                    "name": "T04_PiPage",
+                    "path": "::T04_PiPage",
+                    "id": "b5f84d834ae64b307e834c70104e685a",
+                    "groups": {}
+                },
+                "T03_MyMessages": {
+                    "path": "::T03_MyMessages",
+                    "id": "0de33654e8d33879837958fd25a69e20",
+                    "groups": {},
+                    "checks": {
+                            "MyMessages: status 200": {
+                                "passes": 29,
+                                "fails": 0,
+                                "name": "MyMessages: status 200",
+                                "path": "::T03_MyMessages::MyMessages: status 200",
+                                "id": "38636695ffa5e59ee7280ebd55949566"
+                            }
+                        },
+                    "name": "T03_MyMessages"
+                },
+                "T04_FormSubmit": {
+                    "checks": {
+                        "FormSubmit: status 200": {
+                            "name": "FormSubmit: status 200",
+                            "path": "::T04_FormSubmit::FormSubmit: status 200",
+                            "id": "fc7a940897f784179f1969099016e15f",
+                            "passes": 0,
+                            "fails": 29
+                        }
+                    },
+                    "name": "T04_FormSubmit",
+                    "path": "::T04_FormSubmit",
+                    "id": "6cd13e6ac11b6dde54627cbcf9871fe2",
+                    "groups": {}
+                },
+                "T05_Logout": {
+                    "name": "T05_Logout",
+                    "path": "::T05_Logout",
+                    "id": "bf4085c7be4421dddf2eff8235fbbef0",
+                    "groups": {},
+                    "checks": {
+                            "Logout: status 200": {
+                                "path": "::T05_Logout::Logout: status 200",
+                                "id": "0a7f090a6fd8d8d3e91ee357f8dffe03",
+                                "passes": 29,
+                                "fails": 0,
+                                "name": "Logout: status 200"
+                            }
+                        }
+                }
+            }
+    },
+    "metrics": {
+        "http_req_tls_handshaking": {
+            "min": 0,
+            "med": 0,
+            "max": 292.2864,
+            "p(90)": 0,
+            "p(95)": 0,
+            "avg": 4.539729216867469
+        },
+        "txn_MyMessages": {
+            "med": 263,
+            "max": 287,
+            "p(90)": 271.4,
+            "p(95)": 275.4,
+            "avg": 262.0344827586207,
+            "min": 246
+        },
+        "txn_FormSubmit": {
+            "p(95)": 10.599999999999998,
+            "avg": 6.137931034482759,
+            "min": 3,
+            "med": 6,
+            "max": 12,
+            "p(90)": 9.2
+        },
+        "http_reqs": {
+            "count": 664,
+            "rate": 7.04135569749345
+        },
+        "http_req_duration": {
+            "avg": 119.6346486445783,
+            "min": 2.2875,
+            "med": 12.60325,
+            "max": 547.7215,
+            "p(90)": 258.98143,
+            "p(95)": 269.57757499999997,
+            "thresholds": {
+                "p(95)<2000": false
+            }
+        },
+        "txn_Logout": {
+            "min": 247,
+            "med": 259,
+            "max": 276,
+            "p(90)": 270.4,
+            "p(95)": 273.2,
+            "avg": 260.44827586206895
+        },
+        "group_duration": {
+            "max": 1881.9172,
+            "p(90)": 278.7578,
+            "p(95)": 286.5532,
+            "avg": 239.5201939058172,
+            "min": 2.9643,
+            "med": 256.4836
+        },
+        "data_sent": {
+            "count": 119089,
+            "rate": 1262.8735070162613
+        },
+        "vus_max": {
+            "value": 10,
+            "min": 10,
+            "max": 10
+        },
+        "txn_PiPage": {
+            "p(90)": 280.4,
+            "p(95)": 285.35,
+            "avg": 260.01851851851853,
+            "min": 245,
+            "med": 256.5,
+            "max": 294
+        },
+        "http_req_blocked": {
+            "p(95)": 0,
+            "avg": 10.152134487951805,
+            "min": 0,
+            "med": 0,
+            "max": 1032.6424,
+            "p(90)": 0
+        },
+        "vus": {
+            "value": 1,
+            "min": 0,
+            "max": 10
+        },
+        "checks": {
+            "passes": 548,
+            "fails": 141,
+            "value": 0.795355587808418
+        },
+        "http_req_sending": {
+            "avg": 0.4529823795180721,
+            "min": 0,
+            "med": 0.3224,
+            "max": 16.721,
+            "p(90)": 1.02712,
+            "p(95)": 1.5321750000000005
+        },
+        "data_received": {
+            "count": 806717,
+            "rate": 8554.791181046421
+        },
+        "iterations": {
+            "count": 83,
+            "rate": 0.8801694621866812
+        },
+        "http_req_receiving": {
+            "min": 0,
+            "med": 0,
+            "max": 306.198,
+            "p(90)": 0.8757600000000039,
+            "p(95)": 1.03871,
+            "avg": 0.7368430722891566
+        },
+        "iteration_duration": {
+            "avg": 9608.745428915665,
+            "min": 5871.9374,
+            "med": 9543.8073,
+            "max": 13060.46,
+            "p(90)": 11744.34322,
+            "p(95)": 12040.3269
+        },
+        "txn_LoginSubmit": {
+            "med": 6,
+            "max": 29,
+            "p(90)": 10.2,
+            "p(95)": 19.39999999999997,
+            "avg": 7.344827586206897,
+            "min": 3
+        },
+        "txn_NewsPage": {
+            "med": 257,
+            "max": 295,
+            "p(90)": 279,
+            "p(95)": 282.04999999999995,
+            "avg": 259.962962962963,
+            "min": 244
+        },
+        "http_req_waiting": {
+            "avg": 118.44482319277098,
+            "min": 1.7807,
+            "med": 11.68405,
+            "max": 317.0518,
+            "p(90)": 258.13862,
+            "p(95)": 269.41292000000004
+        },
+        "http_req_failed": {
+            "passes": 58,
+            "fails": 606,
+            "thresholds": {
+                "rate<0.1": false
+            },
+            "value": 0.08734939759036145
+        },
+        "http_req_connecting": {
+            "min": 0,
+            "med": 0,
+            "max": 1013.3862,
+            "p(90)": 0,
+            "p(95)": 0,
+            "avg": 5.495990210843374
+        },
+        "txn_LoginPage": {
+            "p(95)": 836.8,
+            "avg": 342.44827586206895,
+            "min": 244,
+            "med": 264,
+            "max": 935,
+            "p(90)": 806.4
+        },
+        "txn_ContactsPage": {
+            "avg": 258.8333333333333,
+            "min": 244,
+            "med": 257,
+            "max": 288,
+            "p(90)": 277.7,
+            "p(95)": 279.75
+        },
+        "txn_HomePage": {
+            "p(90)": 695.1000000000006,
+            "p(95)": 811.1999999999997,
+            "avg": 349.6666666666667,
+            "min": 243,
+            "med": 258.5,
+            "max": 1882
+        },
+        "http_req_duration{expected_response:true}": {
+            "avg": 130.4925085808581,
+            "min": 2.883,
+            "med": 144.03345,
+            "max": 547.7215,
+            "p(90)": 259.82730000000004,
+            "p(95)": 270.874275
+        }
+    }
+}

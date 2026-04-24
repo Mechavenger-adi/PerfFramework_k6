@@ -33,7 +33,9 @@
     "generate": "tsx core-engine/src/cli/run.ts generate",
     "convert": "tsx core-engine/src/cli/run.ts convert",
     "validate": "tsx core-engine/src/cli/run.ts validate",
-    "watch": "tsx watch core-engine/src/cli/run.ts"
+    "watch": "tsx watch core-engine/src/cli/run.ts",
+    "loadtest": "npm run cli -- run --plan config/test-plans/load-test.json",
+    "debug": "npm run cli -- run --plan config/test-plans/debug-test.json"
   },
   "dependencies": {
     "ajv": "^8.17.1",

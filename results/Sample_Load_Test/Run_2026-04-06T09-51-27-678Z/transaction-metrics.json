@@ -1,0 +1,80 @@
+{
+  "runId": "Run_2026-04-06T09-51-27-678Z",
+  "stats": [
+    "count",
+    "pass",
+    "fail",
+    "avg",
+    "min",
+    "max",
+    "p(90)",
+    "p(95)"
+  ],
+  "transactions": [
+    {
+      "journey": "all",
+      "transaction": "Create Crocodile",
+      "count": 23,
+      "pass": 0,
+      "fail": 23,
+      "errorPct": 100,
+      "avg": 5.086956521739131,
+      "min": 2,
+      "max": 7,
+      "p(90)": 7,
+      "p(95)": 7
+    },
+    {
+      "journey": "all",
+      "transaction": "List Crocodiles",
+      "count": 23,
+      "pass": 23,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 322.7826086956522,
+      "min": 271,
+      "max": 834,
+      "p(90)": 281.2,
+      "p(95)": 777.8999999999992
+    },
+    {
+      "journey": "all",
+      "transaction": "Public Crocodiles",
+      "count": 47,
+      "pass": 47,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 329.7659574468085,
+      "min": 251,
+      "max": 1162,
+      "p(90)": 342,
+      "p(95)": 700.2999999999979
+    },
+    {
+      "journey": "all",
+      "transaction": "Single Crocodile",
+      "count": 47,
+      "pass": 47,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 286.4255319148936,
+      "min": 252,
+      "max": 345,
+      "p(90)": 342.4,
+      "p(95)": 343.7
+    },
+    {
+      "journey": "all",
+      "transaction": "View Crocodile",
+      "count": 23,
+      "pass": 23,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 283.60869565217394,
+      "min": 270,
+      "max": 478,
+      "p(90)": 278.8,
+      "p(95)": 288.9
+    }
+  ]
+}

@@ -1,0 +1,249 @@
+{
+    "root_group": {
+        "name": "",
+        "path": "",
+        "id": "d41d8cd98f00b204e9800998ecf8427e",
+        "groups": {
+            "Public Crocodiles": {
+                "id": "637098d41b52b0789c9541e92294533d",
+                "groups": {},
+                "checks": {
+                        "Public Crocodiles: status 200": {
+                            "id": "fb3ba038cb2f0068b79ff6e55ba1aa4a",
+                            "passes": 47,
+                            "fails": 0,
+                            "name": "Public Crocodiles: status 200",
+                            "path": "::Public Crocodiles::Public Crocodiles: status 200"
+                        }
+                    },
+                "name": "Public Crocodiles",
+                "path": "::Public Crocodiles"
+            },
+            "List Crocodiles": {
+                "name": "List Crocodiles",
+                "path": "::List Crocodiles",
+                "id": "4dbe668877af67873584d6c60e7404d4",
+                "groups": {},
+                "checks": {
+                        "List Crocodiles: status 200": {
+                            "name": "List Crocodiles: status 200",
+                            "path": "::List Crocodiles::List Crocodiles: status 200",
+                            "id": "cf4737d9c1b6dd4f112e0b6d6892e7ce",
+                            "passes": 23,
+                            "fails": 0
+                        }
+                    }
+            },
+            "Single Crocodile": {
+                "name": "Single Crocodile",
+                "path": "::Single Crocodile",
+                "id": "4a173d4fecb930d935111f3b86c41b11",
+                "groups": {},
+                "checks": {
+                        "Single Crocodile: status 200": {
+                            "name": "Single Crocodile: status 200",
+                            "path": "::Single Crocodile::Single Crocodile: status 200",
+                            "id": "e24158514e2cee922c0f4ec1dbd63805",
+                            "passes": 47,
+                            "fails": 0
+                        }
+                    }
+            },
+            "Create Crocodile": {
+                "name": "Create Crocodile",
+                "path": "::Create Crocodile",
+                "id": "30d70c2c9a36d761b9f2e93396013229",
+                "groups": {},
+                "checks": {
+                        "Create Crocodile: status 401 (expected, no auth)": {
+                            "path": "::Create Crocodile::Create Crocodile: status 401 (expected, no auth)",
+                            "id": "f506d69ba462398f91394420b8dfd88c",
+                            "passes": 0,
+                            "fails": 23,
+                            "name": "Create Crocodile: status 401 (expected, no auth)"
+                        }
+                    }
+            },
+            "View Crocodile": {
+                "groups": {},
+                "checks": {
+                        "View Crocodile: status 200": {
+                            "name": "View Crocodile: status 200",
+                            "path": "::View Crocodile::View Crocodile: status 200",
+                            "id": "78825a0f2071f5f9777e690fe82af216",
+                            "passes": 23,
+                            "fails": 0
+                        }
+                    },
+                "name": "View Crocodile",
+                "path": "::View Crocodile",
+                "id": "4a3ec34e1badc05605f3a0c9eefd7339"
+            }
+        },
+        "checks": {}
+    },
+    "metrics": {
+        "iterations": {
+            "count": 70,
+            "rate": 1.3466276778196358
+        },
+        "iteration_duration": {
+            "avg": 2944.148301428571,
+            "min": 2504.5448,
+            "med": 2665.75625,
+            "max": 4113.6382,
+            "p(90)": 3558.16487,
+            "p(95)": 3565.8795950000003
+        },
+        "vus": {
+            "value": 1,
+            "min": 0,
+            "max": 5
+        },
+        "vus_max": {
+            "max": 5,
+            "value": 5,
+            "min": 5
+        },
+        "http_req_receiving": {
+            "avg": 0.3851227722772277,
+            "min": 0,
+            "med": 0,
+            "max": 11.4955,
+            "p(90)": 1.0495800000000008,
+            "p(95)": 1.729669999999999
+        },
+        "http_req_duration": {
+            "avg": 131.32596600660068,
+            "min": 0.5403,
+            "med": 8.1909,
+            "max": 471.3761,
+            "p(90)": 274.6275,
+            "p(95)": 329.42294999999996,
+            "thresholds": {
+                "p(95)<3000": false
+            }
+        },
+        "checks": {
+            "passes": 140,
+            "fails": 23,
+            "value": 0.8588957055214724
+        },
+        "ListCrocodiles": {
+            "min": 271,
+            "med": 274,
+            "max": 834,
+            "p(90)": 281.2,
+            "p(95)": 777.8999999999992,
+            "avg": 322.7826086956522
+        },
+        "data_received": {
+            "count": 594023,
+            "rate": 11427.540186592194
+        },
+        "http_reqs": {
+            "count": 303,
+            "rate": 5.828974091133566
+        },
+        "data_sent": {
+            "count": 49608,
+            "rate": 954.3357977325213
+        },
+        "http_req_failed": {
+            "passes": 23,
+            "fails": 280,
+            "thresholds": {
+                "rate<0.4": false
+            },
+            "value": 0.07590759075907591
+        },
+        "ViewCrocodile": {
+            "avg": 283.60869565217394,
+            "min": 270,
+            "med": 274,
+            "max": 478,
+            "p(90)": 278.8,
+            "p(95)": 288.9
+        },
+        "http_req_tls_handshaking": {
+            "p(90)": 0,
+            "p(95)": 0,
+            "avg": 5.161509900990099,
+            "min": 0,
+            "med": 0,
+            "max": 342.2037
+        },
+        "http_req_sending": {
+            "med": 0,
+            "max": 5.5536,
+            "p(90)": 0.50598,
+            "p(95)": 0.6441799999999993,
+            "avg": 0.13444851485148512,
+            "min": 0
+        },
+        "http_req_connecting": {
+            "p(90)": 0,
+            "p(95)": 0,
+            "avg": 4.950337623762376,
+            "min": 0,
+            "med": 0,
+            "max": 335.3769
+        },
+        "CreateCrocodile": {
+            "max": 7,
+            "p(90)": 7,
+            "p(95)": 7,
+            "avg": 5.086956521739131,
+            "min": 2,
+            "med": 5
+        },
+        "http_req_waiting": {
+            "avg": 130.8063947194719,
+            "min": 0.5403,
+            "med": 8.0968,
+            "max": 470.2242,
+            "p(90)": 273.58922,
+            "p(95)": 328.09271
+        },
+        "http_req_duration{expected_response:true}": {
+            "max": 471.3761,
+            "p(90)": 276.05842,
+            "p(95)": 333.164845,
+            "avg": 141.69589857142856,
+            "min": 0.5403,
+            "med": 131.9066
+        },
+        "PublicCrocodiles": {
+            "med": 278,
+            "max": 1162,
+            "p(90)": 342,
+            "p(95)": 700.2999999999979,
+            "avg": 329.7659574468085,
+            "min": 251
+        },
+        "http_req_blocked": {
+            "avg": 10.464160726072606,
+            "min": 0,
+            "med": 0,
+            "max": 746.8838,
+            "p(90)": 0,
+            "p(95)": 0
+        },
+        "group_duration": {
+            "p(90)": 341.03188,
+            "p(95)": 344.58628,
+            "avg": 263.9260754601228,
+            "min": 2.6106,
+            "med": 273.0435,
+            "max": 1161.2755
+        },
+        "SingleCrocodile": {
+            "p(95)": 343.7,
+            "avg": 286.4255319148936,
+            "min": 252,
+            "med": 278,
+            "max": 345,
+            "p(90)": 342.4
+        }
+    }
+}

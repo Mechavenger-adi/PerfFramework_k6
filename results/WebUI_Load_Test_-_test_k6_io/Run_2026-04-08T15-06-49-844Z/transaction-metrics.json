@@ -1,0 +1,132 @@
+{
+  "runId": "Run_2026-04-08T15-06-49-844Z",
+  "stats": [
+    "count",
+    "pass",
+    "fail",
+    "avg",
+    "min",
+    "max",
+    "p(90)",
+    "p(99)"
+  ],
+  "transactions": [
+    {
+      "journey": "buyanimal_1_framework_lifecycle",
+      "transaction": "add to cart",
+      "count": 80,
+      "pass": 55,
+      "fail": 25,
+      "errorPct": 31.25,
+      "avg": 1396.675,
+      "min": 357,
+      "max": 31133,
+      "p(90)": 1382.9000000000194,
+      "p(99)": 15208.179999999873
+    },
+    {
+      "journey": "buyanimal_1_framework_lifecycle",
+      "transaction": "click confirm",
+      "count": 80,
+      "pass": 42,
+      "fail": 38,
+      "errorPct": 47.5,
+      "avg": 2207.4875,
+      "min": 357,
+      "max": 60251,
+      "p(90)": 1445.9,
+      "p(99)": 37920.859999999826
+    },
+    {
+      "journey": "buyanimal_1_framework_lifecycle",
+      "transaction": "click continue",
+      "count": 80,
+      "pass": 50,
+      "fail": 30,
+      "errorPct": 37.5,
+      "avg": 345.4125,
+      "min": 178,
+      "max": 7417,
+      "p(90)": 294.9000000000001,
+      "p(99)": 2520.5799999999613
+    },
+    {
+      "journey": "buyanimal_1_framework_lifecycle",
+      "transaction": "increase quantity to 2 and proceed to checkout",
+      "count": 80,
+      "pass": 80,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 3053.1,
+      "min": 357,
+      "max": 61220,
+      "p(90)": 866.1000000000051,
+      "p(99)": 61218.42
+    },
+    {
+      "journey": "buyanimal_1_framework_lifecycle",
+      "transaction": "logout",
+      "count": 9,
+      "pass": 6,
+      "fail": 3,
+      "errorPct": 33.33,
+      "avg": 493.55555555555554,
+      "min": 369,
+      "max": 1382,
+      "p(90)": 626.0000000000002,
+      "p(99)": 1306.4
+    },
+    {
+      "journey": "buyanimal_1_framework_lifecycle",
+      "transaction": "search_animal",
+      "count": 80,
+      "pass": 54,
+      "fail": 26,
+      "errorPct": 32.5,
+      "avg": 505.575,
+      "min": 177,
+      "max": 7399,
+      "p(90)": 476.0000000000009,
+      "p(99)": 7387.94
+    },
+    {
+      "journey": "buyanimal_1_framework_lifecycle",
+      "transaction": "select product",
+      "count": 80,
+      "pass": 54,
+      "fail": 26,
+      "errorPct": 32.5,
+      "avg": 1125.6625,
+      "min": 178,
+      "max": 31744,
+      "p(90)": 1204.1,
+      "p(99)": 31734.52
+    },
+    {
+      "journey": "buyanimal_1_framework_lifecycle",
+      "transaction": "t01_launch",
+      "count": 10,
+      "pass": 10,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 4749.4,
+      "min": 564,
+      "max": 10768,
+      "p(90)": 8963.5,
+      "p(99)": 10587.55
+    },
+    {
+      "journey": "buyanimal_1_framework_lifecycle",
+      "transaction": "t02_login",
+      "count": 10,
+      "pass": 10,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 6604.7,
+      "min": 562,
+      "max": 19046,
+      "p(90)": 16445.899999999998,
+      "p(99)": 18785.99
+    }
+  ]
+}

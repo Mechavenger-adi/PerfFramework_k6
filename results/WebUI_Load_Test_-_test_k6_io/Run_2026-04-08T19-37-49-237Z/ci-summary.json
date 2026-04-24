@@ -1,0 +1,112 @@
+{
+  "status": "failed",
+  "runId": "Run_2026-04-08T19-37-49-237Z",
+  "plan": "WebUI Load Test - test.k6.io",
+  "environment": "dev",
+  "thresholdFailures": 6,
+  "errorCount": 13,
+  "warningCount": 6,
+  "aborted": false,
+  "transactions": [
+    {
+      "name": "add to cart",
+      "count": 3,
+      "pass": 1,
+      "fail": 2,
+      "errorPct": 66.67,
+      "avg": 12771.333333333334,
+      "min": 384,
+      "max": 32041
+    },
+    {
+      "name": "click confirm",
+      "count": 3,
+      "pass": 0,
+      "fail": 3,
+      "errorPct": 100,
+      "avg": 390,
+      "min": 384,
+      "max": 401
+    },
+    {
+      "name": "click continue",
+      "count": 3,
+      "pass": 0,
+      "fail": 3,
+      "errorPct": 100,
+      "avg": 196.66666666666666,
+      "min": 192,
+      "max": 205
+    },
+    {
+      "name": "increase quantity to 2 and proceed to checkout",
+      "count": 3,
+      "pass": 0,
+      "fail": 3,
+      "errorPct": 100,
+      "avg": 423.6666666666667,
+      "min": 386,
+      "max": 477
+    },
+    {
+      "name": "logout",
+      "count": 9,
+      "pass": 0,
+      "fail": 9,
+      "errorPct": 100,
+      "avg": 398.44444444444446,
+      "min": 382,
+      "max": 483
+    },
+    {
+      "name": "search_animal",
+      "count": 3,
+      "pass": 2,
+      "fail": 1,
+      "errorPct": 33.33,
+      "avg": 7426.333333333333,
+      "min": 1301,
+      "max": 19671
+    },
+    {
+      "name": "select product",
+      "count": 3,
+      "pass": 3,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 11536.333333333334,
+      "min": 276,
+      "max": 31736
+    },
+    {
+      "name": "t01_launch",
+      "count": 10,
+      "pass": 2,
+      "fail": 8,
+      "errorPct": 80,
+      "avg": 20906.1,
+      "min": 599,
+      "max": 60001
+    },
+    {
+      "name": "t02_login",
+      "count": 10,
+      "pass": 4,
+      "fail": 6,
+      "errorPct": 60,
+      "avg": 28410.333333333332,
+      "min": 942,
+      "max": 67616
+    }
+  ],
+  "gate": {
+    "failedRules": [
+      "http_req_failed{scenario:buyanimal_1_framework_lifecycle}:rate<0.05",
+      "t02_login:p(95)<1000",
+      "http_req_failed:rate<0.1",
+      "t01_launch:p(95)<800",
+      "http_req_duration:p(99)<2000",
+      "http_req_duration{scenario:buyanimal_1_framework_lifecycle}:p(95)<1500"
+    ]
+  }
+}

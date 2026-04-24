@@ -487,7 +487,7 @@ export class ScriptConverter {
     // Transaction utils
     if (!hasTransactionImport) {
       lines.push(
-        `import { initTransactions, startTransaction, endTransaction } from '../../../core-engine/src/utils/transaction.js';`,
+        `import { initTransactions, startTransaction, endTransaction } from '../../../dist/utils/transaction.js';`,
       );
     } else {
       // Keep existing transaction import as-is
@@ -499,13 +499,13 @@ export class ScriptConverter {
 
     // logExchange + trackCorrelation + trackParameter + trackDataRow
     lines.push(
-      `import { logExchange, trackCorrelation, trackParameter, trackDataRow } from '../../../core-engine/src/utils/replayLogger.js';`,
+      `import { logExchange, trackCorrelation, trackParameter, trackDataRow } from '../../../dist/utils/replayLogger.js';`,
     );
     lines.push(
-      `import { createJourneyLifecycleStore, runJourneyLifecycle } from '../../../core-engine/src/utils/lifecycle.js';`,
+      `import { createJourneyLifecycleStore, runJourneyLifecycle } from '../../../dist/utils/lifecycle.js';`,
     );
     lines.push(
-      `import { clearCookies, registerBaseUrl } from '../../../core-engine/src/utils/session.js';`,
+      `import { clearCookies, registerBaseUrl } from '../../../dist/utils/session.js';`,
     );
 
     // Preserve any other imports (CorrelationEngine, RuleProcessor, etc.)
@@ -876,7 +876,7 @@ export class ScriptConverter {
     const grouped = this.partitionLifecycleStatements(statements, lifecycle ?? { initGroups: [], endGroups: [] });
 
     if (!/createJourneyLifecycleStore/.test(beforeDefault)) {
-      beforeDefault += `\nimport { createJourneyLifecycleStore, runJourneyLifecycle } from '../../../core-engine/src/utils/lifecycle.js';\n`;
+      beforeDefault += `\nimport { createJourneyLifecycleStore, runJourneyLifecycle } from '../../../dist/utils/lifecycle.js';\n`;
     }
 
     // Extract and register base URLs from the source script

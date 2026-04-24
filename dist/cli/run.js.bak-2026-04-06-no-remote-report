@@ -1,0 +1,324 @@
+"use strict";
+/**
+ * run.ts
+ * Phase 1 – Main CLI entry point.
+ * Orchestrates the full framework pipeline: load -> validate -> build -> execute.
+ */
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
+const commander_1 = require("commander");
+const fs = __importStar(require("fs"));
+const path = __importStar(require("path"));
+const init_1 = require("./init");
+const validate_1 = require("./validate");
+const generate_byos_1 = require("./generate-byos");
+const generate_1 = require("./generate");
+const ConfigurationManager_1 = require("../config/ConfigurationManager");
+const GatekeeperValidator_1 = require("../config/GatekeeperValidator");
+const TestPlanLoader_1 = require("../scenario/TestPlanLoader");
+const ParallelExecutionManager_1 = require("../execution/ParallelExecutionManager");
+const PipelineRunner_1 = require("../execution/PipelineRunner");
+const ReplayRunner_1 = require("../debug/ReplayRunner");
+const RecordingLogResolver_1 = require("../debug/RecordingLogResolver");
+const program = new commander_1.Command();
+program
+    .name('k6-framework')
+    .description('k6 Performance Framework CLI – Phase 1 Foundation')
+    .version('1.0.0');
+// ---------------------------------------------
+// INIT command
+// ---------------------------------------------
+program
+    .command('init')
+    .description('Scaffold a new k6 performance project in the current directory')
+    .option('-d, --dir <path>', 'Target directory to scaffold into', process.cwd())
+    .action((opts) => {
+    (0, init_1.runInit)(opts.dir);
+});
+// ---------------------------------------------
+// GENERATE BYOS command
+// ---------------------------------------------
+program
+    .command('generate-byos <team> <script-name>')
+    .description('Scaffold a BYOS (Bring Your Own Script) template for pasting raw k6 scripts')
+    .action((team, scriptName) => {
+    (0, generate_byos_1.runGenerateByos)(team, scriptName);
+});
+// ---------------------------------------------
+// GENERATE command
+// ---------------------------------------------
+program
+    .command('generate <team> <script-name>')
+    .description('Generate a k6 script from a HAR recording')
+    .requiredOption('--har <path>', 'Path to the .har file')
+    .action(async (team, scriptName, opts) => {
+    await (0, generate_1.runGenerate)(opts.har, team, scriptName);
+});
+// ---------------------------------------------
+// VALIDATE command
+// ---------------------------------------------
+program
+    .command('validate')
+    .description('Validate configs and test plan before execution')
+    .requiredOption('--plan <path>', 'Path to the test plan JSON file')
+    .option('--env-config <path>', 'Path to the environment config JSON file (auto-resolved if omitted)')
+    .option('--runtime <path>', 'Path to the runtime-settings JSON file', 'config/runtime-settings/default.json')
+    .option('--data-root <path>', 'Root directory for data files', 'scrum-suites')
+    .option('--env-file <path>', 'Path to .env file', '.env')
+    .action((opts) => {
+    const passed = (0, validate_1.runValidate)({
+        planPath: opts.plan,
+        envConfigPath: opts.envConfig,
+        runtimeSettingsPath: opts.runtime,
+        dataRoot: opts.dataRoot,
+        envFilePath: opts.envFile,
+    });
+    if (!passed)
+        process.exit(1);
+});
+// ---------------------------------------------
+// DEBUG command
+// ---------------------------------------------
+program
+    .command('debug')
+    .description('Run a script in single-iteration debug mode and generate an HTML diff report')
+    .requiredOption('--script <path>', 'Path to the generated journey script')
+    .option('--recording-log <path>', 'Path to the normalized recording-log JSON file')
+    .option('--out <path>', 'Path to the HTML diff report', path.join('results', 'debug-diff.html'))
+    .option('--replay-log <path>', 'Optional path to save the captured replay-log JSON file')
+    .action(async (opts) => {
+    console.log('\n============================================');
+    console.log('|    k6 Performance Framework – DEBUG      |');
+    console.log('============================================\n');
+    try {
+        const resolvedRecordingLogPath = opts.recordingLog
+            ? opts.recordingLog
+            : resolveRecordingLogForStandaloneDebug(opts.script);
+        const result = await ReplayRunner_1.ReplayRunner.runDebug({
+            scriptPath: opts.script,
+            recordingLogPath: resolvedRecordingLogPath,
+            outHtmlPath: opts.out,
+            replayLogPath: opts.replayLog,
+            vus: 1,
+            iterations: 1,
+        });
+        console.log(`[PASS]  Replay log saved: ${result.replayLogPath}`);
+        console.log(`[PASS]  HTML diff report: ${result.htmlReportPath}`);
+        console.log(`[PASS]  Diff steps compared: ${result.results.length}\n`);
+    }
+    catch (err) {
+        console.error(`\n[FAIL]  Debug execution failed: ${err.message}\n`);
+        process.exit(1);
+    }
+});
+// ---------------------------------------------
+// RUN command
+// ---------------------------------------------
+program
+    .command('run')
+    .description('Execute a test plan through k6')
+    .requiredOption('--plan <path>', 'Path to the test plan JSON file')
+    .option('--env-config <path>', 'Path to the environment config JSON (auto-resolved if omitted)')
+    .option('--runtime <path>', 'Path to the runtime-settings JSON file', 'config/runtime-settings/default.json')
+    .option('--env-file <path>', 'Path to .env file', '.env')
+    .option('--data-root <path>', 'Root directory for data files', 'scrum-suites')
+    .option('--debug', 'Enable debug mode (prints resolved config)', false)
+    .option('--out <k6-output>', 'k6 --out flag value (e.g. json=results.json)')
+    .action(async (opts) => {
+    console.log('\n============================================');
+    console.log('|     k6 Performance Framework – RUN       |');
+    console.log('============================================\n');
+    // -- Step 1: Load test plan -----------------
+    let plan;
+    try {
+        const loader = new TestPlanLoader_1.TestPlanLoader();
+        plan = loader.load(opts.plan);
+        console.log(`[PASS]  Test Plan loaded: ${plan.name} (${plan.environment})`);
+    }
+    catch (err) {
+        console.error(`\n[FAIL]  ${err.message}`);
+        process.exit(1);
+    }
+    // -- Step 2: Resolve configs ----------------
+    const envConfigPath = opts.envConfig ?? path.join('config', 'environments', `${plan.environment}.json`);
+    let resolvedConfig;
+    try {
+        const configManager = new ConfigurationManager_1.ConfigurationManager(opts.envFile);
+        resolvedConfig = configManager.resolve({
+            environmentConfigPath: envConfigPath,
+            runtimeSettingsPath: opts.runtime,
+            cliOverrides: { debugMode: opts.debug },
+        });
+        console.log(`[PASS]  Config resolved for environment: ${resolvedConfig.environment.name}`);
+    }
+    catch (err) {
+        console.error(`\n[FAIL]  Config error: ${err.message}`);
+        process.exit(1);
+    }
+    // -- Step 3: Gatekeeper pre-flight ----------
+    const gatekeeper = new GatekeeperValidator_1.GatekeeperValidator();
+    const preflight = gatekeeper.validate(resolvedConfig, plan, opts.dataRoot);
+    gatekeeper.printResult(preflight);
+    if (!preflight.passed) {
+        console.error('[FAIL]  Pre-flight checks failed. Execution aborted.\n');
+        process.exit(1);
+    }
+    if (plan.debug?.enabled) {
+        await runPlanDebugMode(plan);
+        return;
+    }
+    // -- Step 4: Build k6 options ---------------
+    let k6Options;
+    try {
+        k6Options = ParallelExecutionManager_1.ParallelExecutionManager.resolve(plan);
+        const scenarioCount = Object.keys(k6Options.scenarios).length;
+        console.log(`[PASS]  Scenarios built: ${scenarioCount} journey(s) -> ${Object.keys(k6Options.scenarios).join(', ')}\n`);
+    }
+    catch (err) {
+        console.error(`\n[FAIL]  Scenario build error: ${err.message}`);
+        process.exit(1);
+    }
+    // -- Step 5: Execute via k6 -----------------
+    // k6 parallel scenarios use "exec" to point to named exported functions.
+    // Each journey script only exports a `default` function.
+    // Solution: Generate a temporary combined entry script that re-exports
+    // each journey's default function under its scenario exec name.
+    const tempDir = path.join(process.cwd(), '.k6-temp');
+    fs.mkdirSync(tempDir, { recursive: true });
+    let entryCode = '';
+    for (const journey of plan.user_journeys) {
+        const execName = journey.name.replace(/[^a-zA-Z0-9_]/g, '_');
+        // Use the resolved absolute path from Gatekeeper
+        const absPath = path.resolve(process.cwd(), journey.scriptPath).replace(/\\/g, '/');
+        entryCode += `export { default as ${execName} } from '${absPath}';\n`;
+    }
+    // -- Step 5.5: Setup Native Reporters -----------------
+    const baseDir = resolvedConfig.secrets['K6_RESULTS_BASE_DIR'] || 'results';
+    const safePlanName = plan.name.replace(/[^a-zA-Z0-9_\-]/g, '_');
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const reportDir = path.join(process.cwd(), baseDir, safePlanName, `Run_${timestamp}`);
+    const safeReportDir = reportDir.replace(/\\/g, '/');
+    fs.mkdirSync(reportDir, { recursive: true });
+    // Inject handleSummary for 3rd-party reporting
+    entryCode += `
+import { htmlReport } from "https://raw.githubusercontent.com/benc-uk/k6-reporter/main/dist/bundle.js";
+
+export function handleSummary(data) {
+    return {
+        "${safeReportDir}/TestDetails.html": htmlReport(data),
+    };
+}
+`;
+    const entryScriptPath = path.join(tempDir, 'entry.js');
+    fs.writeFileSync(entryScriptPath, entryCode, 'utf-8');
+    const extraArgs = [
+        '--summary-export', `${safeReportDir}/summary.json`,
+        '--out', `web-dashboard=export=${safeReportDir}/TestSummary.html`
+    ];
+    if (opts.out) {
+        extraArgs.push('--out', opts.out);
+    }
+    const influxUrl = resolvedConfig.secrets['K6_INFLUXDB_URL'];
+    if (influxUrl) {
+        extraArgs.push('--out', `influxdb=${influxUrl}`);
+    }
+    console.log('[PASS]  Prepared reporting directories');
+    console.log(`>  Reports will be saved to: ${reportDir}`);
+    console.log('>  Launching k6...\n');
+    PipelineRunner_1.PipelineRunner.run({
+        scriptPath: entryScriptPath,
+        k6Options,
+        extraK6Args: extraArgs,
+    });
+});
+async function runPlanDebugMode(plan) {
+    const debugSettings = plan.debug ?? { enabled: false };
+    const baseDir = debugSettings.reportDir
+        ? path.resolve(process.cwd(), debugSettings.reportDir)
+        : path.join(process.cwd(), 'results', 'debug');
+    const safePlanName = plan.name.replace(/[^a-zA-Z0-9_\-]/g, '_');
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const runDir = path.join(baseDir, safePlanName, `Run_${timestamp}`);
+    fs.mkdirSync(runDir, { recursive: true });
+    console.log('[PASS]  Debug mode enabled from test plan');
+    console.log(`>  Debug artifacts will be saved to: ${runDir}\n`);
+    const failures = [];
+    for (const journey of plan.user_journeys) {
+        try {
+            const result = await runJourneyDebug(plan, journey, runDir);
+            console.log(`[PASS]  ${journey.name}`);
+            console.log(`>  Replay log : ${result.replayLogPath}`);
+            console.log(`>  HTML report: ${result.htmlReportPath}`);
+            console.log(`>  Steps      : ${result.results.length}\n`);
+        }
+        catch (err) {
+            const message = `[Journey:${journey.name}] ${err.message}`;
+            failures.push(message);
+            console.error(`[FAIL]  ${message}\n`);
+        }
+    }
+    if (failures.length > 0) {
+        console.error('[FAIL]  Debug run finished with errors:\n');
+        failures.forEach((failure) => console.error(`  - ${failure}`));
+        console.error('');
+        process.exit(1);
+    }
+}
+function runJourneyDebug(plan, journey, runDir) {
+    const safeJourneyName = journey.name.replace(/[^a-zA-Z0-9_\-]/g, '_');
+    const outHtmlPath = path.join(runDir, `${safeJourneyName}.diff.html`);
+    const replayLogPath = path.join(runDir, `${safeJourneyName}.replay-log.json`);
+    return ReplayRunner_1.ReplayRunner.runDebug({
+        scriptPath: journey.scriptPath,
+        recordingLogPath: journey.recordingLogPath,
+        outHtmlPath,
+        replayLogPath,
+        vus: plan.debug?.vus ?? 1,
+        iterations: plan.debug?.iterations ?? 1,
+    });
+}
+function resolveRecordingLogForStandaloneDebug(scriptPath) {
+    const resolution = RecordingLogResolver_1.RecordingLogResolver.resolve(scriptPath);
+    if (resolution.status === 'ambiguous') {
+        throw new Error(`Multiple recording logs matched this script in ${resolution.recordingsDir}. ` +
+            `Set --recording-log explicitly. Candidates: ${(resolution.candidates ?? []).join(', ')}`);
+    }
+    return resolution.resolvedPath;
+}
+// ---------------------------------------------
+// Parse
+// ---------------------------------------------
+program.parse(process.argv);
+//# sourceMappingURL=run.js.map

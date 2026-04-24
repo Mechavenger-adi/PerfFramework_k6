@@ -92,12 +92,12 @@ flowchart LR
 
   subgraph Runtime["Runtime + Suite Runtime Helpers"]
     direction TB
-    LCR["LifecycleRuntime + lifecycle.js"]
+    LCR["LifecycleRuntime + lifecycle.ts"]
     ERRRT["ErrorRuntime"]
     METRT["MetricsRuntime"]
     SNAPRT["SnapshotRuntime"]
     TSRT["TimeseriesRuntime"]
-    K6UTIL["k6 runtime helpers (transaction.js, replayLogger.js, session.js)"]
+    K6UTIL["k6 runtime helpers (transaction.ts, replayLogger.ts, session.ts)"]
   end
 
   subgraph DataCorr["Data + Correlation"]
@@ -328,10 +328,10 @@ flowchart LR
 
 - Journey scripts in `scrum-suites/<team>/tests` are the k6-facing runtime entrypoints.
 - They rely on runtime helpers such as:
-  - `lifecycle.js`
-  - `transaction.js`
-  - `replayLogger.js`
-  - `session.js`
+  - `lifecycle.ts`
+  - `transaction.ts`
+  - `replayLogger.ts`
+  - `session.ts`
 - The runtime layer supports:
   - lifecycle orchestration
   - error handling
@@ -367,7 +367,7 @@ flowchart LR
 - For debug issues, follow:
   - `ReplayRunner -> PipelineRunner -> DiffChecker -> HTMLDiffReporter`
 - For lifecycle issues, follow:
-  - suite script -> `lifecycle.js` / `runtime/` -> `ScenarioBuilder`
+  - suite script -> `lifecycle.ts` / `runtime/` -> `ScenarioBuilder`
 - For generation/conversion issues, follow:
   - `generate.ts` / `convert.ts` -> `recording/` -> runtime helpers
 - Keep this file synchronized with `AGENT-CONTEXT.md` so future AI models can save tokens and skip unnecessary repo-wide rediscovery.
@@ -397,4 +397,4 @@ flowchart LR
 - For CLI/run issues, prioritize: `run.ts -> config -> scenario -> execution -> reporting`.
 - For debug issues, prioritize: `ReplayRunner -> PipelineRunner -> DiffChecker -> HTMLDiffReporter`.
 - For data/correlation issues, prioritize: suite assets -> `data/` or `correlation/` -> generated/converted test script.
-- For lifecycle issues, prioritize: suite script -> `lifecycle.js` / `runtime/` -> `ScenarioBuilder`.
+- For lifecycle issues, prioritize: suite script -> `lifecycle.ts` / `runtime/` -> `ScenarioBuilder`.

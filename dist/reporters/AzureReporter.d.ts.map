@@ -1,0 +1,1 @@
+{"version":3,"file":"AzureReporter.d.ts","sourceRoot":"","sources":["../../core-engine/src/reporters/AzureReporter.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,cAAc,EAAE,MAAM,qBAAqB,CAAC;AAGrD,qBAAa,aAAa;IACxB;;OAEG;IACH,MAAM,CAAC,IAAI,CAAC,MAAM,EAAE,cAAc,EAAE,gBAAgB,EAAE,MAAM,GAAG,IAAI;CAKpE"}

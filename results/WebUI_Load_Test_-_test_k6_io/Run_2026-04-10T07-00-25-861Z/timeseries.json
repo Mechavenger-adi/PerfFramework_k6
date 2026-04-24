@@ -1,0 +1,229 @@
+{
+  "bucketSizeSeconds": 10,
+  "startTime": "2026-04-10T07:00:25.871Z",
+  "endTime": "2026-04-10T07:00:53.080Z",
+  "series": {
+    "overview": [
+      {
+        "ts": "2026-04-10T07:00:50.000Z",
+        "requests": 351,
+        "iterations": 37,
+        "errorRate": 0.7635327635327636,
+        "avgDuration": 164.81225783475801,
+        "p95Duration": 269.02405,
+        "vus": 1,
+        "vusMax": 3
+      }
+    ],
+    "transactions": {
+      "logout": [
+        {
+          "ts": "2026-04-10T07:00:50.000Z",
+          "count": 3,
+          "pass": 0,
+          "fail": 3,
+          "avg": 378.3333333333333,
+          "min": 336,
+          "max": 447,
+          "p90": 428,
+          "p95": 0,
+          "p99": 0
+        }
+      ],
+      "t01_launch": [
+        {
+          "ts": "2026-04-10T07:00:50.000Z",
+          "count": 3,
+          "pass": 3,
+          "fail": 0,
+          "avg": 815.3333333333334,
+          "min": 728,
+          "max": 943,
+          "p90": 909.4,
+          "p95": 0,
+          "p99": 0
+        }
+      ],
+      "t02_login": [
+        {
+          "ts": "2026-04-10T07:00:50.000Z",
+          "count": 3,
+          "pass": 3,
+          "fail": 0,
+          "avg": 804,
+          "min": 682,
+          "max": 1017,
+          "p90": 956.2,
+          "p95": 0,
+          "p99": 0
+        }
+      ],
+      "t03_search_animal": [
+        {
+          "ts": "2026-04-10T07:00:50.000Z",
+          "count": 37,
+          "pass": 37,
+          "fail": 0,
+          "avg": 246.24324324324326,
+          "min": 219,
+          "max": 445,
+          "p90": 296.8,
+          "p95": 0,
+          "p99": 0
+        }
+      ],
+      "t04_select_product": [
+        {
+          "ts": "2026-04-10T07:00:50.000Z",
+          "count": 37,
+          "pass": 6,
+          "fail": 31,
+          "avg": 147.43243243243242,
+          "min": 107,
+          "max": 278,
+          "p90": 230.59999999999997,
+          "p95": 0,
+          "p99": 0
+        }
+      ],
+      "t05_add_to_cart": [
+        {
+          "ts": "2026-04-10T07:00:50.000Z",
+          "count": 37,
+          "pass": 5,
+          "fail": 32,
+          "avg": 301.7027027027027,
+          "min": 224,
+          "max": 809,
+          "p90": 443.4,
+          "p95": 0,
+          "p99": 0
+        }
+      ],
+      "t06_increase_quantity_to_2_and_proceed_to_checkout": [
+        {
+          "ts": "2026-04-10T07:00:50.000Z",
+          "count": 37,
+          "pass": 7,
+          "fail": 30,
+          "avg": 305.7567567567568,
+          "min": 225,
+          "max": 845,
+          "p90": 422.5999999999998,
+          "p95": 0,
+          "p99": 0
+        }
+      ],
+      "t07_click_continue": [
+        {
+          "ts": "2026-04-10T07:00:50.000Z",
+          "count": 37,
+          "pass": 2,
+          "fail": 35,
+          "avg": 149.48648648648648,
+          "min": 112,
+          "max": 241,
+          "p90": 212.79999999999995,
+          "p95": 0,
+          "p99": 0
+        }
+      ],
+      "t08_click_confirm": [
+        {
+          "ts": "2026-04-10T07:00:50.000Z",
+          "count": 37,
+          "pass": 2,
+          "fail": 35,
+          "avg": 284.7837837837838,
+          "min": 216,
+          "max": 548,
+          "p90": 355.4,
+          "p95": 0,
+          "p99": 0
+        }
+      ]
+    },
+    "system": {
+      "MechAvenger": [
+        {
+          "ts": "2026-04-10T07:00:50.000Z",
+          "activeAgents": 1
+        }
+      ]
+    },
+    "events": [
+      {
+        "ts": "2026-04-10T07:00:53.099Z",
+        "type": "assertion_failed",
+        "transaction": "t04_select_product",
+        "severity": "error"
+      },
+      {
+        "ts": "2026-04-10T07:00:53.099Z",
+        "type": "assertion_failed",
+        "transaction": "t05_add_to_cart",
+        "severity": "error"
+      },
+      {
+        "ts": "2026-04-10T07:00:53.099Z",
+        "type": "assertion_failed",
+        "transaction": "t05_add_to_cart",
+        "severity": "error"
+      },
+      {
+        "ts": "2026-04-10T07:00:53.100Z",
+        "type": "assertion_failed",
+        "transaction": "t06_increase_quantity_to_2_and_proceed_to_checkout",
+        "severity": "error"
+      },
+      {
+        "ts": "2026-04-10T07:00:53.100Z",
+        "type": "assertion_failed",
+        "transaction": "t07_click_continue",
+        "severity": "error"
+      },
+      {
+        "ts": "2026-04-10T07:00:53.100Z",
+        "type": "assertion_failed",
+        "transaction": "t08_click_confirm",
+        "severity": "error"
+      },
+      {
+        "ts": "2026-04-10T07:00:53.100Z",
+        "type": "assertion_failed",
+        "transaction": "t08_click_confirm",
+        "severity": "error"
+      },
+      {
+        "ts": "2026-04-10T07:00:53.100Z",
+        "type": "assertion_failed",
+        "transaction": "logout",
+        "severity": "error"
+      },
+      {
+        "ts": "2026-04-10T07:00:53.100Z",
+        "type": "execution_failed",
+        "transaction": "framework_execution",
+        "severity": "error"
+      },
+      {
+        "ts": "2026-04-10T07:00:53.100Z",
+        "type": "threshold_breach",
+        "transaction": "http_req_failed",
+        "severity": "warning"
+      },
+      {
+        "ts": "2026-04-10T07:00:53.100Z",
+        "type": "threshold_breach",
+        "transaction": "t01_launch",
+        "severity": "warning"
+      },
+      {
+        "ts": "2026-04-10T07:00:53.100Z",
+        "type": "threshold_breach",
+        "transaction": "http_req_failed{scenario:buyanimal_1_framework_lifecycle}",
+        "severity": "warning"
+      }
+    ]
+  }
+}

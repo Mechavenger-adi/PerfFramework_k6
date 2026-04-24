@@ -1,0 +1,59 @@
+{
+  "status": "passed",
+  "runId": "Run_2026-04-09T02-59-56-378Z",
+  "plan": "WebUI Load Test - test.k6.io",
+  "environment": "dev",
+  "thresholdFailures": 0,
+  "errorCount": 0,
+  "warningCount": 0,
+  "aborted": false,
+  "transactions": [
+    {
+      "name": "logout",
+      "count": 7,
+      "pass": 0,
+      "fail": 7,
+      "errorPct": 100
+    },
+    {
+      "name": "search_animal",
+      "count": 971,
+      "pass": 971,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 211.9124613800206,
+      "min": 192,
+      "max": 609
+    },
+    {
+      "name": "select product",
+      "count": 971,
+      "pass": 0,
+      "fail": 971,
+      "errorPct": 100
+    },
+    {
+      "name": "t01_launch",
+      "count": 10,
+      "pass": 10,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 593.1,
+      "min": 575,
+      "max": 607
+    },
+    {
+      "name": "t02_login",
+      "count": 10,
+      "pass": 0,
+      "fail": 10,
+      "errorPct": 100,
+      "avg": 0,
+      "min": 0,
+      "max": 0
+    }
+  ],
+  "gate": {
+    "failedRules": []
+  }
+}

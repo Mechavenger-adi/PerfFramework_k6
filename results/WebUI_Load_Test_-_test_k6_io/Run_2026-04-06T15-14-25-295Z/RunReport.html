@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Run Report - WebUI Load Test - test.k6.io</title>
+  <style>
+    :root {
+      --bg: #f3f0e8;
+      --panel: #fffdf8;
+      --ink: #1d2731;
+      --muted: #66717d;
+      --accent: #005f73;
+      --accent-soft: #dff3f4;
+      --border: #d5ddd9;
+      --warn: #c2410c;
+      --error: #b91c1c;
+      --ok: #15803d;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, sans-serif;
+      background: linear-gradient(180deg, #f3f0e8 0%, #eef5f2 100%);
+      color: var(--ink);
+    }
+    .shell { max-width: 1400px; margin: 0 auto; padding: 24px; }
+    .hero {
+      background: radial-gradient(circle at top left, #e2f3eb, #fffdf8 45%, #eef5f2 100%);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 24px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.06);
+    }
+    .hero h1 { margin: 0 0 8px; font-size: 32px; }
+    .meta { color: var(--muted); display: flex; gap: 16px; flex-wrap: wrap; }
+    .status {
+      display: inline-block; padding: 6px 12px; border-radius: 999px; font-weight: 700;
+      background: var(--accent-soft); color: var(--accent); margin-bottom: 12px;
+    }
+    .status.failed { background: #fde2e2; color: var(--error); }
+    .status.passed { background: #def7e5; color: var(--ok); }
+    .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 20px 0 16px; }
+    .tab-btn {
+      border: 1px solid var(--border); background: var(--panel); color: var(--ink);
+      padding: 10px 14px; border-radius: 999px; cursor: pointer; font-weight: 600;
+    }
+    .tab-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
+    .tab-panel {
+      display: none; background: rgba(255,255,255,0.82); backdrop-filter: blur(6px);
+      border: 1px solid var(--border); border-radius: 18px; padding: 20px; box-shadow: 0 12px 36px rgba(0,0,0,0.05);
+    }
+    .tab-panel.active { display: block; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 20px; }
+    .card { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 14px; }
+    .card h3 { margin: 0 0 6px; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+    .card strong { font-size: 24px; }
+    .toolbar { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+    input, select {
+      border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; background: white;
+    }
+    table { width: 100%; border-collapse: separate; border-spacing: 0; }
+    th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); }
+    th { background: #edf4f3; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; }
+    tr:hover td { background: #f7fbfb; }
+    .split { display: grid; grid-template-columns: 1.5fr 1fr; gap: 18px; }
+    .placeholder {
+      min-height: 260px; border: 1px dashed var(--border); border-radius: 16px; padding: 18px;
+      background: linear-gradient(180deg, rgba(255,255,255,.75), rgba(240,246,244,.9));
+      color: var(--muted);
+    }
+    .empty { color: var(--muted); padding: 18px 0; }
+    .graph-shell { display: grid; gap: 16px; }
+    .chart-box {
+      background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 16px;
+    }
+    .bar-chart { display: flex; align-items: end; gap: 10px; min-height: 220px; padding-top: 16px; }
+    .bar-wrap { flex: 1; min-width: 56px; text-align: center; }
+    .bar {
+      width: 100%;
+      border-radius: 10px 10px 0 0;
+      background: linear-gradient(180deg, #0a9396, #005f73);
+      min-height: 6px;
+    }
+    .bar-label, .bar-value { font-size: 12px; color: var(--muted); margin-top: 8px; }
+    .subtle { color: var(--muted); font-size: 13px; }
+    @media (max-width: 980px) { .split { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <section class="hero">
+      <div class="status failed">FAILED</div>
+      <h1>WebUI Load Test - test.k6.io</h1>
+      <div class="meta">
+        <span>Run ID: Run_2026-04-06T15-14-25-295Z</span>
+        <span>Environment: dev</span>
+        <span>Started: 2026-04-06T15:14:25.302Z</span>
+        <span>Ended: 2026-04-06T15:15:57.009Z</span>
+      </div>
+    </section>
+    <div class="tabs" id="tabs"></div>
+    <section id="panel-summary" class="tab-panel active"></section>
+    <section id="panel-graphs" class="tab-panel"></section>
+    <section id="panel-transactions" class="tab-panel"></section>
+    <section id="panel-errors" class="tab-panel"></section>
+    <section id="panel-warnings" class="tab-panel"></section>
+    <section id="panel-snapshots" class="tab-panel"></section>
+    <section id="panel-system" class="tab-panel"></section>
+  </div>
+  <script>
+    const reportData = {"meta":{"runId":"Run_2026-04-06T15-14-25-295Z","plan":"WebUI Load Test - test.k6.io","environment":"dev","startTime":"2026-04-06T15:14:25.302Z","endTime":"2026-04-06T15:15:57.009Z","status":"failed","bucketSizeSeconds":10},"config":{"transactionStats":["count","pass","fail","avg","min","max","p(90)","p(95)"],"defaultTopTransactions":5,"timeseriesEnabled":true},"summary":{"rawSummaryPath":"D:/repos/K6-PerfFramework/results/WebUI_Load_Test_-_test_k6_io/Run_2026-04-06T15-14-25-295Z/summary.json","ciSummary":{"status":"failed","runId":"Run_2026-04-06T15-14-25-295Z","plan":"WebUI Load Test - test.k6.io","environment":"dev","thresholdFailures":1,"errorCount":4,"warningCount":1,"aborted":false,"transactions":[{"name":"add to cart","count":388,"pass":388,"fail":0,"errorPct":0,"avg":428.2628865979381,"min":345,"max":1781,"p95":686.65},{"name":"click confirm","count":388,"pass":10,"fail":378,"errorPct":97.42,"avg":383.7603092783505,"min":331,"max":714,"p95":492.65},{"name":"click continue","count":388,"pass":10,"fail":378,"errorPct":97.42,"avg":199.1159793814433,"min":165,"max":1062,"p95":266.65},{"name":"increase quantity to 2 and proceed to checkout","count":388,"pass":10,"fail":378,"errorPct":97.42,"avg":417.340206185567,"min":346,"max":1381,"p95":616},{"name":"logout","count":6,"pass":6,"fail":0,"errorPct":0,"avg":412.1666666666667,"min":352,"max":499,"p95":486.75},{"name":"search_animal","count":388,"pass":388,"fail":0,"errorPct":0,"avg":205.26288659793815,"min":171,"max":576,"p95":293},{"name":"select product","count":388,"pass":388,"fail":0,"errorPct":0,"avg":229.6237113402062,"min":176,"max":801,"p95":390.14999999999975},{"name":"t01_launch","count":10,"pass":10,"fail":0,"errorPct":0,"avg":369.3,"min":215,"max":650,"p95":613.55},{"name":"t02_login","count":10,"pass":10,"fail":0,"errorPct":0,"avg":576.5,"min":547,"max":603,"p95":602.1}],"gate":{"failedRules":["http_req_failed:rate\u003c0.1"]}}},"transactions":{"runId":"Run_2026-04-06T15-14-25-295Z","stats":["count","pass","fail","avg","min","max","p(90)","p(95)"],"transactions":[{"journey":"buyanimal_1_framework_lifecycle","transaction":"add to cart","count":388,"pass":388,"fail":0,"errorPct":0,"avg":428.2628865979381,"min":345,"max":1781,"p(90)":502,"p(95)":686.65},{"journey":"buyanimal_1_framework_lifecycle","transaction":"click confirm","count":388,"pass":10,"fail":378,"errorPct":97.42,"avg":383.7603092783505,"min":331,"max":714,"p(90)":430.6,"p(95)":492.65},{"journey":"buyanimal_1_framework_lifecycle","transaction":"click continue","count":388,"pass":10,"fail":378,"errorPct":97.42,"avg":199.1159793814433,"min":165,"max":1062,"p(90)":218,"p(95)":266.65},{"journey":"buyanimal_1_framework_lifecycle","transaction":"increase quantity to 2 and proceed to checkout","count":388,"pass":10,"fail":378,"errorPct":97.42,"avg":417.340206185567,"min":346,"max":1381,"p(90)":480.6,"p(95)":616},{"journey":"buyanimal_1_framework_lifecycle","transaction":"logout","count":6,"pass":6,"fail":0,"errorPct":0,"avg":412.1666666666667,"min":352,"max":499,"p(90)":474.5,"p(95)":486.75},{"journey":"buyanimal_1_framework_lifecycle","transaction":"search_animal","count":388,"pass":388,"fail":0,"errorPct":0,"avg":205.26288659793815,"min":171,"max":576,"p(90)":232.60000000000002,"p(95)":293},{"journey":"buyanimal_1_framework_lifecycle","transaction":"select product","count":388,"pass":388,"fail":0,"errorPct":0,"avg":229.6237113402062,"min":176,"max":801,"p(90)":285.3,"p(95)":390.14999999999975},{"journey":"buyanimal_1_framework_lifecycle","transaction":"t01_launch","count":10,"pass":10,"fail":0,"errorPct":0,"avg":369.3,"min":215,"max":650,"p(90)":577.1,"p(95)":613.55},{"journey":"buyanimal_1_framework_lifecycle","transaction":"t02_login","count":10,"pass":10,"fail":0,"errorPct":0,"avg":576.5,"min":547,"max":603,"p(90)":601.2,"p(95)":602.1}]},"timeseries":{"bucketSizeSeconds":10,"startTime":"2026-04-06T15:14:25.302Z","endTime":"2026-04-06T15:15:57.009Z","series":{"overview":[{"ts":"2026-04-06T15:15:50.000Z","requests":4724,"iterations":414,"errorRate":0.2497883149872989,"avgDuration":155.05694223116035,"p95Duration":262.30171499999915,"vus":1,"vusMax":10}],"transactions":{"add to cart":[{"ts":"2026-04-06T15:15:50.000Z","count":388,"pass":388,"fail":0,"avg":428.2628865979381,"min":345,"max":1781,"p90":502,"p95":686.65,"p99":0}],"click confirm":[{"ts":"2026-04-06T15:15:50.000Z","count":388,"pass":10,"fail":378,"avg":383.7603092783505,"min":331,"max":714,"p90":430.6,"p95":492.65,"p99":0}],"click continue":[{"ts":"2026-04-06T15:15:50.000Z","count":388,"pass":10,"fail":378,"avg":199.1159793814433,"min":165,"max":1062,"p90":218,"p95":266.65,"p99":0}],"increase quantity to 2 and proceed to checkout":[{"ts":"2026-04-06T15:15:50.000Z","count":388,"pass":10,"fail":378,"avg":417.340206185567,"min":346,"max":1381,"p90":480.6,"p95":616,"p99":0}],"logout":[{"ts":"2026-04-06T15:15:50.000Z","count":6,"pass":6,"fail":0,"avg":412.1666666666667,"min":352,"max":499,"p90":474.5,"p95":486.75,"p99":0}],"search_animal":[{"ts":"2026-04-06T15:15:50.000Z","count":388,"pass":388,"fail":0,"avg":205.26288659793815,"min":171,"max":576,"p90":232.60000000000002,"p95":293,"p99":0}],"select product":[{"ts":"2026-04-06T15:15:50.000Z","count":388,"pass":388,"fail":0,"avg":229.6237113402062,"min":176,"max":801,"p90":285.3,"p95":390.14999999999975,"p99":0}],"t01_launch":[{"ts":"2026-04-06T15:15:50.000Z","count":10,"pass":10,"fail":0,"avg":369.3,"min":215,"max":650,"p90":577.1,"p95":613.55,"p99":0}],"t02_login":[{"ts":"2026-04-06T15:15:50.000Z","count":10,"pass":10,"fail":0,"avg":576.5,"min":547,"max":603,"p90":601.2,"p95":602.1,"p99":0}]},"system":{"MechAvenger":[{"ts":"2026-04-06T15:15:50.000Z","activeAgents":1}]},"events":[{"ts":"2026-04-06T15:15:57.036Z","type":"assertion_failed","transaction":"increase quantity to 2 and proceed to checkout","severity":"error"},{"ts":"2026-04-06T15:15:57.036Z","type":"assertion_failed","transaction":"click continue","severity":"error"},{"ts":"2026-04-06T15:15:57.037Z","type":"assertion_failed","transaction":"click confirm","severity":"error"},{"ts":"2026-04-06T15:15:57.037Z","type":"execution_failed","transaction":"framework_execution","severity":"error"},{"ts":"2026-04-06T15:15:57.037Z","type":"threshold_breach","transaction":"http_req_failed","severity":"warning"}]}},"errors":[{"ts":"2026-04-06T15:15:57.036Z","level":"error","type":"assertion_failed","runId":"Run_2026-04-06T15-14-25-295Z","plan":"WebUI Load Test - test.k6.io","environment":"dev","journey":"buyanimal_1_framework_lifecycle","scenario":"buyanimal_1_framework_lifecycle","transaction":"increase quantity to 2 and proceed to checkout","requestName":"status equals 200","vu":null,"iteration":null,"phase":"unknown","behavior":"continue","agent":{"host":"MechAvenger","pid":56572,"containerId":"MechAvenger"},"message":"Check failed in transaction \"increase quantity to 2 and proceed to checkout\": status equals 200","cause":{"kind":"check_failure","code":"K6_CHECK_FAILED","detail":"passes=398, fails=378"}},{"ts":"2026-04-06T15:15:57.036Z","level":"error","type":"assertion_failed","runId":"Run_2026-04-06T15-14-25-295Z","plan":"WebUI Load Test - test.k6.io","environment":"dev","journey":"buyanimal_1_framework_lifecycle","scenario":"buyanimal_1_framework_lifecycle","transaction":"click continue","requestName":"status equals 200","vu":null,"iteration":null,"phase":"unknown","behavior":"continue","agent":{"host":"MechAvenger","pid":56572,"containerId":"MechAvenger"},"message":"Check failed in transaction \"click continue\": status equals 200","cause":{"kind":"check_failure","code":"K6_CHECK_FAILED","detail":"passes=10, fails=378"}},{"ts":"2026-04-06T15:15:57.037Z","level":"error","type":"assertion_failed","runId":"Run_2026-04-06T15-14-25-295Z","plan":"WebUI Load Test - test.k6.io","environment":"dev","journey":"buyanimal_1_framework_lifecycle","scenario":"buyanimal_1_framework_lifecycle","transaction":"click confirm","requestName":"status equals 200","vu":null,"iteration":null,"phase":"unknown","behavior":"continue","agent":{"host":"MechAvenger","pid":56572,"containerId":"MechAvenger"},"message":"Check failed in transaction \"click confirm\": status equals 200","cause":{"kind":"check_failure","code":"K6_CHECK_FAILED","detail":"passes=10, fails=378"}},{"ts":"2026-04-06T15:15:57.037Z","level":"error","type":"execution_failed","runId":"Run_2026-04-06T15-14-25-295Z","plan":"WebUI Load Test - test.k6.io","environment":"dev","journey":"buyanimal_1_framework_lifecycle","scenario":"buyanimal_1_framework_lifecycle","transaction":"framework_execution","vu":null,"iteration":null,"phase":"unknown","behavior":"continue","agent":{"host":"MechAvenger","pid":56572,"containerId":"MechAvenger"},"message":"k6 execution finished with non-zero exit code 99","cause":{"kind":"process_exit","code":"EXIT_99","detail":"The k6 process exited with a non-zero status."}}],"warnings":[{"ts":"2026-04-06T15:15:57.037Z","level":"warning","type":"threshold_breach","runId":"Run_2026-04-06T15-14-25-295Z","message":"Threshold breached for http_req_failed: rate\u003c0.1","plan":"WebUI Load Test - test.k6.io","environment":"dev","journey":"buyanimal_1_framework_lifecycle","scenario":"buyanimal_1_framework_lifecycle","transaction":"http_req_failed","phase":"unknown","agent":{"host":"MechAvenger","pid":56572,"containerId":"MechAvenger"},"metric":{"name":"http_req_failed","value":0}}],"snapshots":[],"system":{"agents":[{"host":"MechAvenger","pid":56572,"containerId":"MechAvenger"}],"snapshots":[]}};
+    const tabs = [
+      ['summary', 'Summary'],
+      ['graphs', 'Graphs'],
+      ['transactions', 'Transactions'],
+      ['errors', 'Errors'],
+      ['warnings', 'Warnings'],
+      ['snapshots', 'Snapshots'],
+      ['system', 'System']
+    ];
+
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function buildTabs() {
+      const root = document.getElementById('tabs');
+      tabs.forEach(([id, label], index) => {
+        const btn = document.createElement('button');
+        btn.className = 'tab-btn' + (index === 0 ? ' active' : '');
+        btn.textContent = label;
+        btn.onclick = () => activateTab(id, btn);
+        root.appendChild(btn);
+      });
+    }
+
+    function activateTab(id, button) {
+      document.querySelectorAll('.tab-panel').forEach((panel) => panel.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach((btn) => btn.classList.remove('active'));
+      document.getElementById('panel-' + id).classList.add('active');
+      button.classList.add('active');
+    }
+
+    function renderSummary() {
+      const summary = reportData.summary;
+      const ci = summary.ciSummary;
+      const transactions = reportData.transactions.transactions;
+      const slowest = [...transactions].sort((a, b) => (b.avg || 0) - (a.avg || 0)).slice(0, 5);
+      const failing = [...transactions].sort((a, b) => (b.fail || 0) - (a.fail || 0)).slice(0, 5);
+
+      document.getElementById('panel-summary').innerHTML = `
+        <div class="cards">
+          <div class="card"><h3>Transactions</h3><strong>${transactions.length}</strong></div>
+          <div class="card"><h3>Threshold Failures</h3><strong>${ci.thresholdFailures}</strong></div>
+          <div class="card"><h3>Errors</h3><strong>${ci.errorCount}</strong></div>
+          <div class="card"><h3>Warnings</h3><strong>${ci.warningCount}</strong></div>
+        </div>
+        <div class="split">
+          <div class="card">
+            <h3>Top Slowest Transactions</h3>
+            ${renderMiniTable(slowest, ['transaction', 'avg', 'max'])}
+          </div>
+          <div class="card">
+            <h3>Top Failing Transactions</h3>
+            ${renderMiniTable(failing, ['transaction', 'fail', 'errorPct'])}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderGraphs() {
+      const stats = reportData.config.transactionStats;
+      const transactions = reportData.transactions.transactions;
+      const topFive = [...transactions].sort((a, b) => (b.count || 0) - (a.count || 0)).slice(0, reportData.config.defaultTopTransactions || 5);
+      const range = getSelectedRange();
+      const overviewPoints = filterSeriesByRange(reportData.timeseries.series.overview, range);
+      const selectedOverview = overviewPoints[overviewPoints.length - 1] || null;
+
+      document.getElementById('panel-graphs').innerHTML = `
+        <div class="toolbar">
+          <label><strong>Time Range</strong></label>
+          <input id="global-from" type="datetime-local" />
+          <input id="global-to" type="datetime-local" />
+          <button id="apply-time-filter" class="tab-btn">Apply</button>
+          <label><strong>Transaction View</strong></label>
+          <select id="txn-view-mode">
+            <option value="top">Top 5</option>
+            <option value="all">All</option>
+          </select>
+          <input id="txn-filter" type="search" placeholder="Filter transactions" />
+        </div>
+        <div class="split">
+          <div class="graph-shell">
+            <div class="chart-box">
+              <h3>Load Overview</h3>
+              ${selectedOverview ? renderOverviewCards(selectedOverview) : '<div class="empty">No overview points in the selected time range.</div>'}
+            </div>
+            <div class="chart-box">
+              <h3>Transaction Response Time Over Time</h3>
+              <p class="subtle">Baseline timeseries is now persisted from local load runs. As runtime bucket streaming is added, this same area will deepen into the fully interactive graph experience.</p>
+              <div id="transaction-chart-host"></div>
+              <p class="subtle">Configured stats: ${stats.map(escapeHtml).join(', ')}</p>
+            </div>
+          </div>
+          <div class="card">
+            <h3>Attached Summary Table</h3>
+            <div id="graph-table-host"></div>
+          </div>
+        </div>
+      `;
+
+      const host = document.getElementById('graph-table-host');
+      const chartHost = document.getElementById('transaction-chart-host');
+      const select = document.getElementById('txn-view-mode');
+      const filter = document.getElementById('txn-filter');
+      const fromInput = document.getElementById('global-from');
+      const toInput = document.getElementById('global-to');
+      const applyButton = document.getElementById('apply-time-filter');
+
+      hydrateTimeInputs(fromInput, toInput);
+
+      function renderAttachedTable() {
+        const source = select.value === 'all' ? transactions : topFive;
+        const filtered = source.filter((row) => row.transaction.toLowerCase().includes(filter.value.toLowerCase()));
+        const columns = ['transaction', ...stats];
+        host.innerHTML = filtered.length ? renderTable(filtered, columns) : '<div class="empty">No transactions match the current filter.</div>';
+        chartHost.innerHTML = filtered.length ? renderTransactionBars(filtered) : '<div class="empty">No transactions match the current filter.</div>';
+      }
+
+      select.onchange = renderAttachedTable;
+      filter.oninput = renderAttachedTable;
+      applyButton.onclick = () => {
+        updateGlobalTimeRange(fromInput.value, toInput.value);
+        renderGraphs();
+      };
+      renderAttachedTable();
+    }
+
+    function renderTransactions() {
+      const rows = reportData.transactions.transactions;
+      document.getElementById('panel-transactions').innerHTML = rows.length
+        ? renderTable(rows, ['transaction', 'count', 'pass', 'fail', 'errorPct', ...reportData.config.transactionStats.filter((stat) => !['count', 'pass', 'fail'].includes(stat))])
+        : '<div class="empty">No transaction metrics were captured for this run.</div>';
+    }
+
+    function renderErrors() {
+      const rows = reportData.errors || [];
+      document.getElementById('panel-errors').innerHTML = rows.length
+        ? renderTable(rows, ['ts', 'type', 'transaction', 'vu', 'iteration', 'message'])
+        : '<div class="empty">No structured error events were captured for this run yet.</div>';
+    }
+
+    function renderWarnings() {
+      const rows = reportData.warnings || [];
+      document.getElementById('panel-warnings').innerHTML = rows.length
+        ? renderTable(rows, ['ts', 'type', 'message'])
+        : '<div class="empty">No structured warning events were captured for this run yet.</div>';
+    }
+
+    function renderSnapshots() {
+      const rows = reportData.snapshots || [];
+      document.getElementById('panel-snapshots').innerHTML = rows.length
+        ? renderTable(rows, ['ts', 'type', 'transaction', 'vu', 'iteration'])
+        : '<div class="empty">No failure snapshots were captured for this run.</div>';
+    }
+
+    function renderSystem() {
+      const agents = reportData.system?.agents || [];
+      const snapshots = reportData.system?.snapshots || [];
+      const agentsTable = agents.length ? renderTable(agents, ['host', 'pid', 'jobId', 'containerId']) : '<div class="empty">No agent identity metadata recorded.</div>';
+      const snapshotsTable = snapshots.length ? renderTable(snapshots, ['ts', 'cpuPercent', 'memoryPercent']) : '<div class="empty">No host monitoring snapshots captured for this run.</div>';
+      document.getElementById('panel-system').innerHTML = `
+        <div class="split">
+          <div class="card">
+            <h3>Agents</h3>
+            ${agentsTable}
+          </div>
+          <div class="card">
+            <h3>Host Snapshots</h3>
+            ${snapshotsTable}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderMiniTable(rows, columns) {
+      return renderTable(rows, columns);
+    }
+
+    function formatCellValue(value) {
+      if (value == null || value === '') return '';
+      if (typeof value === 'number') {
+        return Number.isInteger(value) ? value.toString() : value.toFixed(2);
+      }
+      return String(value);
+    }
+
+    function renderTable(rows, columns) {
+      const header = columns.map((column) => '<th>' + escapeHtml(column) + '</th>').join('');
+      const body = rows.map((row) => '<tr>' + columns.map((column) => '<td>' + escapeHtml(formatCellValue(row[column])) + '</td>').join('') + '</tr>').join('');
+      return '<table><thead><tr>' + header + '</tr></thead><tbody>' + body + '</tbody></table>';
+    }
+
+    function renderOverviewCards(point) {
+      const cards = [
+        ['Requests', point.requests ?? 0],
+        ['Iterations', point.iterations ?? 0],
+        ['Error Rate', point.errorRate ?? 0],
+        ['Avg Duration', point.avgDuration ?? 0],
+        ['P95 Duration', point.p95Duration ?? 0],
+        ['VUs Max', point.vusMax ?? point.vus ?? 0]
+      ];
+      return '<div class="cards">' + cards.map(([label, value]) => '<div class="card"><h3>' + escapeHtml(label) + '</h3><strong>' + escapeHtml(Number(value).toFixed(Number(value) % 1 === 0 ? 0 : 2)) + '</strong></div>').join('') + '</div>';
+    }
+
+    function renderTransactionBars(rows) {
+      const max = Math.max(...rows.map((row) => Number(row.avg || row['avg'] || 0)), 1);
+      return '<div class="bar-chart">' + rows.map((row) => {
+        const avg = Number(row.avg || row['avg'] || 0);
+        const height = Math.max(6, Math.round((avg / max) * 180));
+        return '<div class="bar-wrap">' +
+          '<div class="bar" style="height:' + height + 'px"></div>' +
+          '<div class="bar-value">' + escapeHtml(avg.toFixed(0)) + ' ms</div>' +
+          '<div class="bar-label">' + escapeHtml(row.transaction) + '</div>' +
+        '</div>';
+      }).join('') + '</div>';
+    }
+
+    function getSelectedRange() {
+      return window.__k6PerfRange || { from: reportData.meta.startTime, to: reportData.meta.endTime };
+    }
+
+    function updateGlobalTimeRange(from, to) {
+      window.__k6PerfRange = {
+        from: from ? new Date(from).toISOString() : reportData.meta.startTime,
+        to: to ? new Date(to).toISOString() : reportData.meta.endTime
+      };
+    }
+
+    function hydrateTimeInputs(fromInput, toInput) {
+      const range = getSelectedRange();
+      fromInput.value = toLocalInputValue(range.from);
+      toInput.value = toLocalInputValue(range.to);
+    }
+
+    function toLocalInputValue(ts) {
+      const date = new Date(ts);
+      const pad = (value) => String(value).padStart(2, '0');
+      return date.getFullYear() + '-' +
+        pad(date.getMonth() + 1) + '-' +
+        pad(date.getDate()) + 'T' +
+        pad(date.getHours()) + ':' +
+        pad(date.getMinutes());
+    }
+
+    function filterSeriesByRange(rows, range) {
+      const from = new Date(range.from).getTime();
+      const to = new Date(range.to).getTime();
+      return rows.filter((row) => {
+        const value = new Date(row.ts).getTime();
+        return value >= from && value <= to;
+      });
+    }
+
+    buildTabs();
+    renderSummary();
+    renderGraphs();
+    renderTransactions();
+    renderErrors();
+    renderWarnings();
+    renderSnapshots();
+    renderSystem();
+  </script>
+</body>
+</html>

@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Run Report - WebUI Load Test - test.k6.io</title>
+  <style>
+    :root {
+      --bg: #f3f0e8;
+      --panel: #fffdf8;
+      --ink: #1d2731;
+      --muted: #66717d;
+      --accent: #005f73;
+      --accent-soft: #dff3f4;
+      --border: #d5ddd9;
+      --warn: #c2410c;
+      --error: #b91c1c;
+      --ok: #15803d;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, sans-serif;
+      background: linear-gradient(180deg, #f3f0e8 0%, #eef5f2 100%);
+      color: var(--ink);
+    }
+    .shell { max-width: 1400px; margin: 0 auto; padding: 24px; }
+    .hero {
+      background: radial-gradient(circle at top left, #e2f3eb, #fffdf8 45%, #eef5f2 100%);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 24px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.06);
+    }
+    .hero h1 { margin: 0 0 8px; font-size: 32px; }
+    .meta { color: var(--muted); display: flex; gap: 16px; flex-wrap: wrap; }
+    .status {
+      display: inline-block; padding: 6px 12px; border-radius: 999px; font-weight: 700;
+      background: var(--accent-soft); color: var(--accent); margin-bottom: 12px;
+    }
+    .status.failed { background: #fde2e2; color: var(--error); }
+    .status.passed { background: #def7e5; color: var(--ok); }
+    .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 20px 0 16px; }
+    .tab-btn {
+      border: 1px solid var(--border); background: var(--panel); color: var(--ink);
+      padding: 10px 14px; border-radius: 999px; cursor: pointer; font-weight: 600;
+    }
+    .tab-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
+    .tab-panel {
+      display: none; background: rgba(255,255,255,0.82); backdrop-filter: blur(6px);
+      border: 1px solid var(--border); border-radius: 18px; padding: 20px; box-shadow: 0 12px 36px rgba(0,0,0,0.05);
+    }
+    .tab-panel.active { display: block; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 20px; }
+    .card { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 14px; }
+    .card h3 { margin: 0 0 6px; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+    .card strong { font-size: 24px; }
+    .toolbar { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+    input, select {
+      border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; background: white;
+    }
+    table { width: 100%; border-collapse: separate; border-spacing: 0; }
+    th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); }
+    th { background: #edf4f3; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; }
+    tr:hover td { background: #f7fbfb; }
+    .split { display: grid; grid-template-columns: 1.5fr 1fr; gap: 18px; }
+    .placeholder {
+      min-height: 260px; border: 1px dashed var(--border); border-radius: 16px; padding: 18px;
+      background: linear-gradient(180deg, rgba(255,255,255,.75), rgba(240,246,244,.9));
+      color: var(--muted);
+    }
+    .empty { color: var(--muted); padding: 18px 0; }
+    .graph-shell { display: grid; gap: 16px; }
+    .chart-box {
+      background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 16px;
+    }
+    .bar-chart { display: flex; align-items: end; gap: 10px; min-height: 220px; padding-top: 16px; }
+    .bar-wrap { flex: 1; min-width: 56px; text-align: center; }
+    .bar {
+      width: 100%;
+      border-radius: 10px 10px 0 0;
+      background: linear-gradient(180deg, #0a9396, #005f73);
+      min-height: 6px;
+    }
+    .bar-label, .bar-value { font-size: 12px; color: var(--muted); margin-top: 8px; }
+    .subtle { color: var(--muted); font-size: 13px; }
+    .chart-canvas-wrap { position: relative; width: 100%; min-height: 280px; }
+    .chart-canvas-wrap canvas { width: 100% !important; }
+    .donut-wrap { position: relative; width: 100%; max-width: 280px; margin: 0 auto; }
+    @media (max-width: 980px) { .split { grid-template-columns: 1fr; } }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <div class="shell">
+    <section class="hero">
+      <div class="status failed">FAILED</div>
+      <h1>WebUI Load Test - test.k6.io</h1>
+      <div class="meta">
+        <span>Run ID: Run_2026-04-10T07-00-25-861Z</span>
+        <span>Environment: dev</span>
+        <span>Started: 2026-04-10T07:00:25.871Z</span>
+        <span>Ended: 2026-04-10T07:00:53.080Z</span>
+      </div>
+    </section>
+    <div class="tabs" id="tabs"></div>
+    <section id="panel-summary" class="tab-panel active"></section>
+    <section id="panel-graphs" class="tab-panel"></section>
+    <section id="panel-transactions" class="tab-panel"></section>
+    <section id="panel-errors" class="tab-panel"></section>
+    <section id="panel-warnings" class="tab-panel"></section>
+    <section id="panel-snapshots" class="tab-panel"></section>
+    <section id="panel-system" class="tab-panel"></section>
+  </div>
+  <script>
+    const reportData = {"meta":{"runId":"Run_2026-04-10T07-00-25-861Z","plan":"WebUI Load Test - test.k6.io","environment":"dev","startTime":"2026-04-10T07:00:25.871Z","endTime":"2026-04-10T07:00:53.080Z","status":"failed","bucketSizeSeconds":10},"config":{"transactionStats":["count","pass","fail","avg","min","max","p(90)","p(97)"],"defaultTopTransactions":5,"timeseriesEnabled":true},"summary":{"rawSummaryPath":"D:/repos/K6-PerfFramework/results/WebUI_Load_Test_-_test_k6_io/Run_2026-04-10T07-00-25-861Z/summary.json","ciSummary":{"status":"failed","runId":"Run_2026-04-10T07-00-25-861Z","plan":"WebUI Load Test - test.k6.io","environment":"dev","thresholdFailures":3,"errorCount":9,"warningCount":3,"aborted":false,"transactions":[{"name":"logout","count":3,"pass":0,"fail":3,"errorPct":100,"avg":378.3333333333333,"min":336,"max":447},{"name":"t01_launch","count":3,"pass":3,"fail":0,"errorPct":0,"avg":815.3333333333334,"min":728,"max":943},{"name":"t02_login","count":3,"pass":3,"fail":0,"errorPct":0,"avg":804,"min":682,"max":1017},{"name":"t03_search_animal","count":37,"pass":37,"fail":0,"errorPct":0,"avg":246.24324324324326,"min":219,"max":445},{"name":"t04_select_product","count":37,"pass":6,"fail":31,"errorPct":83.78,"avg":147.43243243243242,"min":107,"max":278},{"name":"t05_add_to_cart","count":37,"pass":5,"fail":32,"errorPct":86.49,"avg":301.7027027027027,"min":224,"max":809},{"name":"t06_increase_quantity_to_2_and_proceed_to_checkout","count":37,"pass":7,"fail":30,"errorPct":81.08,"avg":305.7567567567568,"min":225,"max":845},{"name":"t07_click_continue","count":37,"pass":2,"fail":35,"errorPct":94.59,"avg":149.48648648648648,"min":112,"max":241},{"name":"t08_click_confirm","count":37,"pass":2,"fail":35,"errorPct":94.59,"avg":284.7837837837838,"min":216,"max":548}],"gate":{"failedRules":["http_req_failed:rate\u003c0.1","t01_launch:p(95)\u003c800","http_req_failed{scenario:buyanimal_1_framework_lifecycle}:rate\u003c0.05"]}}},"transactions":{"runId":"Run_2026-04-10T07-00-25-861Z","stats":["count","pass","fail","avg","min","max","p(90)","p(97)"],"transactions":[{"journey":"buyanimal_1_framework_lifecycle","transaction":"logout","count":3,"pass":0,"fail":3,"errorPct":100,"avg":378.3333333333333,"min":336,"max":447,"p(90)":428,"p(97)":441.3},{"journey":"buyanimal_1_framework_lifecycle","transaction":"t01_launch","count":3,"pass":3,"fail":0,"errorPct":0,"avg":815.3333333333334,"min":728,"max":943,"p(90)":909.4,"p(97)":932.92},{"journey":"buyanimal_1_framework_lifecycle","transaction":"t02_login","count":3,"pass":3,"fail":0,"errorPct":0,"avg":804,"min":682,"max":1017,"p(90)":956.2,"p(97)":998.76},{"journey":"buyanimal_1_framework_lifecycle","transaction":"t03_search_animal","count":37,"pass":37,"fail":0,"errorPct":0,"avg":246.24324324324326,"min":219,"max":445,"p(90)":296.8,"p(97)":341.00000000000006},{"journey":"buyanimal_1_framework_lifecycle","transaction":"t04_select_product","count":37,"pass":6,"fail":31,"errorPct":83.78,"avg":147.43243243243242,"min":107,"max":278,"p(90)":230.59999999999997,"p(97)":258.40000000000003},{"journey":"buyanimal_1_framework_lifecycle","transaction":"t05_add_to_cart","count":37,"pass":5,"fail":32,"errorPct":86.49,"avg":301.7027027027027,"min":224,"max":809,"p(90)":443.4,"p(97)":495.80000000000007},{"journey":"buyanimal_1_framework_lifecycle","transaction":"t06_increase_quantity_to_2_and_proceed_to_checkout","count":37,"pass":7,"fail":30,"errorPct":81.08,"avg":305.7567567567568,"min":225,"max":845,"p(90)":422.5999999999998,"p(97)":588.76},{"journey":"buyanimal_1_framework_lifecycle","transaction":"t07_click_continue","count":37,"pass":2,"fail":35,"errorPct":94.59,"avg":149.48648648648648,"min":112,"max":241,"p(90)":212.79999999999995,"p(97)":235},{"journey":"buyanimal_1_framework_lifecycle","transaction":"t08_click_confirm","count":37,"pass":2,"fail":35,"errorPct":94.59,"avg":284.7837837837838,"min":216,"max":548,"p(90)":355.4,"p(97)":458.88000000000017}]},"timeseries":{"bucketSizeSeconds":10,"startTime":"2026-04-10T07:00:25.871Z","endTime":"2026-04-10T07:00:53.080Z","series":{"overview":[{"ts":"2026-04-10T07:00:50.000Z","requests":351,"iterations":37,"errorRate":0.7635327635327636,"avgDuration":164.81225783475801,"p95Duration":269.02405,"vus":1,"vusMax":3}],"transactions":{"logout":[{"ts":"2026-04-10T07:00:50.000Z","count":3,"pass":0,"fail":3,"avg":378.3333333333333,"min":336,"max":447,"p90":428,"p95":0,"p99":0}],"t01_launch":[{"ts":"2026-04-10T07:00:50.000Z","count":3,"pass":3,"fail":0,"avg":815.3333333333334,"min":728,"max":943,"p90":909.4,"p95":0,"p99":0}],"t02_login":[{"ts":"2026-04-10T07:00:50.000Z","count":3,"pass":3,"fail":0,"avg":804,"min":682,"max":1017,"p90":956.2,"p95":0,"p99":0}],"t03_search_animal":[{"ts":"2026-04-10T07:00:50.000Z","count":37,"pass":37,"fail":0,"avg":246.24324324324326,"min":219,"max":445,"p90":296.8,"p95":0,"p99":0}],"t04_select_product":[{"ts":"2026-04-10T07:00:50.000Z","count":37,"pass":6,"fail":31,"avg":147.43243243243242,"min":107,"max":278,"p90":230.59999999999997,"p95":0,"p99":0}],"t05_add_to_cart":[{"ts":"2026-04-10T07:00:50.000Z","count":37,"pass":5,"fail":32,"avg":301.7027027027027,"min":224,"max":809,"p90":443.4,"p95":0,"p99":0}],"t06_increase_quantity_to_2_and_proceed_to_checkout":[{"ts":"2026-04-10T07:00:50.000Z","count":37,"pass":7,"fail":30,"avg":305.7567567567568,"min":225,"max":845,"p90":422.5999999999998,"p95":0,"p99":0}],"t07_click_continue":[{"ts":"2026-04-10T07:00:50.000Z","count":37,"pass":2,"fail":35,"avg":149.48648648648648,"min":112,"max":241,"p90":212.79999999999995,"p95":0,"p99":0}],"t08_click_confirm":[{"ts":"2026-04-10T07:00:50.000Z","count":37,"pass":2,"fail":35,"avg":284.7837837837838,"min":216,"max":548,"p90":355.4,"p95":0,"p99":0}]},"system":{"MechAvenger":[{"ts":"2026-04-10T07:00:50.000Z","activeAgents":1}]},"events":[{"ts":"2026-04-10T07:00:53.099Z","type":"assertion_failed","transaction":"t04_select_product","severity":"error"},{"ts":"2026-04-10T07:00:53.099Z","type":"assertion_failed","transaction":"t05_add_to_cart","severity":"error"},{"ts":"2026-04-10T07:00:53.099Z","type":"assertion_failed","transaction":"t05_add_to_cart","severity":"error"},{"ts":"2026-04-10T07:00:53.100Z","type":"assertion_failed","transaction":"t06_increase_quantity_to_2_and_proceed_to_checkout","severity":"error"},{"ts":"2026-04-10T07:00:53.100Z","type":"assertion_failed","transaction":"t07_click_continue","severity":"error"},{"ts":"2026-04-10T07:00:53.100Z","type":"assertion_failed","transaction":"t08_click_confirm","severity":"error"},{"ts":"2026-04-10T07:00:53.100Z","type":"assertion_failed","transaction":"t08_click_confirm","severity":"error"},{"ts":"2026-04-10T07:00:53.100Z","type":"assertion_failed","transaction":"logout","severity":"error"},{"ts":"2026-04-10T07:00:53.100Z","type":"execution_failed","transaction":"framework_execution","severity":"error"},{"ts":"2026-04-10T07:00:53.100Z","type":"threshold_breach","transaction":"http_req_failed","severity":"warning"},{"ts":"2026-04-10T07:00:53.100Z","type":"threshold_breach","transaction":"t01_launch","severity":"warning"},{"ts":"2026-04-10T07:00:53.100Z","type":"threshold_breach","transaction":"http_req_failed{scenario:buyanimal_1_framework_lifecycle}","severity":"warning"}]}},"errors":[{"ts":"2026-04-10T07:00:53.099Z","level":"error","type":"assertion_failed","runId":"Run_2026-04-10T07-00-25-861Z","plan":"WebUI Load Test - test.k6.io","environment":"dev","journey":"buyanimal_1_framework_lifecycle","scenario":"buyanimal_1_framework_lifecycle","transaction":"t04_select_product","requestName":"status equals 200","vu":null,"iteration":null,"phase":"unknown","behavior":"continue","agent":{"host":"MechAvenger","pid":69648,"containerId":"MechAvenger"},"message":"Check failed in transaction \"t04_select_product\": status equals 200","cause":{"kind":"check_failure","code":"K6_CHECK_FAILED","detail":"passes=6, fails=31"}},{"ts":"2026-04-10T07:00:53.099Z","level":"error","type":"assertion_failed","runId":"Run_2026-04-10T07-00-25-861Z","plan":"WebUI Load Test - test.k6.io","environment":"dev","journey":"buyanimal_1_framework_lifecycle","scenario":"buyanimal_1_framework_lifecycle","transaction":"t05_add_to_cart","requestName":"status equals 302","vu":null,"iteration":null,"phase":"unknown","behavior":"continue","agent":{"host":"MechAvenger","pid":69648,"containerId":"MechAvenger"},"message":"Check failed in transaction \"t05_add_to_cart\": status equals 302","cause":{"kind":"check_failure","code":"K6_CHECK_FAILED","detail":"passes=5, fails=32"}},{"ts":"2026-04-10T07:00:53.099Z","level":"error","type":"assertion_failed","runId":"Run_2026-04-10T07-00-25-861Z","plan":"WebUI Load Test - test.k6.io","environment":"dev","journey":"buyanimal_1_framework_lifecycle","scenario":"buyanimal_1_framework_lifecycle","transaction":"t05_add_to_cart","requestName":"status equals 200","vu":null,"iteration":null,"phase":"unknown","behavior":"continue","agent":{"host":"MechAvenger","pid":69648,"containerId":"MechAvenger"},"message":"Check failed in transaction \"t05_add_to_cart\": status equals 200","cause":{"kind":"check_failure","code":"K6_CHECK_FAILED","detail":"passes=5, fails=32"}},{"ts":"2026-04-10T07:00:53.100Z","level":"error","type":"assertion_failed","runId":"Run_2026-04-10T07-00-25-861Z","plan":"WebUI Load Test - test.k6.io","environment":"dev","journey":"buyanimal_1_framework_lifecycle","scenario":"buyanimal_1_framework_lifecycle","transaction":"t06_increase_quantity_to_2_and_proceed_to_checkout","requestName":"status equals 200","vu":null,"iteration":null,"phase":"unknown","behavior":"continue","agent":{"host":"MechAvenger","pid":69648,"containerId":"MechAvenger"},"message":"Check failed in transaction \"t06_increase_quantity_to_2_and_proceed_to_checkout\": status equals 200","cause":{"kind":"check_failure","code":"K6_CHECK_FAILED","detail":"passes=7, fails=67"}},{"ts":"2026-04-10T07:00:53.100Z","level":"error","type":"assertion_failed","runId":"Run_2026-04-10T07-00-25-861Z","plan":"WebUI Load Test - test.k6.io","environment":"dev","journey":"buyanimal_1_framework_lifecycle","scenario":"buyanimal_1_framework_lifecycle","transaction":"t07_click_continue","requestName":"status equals 200","vu":null,"iteration":null,"phase":"unknown","behavior":"continue","agent":{"host":"MechAvenger","pid":69648,"containerId":"MechAvenger"},"message":"Check failed in transaction \"t07_click_continue\": status equals 200","cause":{"kind":"check_failure","code":"K6_CHECK_FAILED","detail":"passes=2, fails=35"}},{"ts":"2026-04-10T07:00:53.100Z","level":"error","type":"assertion_failed","runId":"Run_2026-04-10T07-00-25-861Z","plan":"WebUI Load Test - test.k6.io","environment":"dev","journey":"buyanimal_1_framework_lifecycle","scenario":"buyanimal_1_framework_lifecycle","transaction":"t08_click_confirm","requestName":"status equals 302","vu":null,"iteration":null,"phase":"unknown","behavior":"continue","agent":{"host":"MechAvenger","pid":69648,"containerId":"MechAvenger"},"message":"Check failed in transaction \"t08_click_confirm\": status equals 302","cause":{"kind":"check_failure","code":"K6_CHECK_FAILED","detail":"passes=3, fails=34"}},{"ts":"2026-04-10T07:00:53.100Z","level":"error","type":"assertion_failed","runId":"Run_2026-04-10T07-00-25-861Z","plan":"WebUI Load Test - test.k6.io","environment":"dev","journey":"buyanimal_1_framework_lifecycle","scenario":"buyanimal_1_framework_lifecycle","transaction":"t08_click_confirm","requestName":"status equals 200","vu":null,"iteration":null,"phase":"unknown","behavior":"continue","agent":{"host":"MechAvenger","pid":69648,"containerId":"MechAvenger"},"message":"Check failed in transaction \"t08_click_confirm\": status equals 200","cause":{"kind":"check_failure","code":"K6_CHECK_FAILED","detail":"passes=2, fails=35"}},{"ts":"2026-04-10T07:00:53.100Z","level":"error","type":"assertion_failed","runId":"Run_2026-04-10T07-00-25-861Z","plan":"WebUI Load Test - test.k6.io","environment":"dev","journey":"buyanimal_1_framework_lifecycle","scenario":"buyanimal_1_framework_lifecycle","transaction":"logout","requestName":"status equals 302","vu":null,"iteration":null,"phase":"unknown","behavior":"continue","agent":{"host":"MechAvenger","pid":69648,"containerId":"MechAvenger"},"message":"Check failed in transaction \"logout\": status equals 302","cause":{"kind":"check_failure","code":"K6_CHECK_FAILED","detail":"passes=0, fails=3"}},{"ts":"2026-04-10T07:00:53.100Z","level":"error","type":"execution_failed","runId":"Run_2026-04-10T07-00-25-861Z","plan":"WebUI Load Test - test.k6.io","environment":"dev","journey":"buyanimal_1_framework_lifecycle","scenario":"buyanimal_1_framework_lifecycle","transaction":"framework_execution","vu":null,"iteration":null,"phase":"unknown","behavior":"continue","agent":{"host":"MechAvenger","pid":69648,"containerId":"MechAvenger"},"message":"k6 execution finished with non-zero exit code 99","cause":{"kind":"process_exit","code":"EXIT_99","detail":"The k6 process exited with a non-zero status."}}],"warnings":[{"ts":"2026-04-10T07:00:53.100Z","level":"warning","type":"threshold_breach","runId":"Run_2026-04-10T07-00-25-861Z","message":"Threshold breached for http_req_failed: rate\u003c0.1","plan":"WebUI Load Test - test.k6.io","environment":"dev","journey":"buyanimal_1_framework_lifecycle","scenario":"buyanimal_1_framework_lifecycle","transaction":"http_req_failed","phase":"unknown","agent":{"host":"MechAvenger","pid":69648,"containerId":"MechAvenger"},"metric":{"name":"http_req_failed","value":0}},{"ts":"2026-04-10T07:00:53.100Z","level":"warning","type":"threshold_breach","runId":"Run_2026-04-10T07-00-25-861Z","message":"Threshold breached for t01_launch: p(95)\u003c800","plan":"WebUI Load Test - test.k6.io","environment":"dev","journey":"buyanimal_1_framework_lifecycle","scenario":"buyanimal_1_framework_lifecycle","transaction":"t01_launch","phase":"unknown","agent":{"host":"MechAvenger","pid":69648,"containerId":"MechAvenger"},"metric":{"name":"t01_launch","value":0}},{"ts":"2026-04-10T07:00:53.100Z","level":"warning","type":"threshold_breach","runId":"Run_2026-04-10T07-00-25-861Z","message":"Threshold breached for http_req_failed{scenario:buyanimal_1_framework_lifecycle}: rate\u003c0.05","plan":"WebUI Load Test - test.k6.io","environment":"dev","journey":"buyanimal_1_framework_lifecycle","scenario":"buyanimal_1_framework_lifecycle","transaction":"http_req_failed{scenario:buyanimal_1_framework_lifecycle}","phase":"unknown","agent":{"host":"MechAvenger","pid":69648,"containerId":"MechAvenger"},"metric":{"name":"http_req_failed{scenario:buyanimal_1_framework_lifecycle}","value":0}}],"snapshots":[],"system":{"agents":[{"host":"MechAvenger","pid":69648,"containerId":"MechAvenger"}],"snapshots":[]}};
+    const tabs = [
+      ['summary', 'Summary'],
+      ['graphs', 'Graphs'],
+      ['transactions', 'Transactions'],
+      ['errors', 'Errors'],
+      ['warnings', 'Warnings'],
+      ['snapshots', 'Snapshots'],
+      ['system', 'System']
+    ];
+
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function buildTabs() {
+      const root = document.getElementById('tabs');
+      tabs.forEach(([id, label], index) => {
+        const btn = document.createElement('button');
+        btn.className = 'tab-btn' + (index === 0 ? ' active' : '');
+        btn.textContent = label;
+        btn.onclick = () => activateTab(id, btn);
+        root.appendChild(btn);
+      });
+    }
+
+    function activateTab(id, button) {
+      document.querySelectorAll('.tab-panel').forEach((panel) => panel.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach((btn) => btn.classList.remove('active'));
+      document.getElementById('panel-' + id).classList.add('active');
+      button.classList.add('active');
+    }
+
+    function renderSummary() {
+      const summary = reportData.summary;
+      const ci = summary.ciSummary;
+      const transactions = reportData.transactions.transactions;
+      const slowest = [...transactions].sort((a, b) => (b.avg || 0) - (a.avg || 0)).slice(0, 5);
+      const failing = [...transactions].sort((a, b) => (b.fail || 0) - (a.fail || 0)).slice(0, 5);
+
+      document.getElementById('panel-summary').innerHTML = `
+        <div class="cards">
+          <div class="card"><h3>Transactions</h3><strong>${transactions.length}</strong></div>
+          <div class="card"><h3>Threshold Failures</h3><strong>${ci.thresholdFailures}</strong></div>
+          <div class="card"><h3>Errors</h3><strong>${ci.errorCount}</strong></div>
+          <div class="card"><h3>Warnings</h3><strong>${ci.warningCount}</strong></div>
+        </div>
+        <div class="split">
+          <div class="card">
+            <h3>Top Slowest Transactions</h3>
+            ${renderMiniTable(slowest, ['transaction', 'avg', 'max'])}
+          </div>
+          <div class="card">
+            <h3>Top Failing Transactions</h3>
+            ${renderMiniTable(failing, ['transaction', 'fail', 'errorPct'])}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderGraphs() {
+      const stats = reportData.config.transactionStats;
+      const transactions = reportData.transactions.transactions;
+      const topFive = [...transactions].sort((a, b) => (b.count || 0) - (a.count || 0)).slice(0, reportData.config.defaultTopTransactions || 5);
+      const range = getSelectedRange();
+      const overviewPoints = filterSeriesByRange(reportData.timeseries.series.overview, range);
+      const selectedOverview = overviewPoints[overviewPoints.length - 1] || null;
+
+      document.getElementById('panel-graphs').innerHTML = `
+        <div class="toolbar">
+          <label><strong>Time Range</strong></label>
+          <input id="global-from" type="datetime-local" />
+          <input id="global-to" type="datetime-local" />
+          <button id="apply-time-filter" class="tab-btn">Apply</button>
+          <label><strong>Transaction View</strong></label>
+          <select id="txn-view-mode">
+            <option value="top">Top 5</option>
+            <option value="all">All</option>
+          </select>
+          <input id="txn-filter" type="search" placeholder="Filter transactions" />
+        </div>
+        <div class="split">
+          <div class="graph-shell">
+            <div class="chart-box">
+              <h3>Load Overview</h3>
+              ${selectedOverview ? renderOverviewCards(selectedOverview) : '<div class="empty">No overview points in the selected time range.</div>'}
+            </div>
+            <div class="chart-box">
+              <h3>Transaction Response Time (ms)</h3>
+              <div class="chart-canvas-wrap"><canvas id="txn-bar-chart"></canvas></div>
+            </div>
+            <div class="chart-box">
+              <h3>Pass / Fail Distribution</h3>
+              <div class="donut-wrap"><canvas id="txn-donut-chart"></canvas></div>
+            </div>
+          </div>
+          <div class="card">
+            <h3>Attached Summary Table</h3>
+            <div id="graph-table-host"></div>
+          </div>
+        </div>
+      `;
+
+      const host = document.getElementById('graph-table-host');
+      const select = document.getElementById('txn-view-mode');
+      const filter = document.getElementById('txn-filter');
+      const fromInput = document.getElementById('global-from');
+      const toInput = document.getElementById('global-to');
+      const applyButton = document.getElementById('apply-time-filter');
+
+      hydrateTimeInputs(fromInput, toInput);
+
+      let barChartInstance = null;
+      let donutChartInstance = null;
+
+      function renderAttachedTable() {
+        const source = select.value === 'all' ? transactions : topFive;
+        const filtered = source.filter((row) => row.transaction.toLowerCase().includes(filter.value.toLowerCase()));
+        const columns = ['transaction', ...stats];
+        host.innerHTML = filtered.length ? renderTable(filtered, columns) : '<div class="empty">No transactions match the current filter.</div>';
+        renderBarChart(filtered);
+        renderDonutChart(transactions);
+      }
+
+      function renderBarChart(rows) {
+        if (barChartInstance) barChartInstance.destroy();
+        const canvas = document.getElementById('txn-bar-chart');
+        if (!canvas || !rows.length) return;
+        const labels = rows.map(r => r.transaction.length > 30 ? r.transaction.slice(0, 27) + '...' : r.transaction);
+        const avgData = rows.map(r => Number(r.avg || 0));
+        const p90Data = rows.map(r => Number(r['p(90)'] || 0));
+        const maxData = rows.map(r => Number(r.max || 0));
+        barChartInstance = new Chart(canvas, {
+          type: 'bar',
+          data: {
+            labels,
+            datasets: [
+              { label: 'Avg', data: avgData, backgroundColor: 'rgba(0,95,115,0.85)', borderRadius: 4, barPercentage: 0.7, categoryPercentage: 0.8 },
+              { label: 'p90', data: p90Data, backgroundColor: 'rgba(10,147,150,0.7)', borderRadius: 4, barPercentage: 0.7, categoryPercentage: 0.8 },
+              { label: 'Max', data: maxData, backgroundColor: 'rgba(194,65,12,0.5)', borderRadius: 4, barPercentage: 0.7, categoryPercentage: 0.8 }
+            ]
+          },
+          options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { position: 'top', labels: { usePointStyle: true, padding: 16 } },
+              tooltip: {
+                backgroundColor: 'rgba(29,39,49,0.92)',
+                titleFont: { size: 13 },
+                bodyFont: { size: 12 },
+                padding: 12,
+                cornerRadius: 8,
+                callbacks: {
+                  afterBody: function(items) {
+                    const idx = items[0].dataIndex;
+                    const row = rows[idx];
+                    return 'Count: ' + (row.count || 0) + '  |  Fail: ' + (row.fail || 0) + '  |  Err%: ' + (row.errorPct || 0) + '%';
+                  }
+                }
+              }
+            },
+            scales: {
+              x: { title: { display: true, text: 'Duration (ms)', color: '#66717d' }, grid: { color: 'rgba(0,0,0,0.04)' } },
+              y: { grid: { display: false }, ticks: { font: { size: 11 } } }
+            }
+          }
+        });
+        canvas.parentElement.style.minHeight = Math.max(280, rows.length * 50) + 'px';
+      }
+
+      function renderDonutChart(rows) {
+        if (donutChartInstance) donutChartInstance.destroy();
+        const canvas = document.getElementById('txn-donut-chart');
+        if (!canvas || !rows.length) return;
+        const totalPass = rows.reduce((s, r) => s + (r.pass || 0), 0);
+        const totalFail = rows.reduce((s, r) => s + (r.fail || 0), 0);
+        donutChartInstance = new Chart(canvas, {
+          type: 'doughnut',
+          data: {
+            labels: ['Pass', 'Fail'],
+            datasets: [{
+              data: [totalPass, totalFail],
+              backgroundColor: ['#15803d', '#b91c1c'],
+              hoverBackgroundColor: ['#16a34a', '#dc2626'],
+              borderWidth: 2,
+              borderColor: '#fffdf8'
+            }]
+          },
+          options: {
+            responsive: true,
+            cutout: '60%',
+            plugins: {
+              legend: { position: 'bottom', labels: { padding: 16, usePointStyle: true } },
+              tooltip: {
+                backgroundColor: 'rgba(29,39,49,0.92)',
+                padding: 12,
+                cornerRadius: 8,
+                callbacks: {
+                  label: function(ctx) {
+                    const total = totalPass + totalFail;
+                    const pct = total > 0 ? ((ctx.parsed / total) * 100).toFixed(1) : '0';
+                    return ctx.label + ': ' + ctx.parsed.toLocaleString() + ' (' + pct + '%)';
+                  }
+                }
+              }
+            }
+          }
+        });
+      }
+
+      select.onchange = renderAttachedTable;
+      filter.oninput = renderAttachedTable;
+      applyButton.onclick = () => {
+        updateGlobalTimeRange(fromInput.value, toInput.value);
+        renderGraphs();
+      };
+      renderAttachedTable();
+    }
+
+    function renderTransactions() {
+      const rows = reportData.transactions.transactions;
+      document.getElementById('panel-transactions').innerHTML = rows.length
+        ? renderTable(rows, ['transaction', 'count', 'pass', 'fail', 'errorPct', ...reportData.config.transactionStats.filter((stat) => !['count', 'pass', 'fail'].includes(stat))])
+        : '<div class="empty">No transaction metrics were captured for this run.</div>';
+    }
+
+    function renderErrors() {
+      const rows = reportData.errors || [];
+      document.getElementById('panel-errors').innerHTML = rows.length
+        ? renderTable(rows, ['ts', 'type', 'transaction', 'vu', 'iteration', 'message'])
+        : '<div class="empty">No structured error events were captured for this run yet.</div>';
+    }
+
+    function renderWarnings() {
+      const rows = reportData.warnings || [];
+      document.getElementById('panel-warnings').innerHTML = rows.length
+        ? renderTable(rows, ['ts', 'type', 'message'])
+        : '<div class="empty">No structured warning events were captured for this run yet.</div>';
+    }
+
+    function renderSnapshots() {
+      const rows = reportData.snapshots || [];
+      document.getElementById('panel-snapshots').innerHTML = rows.length
+        ? renderTable(rows, ['ts', 'type', 'transaction', 'vu', 'iteration'])
+        : '<div class="empty">No failure snapshots were captured for this run.</div>';
+    }
+
+    function renderSystem() {
+      const agents = reportData.system?.agents || [];
+      const snapshots = reportData.system?.snapshots || [];
+      const agentsTable = agents.length ? renderTable(agents, ['host', 'pid', 'jobId', 'containerId']) : '<div class="empty">No agent identity metadata recorded.</div>';
+      const snapshotsTable = snapshots.length ? renderTable(snapshots, ['ts', 'cpuPercent', 'memoryPercent']) : '<div class="empty">No host monitoring snapshots captured for this run.</div>';
+      document.getElementById('panel-system').innerHTML = `
+        <div class="split">
+          <div class="card">
+            <h3>Agents</h3>
+            ${agentsTable}
+          </div>
+          <div class="card">
+            <h3>Host Snapshots</h3>
+            ${snapshotsTable}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderMiniTable(rows, columns) {
+      return renderTable(rows, columns);
+    }
+
+    function formatCellValue(value) {
+      if (value == null || value === '') return '';
+      if (typeof value === 'number') {
+        return Number.isInteger(value) ? value.toString() : value.toFixed(2);
+      }
+      return String(value);
+    }
+
+    function renderTable(rows, columns) {
+      const header = columns.map((column) => '<th>' + escapeHtml(column) + '</th>').join('');
+      const body = rows.map((row) => '<tr>' + columns.map((column) => '<td>' + escapeHtml(formatCellValue(row[column])) + '</td>').join('') + '</tr>').join('');
+      return '<table><thead><tr>' + header + '</tr></thead><tbody>' + body + '</tbody></table>';
+    }
+
+    function renderOverviewCards(point) {
+      const cards = [
+        ['Requests', point.requests ?? 0],
+        ['Iterations', point.iterations ?? 0],
+        ['Error Rate', point.errorRate ?? 0],
+        ['Avg Duration', point.avgDuration ?? 0],
+        ['P95 Duration', point.p95Duration ?? 0],
+        ['VUs Max', point.vusMax ?? point.vus ?? 0]
+      ];
+      return '<div class="cards">' + cards.map(([label, value]) => '<div class="card"><h3>' + escapeHtml(label) + '</h3><strong>' + escapeHtml(Number(value).toFixed(Number(value) % 1 === 0 ? 0 : 2)) + '</strong></div>').join('') + '</div>';
+    }
+
+    // renderTransactionBars removed — replaced by Chart.js renderBarChart()
+
+    function getSelectedRange() {
+      return window.__k6PerfRange || { from: reportData.meta.startTime, to: reportData.meta.endTime };
+    }
+
+    function updateGlobalTimeRange(from, to) {
+      window.__k6PerfRange = {
+        from: from ? new Date(from).toISOString() : reportData.meta.startTime,
+        to: to ? new Date(to).toISOString() : reportData.meta.endTime
+      };
+    }
+
+    function hydrateTimeInputs(fromInput, toInput) {
+      const range = getSelectedRange();
+      fromInput.value = toLocalInputValue(range.from);
+      toInput.value = toLocalInputValue(range.to);
+    }
+
+    function toLocalInputValue(ts) {
+      const date = new Date(ts);
+      const pad = (value) => String(value).padStart(2, '0');
+      return date.getFullYear() + '-' +
+        pad(date.getMonth() + 1) + '-' +
+        pad(date.getDate()) + 'T' +
+        pad(date.getHours()) + ':' +
+        pad(date.getMinutes());
+    }
+
+    function filterSeriesByRange(rows, range) {
+      const from = new Date(range.from).getTime();
+      const to = new Date(range.to).getTime();
+      return rows.filter((row) => {
+        const value = new Date(row.ts).getTime();
+        return value >= from && value <= to;
+      });
+    }
+
+    buildTabs();
+    renderSummary();
+    renderGraphs();
+    renderTransactions();
+    renderErrors();
+    renderWarnings();
+    renderSnapshots();
+    renderSystem();
+  </script>
+</body>
+</html>

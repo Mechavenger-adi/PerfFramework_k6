@@ -1,0 +1,116 @@
+{
+  "status": "failed",
+  "runId": "Run_2026-04-06T17-51-25-695Z",
+  "plan": "WebUI Load Test - test.k6.io",
+  "environment": "dev",
+  "thresholdFailures": 1,
+  "errorCount": 4,
+  "warningCount": 1,
+  "aborted": false,
+  "transactions": [
+    {
+      "name": "add to cart",
+      "count": 368,
+      "pass": 1104,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 413.2798913043478,
+      "min": 339,
+      "max": 11201,
+      "p95": 489.29999999999995
+    },
+    {
+      "name": "click confirm",
+      "count": 368,
+      "pass": 378,
+      "fail": 358,
+      "errorPct": 48.64,
+      "avg": 390.625,
+      "min": 328,
+      "max": 11768,
+      "p95": 406.65
+    },
+    {
+      "name": "click continue",
+      "count": 368,
+      "pass": 10,
+      "fail": 358,
+      "errorPct": 97.28,
+      "avg": 184.89402173913044,
+      "min": 164,
+      "max": 588,
+      "p95": 214.29999999999995
+    },
+    {
+      "name": "increase quantity to 2 and proceed to checkout",
+      "count": 368,
+      "pass": 746,
+      "fail": 358,
+      "errorPct": 32.43,
+      "avg": 524.8885869565217,
+      "min": 337,
+      "max": 11385,
+      "p95": 473
+    },
+    {
+      "name": "logout",
+      "count": 5,
+      "pass": 15,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 380,
+      "min": 359,
+      "max": 402,
+      "p95": 400
+    },
+    {
+      "name": "search_animal",
+      "count": 368,
+      "pass": 368,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 275.0597826086956,
+      "min": 168,
+      "max": 11280,
+      "p95": 233.94999999999993
+    },
+    {
+      "name": "select product",
+      "count": 368,
+      "pass": 736,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 206.91032608695653,
+      "min": 175,
+      "max": 894,
+      "p95": 257.4999999999998
+    },
+    {
+      "name": "t01_launch",
+      "count": 10,
+      "pass": 10,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 432.2,
+      "min": 202,
+      "max": 582,
+      "p95": 574.8
+    },
+    {
+      "name": "t02_login",
+      "count": 10,
+      "pass": 40,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 569.4,
+      "min": 513,
+      "max": 853,
+      "p95": 723.8499999999997
+    }
+  ],
+  "gate": {
+    "failedRules": [
+      "http_req_failed:rate<0.1"
+    ]
+  }
+}

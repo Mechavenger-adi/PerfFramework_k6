@@ -3,20 +3,20 @@ import execution from "k6/execution";
 import csv from "k6/experimental/csv";
 import fs from "k6/experimental/fs";
 import http from 'k6/http';
-import { createJourneyLifecycleStore, runJourneyLifecycle } from '../../../core-engine/src/utils/lifecycle.js';
-import { logExchange, trackCorrelation, trackDataRow } from '../../../core-engine/src/utils/replayLogger.js';
-import { endTransaction, initTransactions, startTransaction } from '../../../core-engine/src/utils/transaction.js';
+import { createJourneyLifecycleStore, runJourneyLifecycle } from '../../../dist/utils/lifecycle.js';
+import { logExchange, trackCorrelation, trackDataRow } from '../../../dist/utils/replayLogger.js';
+import { endTransaction, initTransactions, startTransaction } from '../../../dist/utils/transaction.js';
 
 initTransactions([
-  "t01_launch",
-  "t02_login",
-  "t03_search_animal",
-  "t04_select_product",
-  "t05_add_to_cart",
-  "t06_increase_quantity_to_2_and_proceed_to_checkout",
-  "t07_click_continue",
-  "t08_click_confirm",
-  "t09_logout"
+  "tx01_launch",
+  "tx02_login",
+  "tx03_search_animal",
+  "tx04_select_product",
+  "tx05_add_to_cart",
+  "tx06_increase_quantity_to_2_and_proceed_to_checkout",
+  "tx07_click_continue",
+  "tx08_click_confirm",
+  "tx09_logout"
 ]);
 
 const FILES = {
@@ -42,12 +42,12 @@ export function initPhase(ctx) {
   trackDataRow("userdetails", userdetails);
   trackDataRow("pet", ctx.data.pet);
 
-  group("t01_launch", function () {
-      startTransaction('t01_launch');
+  group("tx01_launch", function () {
+      startTransaction('tx01_launch');
   
       const request_1 = {
         id: "req_1",
-        transaction: "t01_launch",
+        transaction: "tx01_launch",
         recordingStartedAt: new Date().toISOString(),
         method: "GET",
         url: `https://jpetstore.aspectran.com/`,
@@ -70,7 +70,7 @@ export function initPhase(ctx) {
           cookies: {},
           redirects: 0,
           tags: {
-            transaction: "t01_launch",
+            transaction: "tx01_launch",
             har_entry_id: "req_1",
             recording_started_at: "converted"
           }
@@ -80,15 +80,15 @@ export function initPhase(ctx) {
       logExchange(request_1, res_1);
   
       check(res_1, { "status equals 200": (r) => r.status === 200 });
-      endTransaction('t01_launch');
+      endTransaction('tx01_launch');
     });
 
-  group("t02_login", function () {
-      startTransaction('t02_login');
+  group("tx02_login", function () {
+      startTransaction('tx02_login');
   
       // const request_1 = {
       //   id: "req_2",
-      //   transaction: "t02_login",
+      //   transaction: "tx02_login",
       //   recordingStartedAt: new Date().toISOString(),
       //   method: "GET",
       //   url: `https://jpetstore.aspectran.com/account/signonForm`,
@@ -113,7 +113,7 @@ export function initPhase(ctx) {
       //     cookies: {},
       //     redirects: 0,
       //     tags: {
-      //       transaction: "t02_login",
+      //       transaction: "tx02_login",
       //       har_entry_id: "req_2",
       //       recording_started_at: "converted"
       //     }
@@ -127,7 +127,7 @@ export function initPhase(ctx) {
   
       const request_2 = {
         id: "req_3",
-        transaction: "t02_login",
+        transaction: "tx02_login",
         recordingStartedAt: new Date().toISOString(),
         method: "GET",
         url: `https://jpetstore.aspectran.com/account/signonForm`,
@@ -151,7 +151,7 @@ export function initPhase(ctx) {
           cookies: {},
           redirects: 0,
           tags: {
-            transaction: "t02_login",
+            transaction: "tx02_login",
             har_entry_id: "req_3",
             recording_started_at: "converted"
           }
@@ -165,7 +165,7 @@ export function initPhase(ctx) {
   
       const request_3 = {
         id: "req_4",
-        transaction: "t02_login",
+        transaction: "tx02_login",
         recordingStartedAt: new Date().toISOString(),
         method: "POST",
         url: `https://jpetstore.aspectran.com/account/signon`,
@@ -194,7 +194,7 @@ export function initPhase(ctx) {
           cookies: {},
           redirects: 0,
           tags: {
-            transaction: "t02_login",
+            transaction: "tx02_login",
             har_entry_id: "req_4",
             recording_started_at: "converted"
           }
@@ -208,7 +208,7 @@ export function initPhase(ctx) {
   
       const request_4 = {
         id: "req_5",
-        transaction: "t02_login",
+        transaction: "tx02_login",
         recordingStartedAt: new Date().toISOString(),
         method: "GET",
         url: `https://jpetstore.aspectran.com/`,
@@ -233,7 +233,7 @@ export function initPhase(ctx) {
           cookies: {},
           redirects: 0,
           tags: {
-            transaction: "t02_login",
+            transaction: "tx02_login",
             har_entry_id: "req_5",
             recording_started_at: "converted"
           }
@@ -243,7 +243,7 @@ export function initPhase(ctx) {
       logExchange(request_4, res_4);
   
       check(res_4, { "status equals 200": (r) => r.status === 200 });
-      endTransaction('t02_login');
+      endTransaction('tx02_login');
     });
 
 }
@@ -256,12 +256,12 @@ export function actionPhase(ctx) {
   ctx.data.pet = ctx.data.pet || getUniqueItem(FILES["pet"]);
   const pet = ctx.data.pet;
 
-  group("t03_search_animal", function () {
-      startTransaction('t03_search_animal');
+  group("tx03_search_animal", function () {
+      startTransaction('tx03_search_animal');
   
       const request_1 = {
         id: "req_6",
-        transaction: "t03_search_animal",
+        transaction: "tx03_search_animal",
         recordingStartedAt: new Date().toISOString(),
         method: "GET",
         url: `https://jpetstore.aspectran.com/catalog/searchProducts?keyword=${pet["p_pet"]}`,
@@ -285,7 +285,7 @@ export function actionPhase(ctx) {
           cookies: {},
           redirects: 0,
           tags: {
-            transaction: "t03_search_animal",
+            transaction: "tx03_search_animal",
             har_entry_id: "req_6",
             recording_started_at: "converted"
           }
@@ -301,11 +301,11 @@ export function actionPhase(ctx) {
       if (match) {
         correlation_vars["correlation_0"] = trackCorrelation("correlation_0", match[1], "body");
       }
-      endTransaction('t03_search_animal');
+      endTransaction('tx03_search_animal');
     });
 
-  group("t04_select_product", function () {
-      startTransaction('t04_select_product');
+  group("tx04_select_product", function () {
+      startTransaction('tx04_select_product');
   
       // const request_1 = {
       //   id: "req_7",
@@ -348,7 +348,7 @@ export function actionPhase(ctx) {
   
       const request_2 = {
         id: "req_8",
-        transaction: "t04_select_product",
+        transaction: "tx04_select_product",
         recordingStartedAt: new Date().toISOString(),
         method: "GET",
         url: `https://jpetstore.aspectran.com/products/${correlation_vars["correlation_0"]}`,
@@ -372,7 +372,7 @@ export function actionPhase(ctx) {
           cookies: {},
           redirects: 0,
           tags: {
-            transaction: "t04_select_product",
+            transaction: "tx04_select_product",
             har_entry_id: "req_8",
             recording_started_at: "converted"
           }
@@ -382,11 +382,11 @@ export function actionPhase(ctx) {
       logExchange(request_2, res_2);
   
       check(res_2, { "status equals 200": (r) => r.status === 200 });
-      endTransaction('t04_select_product');
+      endTransaction('tx04_select_product');
     });
 
-  group("t05_add_to_cart", function () {
-      startTransaction('t05_add_to_cart');
+  group("tx05_add_to_cart", function () {
+      startTransaction('tx05_add_to_cart');
   
       // const request_1 = {
       //   id: "req_9",
@@ -429,7 +429,7 @@ export function actionPhase(ctx) {
   
       const request_2 = {
         id: "req_10",
-        transaction: "t05_add_to_cart",
+        transaction: "tx05_add_to_cart",
         recordingStartedAt: new Date().toISOString(),
         method: "GET",
         url: `https://jpetstore.aspectran.com/cart/addItemToCart?itemId=EST-6`,
@@ -453,7 +453,7 @@ export function actionPhase(ctx) {
           cookies: {},
           redirects: 0,
           tags: {
-            transaction: "t05_add_to_cart",
+            transaction: "tx05_add_to_cart",
             har_entry_id: "req_10",
             recording_started_at: "converted"
           }
@@ -467,7 +467,7 @@ export function actionPhase(ctx) {
   
       const request_3 = {
         id: "req_11",
-        transaction: "t05_add_to_cart",
+        transaction: "tx05_add_to_cart",
         recordingStartedAt: new Date().toISOString(),
         method: "GET",
         url: `https://jpetstore.aspectran.com/cart/viewCart`,
@@ -491,7 +491,7 @@ export function actionPhase(ctx) {
           cookies: {},
           redirects: 0,
           tags: {
-            transaction: "t05_add_to_cart",
+            transaction: "tx05_add_to_cart",
             har_entry_id: "req_11",
             recording_started_at: "converted"
           }
@@ -501,15 +501,15 @@ export function actionPhase(ctx) {
       logExchange(request_3, res_3);
   
       check(res_3, { "status equals 200": (r) => r.status === 200 });
-      endTransaction('t05_add_to_cart');
+      endTransaction('tx05_add_to_cart');
     });
 
-  group("t06_increase_quantity_to_2_and_proceed_to_checkout", function () {
-      startTransaction('t06_increase_quantity_to_2_and_proceed_to_checkout');
+  group("tx06_increase_quantity_to_2_and_proceed_to_checkout", function () {
+      startTransaction('tx06_increase_quantity_to_2_and_proceed_to_checkout');
   
       const request_1 = {
         id: "req_12",
-        transaction: "t06_increase_quantity_to_2_and_proceed_to_checkout",
+        transaction: "tx06_increase_quantity_to_2_and_proceed_to_checkout",
         recordingStartedAt: new Date().toISOString(),
         method: "POST",
         url: `https://jpetstore.aspectran.com/cart/updateCartQuantities`,
@@ -536,7 +536,7 @@ export function actionPhase(ctx) {
           cookies: {},
           redirects: 0,
           tags: {
-            transaction: "t06_increase_quantity_to_2_and_proceed_to_checkout",
+            transaction: "tx06_increase_quantity_to_2_and_proceed_to_checkout",
             har_entry_id: "req_12",
             recording_started_at: "converted"
           }
@@ -589,7 +589,7 @@ export function actionPhase(ctx) {
   
       const request_3 = {
         id: "req_14",
-        transaction: "t06_increase_quantity_to_2_and_proceed_to_checkout",
+        transaction: "tx06_increase_quantity_to_2_and_proceed_to_checkout",
         recordingStartedAt: new Date().toISOString(),
         method: "GET",
         url: `https://jpetstore.aspectran.com/order/newOrderForm`,
@@ -613,7 +613,7 @@ export function actionPhase(ctx) {
           cookies: {},
           redirects: 0,
           tags: {
-            transaction: "t06_increase_quantity_to_2_and_proceed_to_checkout",
+            transaction: "tx06_increase_quantity_to_2_and_proceed_to_checkout",
             har_entry_id: "req_14",
             recording_started_at: "converted"
           }
@@ -623,15 +623,15 @@ export function actionPhase(ctx) {
       logExchange(request_3, res_3);
   
       check(res_3, { "status equals 200": (r) => r.status === 200 });
-      endTransaction('t06_increase_quantity_to_2_and_proceed_to_checkout');
+      endTransaction('tx06_increase_quantity_to_2_and_proceed_to_checkout');
     });
 
-  group("t07_click_continue", function () {
-      startTransaction('t07_click_continue');
+  group("tx07_click_continue", function () {
+      startTransaction('tx07_click_continue');
   
       const request_1 = {
         id: "req_15",
-        transaction: "t07_click_continue",
+        transaction: "tx07_click_continue",
         recordingStartedAt: new Date().toISOString(),
         method: "POST",
         url: `https://jpetstore.aspectran.com/order/newOrder`,
@@ -660,7 +660,7 @@ export function actionPhase(ctx) {
           cookies: {},
           redirects: 0,
           tags: {
-            transaction: "t07_click_continue",
+            transaction: "tx07_click_continue",
             har_entry_id: "req_15",
             recording_started_at: "converted"
           }
@@ -670,15 +670,15 @@ export function actionPhase(ctx) {
       logExchange(request_1, res_1);
   
       check(res_1, { "status equals 200": (r) => r.status === 200 });
-      endTransaction('t07_click_continue');
+      endTransaction('tx07_click_continue');
     });
 
-  group("t08_click_confirm", function () {
-      startTransaction('t08_click_confirm');
+  group("tx08_click_confirm", function () {
+      startTransaction('tx08_click_confirm');
   
       const request_1 = {
         id: "req_16",
-        transaction: "t08_click_confirm",
+        transaction: "tx08_click_confirm",
         recordingStartedAt: new Date().toISOString(),
         method: "POST",
         url: `https://jpetstore.aspectran.com/order/submitOrder`,
@@ -705,7 +705,7 @@ export function actionPhase(ctx) {
           cookies: {},
           redirects: 0,
           tags: {
-            transaction: "t08_click_confirm",
+            transaction: "tx08_click_confirm",
             har_entry_id: "req_16",
             recording_started_at: "converted"
           }
@@ -725,7 +725,7 @@ export function actionPhase(ctx) {
   
       const request_2 = {
         id: "req_17",
-        transaction: "t08_click_confirm",
+        transaction: "tx08_click_confirm",
         recordingStartedAt: new Date().toISOString(),
         method: "GET",
         url: `https://jpetstore.aspectran.com/order/viewOrder?orderId=${correlation_vars["correlation_1"]}&submitted=true`,
@@ -750,7 +750,7 @@ export function actionPhase(ctx) {
           cookies: {},
           redirects: 0,
           tags: {
-            transaction: "t08_click_confirm",
+            transaction: "tx08_click_confirm",
             har_entry_id: "req_17",
             recording_started_at: "converted"
           }
@@ -760,7 +760,7 @@ export function actionPhase(ctx) {
       logExchange(request_2, res_2);
   
       check(res_2, { "status equals 200": (r) => r.status === 200 });
-      endTransaction('t08_click_confirm');
+      endTransaction('tx08_click_confirm');
     });
 
 }
@@ -770,8 +770,8 @@ export function endPhase(ctx) {
   let regex;
   const correlation_vars = ctx.correlation;
 
-  group("logout", function () {
-      startTransaction('t09_logout');
+  group("tx09_logout", function () {
+      startTransaction('tx09_logout');
   
       // const request_1 = {
       //   id: "req_18",
@@ -814,7 +814,7 @@ export function endPhase(ctx) {
   
       const request_2 = {
         id: "req_19",
-        transaction: "t09_logout",
+        transaction: "tx09_logout",
         recordingStartedAt: new Date().toISOString(),
         method: "GET",
         url: `https://jpetstore.aspectran.com/account/signoff`,
@@ -838,7 +838,7 @@ export function endPhase(ctx) {
           cookies: {},
           redirects: 0,
           tags: {
-            transaction: "t09_logout",
+            transaction: "tx09_logout",
             har_entry_id: "req_19",
             recording_started_at: "converted"
           }
@@ -852,7 +852,7 @@ export function endPhase(ctx) {
   
       const request_3 = {
         id: "req_20",
-        transaction: "t09_logout",
+        transaction: "tx09_logout",
         recordingStartedAt: new Date().toISOString(),
         method: "GET",
         url: `https://jpetstore.aspectran.com/`,
@@ -876,7 +876,7 @@ export function endPhase(ctx) {
           cookies: {},
           redirects: 0,
           tags: {
-            transaction: "t09_logout",
+            transaction: "tx09_logout",
             har_entry_id: "req_20",
             recording_started_at: "converted"
           }
@@ -886,7 +886,7 @@ export function endPhase(ctx) {
       logExchange(request_3, res_3);
   
       check(res_3, { "status equals 200": (r) => r.status === 200 });
-      endTransaction('t09_logout');
+      endTransaction('tx09_logout');
     });
 
 }

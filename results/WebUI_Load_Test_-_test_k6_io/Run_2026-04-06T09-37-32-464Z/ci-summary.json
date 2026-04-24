@@ -1,0 +1,78 @@
+{
+  "status": "failed",
+  "runId": "Run_2026-04-06T09-37-32-464Z",
+  "plan": "WebUI Load Test - test.k6.io",
+  "environment": "dev",
+  "thresholdFailures": 0,
+  "errorCount": 4,
+  "warningCount": 0,
+  "aborted": false,
+  "transactions": [
+    {
+      "name": "add to cart",
+      "count": 1290,
+      "pass": 1290,
+      "fail": 0,
+      "errorPct": 0
+    },
+    {
+      "name": "click confirm",
+      "count": 860,
+      "pass": 440,
+      "fail": 420,
+      "errorPct": 48.84
+    },
+    {
+      "name": "click continue",
+      "count": 430,
+      "pass": 10,
+      "fail": 420,
+      "errorPct": 97.67
+    },
+    {
+      "name": "increase quantity to 2 and proceed to checkout",
+      "count": 1290,
+      "pass": 870,
+      "fail": 420,
+      "errorPct": 32.56
+    },
+    {
+      "name": "logout",
+      "count": 15,
+      "pass": 15,
+      "fail": 0,
+      "errorPct": 0
+    },
+    {
+      "name": "search_animal",
+      "count": 430,
+      "pass": 430,
+      "fail": 0,
+      "errorPct": 0
+    },
+    {
+      "name": "select product",
+      "count": 860,
+      "pass": 860,
+      "fail": 0,
+      "errorPct": 0
+    },
+    {
+      "name": "t01_launch",
+      "count": 10,
+      "pass": 10,
+      "fail": 0,
+      "errorPct": 0
+    },
+    {
+      "name": "t02_login",
+      "count": 40,
+      "pass": 40,
+      "fail": 0,
+      "errorPct": 0
+    }
+  ],
+  "gate": {
+    "failedRules": []
+  }
+}

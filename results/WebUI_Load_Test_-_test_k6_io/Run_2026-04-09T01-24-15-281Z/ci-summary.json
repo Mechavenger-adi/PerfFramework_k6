@@ -1,0 +1,105 @@
+{
+  "status": "passed",
+  "runId": "Run_2026-04-09T01-24-15-281Z",
+  "plan": "WebUI Load Test - test.k6.io",
+  "environment": "dev",
+  "thresholdFailures": 0,
+  "errorCount": 1,
+  "warningCount": 0,
+  "aborted": false,
+  "transactions": [
+    {
+      "name": "add to cart",
+      "count": 98,
+      "pass": 98,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 415.7857142857143,
+      "min": 383,
+      "max": 783
+    },
+    {
+      "name": "click confirm",
+      "count": 98,
+      "pass": 93,
+      "fail": 5,
+      "errorPct": 5.1,
+      "avg": 448.51020408163265,
+      "min": 424,
+      "max": 533
+    },
+    {
+      "name": "click continue",
+      "count": 98,
+      "pass": 98,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 212.73469387755102,
+      "min": 193,
+      "max": 575
+    },
+    {
+      "name": "increase quantity to 2 and proceed to checkout",
+      "count": 98,
+      "pass": 98,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 411.2040816326531,
+      "min": 386,
+      "max": 793
+    },
+    {
+      "name": "logout",
+      "count": 6,
+      "pass": 6,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 396,
+      "min": 388,
+      "max": 399
+    },
+    {
+      "name": "search_animal",
+      "count": 98,
+      "pass": 98,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 204.29591836734693,
+      "min": 193,
+      "max": 555
+    },
+    {
+      "name": "select product",
+      "count": 98,
+      "pass": 98,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 216.30612244897958,
+      "min": 192,
+      "max": 578
+    },
+    {
+      "name": "t01_launch",
+      "count": 10,
+      "pass": 10,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 411.5,
+      "min": 223,
+      "max": 638
+    },
+    {
+      "name": "t02_login",
+      "count": 10,
+      "pass": 10,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 599.2,
+      "min": 578,
+      "max": 611
+    }
+  ],
+  "gate": {
+    "failedRules": []
+  }
+}

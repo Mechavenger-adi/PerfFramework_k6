@@ -1,37 +1,48 @@
 {
-  "name": "WebUI Load Test - test.k6.io",
+  "name": "Sample Load Test",
   "environment": "dev",
   "execution_mode": "parallel",
   "global_load_profile": {
     "executor": "ramping-vus",
     "startVUs": 0,
     "stages": [
-      { "duration": "5s", "target": 3 },
-      { "duration": "15s",  "target": 3 },
-      { "duration": "5s", "target": 0  }
+      {
+        "duration": "10s",
+        "target": 5
+      },
+      {
+        "duration": "30s",
+        "target": 5
+      },
+      {
+        "duration": "10s",
+        "target": 0
+      }
     ]
   },
   "noCookiesReset": true,
+  "debug": {
+    "enabled": false,
+    "mode": "diff",
+    "vus": 1,
+    "iterations": 2,
+    "reportDir": "results/debug",
+    "failOnMissingRecordingLog": false
+  },
   "user_journeys": [
     {
-      "name": "buyanimal_1_framework_lifecycle",
-      "scriptPath": "buyanimal_1_framework_lifecycle.js",
-      "weight": 100
+      "name": "browse_crocodiles",
+      "scriptPath": "browse-journey.js",
+      "weight": 50
+    },
+    {
+      "name": "checkout_crocodiles",
+      "scriptPath": "checkout-journey.js",
+      "weight": 50
     }
   ],
   "global_sla": {
-    "p99": 2000,
-    "errorRate": 10
-  },
-  "journey_slas": {
-    "buyanimal_1_framework_lifecycle": {
-      "p95": 1500,
-      "errorRate": 5
-    }
-  },
-  "transaction_slas": {
-    "t01_launch": { "p95": 800 },
-    "t02_login": { "p95": 1000 },
-    "t08_click_confirm": { "p95": 1500, "p99": 3000 }
+    "p95": 3000,
+    "errorRate": 40
   }
 }

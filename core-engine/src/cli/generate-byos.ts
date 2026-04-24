@@ -22,9 +22,9 @@ export function runGenerateByos(teamName: string, scriptName: string): void {
 
   const template = `import http from 'k6/http';
 import { check, sleep, group } from 'k6';
-import { initTransactions, startTransaction, endTransaction } from '../../../core-engine/src/utils/transaction.js';
-import { createJourneyLifecycleStore, runJourneyLifecycle } from '../../../core-engine/src/utils/lifecycle.js';
-import { logExchange } from '../../../core-engine/src/utils/replayLogger.js';
+import { initTransactions, startTransaction, endTransaction } from '../../../dist/utils/transaction.js';
+import { createJourneyLifecycleStore, runJourneyLifecycle } from '../../../dist/utils/lifecycle.js';
+import { logExchange } from '../../../dist/utils/replayLogger.js';
 
 initTransactions(['BYOS_Custom_Logic']);
 const lifecycleStore = createJourneyLifecycleStore();

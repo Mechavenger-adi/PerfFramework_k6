@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>K6 PerfFramework – Architecture Graph</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+    :root {
+      --bg: #0a0e1a;
+      --surface: #111827;
+      --surface2: #1a2233;
+      --border: #1e293b;
+      --text: #e2e8f0;
+      --muted: #64748b;
+      --accent: #6366f1;
+
+      /* Layer colours */
+      --col-cli:         #f59e0b;
+      --col-config:      #22d3ee;
+      --col-scenario:    #a78bfa;
+      --col-execution:   #f97316;
+      --col-runtime:     #34d399;
+      --col-data:        #fb7185;
+      --col-recording:   #60a5fa;
+      --col-assertions:  #facc15;
+      --col-correlation: #e879f9;
+      --col-debug:       #f87171;
+      --col-reporters:   #94a3b8;
+      --col-reporting:   #4ade80;
+      --col-types:       #e2e8f0;
+      --col-utils:       #fbbf24;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ── */
+    header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 12px 24px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      z-index: 10;
+    }
+    .logo {
+      width: 34px; height: 34px;
+      background: linear-gradient(135deg, var(--accent), #818cf8);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+    }
+    header h1 { font-size: 15px; font-weight: 600; letter-spacing: .02em; }
+    header span { font-size: 12px; color: var(--muted); }
+    .header-right { margin-left: auto; display: flex; gap: 8px; }
+    .pill-btn {
+      background: var(--surface2); border: 1px solid var(--border);
+      color: var(--text); border-radius: 6px; padding: 5px 12px;
+      font-size: 12px; font-family: inherit; cursor: pointer;
+      transition: background .2s, border-color .2s;
+    }
+    .pill-btn:hover { background: #1e2d45; border-color: var(--accent); }
+    .pill-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+    /* ── Main split ── */
+    .main { display: flex; flex: 1; overflow: hidden; }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      width: 240px; flex-shrink: 0;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      overflow-y: auto;
+      padding: 12px 0;
+    }
+    .sidebar-section { padding: 0 14px; margin-bottom: 6px; }
+    .sidebar-label {
+      font-size: 10px; font-weight: 600; letter-spacing: .1em;
+      text-transform: uppercase; color: var(--muted);
+      padding: 8px 14px 4px;
+    }
+    .layer-item {
+      display: flex; align-items: center; gap: 9px;
+      padding: 6px 14px; border-radius: 6px; margin: 1px 6px;
+      cursor: pointer; font-size: 12px; font-weight: 500;
+      transition: background .15s;
+      user-select: none;
+    }
+    .layer-item:hover { background: var(--surface2); }
+    .layer-item.active { background: var(--surface2); }
+    .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .layer-count {
+      margin-left: auto; font-size: 10px; color: var(--muted);
+      background: var(--border); padding: 1px 6px; border-radius: 10px;
+    }
+
+    /* ── Canvas ── */
+    .canvas-wrap {
+      flex: 1; overflow: hidden; position: relative;
+    }
+    #graph-canvas { width: 100%; height: 100%; }
+
+    /* ── Tooltip ── */
+    #tooltip {
+      position: fixed; pointer-events: none; z-index: 100;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; padding: 12px 14px;
+      font-size: 12px; max-width: 260px;
+      box-shadow: 0 8px 32px rgba(0,0,0,.6);
+      opacity: 0; transition: opacity .15s;
+    }
+    #tooltip.show { opacity: 1; }
+    #tooltip .tip-title {
+      font-size: 13px; font-weight: 600; margin-bottom: 4px;
+    }
+    #tooltip .tip-layer {
+      font-size: 10px; font-weight: 600; letter-spacing: .08em;
+      text-transform: uppercase; margin-bottom: 8px;
+    }
+    #tooltip .tip-file { color: var(--muted); font-family: 'JetBrains Mono', monospace; font-size: 10.5px; line-height: 1.6; }
+    #tooltip .tip-size { margin-top: 6px; font-size: 10px; color: var(--muted); }
+
+    /* ── Info panel ── */
+    #info-panel {
+      position: absolute; right: 16px; bottom: 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 16px;
+      font-size: 11px; color: var(--muted);
+      pointer-events: none;
+    }
+    #info-panel b { color: var(--text); }
+
+    /* ── Search ── */
+    .search-wrap { padding: 8px 14px 4px; }
+    .search-input {
+      width: 100%; background: var(--surface2);
+      border: 1px solid var(--border); border-radius: 6px;
+      color: var(--text); font-size: 12px; font-family: inherit;
+      padding: 6px 10px; outline: none;
+      transition: border-color .2s;
+    }
+    .search-input:focus { border-color: var(--accent); }
+    .search-input::placeholder { color: var(--muted); }
+
+    /* ── Minimap ── */
+    #minimap {
+      position: absolute; left: 16px; bottom: 16px;
+      width: 160px; height: 100px;
+      background: rgba(17,24,39,.85);
+      border: 1px solid var(--border); border-radius: 8px;
+      overflow: hidden;
+    }
+    #minimap canvas { width: 100%; height: 100%; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">⚡</div>
+  <div>
+    <h1>K6 PerfFramework</h1>
+    <span>Architecture Graph · core-engine/src</span>
+  </div>
+  <div class="header-right">
+    <button class="pill-btn active" id="btn-radial">Radial</button>
+    <button class="pill-btn" id="btn-force">Force</button>
+    <button class="pill-btn" id="btn-layer">Layers</button>
+    <button class="pill-btn" id="btn-reset">Reset View</button>
+  </div>
+</header>
+
+<div class="main">
+  <aside class="sidebar">
+    <div class="search-wrap">
+      <input class="search-input" id="search" placeholder="Search modules…" />
+    </div>
+    <div class="sidebar-label">Layers</div>
+    <!-- populated by JS -->
+    <div id="layer-list"></div>
+  </aside>
+
+  <div class="canvas-wrap">
+    <canvas id="graph-canvas"></canvas>
+    <div id="minimap"><canvas id="mm-canvas"></canvas></div>
+    <div id="info-panel">
+      <b id="info-nodes">0</b> modules &nbsp;·&nbsp;
+      <b id="info-edges">0</b> edges &nbsp;·&nbsp;
+      scroll to zoom · drag to pan · click to focus
+    </div>
+  </div>
+</div>
+
+<div id="tooltip"></div>
+
+<script>
+// ─────────────────────────────────────────────
+//  DATA
+// ─────────────────────────────────────────────
+const LAYERS = [
+  {
+    id: 'cli',        label: 'CLI',         color: '#f59e0b',
+    files: [
+      { name: 'run.ts',            size: 31500, desc: 'Main CLI entry – init / run / generate / convert / validate commands' },
+      { name: 'init.ts',           size: 11170, desc: 'Project initialisation wizard' },
+      { name: 'generate.ts',       size:  5298, desc: 'K6 script generation command' },
+      { name: 'generate-byos.ts',  size:  2357, desc: 'Bring-Your-Own-Script generation' },
+      { name: 'convert.ts',        size:  2325, desc: 'HAR → K6 conversion command' },
+      { name: 'validate.ts',       size:  1896, desc: 'Test-plan schema validation command' },
+      { name: 'LifecyclePrompt.ts',size:  2349, desc: 'Interactive VU lifecycle prompts' },
+    ]
+  },
+  {
+    id: 'config',     label: 'Config',      color: '#22d3ee',
+    files: [
+      { name: 'ConfigurationManager.ts',  size: 5098, desc: 'Merges env, plan, and runtime config sources' },
+      { name: 'EnvResolver.ts',           size: 2199, desc: 'Resolves .env and environment variables' },
+      { name: 'GatekeeperValidator.ts',   size: 8819, desc: 'Pre-run gatekeeper validation rules' },
+      { name: 'RuntimeConfigManager.ts',  size: 5510, desc: 'Live runtime configuration updates' },
+      { name: 'SchemaValidator.ts',       size: 6256, desc: 'JSON Schema validation via AJV' },
+    ]
+  },
+  {
+    id: 'types',      label: 'Types',       color: '#e2e8f0',
+    files: [
+      { name: 'ConfigContracts.ts',   size: 4573, desc: 'Core configuration interfaces & type definitions' },
+      { name: 'EventContracts.ts',    size: 2043, desc: 'Event payload contracts for runtime messaging' },
+      { name: 'ReportingContracts.ts',size: 2165, desc: 'Report output structure contracts' },
+      { name: 'TestPlanSchema.ts',    size: 5427, desc: 'Full test-plan JSON schema definition' },
+      { name: 'HARContracts.ts',      size:  761, desc: 'HAR file format type contracts' },
+    ]
+  },
+  {
+    id: 'scenario',   label: 'Scenario',    color: '#a78bfa',
+    files: [
+      { name: 'ScenarioBuilder.ts',   size: 12288, desc: 'Builds K6 scenario definitions from test plans' },
+      { name: 'WorkloadModels.ts',    size:  3353, desc: 'Load / stress / soak / spike / iteration profiles' },
+      { name: 'ExecutorFactory.ts',   size:  2733, desc: 'Creates K6 executor configs per profile type' },
+      { name: 'TestPlanLoader.ts',    size:  1351, desc: 'Loads and parses test-plan JSON files' },
+    ]
+  },
+  {
+    id: 'execution',  label: 'Execution',   color: '#f97316',
+    files: [
+      { name: 'PipelineRunner.ts',          size: 7703, desc: 'Orchestrates full test-run lifecycle pipeline' },
+      { name: 'ParallelExecutionManager.ts',size: 4686, desc: 'Manages parallel K6 worker processes' },
+      { name: 'JourneyAllocator.ts',        size: 3790, desc: 'Distributes VU journeys across workers' },
+      { name: 'HostMonitor.ts',             size: 3725, desc: 'System resource monitoring during test runs' },
+    ]
+  },
+  {
+    id: 'runtime',    label: 'Runtime',     color: '#34d399',
+    files: [
+      { name: 'LifecycleRuntime.ts',  size: 1916, desc: 'Init / action / end VU lifecycle state machine' },
+      { name: 'TimeseriesRuntime.ts', size: 3091, desc: 'Bucket-based timeseries metric collection' },
+      { name: 'ErrorRuntime.ts',      size: 1853, desc: 'Error capture and request/response snapshots' },
+      { name: 'SnapshotRuntime.ts',   size: 1376, desc: 'Request snapshot collection for failed assertions' },
+      { name: 'MetricsRuntime.ts',    size:  778, desc: 'Transaction metric aggregation runtime' },
+    ]
+  },
+  {
+    id: 'data',       label: 'Data',        color: '#fb7185',
+    files: [
+      { name: 'DataFactory.ts',       size: 4166, desc: 'Creates data providers (CSV, JSON, inline)' },
+      { name: 'DataPoolManager.ts',   size: 4437, desc: 'Manages pooled data sets across VUs' },
+      { name: 'DataValidator.ts',     size: 4918, desc: 'Validates data files against schema expectations' },
+      { name: 'DynamicValueFactory.ts',size:3189, desc: 'Generates dynamic values (UUID, timestamp, etc.)' },
+    ]
+  },
+  {
+    id: 'recording',  label: 'Recording',   color: '#60a5fa',
+    files: [
+      { name: 'ScriptConverter.ts',    size: 39221, desc: 'Converts parsed HAR entries to K6 script code' },
+      { name: 'ScriptGenerator.ts',    size:  8334, desc: 'Generates full K6 test scripts from recordings' },
+      { name: 'HARParser.ts',          size:  3321, desc: 'Parses browser HAR files into request models' },
+      { name: 'DomainFilter.ts',       size:  1446, desc: 'Filters HAR entries by domain allowlist' },
+      { name: 'TransactionGrouper.ts', size:  1013, desc: 'Groups HAR requests into named transactions' },
+    ]
+  },
+  {
+    id: 'assertions', label: 'Assertions',  color: '#facc15',
+    files: [
+      { name: 'ThresholdManager.ts',        size: 3436, desc: 'Builds and manages K6 threshold definitions' },
+      { name: 'SLARegistry.ts',             size:  754, desc: 'Registers SLA targets per transaction' },
+      { name: 'JourneyAssertionResolver.ts',size: 1435, desc: 'Resolves per-journey assertion configurations' },
+    ]
+  },
+  {
+    id: 'correlation',label: 'Correlation', color: '#e879f9',
+    files: [
+      { name: 'CorrelationEngine.ts', size: 1738, desc: 'Orchestrates dynamic value extraction & injection' },
+      { name: 'ExtractorRegistry.ts', size: 1823, desc: 'Registry of regex / JSONPath / header extractors' },
+      { name: 'RuleProcessor.ts',     size:  864, desc: 'Applies correlation rules to captured responses' },
+      { name: 'FallbackHandler.ts',   size:  832, desc: 'Handles fallback when correlation extraction fails' },
+    ]
+  },
+  {
+    id: 'debug',      label: 'Debug',       color: '#f87171',
+    files: [
+      { name: 'HTMLDiffReporter.ts',   size: 87306, desc: 'Generates rich HTML diff reports with Chart.js' },
+      { name: 'DiffChecker.ts',        size: 20710, desc: 'Compares recorded vs replayed request/response pairs' },
+      { name: 'ReplayRunner.ts',       size: 16137, desc: 'Replays recorded HTTP sessions for validation' },
+      { name: 'ExchangeLog.ts',        size:  5873, desc: 'Structured HTTP exchange log builder' },
+      { name: 'RecordingLogResolver.ts',size: 5613, desc: 'Resolves and loads recording log files' },
+    ]
+  },
+  {
+    id: 'reporters',  label: 'Reporters',   color: '#94a3b8',
+    files: [
+      { name: 'GrafanaReporter.ts',  size: 538, desc: 'Pushes metrics to Grafana Cloud / InfluxDB' },
+      { name: 'AzureReporter.ts',    size: 532, desc: 'Pushes metrics to Azure Monitor' },
+      { name: 'CustomUploader.ts',   size: 565, desc: 'Custom webhook result uploader' },
+      { name: 'ResultTransformer.ts',size: 658, desc: 'Transforms K6 results for external reporters' },
+    ]
+  },
+  {
+    id: 'reporting',  label: 'Reporting',   color: '#4ade80',
+    files: [
+      { name: 'RunReportGenerator.ts',      size: 20624, desc: 'Generates full HTML run comparison reports' },
+      { name: 'TransactionMetricsBuilder.ts',size:10804, desc: 'Aggregates per-transaction metrics for reports' },
+      { name: 'EventArtifactBuilder.ts',    size:  5482, desc: 'Builds event timeline artifacts' },
+      { name: 'RunSummaryBuilder.ts',       size:  3060, desc: 'Compiles run-level summary statistics' },
+      { name: 'TimeseriesArtifactBuilder.ts',size: 3369, desc: 'Builds timeseries data artifacts for charting' },
+      { name: 'ArtifactWriter.ts',          size:   643, desc: 'Writes generated artifacts to disk' },
+    ]
+  },
+  {
+    id: 'utils',      label: 'Utils',       color: '#fbbf24',
+    files: [
+      { name: 'PathResolver.ts', size: 1756, desc: 'Resolves framework and project file paths' },
+      { name: 'ProgressBar.ts',  size: 2876, desc: 'CLI progress bar display' },
+      { name: 'lifecycle.ts',    size: 10071, desc: 'K6-side VU lifecycle helper (runs inside K6)' },
+      { name: 'logger.ts',       size: 3896, desc: 'Structured console logger with log levels' },
+      { name: 'replayLogger.ts', size: 13854, desc: 'Logs HTTP exchanges for diff debugging' },
+      { name: 'session.ts',      size: 1617, desc: 'Session state helpers for K6 scripts' },
+      { name: 'transaction.ts',  size: 1465, desc: 'Transaction start/end helpers' },
+    ]
+  },
+];
+
+// Directed dependency edges: [from_layer, to_layer]
+const EDGES_RAW = [
+  ['cli',        'config'],
+  ['cli',        'scenario'],
+  ['cli',        'execution'],
+  ['cli',        'recording'],
+  ['cli',        'debug'],
+  ['cli',        'reporting'],
+  ['cli',        'utils'],
+  ['config',     'types'],
+  ['config',     'utils'],
+  ['scenario',   'types'],
+  ['scenario',   'config'],
+  ['scenario',   'utils'],
+  ['execution',  'scenario'],
+  ['execution',  'config'],
+  ['execution',  'runtime'],
+  ['execution',  'assertions'],
+  ['execution',  'reporting'],
+  ['execution',  'reporters'],
+  ['execution',  'utils'],
+  ['runtime',    'types'],
+  ['runtime',    'utils'],
+  ['data',       'types'],
+  ['data',       'utils'],
+  ['recording',  'types'],
+  ['recording',  'correlation'],
+  ['recording',  'utils'],
+  ['assertions', 'types'],
+  ['assertions', 'config'],
+  ['correlation','types'],
+  ['debug',      'recording'],
+  ['debug',      'runtime'],
+  ['debug',      'utils'],
+  ['debug',      'types'],
+  ['reporters',  'types'],
+  ['reporting',  'types'],
+  ['reporting',  'runtime'],
+  ['reporting',  'assertions'],
+  ['reporting',  'utils'],
+  ['utils',      'types'],
+];
+
+// ─────────────────────────────────────────────
+//  BUILD GRAPH NODES
+// ─────────────────────────────────────────────
+const nodes = LAYERS.map((l, i) => ({
+  id: l.id, label: l.label, color: l.color,
+  files: l.files,
+  totalSize: l.files.reduce((s, f) => s + f.size, 0),
+  x: 0, y: 0, vx: 0, vy: 0,
+  r: 0, // computed
+  layer: i,
+  visible: true,
+}));
+
+const nodeMap = Object.fromEntries(nodes.map(n => [n.id, n]));
+const edges = EDGES_RAW.map(([s, t]) => ({ source: nodeMap[s], target: nodeMap[t] }));
+
+// Node radius proportional to total file size
+const minSize = Math.min(...nodes.map(n => n.totalSize));
+const maxSize = Math.max(...nodes.map(n => n.totalSize));
+nodes.forEach(n => {
+  const t = (n.totalSize - minSize) / (maxSize - minSize);
+  n.r = 26 + t * 34;
+});
+
+// ─────────────────────────────────────────────
+//  CANVAS SETUP
+// ─────────────────────────────────────────────
+const canvas = document.getElementById('graph-canvas');
+const ctx = canvas.getContext('2d');
+const mmCanvas = document.getElementById('mm-canvas');
+const mmCtx = mmCanvas.getContext('2d');
+
+let W, H;
+let transform = { x: 0, y: 0, scale: 1 };
+let animMode = 'radial'; // radial | force | layer
+let hoveredNode = null;
+let selectedNode = null;
+let dragging = null;
+let dragStart = null;
+let panStart = null;
+let searchQuery = '';
+let animFrame = null;
+let tick = 0;
+
+function resize() {
+  const wrap = canvas.parentElement;
+  W = wrap.clientWidth; H = wrap.clientHeight;
+  canvas.width = W * devicePixelRatio; canvas.height = H * devicePixelRatio;
+  canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+  ctx.scale(devicePixelRatio, devicePixelRatio);
+  mmCanvas.width = 320; mmCanvas.height = 200;
+}
+resize();
+window.addEventListener('resize', () => { resize(); layoutNodes(); });
+
+// ─────────────────────────────────────────────
+//  LAYOUT ALGORITHMS
+// ─────────────────────────────────────────────
+function layoutRadial() {
+  const cx = W/2, cy = H/2;
+  const R = Math.min(W, H) * 0.36;
+  nodes.forEach((n, i) => {
+    const angle = (i / nodes.length) * Math.PI * 2 - Math.PI/2;
+    n.x = cx + Math.cos(angle) * R;
+    n.y = cy + Math.sin(angle) * R;
+    n.vx = n.vy = 0;
+  });
+}
+
+function layoutLayer() {
+  // Group by layer index for a tiered layout
+  const groups = [
+    ['types'],
+    ['utils'],
+    ['config'],
+    ['data', 'recording'],
+    ['scenario', 'correlation'],
+    ['assertions', 'runtime'],
+    ['execution'],
+    ['reporters', 'reporting', 'debug'],
+    ['cli'],
+  ];
+  const rows = groups.length;
+  const rowH = H / (rows + 1);
+  groups.forEach((group, row) => {
+    const colW = W / (group.length + 1);
+    group.forEach((id, col) => {
+      const n = nodeMap[id];
+      if (n) { n.x = colW * (col + 1); n.y = rowH * (row + 1); n.vx = n.vy = 0; }
+    });
+  });
+}
+
+let forceRunning = false;
+function initForce() {
+  const cx = W/2, cy = H/2;
+  nodes.forEach(n => {
+    if (Math.abs(n.x - cx) < 5 && Math.abs(n.y - cy) < 5) {
+      n.x = cx + (Math.random() - 0.5) * W * 0.7;
+      n.y = cy + (Math.random() - 0.5) * H * 0.7;
+    }
+    n.vx = n.vy = 0;
+  });
+  forceRunning = true;
+}
+
+function stepForce() {
+  if (!forceRunning) return;
+  const alpha = 0.04;
+  // Repulsion
+  for (let i = 0; i < nodes.length; i++) {
+    for (let j = i + 1; j < nodes.length; j++) {
+      const a = nodes[i], b = nodes[j];
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const d = Math.sqrt(dx*dx + dy*dy) || 1;
+      const f = 8000 / (d * d);
+      const nx = dx/d * f, ny = dy/d * f;
+      a.vx -= nx; a.vy -= ny;
+      b.vx += nx; b.vy += ny;
+    }
+  }
+  // Attraction along edges
+  edges.forEach(e => {
+    const dx = e.target.x - e.source.x, dy = e.target.y - e.source.y;
+    const d = Math.sqrt(dx*dx + dy*dy) || 1;
+    const target = 200;
+    const f = (d - target) * 0.04;
+    const nx = dx/d*f, ny = dy/d*f;
+    e.source.vx += nx; e.source.vy += ny;
+    e.target.vx -= nx; e.target.vy -= ny;
+  });
+  // Center gravity
+  const cx = W/2, cy = H/2;
+  nodes.forEach(n => {
+    n.vx += (cx - n.x) * 0.002;
+    n.vy += (cy - n.y) * 0.002;
+    // Damping
+    n.vx *= 0.82; n.vy *= 0.82;
+    n.x += n.vx * alpha * 60;
+    n.y += n.vy * alpha * 60;
+  });
+}
+
+function layoutNodes() {
+  if (animMode === 'radial') layoutRadial();
+  else if (animMode === 'layer') layoutLayer();
+  else if (animMode === 'force') initForce();
+  resetView();
+}
+
+function resetView() {
+  transform = { x: 0, y: 0, scale: 1 };
+}
+
+// ─────────────────────────────────────────────
+//  DRAW
+// ─────────────────────────────────────────────
+function toScreen(wx, wy) {
+  return {
+    x: wx * transform.scale + transform.x,
+    y: wy * transform.scale + transform.y,
+  };
+}
+function toWorld(sx, sy) {
+  return {
+    x: (sx - transform.x) / transform.scale,
+    y: (sy - transform.y) / transform.scale,
+  };
+}
+
+function hexToRgb(hex) {
+  const r = parseInt(hex.slice(1,3),16);
+  const g = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  return `${r},${g},${b}`;
+}
+
+function drawArrow(x1,y1,x2,y2,r1,r2,color,alpha) {
+  const dx = x2-x1, dy = y2-y1;
+  const d = Math.sqrt(dx*dx+dy*dy);
+  if (d < r1+r2+4) return;
+  const ux = dx/d, uy = dy/d;
+  const sx = x1 + ux*r1, sy = y1 + uy*r1;
+  const ex = x2 - ux*(r2+10), ey = y2 - uy*(r2+10);
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(sx, sy);
+  ctx.lineTo(ex, ey);
+  ctx.stroke();
+  // Arrowhead
+  const angle = Math.atan2(ey-sy,ex-sx);
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(ex, ey);
+  ctx.lineTo(ex - 9*Math.cos(angle-0.4), ey - 9*Math.sin(angle-0.4));
+  ctx.lineTo(ex - 9*Math.cos(angle+0.4), ey - 9*Math.sin(angle+0.4));
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawNode(n, pulse) {
+  const s = toScreen(n.x, n.y);
+  const r = n.r * transform.scale;
+  if (!n.visible) return;
+
+  const isHovered = n === hoveredNode;
+  const isSelected = n === selectedNode;
+  const isHighlighted = selectedNode
+    ? (n === selectedNode || edges.some(e =>
+        (e.source === selectedNode && e.target === n) ||
+        (e.target === selectedNode && e.source === n)))
+    : true;
+
+  const dimmed = !isHighlighted;
+
+  ctx.save();
+  ctx.globalAlpha = dimmed ? 0.18 : 1;
+
+  // Glow on hover/select
+  if ((isHovered || isSelected) && !dimmed) {
+    const grd = ctx.createRadialGradient(s.x, s.y, r*0.5, s.x, s.y, r*2);
+    grd.addColorStop(0, `rgba(${hexToRgb(n.color)},0.25)`);
+    grd.addColorStop(1, `rgba(${hexToRgb(n.color)},0)`);
+    ctx.fillStyle = grd;
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, r*2, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  // Pulse ring
+  if (isSelected && !dimmed) {
+    const pr = r + 6 + Math.sin(pulse) * 4;
+    ctx.strokeStyle = n.color;
+    ctx.lineWidth = 1.5;
+    ctx.globalAlpha = 0.4 + Math.sin(pulse)*0.2;
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, pr, 0, Math.PI*2);
+    ctx.stroke();
+    ctx.globalAlpha = dimmed ? 0.18 : 1;
+  }
+
+  // Node circle
+  const grd = ctx.createRadialGradient(s.x - r*0.3, s.y - r*0.3, 0, s.x, s.y, r);
+  grd.addColorStop(0, `rgba(${hexToRgb(n.color)},0.55)`);
+  grd.addColorStop(1, `rgba(${hexToRgb(n.color)},0.15)`);
+  ctx.fillStyle = grd;
+  ctx.beginPath();
+  ctx.arc(s.x, s.y, r, 0, Math.PI*2);
+  ctx.fill();
+
+  // Border
+  ctx.strokeStyle = isHovered || isSelected
+    ? n.color
+    : `rgba(${hexToRgb(n.color)},0.45)`;
+  ctx.lineWidth = isHovered || isSelected ? 2.5 : 1.5;
+  ctx.stroke();
+
+  // Label
+  const fs = Math.max(9, Math.min(13, 11 * transform.scale));
+  ctx.font = `600 ${fs}px Inter, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#fff';
+  ctx.fillText(n.label, s.x, s.y - fs*0.25);
+
+  // File count
+  const fs2 = Math.max(7, Math.min(10, 9 * transform.scale));
+  ctx.font = `400 ${fs2}px Inter, sans-serif`;
+  ctx.fillStyle = `rgba(${hexToRgb(n.color)},0.9)`;
+  ctx.fillText(n.files.length + ' files', s.x, s.y + fs*0.65);
+
+  ctx.restore();
+}
+
+function draw() {
+  tick++;
+  const pulse = tick * 0.05;
+  ctx.clearRect(0, 0, W, H);
+
+  // Background grid
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255,255,255,0.025)';
+  ctx.lineWidth = 1;
+  const gridSize = 60 * transform.scale;
+  const ox = transform.x % gridSize;
+  const oy = transform.y % gridSize;
+  for (let x = ox; x < W; x += gridSize) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+  for (let y = oy; y < H; y += gridSize) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+  ctx.restore();
+
+  // Draw edges
+  edges.forEach(e => {
+    if (!e.source.visible || !e.target.visible) return;
+    const ss = toScreen(e.source.x, e.source.y);
+    const ts = toScreen(e.target.x, e.target.y);
+    const isActive = selectedNode && (e.source === selectedNode || e.target === selectedNode);
+    const dimmed = selectedNode && !isActive;
+    drawArrow(
+      ss.x, ss.y, ts.x, ts.y,
+      e.source.r * transform.scale,
+      e.target.r * transform.scale,
+      isActive ? e.source.color : `rgba(${hexToRgb(e.source.color)},0.6)`,
+      dimmed ? 0.05 : (isActive ? 0.85 : 0.3)
+    );
+  });
+
+  // Draw nodes
+  nodes.forEach(n => drawNode(n, pulse));
+
+  drawMinimap();
+  animFrame = requestAnimationFrame(draw);
+}
+
+// ─────────────────────────────────────────────
+//  MINIMAP
+// ─────────────────────────────────────────────
+function drawMinimap() {
+  const mw = 160, mh = 100;
+  mmCtx.clearRect(0, 0, mw, mh);
+  // World bounds
+  const xs = nodes.map(n => n.x), ys = nodes.map(n => n.y);
+  const wx1 = Math.min(...xs) - 60, wx2 = Math.max(...xs) + 60;
+  const wy1 = Math.min(...ys) - 60, wy2 = Math.max(...ys) + 60;
+  const wRange = wx2-wx1 || 1, hRange = wy2-wy1 || 1;
+
+  const toMm = (wx, wy) => ({
+    x: (wx-wx1)/wRange * mw,
+    y: (wy-wy1)/hRange * mh,
+  });
+
+  nodes.forEach(n => {
+    if (!n.visible) return;
+    const m = toMm(n.x, n.y);
+    mmCtx.beginPath();
+    mmCtx.arc(m.x, m.y, 4, 0, Math.PI*2);
+    mmCtx.fillStyle = n.color;
+    mmCtx.fill();
+  });
+
+  // Viewport rect
+  const vx1 = toMm(...Object.values(toWorld(0,0))).x;
+  const vy1 = toMm(...Object.values(toWorld(0,0))).y;
+  const vx2 = toMm(...Object.values(toWorld(W,H))).x;
+  const vy2 = toMm(...Object.values(toWorld(W,H))).y;
+
+  // Fix calculation
+  const tl = toWorld(0, 0);
+  const br = toWorld(W, H);
+  const mm_tl = toMm(tl.x, tl.y);
+  const mm_br = toMm(br.x, br.y);
+  mmCtx.strokeStyle = 'rgba(99,102,241,0.7)';
+  mmCtx.lineWidth = 1;
+  mmCtx.strokeRect(mm_tl.x, mm_tl.y, mm_br.x - mm_tl.x, mm_br.y - mm_tl.y);
+}
+
+// ─────────────────────────────────────────────
+//  SIDEBAR
+// ─────────────────────────────────────────────
+const layerList = document.getElementById('layer-list');
+function buildSidebar() {
+  layerList.innerHTML = '';
+  LAYERS.forEach(l => {
+    const item = document.createElement('div');
+    item.className = 'layer-item';
+    item.dataset.id = l.id;
+    item.innerHTML = `<div class="dot" style="background:${l.color}"></div>
+      <span>${l.label}</span>
+      <span class="layer-count">${l.files.length}</span>`;
+    item.addEventListener('click', () => {
+      const n = nodeMap[l.id];
+      if (selectedNode === n) {
+        selectedNode = null;
+        document.querySelectorAll('.layer-item').forEach(i => i.classList.remove('active'));
+      } else {
+        selectedNode = n;
+        document.querySelectorAll('.layer-item').forEach(i => i.classList.remove('active'));
+        item.classList.add('active');
+        // Pan to node
+        transform.x = W/2 - n.x * transform.scale;
+        transform.y = H/2 - n.y * transform.scale;
+      }
+    });
+    layerList.appendChild(item);
+  });
+  document.getElementById('info-nodes').textContent = nodes.length;
+  document.getElementById('info-edges').textContent = edges.length;
+}
+buildSidebar();
+
+// ─────────────────────────────────────────────
+//  TOOLTIP
+// ─────────────────────────────────────────────
+const tooltip = document.getElementById('tooltip');
+function showTooltip(n, x, y) {
+  const totalKB = (n.totalSize / 1024).toFixed(1);
+  const fileHtml = n.files.map(f =>
+    `<div class="tip-file">· ${f.name} <span style="opacity:.5">(${(f.size/1024).toFixed(1)}KB)</span></div>`
+  ).join('');
+  tooltip.innerHTML = `
+    <div class="tip-title" style="color:${n.color}">${n.label} Layer</div>
+    <div class="tip-layer" style="color:${n.color}">${n.files.length} modules</div>
+    ${fileHtml}
+    <div class="tip-size">Total: ${totalKB} KB</div>
+  `;
+  const px = Math.min(x + 16, window.innerWidth - 280);
+  const py = Math.min(y + 16, window.innerHeight - tooltip.offsetHeight - 10);
+  tooltip.style.left = px + 'px';
+  tooltip.style.top = py + 'px';
+  tooltip.classList.add('show');
+}
+function hideTooltip() { tooltip.classList.remove('show'); }
+
+// ─────────────────────────────────────────────
+//  INTERACTION
+// ─────────────────────────────────────────────
+function getNodeAt(sx, sy) {
+  const { x, y } = toWorld(sx, sy);
+  for (let i = nodes.length-1; i >= 0; i--) {
+    const n = nodes[i];
+    if (!n.visible) continue;
+    const dx = x - n.x, dy = y - n.y;
+    if (dx*dx + dy*dy < n.r*n.r) return n;
+  }
+  return null;
+}
+
+canvas.addEventListener('mousemove', e => {
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+
+  if (dragging) {
+    dragging.x = toWorld(mx, my).x;
+    dragging.y = toWorld(mx, my).y;
+    return;
+  }
+  if (panStart) {
+    transform.x = panStart.tx + (e.clientX - panStart.mx);
+    transform.y = panStart.ty + (e.clientY - panStart.my);
+    return;
+  }
+
+  const n = getNodeAt(mx, my);
+  hoveredNode = n;
+  canvas.style.cursor = n ? 'pointer' : 'grab';
+  if (n) showTooltip(n, e.clientX, e.clientY);
+  else hideTooltip();
+});
+
+canvas.addEventListener('mousedown', e => {
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  const n = getNodeAt(mx, my);
+  if (n) {
+    dragging = n;
+    forceRunning = false;
+  } else {
+    panStart = { mx: e.clientX, my: e.clientY, tx: transform.x, ty: transform.y };
+    canvas.style.cursor = 'grabbing';
+  }
+});
+
+canvas.addEventListener('mouseup', e => {
+  if (dragging) {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+    const moved = Math.abs(mx - (rect.left + toScreen(dragging.x,dragging.y).x));
+    if (moved < 3) {
+      selectedNode = selectedNode === dragging ? null : dragging;
+      document.querySelectorAll('.layer-item').forEach(i => i.classList.remove('active'));
+      if (selectedNode) {
+        document.querySelector(`[data-id="${selectedNode.id}"]`)?.classList.add('active');
+      }
+    }
+    dragging = null;
+  }
+  panStart = null;
+  canvas.style.cursor = 'grab';
+});
+
+canvas.addEventListener('mouseleave', () => {
+  dragging = null; panStart = null;
+  hideTooltip(); hoveredNode = null;
+});
+
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  const factor = e.deltaY < 0 ? 1.12 : 1/1.12;
+  const newScale = Math.max(0.2, Math.min(4, transform.scale * factor));
+  transform.x = mx - (mx - transform.x) * (newScale / transform.scale);
+  transform.y = my - (my - transform.y) * (newScale / transform.scale);
+  transform.scale = newScale;
+}, { passive: false });
+
+// ─────────────────────────────────────────────
+//  SEARCH
+// ─────────────────────────────────────────────
+document.getElementById('search').addEventListener('input', e => {
+  searchQuery = e.target.value.toLowerCase().trim();
+  nodes.forEach(n => {
+    n.visible = !searchQuery ||
+      n.label.toLowerCase().includes(searchQuery) ||
+      n.files.some(f => f.name.toLowerCase().includes(searchQuery) || f.desc.toLowerCase().includes(searchQuery));
+  });
+});
+
+// ─────────────────────────────────────────────
+//  BUTTONS
+// ─────────────────────────────────────────────
+const btns = { radial: document.getElementById('btn-radial'), force: document.getElementById('btn-force'), layer: document.getElementById('btn-layer') };
+
+function setMode(mode) {
+  animMode = mode;
+  Object.values(btns).forEach(b => b.classList.remove('active'));
+  if (btns[mode]) btns[mode].classList.add('active');
+  layoutNodes();
+  if (mode === 'force') forceRunning = true;
+}
+
+btns.radial.addEventListener('click', () => setMode('radial'));
+btns.force.addEventListener('click', () => setMode('force'));
+btns.layer.addEventListener('click', () => setMode('layer'));
+document.getElementById('btn-reset').addEventListener('click', () => {
+  resetView();
+  selectedNode = null;
+  document.querySelectorAll('.layer-item').forEach(i => i.classList.remove('active'));
+});
+
+// ─────────────────────────────────────────────
+//  FORCE TICK in RAF
+// ─────────────────────────────────────────────
+const _drawOrig = draw;
+function drawLoop() {
+  if (animMode === 'force') stepForce();
+  tick++;
+  const pulse = tick * 0.05;
+  ctx.clearRect(0, 0, W, H);
+
+  // Grid
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255,255,255,0.025)';
+  ctx.lineWidth = 1;
+  const gridSize = 60 * transform.scale;
+  const ox = ((transform.x % gridSize) + gridSize) % gridSize;
+  const oy = ((transform.y % gridSize) + gridSize) % gridSize;
+  for (let x = ox; x < W; x += gridSize) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+  for (let y = oy; y < H; y += gridSize) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+  ctx.restore();
+
+  edges.forEach(e => {
+    if (!e.source.visible || !e.target.visible) return;
+    const ss = toScreen(e.source.x, e.source.y);
+    const ts = toScreen(e.target.x, e.target.y);
+    const isActive = selectedNode && (e.source === selectedNode || e.target === selectedNode);
+    const dimmed = selectedNode && !isActive;
+    drawArrow(
+      ss.x, ss.y, ts.x, ts.y,
+      e.source.r * transform.scale,
+      e.target.r * transform.scale,
+      isActive ? e.source.color : e.source.color,
+      dimmed ? 0.05 : (isActive ? 0.9 : 0.22)
+    );
+  });
+
+  nodes.forEach(n => drawNode(n, pulse));
+  drawMinimap();
+  requestAnimationFrame(drawLoop);
+}
+
+// ─────────────────────────────────────────────
+//  INIT
+// ─────────────────────────────────────────────
+layoutNodes();
+drawLoop();
+</script>
+</body>
+</html>

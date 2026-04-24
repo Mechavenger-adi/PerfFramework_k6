@@ -1,0 +1,61 @@
+{
+  "runId": "Run_2026-04-06T09-51-27-678Z",
+  "generatedAt": "2026-04-06T09:51:27.680Z",
+  "plan": {
+    "name": "Sample Load Test",
+    "environment": "dev",
+    "executionMode": "parallel",
+    "journeys": [
+      {
+        "name": "browse_crocodiles",
+        "scriptPath": "D:\\repos\\K6-PerfFramework\\scrum-suites\\sample-team\\tests\\browse-journey.js",
+        "weight": 50
+      },
+      {
+        "name": "checkout_crocodiles",
+        "scriptPath": "D:\\repos\\K6-PerfFramework\\scrum-suites\\sample-team\\tests\\checkout-journey.js",
+        "weight": 50
+      }
+    ]
+  },
+  "runtime": {
+    "errorBehavior": "continue",
+    "thinkTimeMode": "fixed",
+    "pacingEnabled": false,
+    "pacingSeconds": 0,
+    "reporting": {
+      "transactionStats": [
+        "count",
+        "pass",
+        "fail",
+        "avg",
+        "min",
+        "max",
+        "p(90)",
+        "p(95)"
+      ],
+      "includeTransactionTable": true,
+      "includeErrorTable": true,
+      "timeseriesEnabled": true,
+      "timeseriesBucketSizeSeconds": 10
+    }
+  },
+  "artifacts": {
+    "reportDir": "D:/repos/K6-PerfFramework/results/Sample_Load_Test/Run_2026-04-06T09-51-27-678Z",
+    "summaryJson": "D:/repos/K6-PerfFramework/results/Sample_Load_Test/Run_2026-04-06T09-51-27-678Z/summary.json",
+    "testDetailsHtml": "D:/repos/K6-PerfFramework/results/Sample_Load_Test/Run_2026-04-06T09-51-27-678Z/TestDetails.html",
+    "testSummaryHtml": "D:/repos/K6-PerfFramework/results/Sample_Load_Test/Run_2026-04-06T09-51-27-678Z/TestSummary.html",
+    "runReportHtml": "D:/repos/K6-PerfFramework/results/Sample_Load_Test/Run_2026-04-06T09-51-27-678Z/RunReport.html",
+    "transactionMetricsJson": "D:/repos/K6-PerfFramework/results/Sample_Load_Test/Run_2026-04-06T09-51-27-678Z/transaction-metrics.json",
+    "errorsNdjson": "D:/repos/K6-PerfFramework/results/Sample_Load_Test/Run_2026-04-06T09-51-27-678Z/errors.ndjson",
+    "warningsNdjson": "D:/repos/K6-PerfFramework/results/Sample_Load_Test/Run_2026-04-06T09-51-27-678Z/warnings.ndjson",
+    "ciSummaryJson": "D:/repos/K6-PerfFramework/results/Sample_Load_Test/Run_2026-04-06T09-51-27-678Z/ci-summary.json",
+    "timeseriesJson": "D:/repos/K6-PerfFramework/results/Sample_Load_Test/Run_2026-04-06T09-51-27-678Z/timeseries.json",
+    "systemMetricsJson": "D:/repos/K6-PerfFramework/results/Sample_Load_Test/Run_2026-04-06T09-51-27-678Z/system-metrics.json",
+    "runManifest": "D:/repos/K6-PerfFramework/results/Sample_Load_Test/Run_2026-04-06T09-51-27-678Z/run-manifest.json"
+  },
+  "environment": {
+    "name": "dev",
+    "baseUrl": "https://test-api.k6.io"
+  }
+}

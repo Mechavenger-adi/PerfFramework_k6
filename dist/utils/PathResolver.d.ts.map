@@ -1,0 +1,1 @@
+{"version":3,"file":"PathResolver.d.ts","sourceRoot":"","sources":["../../core-engine/src/utils/PathResolver.ts"],"names":[],"mappings":"AAQA,qBAAa,YAAY;IACvB;;;;;;;;OAQG;IACH,MAAM,CAAC,OAAO,CAAC,UAAU,EAAE,MAAM,EAAE,UAAU,GAAE,MAAuB,GAAG,MAAM,GAAG,IAAI;IAgBtF,OAAO,CAAC,MAAM,CAAC,eAAe;CAiB/B"}

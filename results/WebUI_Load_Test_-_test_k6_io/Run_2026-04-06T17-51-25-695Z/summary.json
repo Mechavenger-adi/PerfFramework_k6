@@ -1,0 +1,440 @@
+{
+    "metrics": {
+        "http_req_sending": {
+            "p(90)": 0.5519,
+            "p(95)": 0.6406,
+            "avg": 0.12970921669270244,
+            "min": 0,
+            "med": 0,
+            "max": 5.8254
+        },
+        "search_animal_count": {
+            "rate": 4.07336886471008,
+            "count": 368
+        },
+        "iterations": {
+            "count": 386,
+            "rate": 4.272609733092638
+        },
+        "click_confirm": {
+            "min": 328,
+            "med": 348,
+            "max": 11768,
+            "p(90)": 397.3,
+            "p(95)": 406.65,
+            "avg": 390.625
+        },
+        "http_req_failed": {
+            "passes": 1119,
+            "fails": 3362,
+            "thresholds": {
+                "rate<0.1": true
+            },
+            "value": 0.24972104440972998
+        },
+        "click_continue_count": {
+            "rate": 4.07336886471008,
+            "count": 368
+        },
+        "logout": {
+            "p(95)": 400,
+            "avg": 380,
+            "min": 359,
+            "med": 386,
+            "max": 402,
+            "p(90)": 398
+        },
+        "select_product": {
+            "avg": 206.91032608695653,
+            "min": 175,
+            "med": 190,
+            "max": 894,
+            "p(90)": 223.3,
+            "p(95)": 257.4999999999998
+        },
+        "vus": {
+            "value": 1,
+            "min": 0,
+            "max": 10
+        },
+        "group_duration": {
+            "p(90)": 393.75226000000004,
+            "p(95)": 425.8859400000001,
+            "avg": 334.2348793999102,
+            "min": 163.8042,
+            "med": 334.969,
+            "max": 11768.6359
+        },
+        "iteration_duration": {
+            "p(90)": 2005.2206,
+            "p(95)": 2412.3424250000003,
+            "avg": 1967.4582450777214,
+            "min": 359.0122,
+            "med": 1641.4263999999998,
+            "max": 13041.2529
+        },
+        "http_req_duration{expected_response:true}": {
+            "med": 175.3586,
+            "max": 11470.3058,
+            "p(90)": 201.53909000000002,
+            "p(95)": 219.24567499999992,
+            "avg": 218.20278402736471,
+            "min": 157.9819
+        },
+        "t02_login_count": {
+            "count": 10,
+            "rate": 0.11068937132364347
+        },
+        "click_continue": {
+            "p(90)": 201,
+            "p(95)": 214.29999999999995,
+            "avg": 184.89402173913044,
+            "min": 164,
+            "med": 174,
+            "max": 588
+        },
+        "add_to_cart_count": {
+            "count": 368,
+            "rate": 4.07336886471008
+        },
+        "t01_launch": {
+            "avg": 432.2,
+            "min": 202,
+            "med": 508.5,
+            "max": 582,
+            "p(90)": 567.6,
+            "p(95)": 574.8
+        },
+        "http_reqs": {
+            "rate": 49.59990729012464,
+            "count": 4481
+        },
+        "http_req_connecting": {
+            "p(95)": 0,
+            "avg": 0.016779334969872797,
+            "min": 0,
+            "med": 0,
+            "max": 12.4719,
+            "p(90)": 0
+        },
+        "logout_count": {
+            "count": 5,
+            "rate": 0.055344685661821734
+        },
+        "http_req_blocked": {
+            "max": 37.2891,
+            "p(90)": 0,
+            "p(95)": 0,
+            "avg": 0.051064516848917656,
+            "min": 0,
+            "med": 0
+        },
+        "t02_login": {
+            "med": 540.5,
+            "max": 853,
+            "p(90)": 594.6999999999999,
+            "p(95)": 723.8499999999997,
+            "avg": 569.4,
+            "min": 513
+        },
+        "http_req_tls_handshaking": {
+            "min": 0,
+            "med": 0,
+            "max": 17.9933,
+            "p(90)": 0,
+            "p(95)": 0,
+            "avg": 0.031104753403258203
+        },
+        "http_req_waiting": {
+            "min": 0,
+            "med": 170.7293,
+            "max": 11470.3058,
+            "p(90)": 194.8605,
+            "p(95)": 208.1703,
+            "avg": 164.63592856505224
+        },
+        "data_sent": {
+            "count": 492273,
+            "rate": 5448.938888960394
+        },
+        "http_req_duration": {
+            "avg": 166.0342146619056,
+            "min": 0.452,
+            "med": 172.1421,
+            "max": 11470.3058,
+            "p(90)": 196.6633,
+            "p(95)": 209.8933,
+            "thresholds": {
+                "p(95)<2000": false
+            }
+        },
+        "vus_max": {
+            "value": 10,
+            "min": 10,
+            "max": 10
+        },
+        "add_to_cart": {
+            "p(90)": 415,
+            "p(95)": 489.29999999999995,
+            "avg": 413.2798913043478,
+            "min": 339,
+            "med": 364,
+            "max": 11201
+        },
+        "data_received": {
+            "count": 8524124,
+            "rate": 94352.99266447811
+        },
+        "search_animal": {
+            "avg": 275.0597826086956,
+            "min": 168,
+            "med": 178,
+            "max": 11280,
+            "p(90)": 208,
+            "p(95)": 233.94999999999993
+        },
+        "click_confirm_count": {
+            "count": 368,
+            "rate": 4.07336886471008
+        },
+        "checks": {
+            "passes": 3407,
+            "fails": 1074,
+            "value": 0.760321356839991
+        },
+        "increase_quantity_to_2_and_proceed_to_checkout_count": {
+            "count": 368,
+            "rate": 4.07336886471008
+        },
+        "increase_quantity_to_2_and_proceed_to_checkout": {
+            "avg": 524.8885869565217,
+            "min": 337,
+            "med": 363.5,
+            "max": 11385,
+            "p(90)": 407.3,
+            "p(95)": 473
+        },
+        "t01_launch_count": {
+            "count": 10,
+            "rate": 0.11068937132364347
+        },
+        "http_req_receiving": {
+            "max": 96.5211,
+            "p(90)": 3.6228,
+            "p(95)": 5.4248,
+            "avg": 1.2685768801606774,
+            "min": 0,
+            "med": 0
+        },
+        "select_product_count": {
+            "count": 368,
+            "rate": 4.07336886471008
+        }
+    },
+    "root_group": {
+        "id": "d41d8cd98f00b204e9800998ecf8427e",
+        "groups": {
+            "t01_launch": {
+                "name": "t01_launch",
+                "path": "::t01_launch",
+                "id": "a82ae98f898725552b4853573aeba794",
+                "groups": {},
+                "checks": {
+                        "status equals 200": {
+                            "name": "status equals 200",
+                            "path": "::t01_launch::status equals 200",
+                            "id": "e9fbeabb072d870b2a1f6ebf693273bc",
+                            "passes": 10,
+                            "fails": 0
+                        }
+                    }
+            },
+            "t02_login": {
+                "checks": {
+                    "status equals 503": {
+                        "fails": 0,
+                        "name": "status equals 503",
+                        "path": "::t02_login::status equals 503",
+                        "id": "718d383d763353e5e435e15f22a4b7bb",
+                        "passes": 10
+                    },
+                    "status equals 200": {
+                        "name": "status equals 200",
+                        "path": "::t02_login::status equals 200",
+                        "id": "572a1a7e66e6da006d74905a3749aa7e",
+                        "passes": 20,
+                        "fails": 0
+                    },
+                    "status equals 302": {
+                        "name": "status equals 302",
+                        "path": "::t02_login::status equals 302",
+                        "id": "a39706f621fc861dc2d818be458495e2",
+                        "passes": 10,
+                        "fails": 0
+                    }
+                },
+                "name": "t02_login",
+                "path": "::t02_login",
+                "id": "9ce03dfe38bfc54c55b3606608908d98",
+                "groups": {}
+            },
+            "search_animal": {
+                "name": "search_animal",
+                "path": "::search_animal",
+                "id": "cabe02709c4dd9b04d7bd941aa2d60ad",
+                "groups": {},
+                "checks": {
+                        "status equals 200": {
+                            "passes": 368,
+                            "fails": 0,
+                            "name": "status equals 200",
+                            "path": "::search_animal::status equals 200",
+                            "id": "c8854605e6a21e243f32dbfd62f9035a"
+                        }
+                    }
+            },
+            "select product": {
+                "groups": {},
+                "checks": {
+                        "status equals 503": {
+                            "path": "::select product::status equals 503",
+                            "id": "3b04246dc68b6b79df759df4ee908711",
+                            "passes": 368,
+                            "fails": 0,
+                            "name": "status equals 503"
+                        },
+                        "status equals 200": {
+                            "name": "status equals 200",
+                            "path": "::select product::status equals 200",
+                            "id": "88e9abd236f8bcb9f79a47eb7c830421",
+                            "passes": 368,
+                            "fails": 0
+                        }
+                    },
+                "name": "select product",
+                "path": "::select product",
+                "id": "99aed3188dced85edcd86eac85ec069a"
+            },
+            "add to cart": {
+                "groups": {},
+                "checks": {
+                        "status equals 503": {
+                            "name": "status equals 503",
+                            "path": "::add to cart::status equals 503",
+                            "id": "89500562b861c08c72d77a2fbfd77a91",
+                            "passes": 368,
+                            "fails": 0
+                        },
+                        "status equals 302": {
+                            "name": "status equals 302",
+                            "path": "::add to cart::status equals 302",
+                            "id": "4cb510aa46e43306ee34f6ad3f31cc9f",
+                            "passes": 368,
+                            "fails": 0
+                        },
+                        "status equals 200": {
+                            "name": "status equals 200",
+                            "path": "::add to cart::status equals 200",
+                            "id": "635173fcf3662df8ba0eed0319888cce",
+                            "passes": 368,
+                            "fails": 0
+                        }
+                    },
+                "name": "add to cart",
+                "path": "::add to cart",
+                "id": "2d37542368a4aab15aeddb289d87bac9"
+            },
+            "increase quantity to 2 and proceed to checkout": {
+                "name": "increase quantity to 2 and proceed to checkout",
+                "path": "::increase quantity to 2 and proceed to checkout",
+                "id": "7b040ebedb1529cf91f96dc89a3532d2",
+                "groups": {},
+                "checks": {
+                        "status equals 200": {
+                            "name": "status equals 200",
+                            "path": "::increase quantity to 2 and proceed to checkout::status equals 200",
+                            "id": "77b3ed362a9b3f1e97c82a306ceacbfa",
+                            "passes": 378,
+                            "fails": 358
+                        },
+                        "status equals 503": {
+                            "name": "status equals 503",
+                            "path": "::increase quantity to 2 and proceed to checkout::status equals 503",
+                            "id": "4ce040c7f3225975e6952bb2f5e83ef1",
+                            "passes": 368,
+                            "fails": 0
+                        }
+                    }
+            },
+            "click continue": {
+                "checks": {
+                    "status equals 200": {
+                        "path": "::click continue::status equals 200",
+                        "id": "693f1783eccb20ce4396fdb1b0618f8d",
+                        "passes": 10,
+                        "fails": 358,
+                        "name": "status equals 200"
+                    }
+                },
+                "name": "click continue",
+                "path": "::click continue",
+                "id": "76731e14e793c171b0ba6fac15947d3c",
+                "groups": {}
+            },
+            "click confirm": {
+                "path": "::click confirm",
+                "id": "d492caa158c066a9886c31bfb27d4db2",
+                "groups": {},
+                "checks": {
+                        "status equals 302": {
+                            "path": "::click confirm::status equals 302",
+                            "id": "70ac24a0d9935b895a6297732433eb1b",
+                            "passes": 368,
+                            "fails": 0,
+                            "name": "status equals 302"
+                        },
+                        "status equals 200": {
+                            "passes": 10,
+                            "fails": 358,
+                            "name": "status equals 200",
+                            "path": "::click confirm::status equals 200",
+                            "id": "f2249c39f3f264f0ec433de79d937bb3"
+                        }
+                    },
+                "name": "click confirm"
+            },
+            "logout": {
+                "path": "::logout",
+                "id": "e7b2b17596a4f83d6bfb6e6e66df21aa",
+                "groups": {},
+                "checks": {
+                        "status equals 503": {
+                            "name": "status equals 503",
+                            "path": "::logout::status equals 503",
+                            "id": "56e4a8412042f6e5e8f6fd60053af9be",
+                            "passes": 5,
+                            "fails": 0
+                        },
+                        "status equals 302": {
+                            "passes": 5,
+                            "fails": 0,
+                            "name": "status equals 302",
+                            "path": "::logout::status equals 302",
+                            "id": "fed385f6cdcf697979f541b5c8029269"
+                        },
+                        "status equals 200": {
+                            "path": "::logout::status equals 200",
+                            "id": "6e88a53164b2e7f25aded4fdfe9ff84a",
+                            "passes": 5,
+                            "fails": 0,
+                            "name": "status equals 200"
+                        }
+                    },
+                "name": "logout"
+            }
+        },
+        "checks": {},
+        "name": "",
+        "path": ""
+    }
+}

@@ -1,0 +1,56 @@
+{
+  "status": "passed",
+  "runId": "Run_2026-04-09T02-49-27-894Z",
+  "plan": "Sample Debug Test",
+  "environment": "dev",
+  "thresholdFailures": 0,
+  "errorCount": 0,
+  "warningCount": 0,
+  "aborted": false,
+  "transactions": [
+    {
+      "name": "logout",
+      "count": 5,
+      "pass": 0,
+      "fail": 5,
+      "errorPct": 100
+    },
+    {
+      "name": "search_animal",
+      "count": 463,
+      "pass": 463,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 203.07343412526998,
+      "min": 191,
+      "max": 573
+    },
+    {
+      "name": "select product",
+      "count": 463,
+      "pass": 0,
+      "fail": 463,
+      "errorPct": 100
+    },
+    {
+      "name": "t01_launch",
+      "count": 5,
+      "pass": 5,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 299.6,
+      "min": 223,
+      "max": 602
+    },
+    {
+      "name": "t02_login",
+      "count": 5,
+      "pass": 0,
+      "fail": 5,
+      "errorPct": 100
+    }
+  ],
+  "gate": {
+    "failedRules": []
+  }
+}

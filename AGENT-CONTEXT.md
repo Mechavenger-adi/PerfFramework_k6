@@ -103,7 +103,7 @@ K6-PerfFramework/
 |     |- reporting/                    # Run artifact builders and unified report generation
 |     |- reporters/                    # External/report sink adapters and stubs
 |     |- runtime/                      # Lifecycle, metrics, error, snapshot, timeseries runtime helpers
-|     |- utils/                        # Logger, progress, path, transaction, replay/session/lifecycle JS helpers
+|     |- utils/                        # Logger, progress, path, transaction, replay/session/lifecycle TS helpers
 |     `- types/                        # Config, test-plan, event, reporting, HAR contracts
 |- dist/                               # Transpiled JS output
 |- scrum-suites/
@@ -146,7 +146,7 @@ K6-PerfFramework/
 │       ├── debug/                     # ReplayRunner, DiffChecker, HTMLDiffReporter, ExchangeLog, RecordingLogResolver
 │       ├── assertions/                # SLARegistry, ThresholdManager, JourneyAssertionResolver
 │       ├── reporters/                 # ResultTransformer, GrafanaReporter, AzureReporter, CustomUploader
-│       ├── utils/                     # Logger, ProgressBar, PathResolver, transaction.ts/.js, replayLogger.js, session.js, lifecycle.js
+│       ├── utils/                     # Logger, ProgressBar, PathResolver, transaction.ts, replayLogger.ts, session.ts, lifecycle.ts
 │       └── types/                     # ConfigContracts, TestPlanSchema, HARContracts
 ├── scrum-suites/                      # Team test suites
 │   ├── sample-team/                   # 6 test scripts, CSV data, correlation rules, recording logs
@@ -238,12 +238,12 @@ flowchart LR
 
   subgraph Runtime["Runtime + Suite Runtime Helpers"]
     direction TB
-    LCR["LifecycleRuntime + lifecycle.js"]
+    LCR["LifecycleRuntime + lifecycle.ts"]
     ERRRT["ErrorRuntime"]
     METRT["MetricsRuntime"]
     SNAPRT["SnapshotRuntime"]
     TSRT["TimeseriesRuntime"]
-    K6UTIL["k6 runtime helpers (transaction.js, replayLogger.js, session.js)"]
+    K6UTIL["k6 runtime helpers (transaction.ts, replayLogger.ts, session.ts, lifecycle.ts)"]
   end
 
   subgraph DataCorr["Data + Correlation"]
@@ -540,9 +540,9 @@ flowchart LR
 | ProgressBar.ts | `ProgressBar`, `createSpinner` | Phase-based terminal progress logger compatible with blocking `spawnSync`. `start()` prints `▸ label...`, `done(msg?)` prints `✔ msg (elapsed)`, `fail(msg?)` prints `✖ msg (elapsed)`. `update(current, label?)` prints `▸ [n/total] label...` for multi-step progress. `createSpinner(label)` factory for single blocking operations. |
 | PathResolver.ts | `PathResolver` | `resolve(targetPath, searchRoot='scrum-suites')` → resolves exact path first, then recursively searches scrum-suites for filename match. Eliminates hardcoded paths in test plans |
 | transaction.ts | `initTransactions`, `startTransaction`, `endTransaction` | LoadRunner-style timing. Creates Trend metrics using the transaction name directly (e.g., `new Trend('Homepage')`) in k6 init context. Records start timestamp → calculates duration → adds to Trend |
-| transaction.js | (same as .ts) | JavaScript version for k6 runtime consumption |
-| replayLogger.js | `logReplayExchange`, `logExchange`, `trackCorrelation`, `trackParameter`, `trackDataRow`, `createVariableEvent` | k6-side logging. Outputs `[k6-perf][replay-log]` JSON with: harEntryId, transaction, iteration, VU, request/response details, headers, cookies, body. `trackCorrelation(name, value, source)` / `trackParameter(name, value, source)` register variables in `_variableRegistry`. `trackDataRow(sourceName, rowObject)` bulk-registers all CSV columns as parameters. `logExchange` auto-detects variable usage by scanning request URL/body/headers for registered values (via `detectVariableEvents()`). Body values stringified defensively (`typeof body === 'object' ? JSON.stringify(body) : String(body)`). **Binary body detection:** `binaryBodyPlaceholder(url, responseHeaders)` checks Content-Type (image/audio/video/font + common binary MIME types) and URL extension (.png/.ttf/.woff2/etc.) — replaces body with `[binary: content-type]` placeholder to prevent JSON serialization failures. Cookie extraction: `extractJarCookies(url)` uses `http.cookieJar().cookiesForURL()` for auto-managed cookies, `extractK6ResponseCookies(resCookies)` for k6's parsed `res.cookies` object. Tracks per-iteration state and request sequencing |
-| session.js | `registerBaseUrl`, `clearCookies`, `deleteCookie` | k6-side cookie management utilities. **URL registry pattern:** `_registeredUrls` Set tracks all known base URLs. `registerBaseUrl(url)` adds a URL to the registry (called automatically by generated/converted scripts at module init). `clearCookies(...urls)` clears the VU's cookie jar — with no arguments, clears all registered URLs; with arguments, clears only the given URLs. `deleteCookie(url, name)` removes a specific named cookie. Used by framework to support per-journey cookie control when `noCookiesReset` is true globally but individual journeys need session resets. |
+| replayLogger.ts | `logReplayExchange`, `logExchange`, `trackCorrelation`, `trackParameter`, `trackDataRow`, `createVariableEvent` | k6-side logging. Outputs `[k6-perf][replay-log]` JSON with: harEntryId, transaction, iteration, VU, request/response details, headers, cookies, body. `trackCorrelation(name, value, source)` / `trackParameter(name, value, source)` register variables in `_variableRegistry`. `trackDataRow(sourceName, rowObject)` bulk-registers all CSV columns as parameters. `logExchange` auto-detects variable usage by scanning request URL/body/headers for registered values (via `detectVariableEvents()`). Body values stringified defensively (`typeof body === 'object' ? JSON.stringify(body) : String(body)`). **Binary body detection:** `binaryBodyPlaceholder(url, responseHeaders)` checks Content-Type (image/audio/video/font + common binary MIME types) and URL extension (.png/.ttf/.woff2/etc.) — replaces body with `[binary: content-type]` placeholder to prevent JSON serialization failures. Cookie extraction: `extractJarCookies(url)` uses `http.cookieJar().cookiesForURL()` for auto-managed cookies, `extractK6ResponseCookies(resCookies)` for k6's parsed `res.cookies` object. Tracks per-iteration state and request sequencing |
+| session.ts | `registerBaseUrl`, `clearCookies`, `deleteCookie` | k6-side cookie management utilities. **URL registry pattern:** `_registeredUrls` Set tracks all known base URLs. `registerBaseUrl(url)` adds a URL to the registry (called automatically by generated/converted scripts at module init). `clearCookies(...urls)` clears the VU's cookie jar — with no arguments, clears all registered URLs; with arguments, clears only the given URLs. `deleteCookie(url, name)` removes a specific named cookie. Used by framework to support per-journey cookie control when `noCookiesReset` is true globally but individual journeys need session resets. |
+| lifecycle.ts | `createJourneyLifecycleStore`, `runJourneyLifecycle` | k6-side lifecycle orchestration. Manages `initPhase`, `actionPhase`, `endPhase` execution, pacing, and error behavior. |
 
 ### 13. TYPES (`core-engine/src/types/`)
 
@@ -702,7 +702,7 @@ For each journey in test plan:
 - **Recording index:** `.recording-index.json` in each team's recordings/ dir
 - **Script resolution:** PathResolver searches `scrum-suites/` recursively if direct path fails
 - **Config auto-resolution:** Environment config from `config/environments/{plan.environment}.json`
-- **Cookie management:** `noCookiesReset: true` (default) persists cookies across k6 VU iterations (like LoadRunner). Per-journey cookie control via `session.js` utilities (`clearCookies()`, `deleteCookie()`). Generated/converted scripts auto-import `registerBaseUrl` and call `clearCookies()` in `initPhase`.
+- **Cookie management:** `noCookiesReset: true` (default) persists cookies across k6 VU iterations (like LoadRunner). Per-journey cookie control via `session.ts` utilities (`clearCookies()`, `deleteCookie()`). Generated/converted scripts auto-import `registerBaseUrl` and call `clearCookies()` in `initPhase`.
 - **Team folder structure:** `scrum-suites/{team}/tests/`, `scrum-suites/{team}/recordings/`, `scrum-suites/{team}/data/`, `scrum-suites/{team}/results/`
 
 ---
@@ -851,9 +851,9 @@ npm run cli -- run --plan config/test-plans/debug-test.json
 - **Fix:** Removed `reqBodyPreview` and `resBodyPreview` rows from `renderSnapshot()`. Bodies now appear only in the collapsible `<details>` sections (auto-expanded for POST/PUT/PATCH/DELETE).
 
 ### 2026-03-31 — Compact Debug Logging & Env-Gated Replay Logs
-- **What:** Modified `core-engine/src/utils/replayLogger.js`, `core-engine/src/recording/ScriptGenerator.ts`, `core-engine/src/debug/ReplayRunner.ts`
+- **What:** Modified `core-engine/src/utils/replayLogger.ts`, `core-engine/src/recording/ScriptGenerator.ts`, `core-engine/src/debug/ReplayRunner.ts`
 - **Why:** Generated scripts were bloated with ~20 lines of `console.log` + `logReplayExchange` boilerplate per request. Also, replay logging ran unconditionally during load tests (unnecessary I/O overhead).
-- **replayLogger.js:** Added `logExchange(req, res)` compact wrapper — checks `__ENV.K6_PERF_DEBUG` env var, extracts metadata from request definition object, delegates to `logReplayExchange`. Original `logReplayExchange` still exported (backward compatible, always logs).
+- **replayLogger.ts:** Added `logExchange(req, res)` compact wrapper — checks `__ENV.K6_PERF_DEBUG` env var, extracts metadata from request definition object, delegates to `logReplayExchange`. Original `logReplayExchange` still exported (backward compatible, always logs).
 - **ScriptGenerator.ts:** Changed import from `logReplayExchange` to `logExchange`. Replaced ~20 lines of per-request logging boilerplate with single `logExchange(request_N, res_N)` call. Removed inline `console.log('[k6-perf][replay]...')` lines.
 - **ReplayRunner.ts:** Passes `env: { K6_PERF_DEBUG: 'true' }` to `PipelineRunner.execute()` so k6 gets the env var in debug mode.
 - **Behavior:** Debug mode → logs fire → diff report works. Load test → env var absent → `logExchange` returns immediately → zero overhead. Existing scripts using `logReplayExchange` directly still work.
@@ -982,8 +982,8 @@ npm run cli -- run --plan config/test-plans/debug-test.json
   - `decodeText(value)` → `const str = String(value ?? ''); try { return decodeURIComponent(str); } ...`
 - **Impact:** Debug replay reports now generate successfully for converted k6 Studio scripts even when JSON fields contain unexpected non-string types.
 
-### 2026-04-02 — replayLogger.js: Body Stringification Fix (body.trim crash)
-- **What:** Modified `core-engine/src/utils/replayLogger.js` — `logReplayExchange()` body field
+### 2026-04-02 — replayLogger.ts: Body Stringification Fix (body.trim crash)
+- **What:** Modified `core-engine/src/utils/replayLogger.ts` — `logReplayExchange()` body field
 - **Why:** POST bodies using `JSON.parse(...)` in k6 scripts produce JS objects. When `logReplayExchange` logged `requestInfo.body`, the object survived through the JSON pipeline. `DiffChecker.toReplayProjection` sets `postData: { text: entry.request.body }` where `text` was an object (not string). `HTMLDiffReporter.formatBody()` calls `body.trim()` on that object → `body.trim is not a function` crash.
 - **Fix:** In `logReplayExchange()`, body is now stringified: `typeof requestInfo.body === 'object' ? JSON.stringify(requestInfo.body) : String(requestInfo.body)`. Bodies are always strings in the replay log.
 
@@ -1011,8 +1011,8 @@ npm run cli -- run --plan config/test-plans/debug-test.json
   - HTML: Conditionally renders error panel between hero section and sticky bar when `k6Errors.length > 0`
   - Error messages HTML-escaped via `escapeHtml()`
 
-### 2026-04-02 — replayLogger.js: Runtime Variable Tracking (trackCorrelation/trackParameter)
-- **What:** Modified `core-engine/src/utils/replayLogger.js`
+### 2026-04-02 — replayLogger.ts: Runtime Variable Tracking (trackCorrelation/trackParameter)
+- **What:** Modified `core-engine/src/utils/replayLogger.ts`
 - **Why:** The HTML diff report showed "No request variables were captured" and "No parameterization or correlation variables were captured" because there was no mechanism to register variables at runtime and auto-detect their usage across requests.
 - **Changes:**
   - New `_variableRegistry` object stores `{ name, type, value, source }` for each tracked variable
@@ -1029,7 +1029,7 @@ npm run cli -- run --plan config/test-plans/debug-test.json
   - **Correlation rewrite:** `correlation_vars["key"] = expr;` → `correlation_vars["key"] = trackCorrelation("key", expr, "body");`
   - **Parameter pre-scan:** Scans entire source for `getUniqueItem(FILES["xxx"])["p_yyy"]` patterns using regex, collects unique `{ paramName, expression }` pairs
   - **Parameter injection:** Before the first `group()` call, emits `trackParameter("p_yyy", getUniqueItem(FILES["xxx"])["p_yyy"], "data");` for each unique parameter
-  - **Import:** Already imports `trackCorrelation, trackParameter` from replayLogger.js
+  - **Import:** Already imports `trackCorrelation, trackParameter` from replayLogger.ts
 
 ### 2026-04-02 — buyanimal_new.js: Manual Fixes for Converted Script
 - **What:** Modified `scrum-suites/jpet-team/tests/buyanimal_new.js`
@@ -1066,10 +1066,10 @@ npm run cli -- run --plan config/test-plans/debug-test.json
 - **PipelineRunner.ts:** `Logger.info` execution details suppressed when `captureOutput: true` (debug mode — progress phases provide status instead).
 
 ### 2026-04-03 — Binary Content Detection for Static Resources
-- **What:** Modified `core-engine/src/utils/replayLogger.js`, `core-engine/src/debug/ExchangeLog.ts`, `core-engine/src/debug/ReplayRunner.ts`
+- **What:** Modified `core-engine/src/utils/replayLogger.ts`, `core-engine/src/debug/ExchangeLog.ts`, `core-engine/src/debug/ReplayRunner.ts`
 - **Why:** Static resources (.png, .ttf, .gif, etc.) caused JSON parse errors in debug mode. Response bodies for binary content were serialized via `JSON.stringify()` producing broken/enormous log lines.
 - **Three-layer fix:**
-  1. **replayLogger.js (source):** New `binaryBodyPlaceholder(url, responseHeaders)` function. Checks: (a) response `Content-Type` header against `BINARY_CONTENT_RE` (`image/*`, `audio/*`, `video/*`, `font/*`) and `BINARY_MIME_TYPES` set (`application/octet-stream`, `application/zip`, `application/pdf`, various font types), (b) URL extension against `STATIC_EXT_RE` (.png, .jpg, .gif, .svg, .ico, .webp, .woff2, .ttf, .otf, .eot, .mp3, .mp4, .zip, .pdf, etc.). Replaces body with `[binary: content-type]` or `[binary: static asset]` placeholder **before** `JSON.stringify()`.
+  1. **replayLogger.ts (source):** New `binaryBodyPlaceholder(url, responseHeaders)` function. Checks: (a) response `Content-Type` header against `BINARY_CONTENT_RE` (`image/*`, `audio/*`, `video/*`, `font/*`) and `BINARY_MIME_TYPES` set (`application/octet-stream`, `application/zip`, `application/pdf`, various font types), (b) URL extension against `STATIC_EXT_RE` (.png, .jpg, .gif, .svg, .ico, .webp, .woff2, .ttf, .otf, .eot, .mp3, .mp4, .zip, .pdf, etc.). Replaces body with `[binary: content-type]` or `[binary: static asset]` placeholder **before** `JSON.stringify()`.
   2. **ExchangeLog.ts (recording side):** New `isBinaryContent(mimeType?, url?)` static method with same regex/set patterns. `normalizeBody()` now takes optional `mimeType` and `url` params — returns placeholder for binary content. `fromHAREntry()` passes `entry.mimeType` and `entry.url` to `normalizeBody()`.
   3. **ReplayRunner.ts (recording log file side):** New `STATIC_EXT_RE` regex. `normalizeRecordingEntry()` checks URL against regex — replaces response body with `[binary: static asset]` for pre-existing recording-log JSON files loaded from disk.
 - **jpet-team test:** `buyanimal_raw.js` has 4 image requests (logo-topbar.gif, splash.gif, banner_dogs.gif + cdn-cgi requests). These now log `[binary: image/gif]` instead of raw binary data, eliminating parse errors.
@@ -1126,15 +1126,6 @@ npm run cli -- run --plan config/test-plans/debug-test.json
   - **generate-byos.ts:** BYOS scaffold template rewritten from manual `Trend('txn_BYOS_Sample')` + `Date.now()` timing to framework-style `initTransactions/startTransaction/endTransaction` with `logExchange` import
   - **init.ts:** Both scaffold templates (browse-journey.js, checkout-journey.js) rewritten from manual Trend timing to framework-style transactions. Browse: `Homepage`, `Product_List`. Checkout: `Login`, `Add_To_Cart`, `Checkout`
 
-### 2026-04-05 — Captured Output File Naming Improvement
-- **What:** Modified `core-engine/src/execution/PipelineRunner.ts`
-- **Why:** Captured output files were generic; now include script name and stream type for easier identification.
-- **Change:** File naming updated to `{scriptName}_{stdout|stderr}_{ISO-timestamp}.log`
-
----
-
-*END OF CONTEXT — Keep this file updated after every change!*
-
 ### 2026-04-06 - Lifecycle / Reporting Architecture Agreed (Planning Only, No Production Code Changes)
 - **What:** Added planning/review artifacts only and updated architectural direction; no live framework source files were changed as part of this step.
 - **Backups / review artifacts created:**
@@ -1186,7 +1177,7 @@ npm run cli -- run --plan config/test-plans/debug-test.json
   - `ci-summary.json` -> compact CI gate artifact containing status, threshold failures, error/warning counts, key transaction summary, and failed gate rules.
   - snapshot files -> optional JSON request/response snapshots for failed requests only.
 - **Snapshot trigger direction:** Capture snapshots only for selected failure types (`http_request_failed`, `timeout`, `connection_error`, `correlation_missing`, `runtime_exception`) when enabled and within per-run limits.
-- **CI/CD direction reinforced:** Machine-readable artifacts should be default outputs and first-class citizens; HTML reports remain optional human-facing outputs.
+- **CI/CD direction reinforced:** pipelines should use `ci-summary.json` for gating and should not depend on scraping console logs.
 
 ### 2026-04-06 - Reporting Architecture And Output Flow Agreed (Planning Only)
 - **What:** Extended the reporting design with explicit output layers, file ownership, run-directory layout, and CI/CD flow.
@@ -1483,7 +1474,7 @@ npm run cli -- run --plan config/test-plans/debug-test.json
   - `FRAMEWORK-IMPLEMENTATION-TODO.md`
   - `AGENT-CONTEXT.md`
 - **New file created:**
-  - `core-engine/src/utils/lifecycle.js`
+  - `core-engine/src/utils/lifecycle.ts`
 - **What the helper does:**
   - creates a per-script module-scope lifecycle store (`ctx` + run state)
   - runs `initPhase(ctx)` once per VU lifecycle
@@ -1773,3 +1764,8 @@ npm run cli -- run --plan config/test-plans/debug-test.json
   - detailed layer-to-module relationships across `config`, `scenario`, `assertions`, `execution`, `runtime`, `data`, `recording`, `correlation`, `debug`, `reporting`, `reporters`, and `utils/types`
   - end-to-end runtime flow from plan loading through reporting/artifact generation
 - **Instruction added:** Future agents should update both the flow diagram and surrounding agent context together so this file stays usable as a token-saving orientation layer for AI assistants.
+  
+### 2026-04-20 - Utils Layer TypeScript Migration  
+- **What:** Converted 	ransaction.js, session.js, eplayLogger.js, and lifecycle.js to TypeScript (.ts) in core-engine/src/utils/  
+- **Why:** To bring type-safety to the last remaining loose JS files in the core framework architecture.  
+- **Impact:** All internal references point to dist/utils/*.js which is where tsc outputs the compiled CommonJS helpers for goja. 

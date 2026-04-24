@@ -1,0 +1,132 @@
+{
+  "runId": "Run_2026-04-19T18-22-49-493Z",
+  "stats": [
+    "count",
+    "pass",
+    "fail",
+    "avg",
+    "min",
+    "max",
+    "p(90)",
+    "p(97)"
+  ],
+  "transactions": [
+    {
+      "journey": "all",
+      "transaction": "logout",
+      "count": 3,
+      "pass": 3,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 414.6666666666667,
+      "min": 400,
+      "max": 422,
+      "p(90)": 422,
+      "p(97)": 422
+    },
+    {
+      "journey": "all",
+      "transaction": "t01_launch",
+      "count": 3,
+      "pass": 3,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 578.6666666666666,
+      "min": 578,
+      "max": 579,
+      "p(90)": 579,
+      "p(97)": 579
+    },
+    {
+      "journey": "all",
+      "transaction": "t02_login",
+      "count": 3,
+      "pass": 3,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 583,
+      "min": 574,
+      "max": 590,
+      "p(90)": 589,
+      "p(97)": 589.7
+    },
+    {
+      "journey": "all",
+      "transaction": "t03_search_animal",
+      "count": 93,
+      "pass": 93,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 200.72043010752688,
+      "min": 190,
+      "max": 251,
+      "p(90)": 214,
+      "p(97)": 219.24
+    },
+    {
+      "journey": "all",
+      "transaction": "t04_select_product",
+      "count": 93,
+      "pass": 10,
+      "fail": 83,
+      "errorPct": 89.25,
+      "avg": 39.505376344086024,
+      "min": 5,
+      "max": 218,
+      "p(90)": 160.39999999999955,
+      "p(97)": 210.24
+    },
+    {
+      "journey": "all",
+      "transaction": "t05_add_to_cart",
+      "count": 93,
+      "pass": 10,
+      "fail": 83,
+      "errorPct": 89.25,
+      "avg": 79.15053763440861,
+      "min": 15,
+      "max": 487,
+      "p(90)": 317.5999999999991,
+      "p(97)": 396.4
+    },
+    {
+      "journey": "all",
+      "transaction": "t06_increase_quantity_to_2_and_proceed_to_checkout",
+      "count": 186,
+      "pass": 17,
+      "fail": 169,
+      "errorPct": 90.86,
+      "avg": 73.70967741935483,
+      "min": 14,
+      "max": 416,
+      "p(90)": 176.19999999999965,
+      "p(97)": 395.48
+    },
+    {
+      "journey": "all",
+      "transaction": "t07_click_continue",
+      "count": 93,
+      "pass": 8,
+      "fail": 85,
+      "errorPct": 91.4,
+      "avg": 36.45161290322581,
+      "min": 7,
+      "max": 214,
+      "p(90)": 98.99999999999977,
+      "p(97)": 212
+    },
+    {
+      "journey": "all",
+      "transaction": "t08_click_confirm",
+      "count": 93,
+      "pass": 5,
+      "fail": 88,
+      "errorPct": 94.62,
+      "avg": 71.35483870967742,
+      "min": 15,
+      "max": 577,
+      "p(90)": 59,
+      "p(97)": 489.47999999999985
+    }
+  ]
+}

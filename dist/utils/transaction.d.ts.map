@@ -1,0 +1,1 @@
+{"version":3,"file":"transaction.d.ts","sourceRoot":"","sources":["../../core-engine/src/utils/transaction.ts"],"names":[],"mappings":"AAMA;;;;;;;;GAQG;AACH,wBAAgB,gBAAgB,CAAC,KAAK,EAAE,MAAM,EAAE,GAAG,IAAI,CAMtD;AAED;;;;GAIG;AACH,wBAAgB,gBAAgB,CAAC,IAAI,EAAE,MAAM,GAAG,IAAI,CAEnD;AAED;;;;;GAKG;AACH,wBAAgB,cAAc,CAAC,IAAI,EAAE,MAAM,GAAG,IAAI,CAiBjD"}

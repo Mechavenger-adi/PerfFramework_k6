@@ -1,0 +1,198 @@
+{
+  "status": "failed",
+  "runId": "Run_2026-04-19T18-29-03-262Z",
+  "plan": "WebUI Load Test - test.k6.io",
+  "environment": "dev",
+  "thresholdFailures": 2,
+  "errorCount": 15,
+  "warningCount": 2,
+  "aborted": false,
+  "transactions": [
+    {
+      "name": "t01_launch",
+      "count": 1,
+      "pass": 1,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 589,
+      "min": 589,
+      "max": 589
+    },
+    {
+      "name": "t02_login",
+      "count": 1,
+      "pass": 1,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 575,
+      "min": 575,
+      "max": 575
+    },
+    {
+      "name": "t03_search_animal",
+      "count": 37,
+      "pass": 37,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 195.48648648648648,
+      "min": 191,
+      "max": 205
+    },
+    {
+      "name": "t04_select_product",
+      "count": 37,
+      "pass": 3,
+      "fail": 34,
+      "errorPct": 91.89,
+      "avg": 27.83783783783784,
+      "min": 7,
+      "max": 212
+    },
+    {
+      "name": "t05_add_to_cart",
+      "count": 37,
+      "pass": 3,
+      "fail": 34,
+      "errorPct": 91.89,
+      "avg": 57.78378378378378,
+      "min": 17,
+      "max": 388
+    },
+    {
+      "name": "t06_increase_quantity_to_2_and_proceed_to_checkout",
+      "count": 74,
+      "pass": 6,
+      "fail": 68,
+      "errorPct": 91.89,
+      "avg": 58.648648648648646,
+      "min": 16,
+      "max": 415
+    },
+    {
+      "name": "t07_click_continue",
+      "count": 37,
+      "pass": 2,
+      "fail": 35,
+      "errorPct": 94.59,
+      "avg": 25.2972972972973,
+      "min": 8,
+      "max": 214
+    },
+    {
+      "name": "t08_click_confirm",
+      "count": 37,
+      "pass": 2,
+      "fail": 35,
+      "errorPct": 94.59,
+      "avg": 57.5945945945946,
+      "min": 16,
+      "max": 510
+    },
+    {
+      "name": "t09_logout",
+      "count": 1,
+      "pass": 1,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 421,
+      "min": 421,
+      "max": 421
+    },
+    {
+      "name": "tx01_launch",
+      "count": 2,
+      "pass": 2,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 586.5,
+      "min": 584,
+      "max": 589
+    },
+    {
+      "name": "tx02_login",
+      "count": 2,
+      "pass": 2,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 579,
+      "min": 577,
+      "max": 581
+    },
+    {
+      "name": "tx03_search_animal",
+      "count": 77,
+      "pass": 77,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 197.35064935064935,
+      "min": 191,
+      "max": 212
+    },
+    {
+      "name": "tx04_select_product",
+      "count": 77,
+      "pass": 7,
+      "fail": 70,
+      "errorPct": 90.91,
+      "avg": 31.77922077922078,
+      "min": 7,
+      "max": 233
+    },
+    {
+      "name": "tx05_add_to_cart",
+      "count": 77,
+      "pass": 7,
+      "fail": 70,
+      "errorPct": 90.91,
+      "avg": 61.753246753246756,
+      "min": 14,
+      "max": 403
+    },
+    {
+      "name": "tx06_increase_quantity_to_2_and_proceed_to_checkout",
+      "count": 154,
+      "pass": 14,
+      "fail": 140,
+      "errorPct": 90.91,
+      "avg": 61.37662337662338,
+      "min": 16,
+      "max": 425
+    },
+    {
+      "name": "tx07_click_continue",
+      "count": 77,
+      "pass": 6,
+      "fail": 71,
+      "errorPct": 92.21,
+      "avg": 33.103896103896105,
+      "min": 7,
+      "max": 263
+    },
+    {
+      "name": "tx08_click_confirm",
+      "count": 77,
+      "pass": 6,
+      "fail": 71,
+      "errorPct": 92.21,
+      "avg": 65.50649350649351,
+      "min": 15,
+      "max": 495
+    },
+    {
+      "name": "tx09_logout",
+      "count": 2,
+      "pass": 2,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 391.5,
+      "min": 382,
+      "max": 401
+    }
+  ],
+  "gate": {
+    "failedRules": [
+      "http_req_failed{scenario:buyanimal_1_framework_lifecycle}:rate<0.05",
+      "http_req_failed:rate<0.1"
+    ]
+  }
+}

@@ -1,0 +1,105 @@
+{
+  "status": "passed",
+  "runId": "Run_2026-04-09T01-18-41-890Z",
+  "plan": "WebUI Load Test - test.k6.io",
+  "environment": "dev",
+  "thresholdFailures": 0,
+  "errorCount": 1,
+  "warningCount": 0,
+  "aborted": false,
+  "transactions": [
+    {
+      "name": "add to cart",
+      "count": 188,
+      "pass": 188,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 408.81382978723406,
+      "min": 380,
+      "max": 775
+    },
+    {
+      "name": "click confirm",
+      "count": 188,
+      "pass": 169,
+      "fail": 19,
+      "errorPct": 10.11,
+      "avg": 456.468085106383,
+      "min": 418,
+      "max": 996
+    },
+    {
+      "name": "click continue",
+      "count": 188,
+      "pass": 188,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 207.84574468085106,
+      "min": 191,
+      "max": 555
+    },
+    {
+      "name": "increase quantity to 2 and proceed to checkout",
+      "count": 188,
+      "pass": 188,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 407.1329787234043,
+      "min": 382,
+      "max": 803
+    },
+    {
+      "name": "logout",
+      "count": 6,
+      "pass": 6,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 387.1666666666667,
+      "min": 383,
+      "max": 393
+    },
+    {
+      "name": "search_animal",
+      "count": 188,
+      "pass": 188,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 209.22340425531914,
+      "min": 181,
+      "max": 596
+    },
+    {
+      "name": "select product",
+      "count": 188,
+      "pass": 188,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 210.36702127659575,
+      "min": 191,
+      "max": 604
+    },
+    {
+      "name": "t01_launch",
+      "count": 10,
+      "pass": 10,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 377.9,
+      "min": 219,
+      "max": 711
+    },
+    {
+      "name": "t02_login",
+      "count": 10,
+      "pass": 10,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 671,
+      "min": 578,
+      "max": 1028
+    }
+  ],
+  "gate": {
+    "failedRules": []
+  }
+}

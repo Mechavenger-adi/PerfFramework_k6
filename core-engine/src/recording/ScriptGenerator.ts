@@ -12,10 +12,10 @@ export class ScriptGenerator {
   static generate(groups: TransactionGroup[], lifecycle?: LifecycleSelection): string {
     let script = `import http from 'k6/http';\n`;
     script += `import { check, sleep, group } from 'k6';\n`;
-    script += `import { initTransactions, startTransaction, endTransaction } from '../../../core-engine/src/utils/transaction.js';\n`;
-    script += `import { createJourneyLifecycleStore, runJourneyLifecycle } from '../../../core-engine/src/utils/lifecycle.js';\n`;
-    script += `import { logExchange, trackCorrelation, trackParameter } from '../../../core-engine/src/utils/replayLogger.js';\n`;
-    script += `import { clearCookies, registerBaseUrl } from '../../../core-engine/src/utils/session.js';\n\n`;
+    script += `import { initTransactions, startTransaction, endTransaction } from '../../../dist/utils/transaction.js';\n`;
+    script += `import { createJourneyLifecycleStore, runJourneyLifecycle } from '../../../dist/utils/lifecycle.js';\n`;
+    script += `import { logExchange, trackCorrelation, trackParameter } from '../../../dist/utils/replayLogger.js';\n`;
+    script += `import { clearCookies, registerBaseUrl } from '../../../dist/utils/session.js';\n\n`;
 
     // Extract unique base URLs from all request entries for registerBaseUrl
     const baseUrls = this.extractBaseUrls(groups);

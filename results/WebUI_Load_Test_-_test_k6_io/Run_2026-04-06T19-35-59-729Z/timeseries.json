@@ -1,0 +1,175 @@
+{
+  "bucketSizeSeconds": 10,
+  "startTime": "2026-04-06T19:35:59.734Z",
+  "endTime": "2026-04-06T19:37:31.541Z",
+  "series": {
+    "overview": [
+      {
+        "ts": "2026-04-06T19:37:30.000Z",
+        "requests": 4111,
+        "iterations": 476,
+        "errorRate": 0,
+        "avgDuration": 178.81325662855676,
+        "p95Duration": 195.21724999999998,
+        "vus": 1,
+        "vusMax": 10
+      }
+    ],
+    "transactions": {
+      "add to cart": [
+        {
+          "ts": "2026-04-06T19:37:30.000Z",
+          "count": 451,
+          "pass": 451,
+          "fail": 0,
+          "avg": 358.4789356984479,
+          "min": 327,
+          "max": 698,
+          "p90": 371,
+          "p95": 396.5,
+          "p99": 0
+        }
+      ],
+      "click confirm": [
+        {
+          "ts": "2026-04-06T19:37:30.000Z",
+          "count": 451,
+          "pass": 10,
+          "fail": 441,
+          "avg": 354.1618625277162,
+          "min": 329,
+          "max": 675,
+          "p90": 372,
+          "p95": 394.5,
+          "p99": 0
+        }
+      ],
+      "click continue": [
+        {
+          "ts": "2026-04-06T19:37:30.000Z",
+          "count": 451,
+          "pass": 10,
+          "fail": 441,
+          "avg": 176.30376940133038,
+          "min": 162,
+          "max": 561,
+          "p90": 183,
+          "p95": 192,
+          "p99": 0
+        }
+      ],
+      "increase quantity to 2 and proceed to checkout": [
+        {
+          "ts": "2026-04-06T19:37:30.000Z",
+          "count": 451,
+          "pass": 461,
+          "fail": 0,
+          "avg": 353.430155210643,
+          "min": 328,
+          "max": 722,
+          "p90": 366,
+          "p95": 383,
+          "p99": 0
+        }
+      ],
+      "logout": [
+        {
+          "ts": "2026-04-06T19:37:30.000Z",
+          "count": 6,
+          "pass": 6,
+          "fail": 0,
+          "avg": 345.5,
+          "min": 337,
+          "max": 359,
+          "p90": 355,
+          "p95": 357,
+          "p99": 0
+        }
+      ],
+      "search_animal": [
+        {
+          "ts": "2026-04-06T19:37:30.000Z",
+          "count": 451,
+          "pass": 451,
+          "fail": 0,
+          "avg": 183.50554323725055,
+          "min": 166,
+          "max": 531,
+          "p90": 187,
+          "p95": 197,
+          "p99": 0
+        }
+      ],
+      "select product": [
+        {
+          "ts": "2026-04-06T19:37:30.000Z",
+          "count": 451,
+          "pass": 451,
+          "fail": 0,
+          "avg": 182.33037694013305,
+          "min": 167,
+          "max": 502,
+          "p90": 188,
+          "p95": 196.5,
+          "p99": 0
+        }
+      ],
+      "t01_launch": [
+        {
+          "ts": "2026-04-06T19:37:30.000Z",
+          "count": 10,
+          "pass": 10,
+          "fail": 0,
+          "avg": 425.9,
+          "min": 193,
+          "max": 548,
+          "p90": 530.9,
+          "p95": 539.4499999999999,
+          "p99": 0
+        }
+      ],
+      "t02_login": [
+        {
+          "ts": "2026-04-06T19:37:30.000Z",
+          "count": 10,
+          "pass": 10,
+          "fail": 0,
+          "avg": 533.6,
+          "min": 512,
+          "max": 631,
+          "p90": 560.8,
+          "p95": 595.8999999999999,
+          "p99": 0
+        }
+      ]
+    },
+    "system": {
+      "MechAvenger": [
+        {
+          "ts": "2026-04-06T19:37:30.000Z",
+          "activeAgents": 1
+        }
+      ]
+    },
+    "events": [
+      {
+        "ts": "2026-04-06T19:37:31.558Z",
+        "type": "assertion_failed",
+        "transaction": "increase quantity to 2 and proceed to checkout",
+        "severity": "error"
+      },
+      {
+        "ts": "2026-04-06T19:37:31.558Z",
+        "type": "assertion_failed",
+        "transaction": "click continue",
+        "severity": "error"
+      },
+      {
+        "ts": "2026-04-06T19:37:31.558Z",
+        "type": "assertion_failed",
+        "transaction": "click confirm",
+        "severity": "error"
+      }
+    ]
+  }
+}

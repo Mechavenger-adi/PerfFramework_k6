@@ -92,6 +92,7 @@ program
 // VALIDATE command
 // ---------------------------------------------
 
+
 program
   .command('validate')
   .description('Validate configs and test plan before execution')

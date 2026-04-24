@@ -1,0 +1,1 @@
+{"version":3,"file":"TransactionGrouper.d.ts","sourceRoot":"","sources":["../../core-engine/src/recording/TransactionGrouper.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,QAAQ,EAAE,MAAM,uBAAuB,CAAC;AAEjD,MAAM,WAAW,gBAAgB;IAC/B,IAAI,EAAE,MAAM,CAAC;IACb,OAAO,EAAE,QAAQ,EAAE,CAAC;CACrB;AAED,qBAAa,kBAAkB;IAC7B;;;OAGG;IACH,MAAM,CAAC,KAAK,CAAC,OAAO,EAAE,QAAQ,EAAE,GAAG,gBAAgB,EAAE;CAoBtD"}

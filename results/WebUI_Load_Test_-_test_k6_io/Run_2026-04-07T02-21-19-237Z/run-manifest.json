@@ -1,0 +1,56 @@
+{
+  "runId": "Run_2026-04-07T02-21-19-237Z",
+  "generatedAt": "2026-04-07T02:21:19.239Z",
+  "plan": {
+    "name": "WebUI Load Test - test.k6.io",
+    "environment": "dev",
+    "executionMode": "parallel",
+    "journeys": [
+      {
+        "name": "buyanimal_1_framework_lifecycle",
+        "scriptPath": "D:\\repos\\K6-PerfFramework\\scrum-suites\\jpet-team\\tests\\buyanimal_1_framework_lifecycle.js",
+        "weight": 100
+      }
+    ]
+  },
+  "runtime": {
+    "errorBehavior": "continue",
+    "thinkTimeMode": "fixed",
+    "pacingEnabled": false,
+    "pacingSeconds": 0,
+    "reporting": {
+      "transactionStats": [
+        "count",
+        "pass",
+        "fail",
+        "avg",
+        "min",
+        "max",
+        "p(90)",
+        "p(95)"
+      ],
+      "includeTransactionTable": true,
+      "includeErrorTable": true,
+      "timeseriesEnabled": true,
+      "timeseriesBucketSizeSeconds": 10
+    }
+  },
+  "artifacts": {
+    "reportDir": "D:/repos/K6-PerfFramework/results/WebUI_Load_Test_-_test_k6_io/Run_2026-04-07T02-21-19-237Z",
+    "summaryJson": "D:/repos/K6-PerfFramework/results/WebUI_Load_Test_-_test_k6_io/Run_2026-04-07T02-21-19-237Z/summary.json",
+    "testDetailsHtml": "D:/repos/K6-PerfFramework/results/WebUI_Load_Test_-_test_k6_io/Run_2026-04-07T02-21-19-237Z/TestDetails.html",
+    "testSummaryHtml": "D:/repos/K6-PerfFramework/results/WebUI_Load_Test_-_test_k6_io/Run_2026-04-07T02-21-19-237Z/TestSummary.html",
+    "runReportHtml": "D:/repos/K6-PerfFramework/results/WebUI_Load_Test_-_test_k6_io/Run_2026-04-07T02-21-19-237Z/RunReport.html",
+    "transactionMetricsJson": "D:/repos/K6-PerfFramework/results/WebUI_Load_Test_-_test_k6_io/Run_2026-04-07T02-21-19-237Z/transaction-metrics.json",
+    "errorsNdjson": "D:/repos/K6-PerfFramework/results/WebUI_Load_Test_-_test_k6_io/Run_2026-04-07T02-21-19-237Z/errors.ndjson",
+    "warningsNdjson": "D:/repos/K6-PerfFramework/results/WebUI_Load_Test_-_test_k6_io/Run_2026-04-07T02-21-19-237Z/warnings.ndjson",
+    "ciSummaryJson": "D:/repos/K6-PerfFramework/results/WebUI_Load_Test_-_test_k6_io/Run_2026-04-07T02-21-19-237Z/ci-summary.json",
+    "timeseriesJson": "D:/repos/K6-PerfFramework/results/WebUI_Load_Test_-_test_k6_io/Run_2026-04-07T02-21-19-237Z/timeseries.json",
+    "systemMetricsJson": "D:/repos/K6-PerfFramework/results/WebUI_Load_Test_-_test_k6_io/Run_2026-04-07T02-21-19-237Z/system-metrics.json",
+    "runManifest": "D:/repos/K6-PerfFramework/results/WebUI_Load_Test_-_test_k6_io/Run_2026-04-07T02-21-19-237Z/run-manifest.json"
+  },
+  "environment": {
+    "name": "dev",
+    "baseUrl": "https://test-api.k6.io"
+  }
+}

@@ -1,0 +1,107 @@
+{
+  "bucketSizeSeconds": 10,
+  "startTime": "2026-04-06T09:52:19.789Z",
+  "endTime": "2026-04-06T09:52:20.120Z",
+  "series": {
+    "overview": [
+      {
+        "ts": "2026-04-06T09:52:20.000Z",
+        "requests": 0,
+        "iterations": 0,
+        "errorRate": 0,
+        "avgDuration": 0,
+        "p95Duration": 0,
+        "vus": 0,
+        "vusMax": 0
+      }
+    ],
+    "transactions": {
+      "Create Crocodile": [
+        {
+          "ts": "2026-04-06T09:52:20.000Z",
+          "count": 23,
+          "pass": 0,
+          "fail": 23,
+          "avg": 5.086956521739131,
+          "min": 2,
+          "max": 7,
+          "p90": 7,
+          "p95": 7,
+          "p99": 0
+        }
+      ],
+      "List Crocodiles": [
+        {
+          "ts": "2026-04-06T09:52:20.000Z",
+          "count": 23,
+          "pass": 23,
+          "fail": 0,
+          "avg": 322.7826086956522,
+          "min": 271,
+          "max": 834,
+          "p90": 281.2,
+          "p95": 777.8999999999992,
+          "p99": 0
+        }
+      ],
+      "Public Crocodiles": [
+        {
+          "ts": "2026-04-06T09:52:20.000Z",
+          "count": 47,
+          "pass": 47,
+          "fail": 0,
+          "avg": 329.7659574468085,
+          "min": 251,
+          "max": 1162,
+          "p90": 342,
+          "p95": 700.2999999999979,
+          "p99": 0
+        }
+      ],
+      "Single Crocodile": [
+        {
+          "ts": "2026-04-06T09:52:20.000Z",
+          "count": 47,
+          "pass": 47,
+          "fail": 0,
+          "avg": 286.4255319148936,
+          "min": 252,
+          "max": 345,
+          "p90": 342.4,
+          "p95": 343.7,
+          "p99": 0
+        }
+      ],
+      "View Crocodile": [
+        {
+          "ts": "2026-04-06T09:52:20.000Z",
+          "count": 23,
+          "pass": 23,
+          "fail": 0,
+          "avg": 283.60869565217394,
+          "min": 270,
+          "max": 478,
+          "p90": 278.8,
+          "p95": 288.9,
+          "p99": 0
+        }
+      ]
+    },
+    "system": {
+      "MechAvenger": [
+        {
+          "ts": "2026-04-06T09:52:20.000Z",
+          "activeAgents": 1
+        }
+      ]
+    },
+    "events": [
+      {
+        "ts": "2026-04-06T09:52:20.119Z",
+        "type": "assertion_failed",
+        "transaction": "Create Crocodile",
+        "severity": "error"
+      }
+    ]
+  }
+}

@@ -1,0 +1,1 @@
+{"version":3,"file":"DomainFilter.backup.d.ts","sourceRoot":"","sources":["../../core-engine/src/recording/DomainFilter.backup.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,QAAQ,EAAE,MAAM,uBAAuB,CAAC;AAGjD,qBAAa,YAAY;IACvB;;OAEG;IACH,MAAM,CAAC,MAAM,CAAC,OAAO,EAAE,QAAQ,EAAE,EAAE,cAAc,EAAE,MAAM,EAAE,GAAG,QAAQ,EAAE;CAkBzE"}
