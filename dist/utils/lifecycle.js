@@ -4,6 +4,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createJourneyLifecycleStore = createJourneyLifecycleStore;
+exports.getFrameworkThinkTime = getFrameworkThinkTime;
 exports.runJourneyLifecycle = runJourneyLifecycle;
 // @ts-ignore - K6 runtime module
 const k6_1 = require("k6");
@@ -177,6 +178,29 @@ function createJourneyLifecycleStore() {
         ctx: createContext(),
         state: createState(),
     };
+}
+/**
+ * Returns the framework-configured think time in seconds.
+ *
+ * Reads the thinkTime block from K6_PERF_RUNTIME_METADATA:
+ *   - mode 'fixed' → returns `fixed` value (default 1s)
+ *   - mode 'random' → returns random value in [min, max] (defaults 0.5–3s)
+ *
+ * Falls back to 1 second when no runtime metadata is available.
+ */
+function getFrameworkThinkTime() {
+    const runtime = getRuntimeMetadata();
+    const thinkTime = runtime.thinkTime;
+    if (!thinkTime) {
+        return 1;
+    }
+    if (thinkTime.mode === 'random') {
+        const min = Number(thinkTime.min ?? 0.5);
+        const max = Number(thinkTime.max ?? 3);
+        return min + Math.random() * (max - min);
+    }
+    // fixed mode (default)
+    return Number(thinkTime.fixed ?? 1);
 }
 function runJourneyLifecycle(store, phaseFns) {
     const runtime = getRuntimeMetadata();

@@ -2,10 +2,17 @@
  * SchemaValidator.ts
  * Phase 1 – JSON Schema validation using ajv.
  * Validates test plans and runtime settings against their contracts at startup.
+ *
+ * Schemas are loaded from config/schemas/*.schema.json (single source of truth)
+ * with inline fallbacks for robustness. The $schema property is allowed in all
+ * config files for editor IntelliSense (works in VS Code, JetBrains, Sublime LSP,
+ * Neovim LSP, and any JSON Schema-aware editor).
  */
 
 import Ajv, { ValidateFunction, ErrorObject } from 'ajv';
 import addFormats from 'ajv-formats';
+import * as fs from 'fs';
+import * as path from 'path';
 
 export interface ValidationResult {
   valid: boolean;
@@ -13,14 +20,40 @@ export interface ValidationResult {
 }
 
 // ---------------------------------------------
-// JSON Schemas
+// Schema Loading
 // ---------------------------------------------
 
-const RUNTIME_SETTINGS_SCHEMA = {
+/**
+ * Attempt to load a JSON Schema from the config/schemas/ directory.
+ * Returns undefined if the file doesn't exist (caller falls back to inline).
+ */
+function loadExternalSchema(schemaFileName: string): object | undefined {
+  const candidates = [
+    path.join(process.cwd(), 'config', 'schemas', schemaFileName),
+    path.join(__dirname, '..', '..', '..', 'config', 'schemas', schemaFileName),
+  ];
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      try {
+        return JSON.parse(fs.readFileSync(candidate, 'utf-8'));
+      } catch {
+        // Corrupted schema file — fall through to inline
+      }
+    }
+  }
+  return undefined;
+}
+
+// ---------------------------------------------
+// Inline Fallback Schemas
+// ---------------------------------------------
+
+const RUNTIME_SETTINGS_SCHEMA_INLINE = {
   type: 'object',
   required: ['thinkTime', 'pacing', 'http', 'errorBehavior'],
   additionalProperties: false,
   properties: {
+    $schema: { type: 'string' },
     thinkTime: {
       type: 'object',
       required: ['mode'],
@@ -99,11 +132,12 @@ const RUNTIME_SETTINGS_SCHEMA = {
   },
 };
 
-const TEST_PLAN_SCHEMA = {
+const TEST_PLAN_SCHEMA_INLINE = {
   type: 'object',
   required: ['name', 'environment', 'execution_mode', 'global_load_profile', 'user_journeys'],
   additionalProperties: true,
   properties: {
+    $schema: { type: 'string' },
     name: { type: 'string', minLength: 1 },
     environment: { type: 'string', minLength: 1 },
     execution_mode: { type: 'string', enum: ['parallel', 'sequential', 'hybrid'] },
@@ -170,8 +204,14 @@ export class SchemaValidator {
   constructor() {
     this.ajv = new Ajv({ allErrors: true });
     addFormats(this.ajv);
-    this.validateRuntimeSettings = this.ajv.compile(RUNTIME_SETTINGS_SCHEMA);
-    this.validateTestPlan = this.ajv.compile(TEST_PLAN_SCHEMA);
+
+    // Prefer external schema files (rich descriptions for docs/tooling),
+    // fall back to inline schemas if external files are unavailable.
+    const runtimeSchema = loadExternalSchema('runtime-settings.schema.json') ?? RUNTIME_SETTINGS_SCHEMA_INLINE;
+    const planSchema = loadExternalSchema('test-plan.schema.json') ?? TEST_PLAN_SCHEMA_INLINE;
+
+    this.validateRuntimeSettings = this.ajv.compile(runtimeSchema);
+    this.validateTestPlan = this.ajv.compile(planSchema);
   }
 
   validateRuntime(data: unknown): ValidationResult {
@@ -192,6 +232,13 @@ export class SchemaValidator {
 
     const errors = (validate.errors ?? []).map((e: ErrorObject) => {
       const field = e.instancePath || '(root)';
+
+      // Enhanced enum error messages with allowed values
+      if (e.keyword === 'enum' && e.params?.allowedValues) {
+        const allowed = (e.params.allowedValues as string[]).join(' | ');
+        return `[${label}] ${field}: ${e.message}. Allowed values: ${allowed}`;
+      }
+
       return `[${label}] ${field}: ${e.message}`;
     });
 

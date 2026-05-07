@@ -215,8 +215,8 @@ const LAYERS = [
   {
     id: 'cli',        label: 'CLI',         color: '#f59e0b',
     files: [
-      { name: 'run.ts',            size: 31500, desc: 'Main CLI entry – init / run / generate / convert / validate commands' },
-      { name: 'init.ts',           size: 11170, desc: 'Project initialisation wizard' },
+      { name: 'run.ts',            size: 31679, desc: 'Main CLI entry – init / run / generate / convert / validate commands' },
+      { name: 'init.ts',           size: 11450, desc: 'Project initialisation wizard + $schema scaffolding' },
       { name: 'generate.ts',       size:  5298, desc: 'K6 script generation command' },
       { name: 'generate-byos.ts',  size:  2357, desc: 'Bring-Your-Own-Script generation' },
       { name: 'convert.ts',        size:  2325, desc: 'HAR → K6 conversion command' },
@@ -231,7 +231,15 @@ const LAYERS = [
       { name: 'EnvResolver.ts',           size: 2199, desc: 'Resolves .env and environment variables' },
       { name: 'GatekeeperValidator.ts',   size: 8819, desc: 'Pre-run gatekeeper validation rules' },
       { name: 'RuntimeConfigManager.ts',  size: 5510, desc: 'Live runtime configuration updates' },
-      { name: 'SchemaValidator.ts',       size: 6256, desc: 'JSON Schema validation via AJV' },
+      { name: 'SchemaValidator.ts',       size: 8023, desc: 'JSON Schema validation via AJV – loads external .schema.json files' },
+    ]
+  },
+  {
+    id: 'schemas',    label: 'Schemas',     color: '#c084fc',
+    files: [
+      { name: 'test-plan.schema.json',         size: 13041, desc: 'JSON Schema for test plans – SLAs, debug, hybrid, per-journey overrides' },
+      { name: 'runtime-settings.schema.json',  size: 10902, desc: 'JSON Schema for runtime settings – thinkTime, pacing, errors, monitoring' },
+      { name: 'environment.schema.json',       size:  2009, desc: 'JSON Schema for environment configs – baseUrl, serviceUrls, custom' },
     ]
   },
   {
@@ -247,7 +255,7 @@ const LAYERS = [
   {
     id: 'scenario',   label: 'Scenario',    color: '#a78bfa',
     files: [
-      { name: 'ScenarioBuilder.ts',   size: 12288, desc: 'Builds K6 scenario definitions from test plans' },
+      { name: 'ScenarioBuilder.ts',   size: 12367, desc: 'Builds K6 scenario definitions from test plans' },
       { name: 'WorkloadModels.ts',    size:  3353, desc: 'Load / stress / soak / spike / iteration profiles' },
       { name: 'ExecutorFactory.ts',   size:  2733, desc: 'Creates K6 executor configs per profile type' },
       { name: 'TestPlanLoader.ts',    size:  1351, desc: 'Loads and parses test-plan JSON files' },
@@ -285,7 +293,7 @@ const LAYERS = [
     id: 'recording',  label: 'Recording',   color: '#60a5fa',
     files: [
       { name: 'ScriptConverter.ts',    size: 39221, desc: 'Converts parsed HAR entries to K6 script code' },
-      { name: 'ScriptGenerator.ts',    size:  8334, desc: 'Generates full K6 test scripts from recordings' },
+      { name: 'ScriptGenerator.ts',    size:  8335, desc: 'Generates full K6 test scripts from recordings' },
       { name: 'HARParser.ts',          size:  3321, desc: 'Parses browser HAR files into request models' },
       { name: 'DomainFilter.ts',       size:  1446, desc: 'Filters HAR entries by domain allowlist' },
       { name: 'TransactionGrouper.ts', size:  1013, desc: 'Groups HAR requests into named transactions' },
@@ -343,7 +351,7 @@ const LAYERS = [
     files: [
       { name: 'PathResolver.ts', size: 1756, desc: 'Resolves framework and project file paths' },
       { name: 'ProgressBar.ts',  size: 2876, desc: 'CLI progress bar display' },
-      { name: 'lifecycle.ts',    size: 10071, desc: 'K6-side VU lifecycle helper (runs inside K6)' },
+      { name: 'lifecycle.ts',    size: 10829, desc: 'K6-side VU lifecycle helper + getFrameworkThinkTime (runs inside K6)' },
       { name: 'logger.ts',       size: 3896, desc: 'Structured console logger with log levels' },
       { name: 'replayLogger.ts', size: 13854, desc: 'Logs HTTP exchanges for diff debugging' },
       { name: 'session.ts',      size: 1617, desc: 'Session state helpers for K6 scripts' },

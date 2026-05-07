@@ -9,7 +9,7 @@ class ScriptGenerator {
         let script = `import http from 'k6/http';\n`;
         script += `import { check, sleep, group } from 'k6';\n`;
         script += `import { initTransactions, startTransaction, endTransaction } from '../../../dist/utils/transaction.js';\n`;
-        script += `import { createJourneyLifecycleStore, runJourneyLifecycle } from '../../../dist/utils/lifecycle.js';\n`;
+        script += `import { createJourneyLifecycleStore, runJourneyLifecycle, getFrameworkThinkTime } from '../../../dist/utils/lifecycle.js';\n`;
         script += `import { logExchange, trackCorrelation, trackParameter } from '../../../dist/utils/replayLogger.js';\n`;
         script += `import { clearCookies, registerBaseUrl } from '../../../dist/utils/session.js';\n\n`;
         // Extract unique base URLs from all request entries for registerBaseUrl
@@ -85,7 +85,7 @@ class ScriptGenerator {
             script += `    endTransaction('${groupItem.name}');\n`;
             script += `  });\n\n`;
             if (groupIndex < groups.length - 1) {
-                script += `  sleep(1);\n\n`;
+                script += `  sleep(getFrameworkThinkTime());\n\n`;
             }
         });
         script += `}\n`;

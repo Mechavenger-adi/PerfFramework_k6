@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/test-plan.schema.json",
   "name": "Sample Load Test",
   "environment": "dev",
   "execution_mode": "parallel",

@@ -14,6 +14,7 @@ export function runInit(projectDir: string = process.cwd()): void {
     'config/environments',
     'config/test-plans',
     'config/runtime-settings',
+    'config/schemas',
     'config/correlation-rules',
     'scrum-suites/sample-team/tests',
     'scrum-suites/sample-team/data',
@@ -34,6 +35,7 @@ export function runInit(projectDir: string = process.cwd()): void {
     path.join(projectDir, 'config/environments/dev.json'),
     JSON.stringify(
       {
+        $schema: '../schemas/environment.schema.json',
         name: 'dev',
         baseUrl: 'https://your-dev-environment.com',
         serviceUrls: {
@@ -54,6 +56,7 @@ export function runInit(projectDir: string = process.cwd()): void {
     path.join(projectDir, 'config/runtime-settings/default.json'),
     JSON.stringify(
       {
+        $schema: '../schemas/runtime-settings.schema.json',
         thinkTime: { mode: 'fixed', fixed: 1 },
         pacing: { enabled: false },
         http: { timeoutSeconds: 60, maxRedirects: 10, throwOnError: false },
@@ -94,6 +97,7 @@ export function runInit(projectDir: string = process.cwd()): void {
     path.join(projectDir, 'config/test-plans/load-test.json'),
     JSON.stringify(
       {
+        $schema: '../schemas/test-plan.schema.json',
         name: 'Sample Load Test',
         environment: 'dev',
         execution_mode: 'parallel',
@@ -134,6 +138,7 @@ export function runInit(projectDir: string = process.cwd()): void {
     path.join(projectDir, 'config/test-plans/debug-test.json'),
     JSON.stringify(
       {
+        $schema: '../schemas/test-plan.schema.json',
         name: 'Sample Debug Test',
         environment: 'dev',
         execution_mode: 'parallel',
@@ -230,7 +235,7 @@ testuser003,P@ssw0rd3,testuser003@perf-test.local
     `import http from 'k6/http';
 import { check, sleep, group } from 'k6';
 import { initTransactions, startTransaction, endTransaction } from '../../../dist/utils/transaction.js';
-import { createJourneyLifecycleStore, runJourneyLifecycle } from '../../../dist/utils/lifecycle.js';
+import { createJourneyLifecycleStore, runJourneyLifecycle, getFrameworkThinkTime } from '../../../dist/utils/lifecycle.js';
 import { logExchange } from '../../../dist/utils/replayLogger.js';
 
 initTransactions(['Homepage', 'Product_List']);
@@ -248,7 +253,7 @@ export function actionPhase(ctx) {
     endTransaction('Homepage');
   });
 
-  sleep(1); // think time between transactions
+  sleep(getFrameworkThinkTime());
 
   group('Product List', function () {
     startTransaction('Product_List');
@@ -257,7 +262,7 @@ export function actionPhase(ctx) {
     endTransaction('Product_List');
   });
 
-  sleep(1);
+  sleep(getFrameworkThinkTime());
 }
 
 export function endPhase(ctx) {
@@ -276,7 +281,7 @@ export default function () {
     `import http from 'k6/http';
 import { check, sleep, group } from 'k6';
 import { initTransactions, startTransaction, endTransaction } from '../../../dist/utils/transaction.js';
-import { createJourneyLifecycleStore, runJourneyLifecycle } from '../../../dist/utils/lifecycle.js';
+import { createJourneyLifecycleStore, runJourneyLifecycle, getFrameworkThinkTime } from '../../../dist/utils/lifecycle.js';
 import { logExchange } from '../../../dist/utils/replayLogger.js';
 
 initTransactions(['Login', 'Add_To_Cart', 'Checkout']);
@@ -307,7 +312,7 @@ export function actionPhase(ctx) {
     endTransaction('Add_To_Cart');
   });
 
-  sleep(1);
+  sleep(getFrameworkThinkTime());
 
   group('Checkout', function () {
     startTransaction('Checkout');
@@ -318,7 +323,7 @@ export function actionPhase(ctx) {
     endTransaction('Checkout');
   });
 
-  sleep(1);
+  sleep(getFrameworkThinkTime());
 }
 
 export function endPhase(ctx) {

@@ -428,14 +428,14 @@ flowchart LR
 
 ### 2. SCENARIO LAYER (`core-engine/src/scenario/`)
 
-**Current layer note:** This layer now does more than executor translation. It injects `K6_PERF_RUNTIME_METADATA`, `K6_PERF_SCENARIO_METADATA`, and `K6_PERF_PHASES` into scenario env, and `computePhaseEnvelope()` now includes explicit `shared-iterations` metadata for lifecycle-aware iteration flows.
+**Current layer note:** This layer now does more than executor translation. It injects `K6_PERF_RUNTIME_METADATA`, `K6_PERF_SCENARIO_METADATA`, and `K6_PERF_PHASES` into scenario env, and `computePhaseEnvelope()` now includes explicit `shared-iterations` metadata for lifecycle-aware iteration flows. `ScenarioRuntimeMetadata.runtime.thinkTime` now carries the full think-time config (`mode`, `fixed`, `min`, `max`) so k6-side `getFrameworkThinkTime()` can compute correct sleep durations.
 
 | File | Class | Purpose |
 |------|-------|---------|
 | WorkloadModels.ts | (functions) | `buildLoadProfile()` (ramp-up → steady → ramp-down), `buildStressProfile()` (aggressive ramp), `buildSoakProfile()` (low sustained), `buildSpikeProfile()` (sudden surge), `buildIterationProfile()` (fixed iterations), `toK6ExecutorConfig()` (translates to k6-native) |
 | ExecutorFactory.ts | `ExecutorFactory` | `validate()` checks required fields per executor, `build()` → k6 executor config, `listSupported()` prints all 6 types. Supports: ramping-vus, constant-vus, ramping-arrival-rate, constant-arrival-rate, shared-iterations, per-vu-iterations |
 | TestPlanLoader.ts | `TestPlanLoader` | `load(planPath)` → reads JSON, validates schema via SchemaValidator, returns typed TestPlan |
-| ScenarioBuilder.ts | `ScenarioBuilder` | `build(plan)` → K6ScenariosMap. Routes to `buildParallel()`, `buildSequential()` (startTime offsets), `buildHybrid()` (mixed groups). Helpers: `sanitizeExecName()`, `estimateTotalDurationSeconds()`, `parseDurationToSeconds()` |
+| ScenarioBuilder.ts | `ScenarioBuilder` | `build(plan)` → K6ScenariosMap. Routes to `buildParallel()`, `buildSequential()` (startTime offsets), `buildHybrid()` (mixed groups). Helpers: `sanitizeExecName()`, `estimateTotalDurationSeconds()`, `parseDurationToSeconds()`. `ScenarioRuntimeMetadata` interface carries `runtime.thinkTime: { mode, fixed?, min?, max? }` (replaced flat `thinkTimeMode` string) |
 
 ### 3. EXECUTION LAYER (`core-engine/src/execution/`)
 
@@ -542,7 +542,7 @@ flowchart LR
 | transaction.ts | `initTransactions`, `startTransaction`, `endTransaction` | LoadRunner-style timing. Creates Trend metrics using the transaction name directly (e.g., `new Trend('Homepage')`) in k6 init context. Records start timestamp → calculates duration → adds to Trend |
 | replayLogger.ts | `logReplayExchange`, `logExchange`, `trackCorrelation`, `trackParameter`, `trackDataRow`, `createVariableEvent` | k6-side logging. Outputs `[k6-perf][replay-log]` JSON with: harEntryId, transaction, iteration, VU, request/response details, headers, cookies, body. `trackCorrelation(name, value, source)` / `trackParameter(name, value, source)` register variables in `_variableRegistry`. `trackDataRow(sourceName, rowObject)` bulk-registers all CSV columns as parameters. `logExchange` auto-detects variable usage by scanning request URL/body/headers for registered values (via `detectVariableEvents()`). Body values stringified defensively (`typeof body === 'object' ? JSON.stringify(body) : String(body)`). **Binary body detection:** `binaryBodyPlaceholder(url, responseHeaders)` checks Content-Type (image/audio/video/font + common binary MIME types) and URL extension (.png/.ttf/.woff2/etc.) — replaces body with `[binary: content-type]` placeholder to prevent JSON serialization failures. Cookie extraction: `extractJarCookies(url)` uses `http.cookieJar().cookiesForURL()` for auto-managed cookies, `extractK6ResponseCookies(resCookies)` for k6's parsed `res.cookies` object. Tracks per-iteration state and request sequencing |
 | session.ts | `registerBaseUrl`, `clearCookies`, `deleteCookie` | k6-side cookie management utilities. **URL registry pattern:** `_registeredUrls` Set tracks all known base URLs. `registerBaseUrl(url)` adds a URL to the registry (called automatically by generated/converted scripts at module init). `clearCookies(...urls)` clears the VU's cookie jar — with no arguments, clears all registered URLs; with arguments, clears only the given URLs. `deleteCookie(url, name)` removes a specific named cookie. Used by framework to support per-journey cookie control when `noCookiesReset` is true globally but individual journeys need session resets. |
-| lifecycle.ts | `createJourneyLifecycleStore`, `runJourneyLifecycle` | k6-side lifecycle orchestration. Manages `initPhase`, `actionPhase`, `endPhase` execution, pacing, and error behavior. |
+| lifecycle.ts | `createJourneyLifecycleStore`, `runJourneyLifecycle`, `getFrameworkThinkTime` | k6-side lifecycle orchestration. Manages `initPhase`, `actionPhase`, `endPhase` execution, pacing, and error behavior. `getFrameworkThinkTime()` reads the thinkTime config from `K6_PERF_RUNTIME_METADATA` env var and returns the appropriate sleep duration in seconds — supports `fixed` (default 1s) and `random` (random in [min, max], defaults 0.5–3s) modes. Used by generated/converted scripts via `sleep(getFrameworkThinkTime())` between transaction groups. |
 
 ### 13. TYPES (`core-engine/src/types/`)
 
@@ -1764,8 +1764,38 @@ npm run cli -- run --plan config/test-plans/debug-test.json
   - detailed layer-to-module relationships across `config`, `scenario`, `assertions`, `execution`, `runtime`, `data`, `recording`, `correlation`, `debug`, `reporting`, `reporters`, and `utils/types`
   - end-to-end runtime flow from plan loading through reporting/artifact generation
 - **Instruction added:** Future agents should update both the flow diagram and surrounding agent context together so this file stays usable as a token-saving orientation layer for AI assistants.
-  
-### 2026-04-20 - Utils Layer TypeScript Migration  
-- **What:** Converted 	ransaction.js, session.js, eplayLogger.js, and lifecycle.js to TypeScript (.ts) in core-engine/src/utils/  
-- **Why:** To bring type-safety to the last remaining loose JS files in the core framework architecture.  
-- **Impact:** All internal references point to dist/utils/*.js which is where tsc outputs the compiled CommonJS helpers for goja. 
+
+### 2026-04-20 - Utils Layer TypeScript Migration
+- **What:** Converted transaction.js, session.js, replayLogger.js, and lifecycle.js to TypeScript (.ts) in core-engine/src/utils/
+- **Why:** To bring type-safety to the last remaining loose JS files in the core framework architecture.
+- **Impact:** All internal references point to dist/utils/*.js which is where tsc outputs the compiled CommonJS helpers for goja.
+
+### 2026-05-07 — getFrameworkThinkTime Implementation & Duplicate Import Fix
+- **What:** Modified `core-engine/src/utils/lifecycle.ts`, `core-engine/src/recording/ScriptGenerator.ts`, `core-engine/src/scenario/ScenarioBuilder.ts`, `core-engine/src/cli/run.ts`, `scrum-suites/jpet-team/tests/buyanimal_1_framework_lifecycle.js`
+- **Why:** Two errors blocked test execution:
+  1. `SyntaxError: duplicate bounded name createJourneyLifecycleStore` — duplicate lifecycle import lines in ScriptGenerator and test script
+  2. `getFrameworkThinkTime is not defined` — function was referenced but never implemented
+- **lifecycle.ts:** Added `getFrameworkThinkTime()` export — reads thinkTime config from `K6_PERF_RUNTIME_METADATA`, supports fixed and random modes
+- **ScenarioBuilder.ts:** Changed `thinkTimeMode: string` to `thinkTime: { mode, fixed?, min?, max? }` in `ScenarioRuntimeMetadata`
+- **run.ts:** Updated `buildScenarioRuntimeMetadata()` to pass full thinkTime config
+- **ScriptGenerator.ts:** Removed duplicate import and duplicate `sleep(1)` call
+- **buyanimal_1_framework_lifecycle.js:** Removed duplicate import, added missing `sleep` to k6 import
+- **Rebuilt dist/** via `tsc`
+
+### 2026-05-07 — Schema-Driven DX: Phase 1 (Editor-Agnostic IntelliSense)
+- **What:** Created `config/schemas/` with three JSON Schema files and wired them into all config files via `$schema` property.
+- **Why:** Users had no discoverability for config fields — no autocomplete, no hover descriptions, no validation hints. JSON Schema with `$schema` is editor-agnostic and works in VS Code, JetBrains (IntelliJ/WebStorm), Sublime Text (LSP), Neovim (LSP), Eclipse, and any JSON Schema-aware editor.
+- **New files:**
+  - `config/schemas/runtime-settings.schema.json` — 8 top-level sections, ~30 fields, all with rich descriptions and defaults
+  - `config/schemas/test-plan.schema.json` — covers all plan fields including SLAs, debug, hybrid groups, per-journey overrides
+  - `config/schemas/environment.schema.json` — environment config with serviceUrls and custom fields
+- **Modified files:**
+  - `config/runtime-settings/default.json` — added `$schema` reference
+  - `config/test-plans/load-test.json`, `webui-load-test.json` — added `$schema` references
+  - `config/environments/dev.json` — added `$schema` reference
+  - `core-engine/src/config/SchemaValidator.ts` — loads external schema files with inline fallback, allows `$schema` property, enhanced enum error messages to show allowed values
+  - `core-engine/src/cli/init.ts` — scaffolds `config/schemas/` directory, adds `$schema` to generated configs, uses `getFrameworkThinkTime` in sample scripts
+- **Design decisions:**
+  - `$schema` in each file (not `.vscode/settings.json`) for editor-agnosticism
+  - External schema files as single source of truth; inline schemas kept as fallback
+  - Rich `description` fields become tooltips/hover info in any editor

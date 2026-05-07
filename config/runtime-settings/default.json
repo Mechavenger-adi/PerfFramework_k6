@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/runtime-settings.schema.json",
   "thinkTime": {
     "mode": "fixed",
     "fixed": 1
@@ -9,7 +10,7 @@
   "http": {
     "timeoutSeconds": 60,
     "maxRedirects": 10,
-    "throwOnError": false
+    "throwOnError": true
   },
   "errorBehavior": "continue",
   "reporting": {

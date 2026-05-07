@@ -30,7 +30,12 @@ export interface ScenarioRuntimeMetadata {
     generatedAt: string;
     runtime: {
         errorBehavior: string;
-        thinkTimeMode: string;
+        thinkTime: {
+            mode: string;
+            fixed?: number;
+            min?: number;
+            max?: number;
+        };
         pacingEnabled: boolean;
         pacingSeconds: number;
         reporting: {

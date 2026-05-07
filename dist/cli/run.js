@@ -435,7 +435,12 @@ function buildScenarioRuntimeMetadata(plan, resolvedConfig, runId, safeReportDir
         generatedAt: new Date().toISOString(),
         runtime: {
             errorBehavior: runtime.getErrorBehavior(),
-            thinkTimeMode: resolvedConfig.runtime.thinkTime.mode,
+            thinkTime: {
+                mode: resolvedConfig.runtime.thinkTime.mode,
+                fixed: resolvedConfig.runtime.thinkTime.fixed,
+                min: resolvedConfig.runtime.thinkTime.min,
+                max: resolvedConfig.runtime.thinkTime.max,
+            },
             pacingEnabled: runtime.isPacingEnabled(),
             pacingSeconds: runtime.getPacingSeconds(),
             reporting: {

@@ -267,6 +267,30 @@ export function createJourneyLifecycleStore(): JourneyLifecycleStore {
   };
 }
 
+/**
+ * Returns the framework-configured think time in seconds.
+ *
+ * Reads the thinkTime block from K6_PERF_RUNTIME_METADATA:
+ *   - mode 'fixed' → returns `fixed` value (default 1s)
+ *   - mode 'random' → returns random value in [min, max] (defaults 0.5–3s)
+ *
+ * Falls back to 1 second when no runtime metadata is available.
+ */
+export function getFrameworkThinkTime(): number {
+  const runtime = getRuntimeMetadata();
+  const thinkTime = (runtime as any).thinkTime;
+  if (!thinkTime) {
+    return 1;
+  }
+  if (thinkTime.mode === 'random') {
+    const min = Number(thinkTime.min ?? 0.5);
+    const max = Number(thinkTime.max ?? 3);
+    return min + Math.random() * (max - min);
+  }
+  // fixed mode (default)
+  return Number(thinkTime.fixed ?? 1);
+}
+
 export function runJourneyLifecycle(store: JourneyLifecycleStore, phaseFns: PhaseFns): void {
   const runtime = getRuntimeMetadata();
   const phases = getPhaseMetadata();

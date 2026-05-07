@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/environment.schema.json",
   "name": "dev",
   "baseUrl": "https://test-api.k6.io"
 }
