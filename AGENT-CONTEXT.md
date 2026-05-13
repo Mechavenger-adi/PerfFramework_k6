@@ -714,6 +714,8 @@ For each journey in test plan:
 { "name": "dev", "baseUrl": "https://test-api.k6.io" }
 ```
 
+**Current behavior note:** `baseUrl` is loaded into resolved environment config and written into run-manifest metadata, but it is not yet auto-injected into journey scripts as a request base URL or runtime env var. Generated and converted scripts currently use discovered request URLs for `registerBaseUrl()` cookie-jar registration.
+
 ### config/runtime-settings/default.json
 ```json
 {
@@ -1641,6 +1643,16 @@ npm run cli -- run --plan config/test-plans/debug-test.json
   - Generates `registerBaseUrl()` calls before lifecycle store in `applyPhaseContract()`
   - Added `clearCookies()` as first line of `initPhase` in `renderPhaseFunction`
 
+### 2026-05-13 - Transaction Counter Metrics
+- **What:** Updated `core-engine/src/utils/transaction.ts` so each transaction initializes a k6 Counter named `<transaction>_count` alongside its Trend.
+- **Behavior:** `startTransaction(name)` increments `<name>_count` on every call, while `endTransaction(name)` still records duration to the Trend metric.
+- **Reporting effect:** `TransactionMetricsBuilder` uses `<transaction>_count` as the authoritative transaction count when present. `pass` remains the minimum successful check count inside the transaction, and `fail` is computed as `count - pass`.
+
+### 2026-05-13 - Base URL Integration Clarification
+- **Environment config:** `config/environments/*.json` `baseUrl` is resolved by `ConfigurationManager` and carried into run-manifest metadata.
+- **Current script behavior:** Generated and converted scripts do not yet consume environment `baseUrl` for request construction.
+- **Current `registerBaseUrl()` source:** Cookie-jar URL registration comes from discovered HAR/source request URLs, not from environment config.
+
 ### 2026-04-08 - Test Plan JSON Files Updated
 - **What:** Added `noCookiesReset: true` to all three test plan JSON files.
 - **Files modified:**
@@ -1799,3 +1811,62 @@ npm run cli -- run --plan config/test-plans/debug-test.json
   - `$schema` in each file (not `.vscode/settings.json`) for editor-agnosticism
   - External schema files as single source of truth; inline schemas kept as fallback
   - Rich `description` fields become tooltips/hover info in any editor
+
+### 2026-05-07 — Schema-Driven DX: Phases 2, 3, and 4 (Validation UX, Templates, JSONC)
+- **What:** Enhanced validation errors, added JSONC parsing for comments, and built a template library.
+- **Why:** To make configuration failure states actionable ("Did you mean X?"), allow users to document their configs inline via JSONC, and provide easy starting points (templates) for different test types (load, spike, soak) rather than starting from scratch.
+- **Phase 2 (Validation UX):**
+  - Updated `SchemaValidator.ts` to implement a Levenshtein distance check for `additionalProperties` violations, providing `"Did you mean 'X'?"` suggestions for typos.
+  - Improved `required` field errors to dynamically list all available valid properties.
+  - Added `--verbose` flag to `validate.ts` & `run.ts` which computes and prints a "Config Completeness Score" indicating how many top-level sections were utilized vs left to defaults.
+- **Phase 3 (Template Library):**
+  - Updated `*.schema.json` files and inline schemas to explicitly allow a `_meta` object (ignored at runtime) for storing template titles and descriptions.
+  - Created 6 test plan templates in `config/templates/test-plans/*.jsonc` (smoke, load, spike, soak, stress, breakpoint).
+  - Created 4 runtime setting templates in `config/templates/runtime-settings/*.jsonc` (ci-pipeline, local-debug, max-throughput, strict-sla).
+  - Created new `templates.ts` CLI module with `list` and `show <name>` commands.
+- **Phase 4 (JSONC Support):**
+  - Replaced native `JSON.parse` with `jsonc-parser.parse()` in `ConfigurationManager.ts` and `TestPlanLoader.ts`, natively supporting inline `//` and `/* */` comments in user config files.
+
+### 2026-05-07 — Schema-Driven DX: Phase 5 (CLI Enhancements)
+- **What:** Added new CLI commands: `features`, `config inspect`, and `new`.
+- **Why:** To improve onboarding and troubleshooting directly from the terminal without requiring users to hunt through source code.
+- **`features` command:** Prints a quick summary of framework capabilities (Parallel Execution, Hybrid Execution, Breakpoint Testing, Reporting, etc.) so developers understand what's possible out-of-the-box.
+- **`config inspect` command:** Prints the exact resolution chain (Defaults -> Environment -> Runtime Settings -> .env secrets -> Test Plan) and the final merged JSON object. Essential for debugging "why didn't my setting apply?".
+- **`new` command:** An interactive `readline` wizard that prompts the user to select whether they want to create a Test Plan or Runtime Settings, lists the available templates, asks for a filename, and automatically copies the `.jsonc` template into the correct directory.
+
+### 2026-05-07 — Schema-Driven DX: Phase 6 (Documentation Automation)
+- **What:** Created a `docs` CLI command that dynamically generates markdown documentation directly from the JSON Schemas.
+- **Why:** To eliminate the problem of stale documentation. The schema is now the single source of truth for both runtime validation, editor tooling, *and* documentation.
+- **Implementation:** Added `docs.ts` to read `config/schemas/*.schema.json`, extract descriptions, required status, and enums, and output a formatted `docs/configuration-reference.md`.
+
+### 2026-05-13 — AI Context System (`/ai-context`) Created
+- **What:** Created a 25-file modular AI context system at `ai-context/` to replace monolithic AGENT-CONTEXT.md loading for AI agents.
+- **Why:** AGENT-CONTEXT.md is 1,841 lines / 140KB (~35K tokens). Most tasks only need 3-8K tokens of context. Modular files enable targeted loading with 80-90% token savings.
+- **Files created (25):**
+  - `overview.md` — Entry point and routing table (always read first)
+  - `architecture-laws.md` — 10 inviolable rules (L1-L10)
+  - `framework-philosophy.md` — 10 design principles (P1-P10)
+  - `module-map.md` — File-level routing table (all ~75 source files)
+  - `execution-flow.md` — Step-by-step runtime execution flows
+  - `dependency-rules.md` — Layer dependency matrix and import constraints
+  - `integration-checklist.md` — Feature addition checklist
+  - `change-impact-map.md` — Cross-reference blast radius tables
+  - `fragile-areas.md` — 8 historically problematic areas (F1-F8)
+  - `decisions.md` — 12 distilled decision records (D1-D12)
+  - `rejected-approaches.md` — 10 abandoned approaches (R1-R10)
+  - `ai-workflow.md` — AI agent operational guide
+  - `prompt-templates.md` — 5 reusable prompt patterns (PT1-PT5)
+  - `token-optimization-guide.md` — Token budget strategies
+  - `architecture-evolution.md` — Timeline from Phase 1 to future
+  - `integration-contracts.md` — Cross-layer API contracts + env vars
+  - `extension-points.md` — 11 pluggable extension points (EP1-EP11)
+  - `known-tech-debt.md` — 13 tech debt items (TD1-TD13)
+  - `dependency-hotspots.md` — Module coupling analysis with risk levels
+  - `orchestration-map.md` — CLI → engine → k6 wiring per command
+  - `runtime-contracts.md` — k6-side runtime behavior contracts
+  - `reporting-contracts.md` — Artifact schemas and CI/CD patterns
+  - `replay-debug-contracts.md` — Debug replay system contracts
+  - `subsystem-boundaries.md` — Layer ownership rules
+  - `risk-zones.md` — 10 hidden complexity areas (RZ1-RZ10)
+- **Design:** All content derived from actual repository analysis (code, change logs, graph.html, implementation history). Zero generic documentation. Each file is self-contained, concise, and scannable.
+- **Usage:** AI agents should read `ai-context/overview.md` first, then load only task-relevant files. AGENT-CONTEXT.md remains the canonical record but should NOT be the primary AI loading target.

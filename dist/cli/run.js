@@ -63,6 +63,11 @@ const generate_1 = require("./generate");
 const generate_byos_1 = require("./generate-byos");
 const init_1 = require("./init");
 const validate_1 = require("./validate");
+const templates_1 = require("./templates");
+const features_1 = require("./features");
+const config_inspect_1 = require("./config-inspect");
+const new_1 = require("./new");
+const docs_1 = require("./docs");
 const program = new commander_1.Command();
 program
     .name('k6-framework')
@@ -77,6 +82,24 @@ program
     .option('-d, --dir <path>', 'Target directory to scaffold into', process.cwd())
     .action((opts) => {
     (0, init_1.runInit)(opts.dir);
+});
+// ---------------------------------------------
+// NEW command
+// ---------------------------------------------
+program
+    .command('new')
+    .description('Interactive wizard to create a new test plan or runtime settings from templates')
+    .action(() => {
+    (0, new_1.runNewWizard)();
+});
+// ---------------------------------------------
+// DOCS command
+// ---------------------------------------------
+program
+    .command('docs')
+    .description('Auto-generate Markdown reference documentation from JSON schemas')
+    .action(() => {
+    (0, docs_1.generateDocs)();
 });
 // ---------------------------------------------
 // GENERATE BYOS command
@@ -118,6 +141,7 @@ program
     .option('--runtime <path>', 'Path to the runtime-settings JSON file', 'config/runtime-settings/default.json')
     .option('--data-root <path>', 'Root directory for data files', 'scrum-suites')
     .option('--env-file <path>', 'Path to .env file', '.env')
+    .option('--verbose', 'Print verbose validation output including completeness score')
     .action((opts) => {
     const passed = (0, validate_1.runValidate)({
         planPath: opts.plan,
@@ -125,9 +149,63 @@ program
         runtimeSettingsPath: opts.runtime,
         dataRoot: opts.dataRoot,
         envFilePath: opts.envFile,
+        verbose: opts.verbose,
     });
     if (!passed)
         process.exit(1);
+});
+// ---------------------------------------------
+// TEMPLATES command
+// ---------------------------------------------
+const templatesCmd = program
+    .command('templates')
+    .description('Discover and view built-in config templates');
+templatesCmd
+    .command('list')
+    .description('List all available templates')
+    .option('--type <type>', 'Type of templates (test-plans | runtime-settings)', 'test-plans')
+    .action((opts) => {
+    if (opts.type !== 'test-plans' && opts.type !== 'runtime-settings') {
+        console.error('Invalid type. Must be test-plans or runtime-settings.');
+        process.exit(1);
+    }
+    (0, templates_1.listTemplates)(opts.type);
+});
+templatesCmd
+    .command('show <name>')
+    .description('Show the content of a specific template')
+    .option('--type <type>', 'Type of template (test-plans | runtime-settings)', 'test-plans')
+    .action((name, opts) => {
+    if (opts.type !== 'test-plans' && opts.type !== 'runtime-settings') {
+        console.error('Invalid type. Must be test-plans or runtime-settings.');
+        process.exit(1);
+    }
+    (0, templates_1.showTemplate)(opts.type, name);
+});
+// ---------------------------------------------
+// FEATURES command
+// ---------------------------------------------
+program
+    .command('features')
+    .description('Discover built-in framework capabilities')
+    .action(() => {
+    (0, features_1.listFeatures)();
+});
+// ---------------------------------------------
+// CONFIG command
+// ---------------------------------------------
+const configCmd = program
+    .command('config')
+    .description('Configuration utilities');
+configCmd
+    .command('inspect')
+    .description('Inspect the final merged configuration resolution chain')
+    .requiredOption('--plan <path>', 'Path to the test plan JSON file')
+    .option('--env-config <path>', 'Path to the environment config JSON file')
+    .option('--runtime <path>', 'Path to the runtime-settings JSON file')
+    .option('--env-file <path>', 'Path to .env file')
+    .action((opts) => {
+    (0, config_inspect_1.inspectConfig)(opts.plan, opts.envConfig, opts.runtime, opts.envFile);
 });
 // ---------------------------------------------
 // DEBUG command

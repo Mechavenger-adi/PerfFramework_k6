@@ -11,6 +11,11 @@
       "type": "string",
       "description": "JSON Schema reference for editor IntelliSense (ignored at runtime)."
     },
+    "_meta": {
+      "type": "object",
+      "description": "Template metadata (ignored at runtime).",
+      "additionalProperties": true
+    },
     "name": {
       "type": "string",
       "minLength": 1,

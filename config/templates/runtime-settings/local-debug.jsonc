@@ -1,0 +1,27 @@
+{
+  "$schema": "../../schemas/runtime-settings.schema.json",
+  "_meta": {
+    "title": "Local Debug",
+    "description": "Captures maximum detail for troubleshooting script failures locally. High snapshot capture rate."
+  },
+  "thinkTime": { "mode": "fixed", "fixed": 0 },
+  "pacing": { "enabled": false },
+  "http": { "timeoutSeconds": 60, "maxRedirects": 10, "throwOnError": false },
+  "errorBehavior": "stop_iteration",
+  "reporting": {
+    "transactionStats": ["count", "fail"],
+    "includeTransactionTable": true,
+    "includeErrorTable": true,
+    "timeseries": { "enabled": false }
+  },
+  "errors": {
+    "captureSnapshotOnFailure": true,
+    "maxSnapshotsPerRun": 100,
+    "includeRequestHeaders": true,
+    "includeRequestBody": true,
+    "includeResponseHeaders": true,
+    "includeResponseBody": true
+  },
+  "monitoring": { "enabled": false },
+  "debugMode": true
+}

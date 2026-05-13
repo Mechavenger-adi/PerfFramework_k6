@@ -44,6 +44,7 @@ const path = __importStar(require("path"));
 const ConfigContracts_1 = require("../types/ConfigContracts");
 const EnvResolver_1 = require("./EnvResolver");
 const SchemaValidator_1 = require("./SchemaValidator");
+const jsonc_parser_1 = require("jsonc-parser");
 class ConfigurationManager {
     constructor(envFilePath) {
         this.envResolver = new EnvResolver_1.EnvResolver(envFilePath);
@@ -109,10 +110,15 @@ class ConfigurationManager {
             throw new Error(`[ConfigurationManager] ${label} file not found: ${abs}`);
         }
         try {
-            return JSON.parse(fs.readFileSync(abs, 'utf-8'));
+            const fileContent = fs.readFileSync(abs, 'utf-8');
+            const parsed = (0, jsonc_parser_1.parse)(fileContent);
+            if (parsed === undefined) {
+                throw new Error('Invalid JSONC format or empty file');
+            }
+            return parsed;
         }
         catch (err) {
-            throw new Error(`[ConfigurationManager] Failed to parse ${label} JSON at ${abs}: ${err.message}`);
+            throw new Error(`[ConfigurationManager] Failed to parse ${label} JSONC at ${abs}: ${err.message}`);
         }
     }
     /** Recursive deep merge – source keys override target keys. */

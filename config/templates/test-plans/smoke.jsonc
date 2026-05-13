@@ -1,0 +1,22 @@
+{
+  "$schema": "../../schemas/test-plan.schema.json",
+  "_meta": {
+    "title": "Smoke Test",
+    "description": "A very quick, low-volume test to verify the system and test scripts are working correctly."
+  },
+  "name": "Smoke Test",
+  "environment": "dev",
+  "execution_mode": "parallel",
+  "global_load_profile": {
+    "executor": "constant-vus",
+    "vus": 1,
+    "duration": "1m"
+  },
+  "user_journeys": [
+    {
+      "name": "example_journey",
+      "scriptPath": "scrum-suites/sample-team/tests/example.js",
+      "weight": 100
+    }
+  ]
+}

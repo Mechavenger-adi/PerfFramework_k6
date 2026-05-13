@@ -84,6 +84,7 @@ const RUNTIME_SETTINGS_SCHEMA_INLINE = {
     additionalProperties: false,
     properties: {
         $schema: { type: 'string' },
+        _meta: { type: 'object', additionalProperties: true },
         thinkTime: {
             type: 'object',
             required: ['mode'],
@@ -167,6 +168,7 @@ const TEST_PLAN_SCHEMA_INLINE = {
     additionalProperties: true,
     properties: {
         $schema: { type: 'string' },
+        _meta: { type: 'object', additionalProperties: true },
         name: { type: 'string', minLength: 1 },
         environment: { type: 'string', minLength: 1 },
         execution_mode: { type: 'string', enum: ['parallel', 'sequential', 'hybrid'] },
@@ -226,7 +228,7 @@ const TEST_PLAN_SCHEMA_INLINE = {
 };
 class SchemaValidator {
     constructor() {
-        this.ajv = new ajv_1.default({ allErrors: true });
+        this.ajv = new ajv_1.default({ allErrors: true, verbose: true });
         (0, ajv_formats_1.default)(this.ajv);
         // Prefer external schema files (rich descriptions for docs/tooling),
         // fall back to inline schemas if external files are unavailable.
@@ -252,10 +254,65 @@ class SchemaValidator {
                 const allowed = e.params.allowedValues.join(' | ');
                 return `[${label}] ${field}: ${e.message}. Allowed values: ${allowed}`;
             }
+            // "Did you mean?" for misspelled additional properties
+            if (e.keyword === 'additionalProperties' && e.params?.additionalProperty) {
+                const misspelled = e.params.additionalProperty;
+                const parentSchema = e.parentSchema;
+                if (parentSchema?.properties) {
+                    const allowedProps = Object.keys(parentSchema.properties);
+                    let bestMatch = '';
+                    let lowestDist = Infinity;
+                    for (const prop of allowedProps) {
+                        const dist = levenshtein(misspelled, prop);
+                        if (dist < lowestDist) {
+                            lowestDist = dist;
+                            bestMatch = prop;
+                        }
+                    }
+                    if (lowestDist <= 3 && bestMatch) {
+                        return `[${label}] ${field}: unknown property "${misspelled}". Did you mean "${bestMatch}"?`;
+                    }
+                }
+                return `[${label}] ${field}: unknown property "${misspelled}".`;
+            }
+            // Better required field messages
+            if (e.keyword === 'required' && e.params?.missingProperty) {
+                const missing = e.params.missingProperty;
+                const parentSchema = e.parentSchema;
+                if (parentSchema?.properties) {
+                    const available = Object.keys(parentSchema.properties)
+                        .filter(p => p !== '$schema')
+                        .join(', ');
+                    return `[${label}] ${field}: missing required property "${missing}". Available fields: ${available}`;
+                }
+                return `[${label}] ${field}: missing required property "${missing}".`;
+            }
             return `[${label}] ${field}: ${e.message}`;
         });
         return { valid: false, errors };
     }
 }
 exports.SchemaValidator = SchemaValidator;
+// Simple Levenshtein distance for "Did you mean?" suggestions
+function levenshtein(a, b) {
+    const matrix = Array.from({ length: a.length + 1 }, () => Array(b.length + 1).fill(0));
+    for (let i = 0; i <= a.length; i++)
+        matrix[i][0] = i;
+    for (let j = 0; j <= b.length; j++)
+        matrix[0][j] = j;
+    for (let i = 1; i <= a.length; i++) {
+        for (let j = 1; j <= b.length; j++) {
+            if (a[i - 1] === b[j - 1]) {
+                matrix[i][j] = matrix[i - 1][j - 1];
+            }
+            else {
+                matrix[i][j] = Math.min(matrix[i - 1][j - 1] + 1, // substitution
+                matrix[i][j - 1] + 1, // insertion
+                matrix[i - 1][j] + 1 // deletion
+                );
+            }
+        }
+    }
+    return matrix[a.length][b.length];
+}
 //# sourceMappingURL=SchemaValidator.js.map

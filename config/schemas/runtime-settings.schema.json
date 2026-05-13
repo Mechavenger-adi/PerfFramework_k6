@@ -11,6 +11,11 @@
       "type": "string",
       "description": "JSON Schema reference for editor IntelliSense (ignored at runtime)."
     },
+    "_meta": {
+      "type": "object",
+      "description": "Template metadata (ignored at runtime).",
+      "additionalProperties": true
+    },
     "thinkTime": {
       "type": "object",
       "description": "Simulates user think time (pause) between transaction groups. Applied automatically in generated/converted scripts via sleep(getFrameworkThinkTime()). Realistic think times improve load accuracy by mimicking real user behavior.",

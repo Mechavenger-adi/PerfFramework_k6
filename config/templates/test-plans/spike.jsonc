@@ -1,0 +1,29 @@
+{
+  "$schema": "../../schemas/test-plan.schema.json",
+  "_meta": {
+    "title": "Spike Test",
+    "description": "Rapidly spikes to a very high load and then drops. Good for testing recovery and elasticity."
+  },
+  "name": "Spike Test",
+  "environment": "dev",
+  "execution_mode": "parallel",
+  "global_load_profile": {
+    "executor": "ramping-vus",
+    "startVUs": 0,
+    "stages": [
+      // Rapid spike over 10s
+      { "duration": "10s", "target": 200 },
+      // Hold the spike
+      { "duration": "1m", "target": 200 },
+      // Rapid drop
+      { "duration": "10s", "target": 0 }
+    ]
+  },
+  "user_journeys": [
+    {
+      "name": "example_journey",
+      "scriptPath": "scrum-suites/sample-team/tests/example.js",
+      "weight": 100
+    }
+  ]
+}

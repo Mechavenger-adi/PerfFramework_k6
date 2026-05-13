@@ -8,6 +8,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { TestPlan } from '../types/TestPlanSchema';
 import { SchemaValidator } from '../config/SchemaValidator';
+import { parse } from 'jsonc-parser';
 
 export class TestPlanLoader {
   private readonly schemaValidator: SchemaValidator;
@@ -29,10 +30,14 @@ export class TestPlanLoader {
 
     let raw: unknown;
     try {
-      raw = JSON.parse(fs.readFileSync(abs, 'utf-8'));
+      const fileContent = fs.readFileSync(abs, 'utf-8');
+      raw = parse(fileContent);
+      if (raw === undefined) {
+        throw new Error('Invalid JSONC format or empty file');
+      }
     } catch (err) {
       throw new Error(
-        `[TestPlanLoader] Failed to parse JSON at ${abs}: ${(err as Error).message}`,
+        `[TestPlanLoader] Failed to parse JSONC at ${abs}: ${(err as Error).message}`,
       );
     }
 

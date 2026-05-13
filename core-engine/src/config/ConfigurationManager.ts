@@ -15,6 +15,7 @@ import {
 import { TestPlan } from '../types/TestPlanSchema';
 import { EnvResolver } from './EnvResolver';
 import { SchemaValidator } from './SchemaValidator';
+import { parse } from 'jsonc-parser';
 
 export class ConfigurationManager {
   private readonly envResolver: EnvResolver;
@@ -109,10 +110,15 @@ export class ConfigurationManager {
       throw new Error(`[ConfigurationManager] ${label} file not found: ${abs}`);
     }
     try {
-      return JSON.parse(fs.readFileSync(abs, 'utf-8')) as T;
+      const fileContent = fs.readFileSync(abs, 'utf-8');
+      const parsed = parse(fileContent);
+      if (parsed === undefined) {
+        throw new Error('Invalid JSONC format or empty file');
+      }
+      return parsed as T;
     } catch (err) {
       throw new Error(
-        `[ConfigurationManager] Failed to parse ${label} JSON at ${abs}: ${(err as Error).message}`,
+        `[ConfigurationManager] Failed to parse ${label} JSONC at ${abs}: ${(err as Error).message}`,
       );
     }
   }

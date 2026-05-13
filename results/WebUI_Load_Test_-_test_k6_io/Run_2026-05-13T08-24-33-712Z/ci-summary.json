@@ -1,0 +1,107 @@
+{
+  "status": "failed",
+  "runId": "Run_2026-05-13T08-24-33-712Z",
+  "plan": "WebUI Load Test - test.k6.io",
+  "environment": "dev",
+  "thresholdFailures": 1,
+  "errorCount": 1,
+  "warningCount": 1,
+  "aborted": false,
+  "transactions": [
+    {
+      "name": "tx01_launch",
+      "count": 3,
+      "pass": 3,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 704.6666666666666,
+      "min": 608,
+      "max": 870
+    },
+    {
+      "name": "tx02_login",
+      "count": 3,
+      "pass": 3,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 643,
+      "min": 609,
+      "max": 670
+    },
+    {
+      "name": "tx03_search_animal",
+      "count": 7,
+      "pass": 7,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 252.14285714285714,
+      "min": 193,
+      "max": 428
+    },
+    {
+      "name": "tx04_select_product",
+      "count": 7,
+      "pass": 7,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 234.71428571428572,
+      "min": 219,
+      "max": 243
+    },
+    {
+      "name": "tx05_add_to_cart",
+      "count": 7,
+      "pass": 7,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 445,
+      "min": 379,
+      "max": 605
+    },
+    {
+      "name": "tx06_increase_quantity_to_2_and_proceed_to_checkout",
+      "count": 14,
+      "pass": 14,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 466,
+      "min": 384,
+      "max": 719
+    },
+    {
+      "name": "tx07_click_continue",
+      "count": 7,
+      "pass": 7,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 219.71428571428572,
+      "min": 210,
+      "max": 227
+    },
+    {
+      "name": "tx08_click_confirm",
+      "count": 7,
+      "pass": 7,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 527.7142857142857,
+      "min": 467,
+      "max": 617
+    },
+    {
+      "name": "tx09_logout",
+      "count": 3,
+      "pass": 3,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 570.3333333333334,
+      "min": 384,
+      "max": 866
+    }
+  ],
+  "gate": {
+    "failedRules": [
+      "tx01_launch:p(95)<800"
+    ]
+  }
+}

@@ -215,23 +215,28 @@ const LAYERS = [
   {
     id: 'cli',        label: 'CLI',         color: '#f59e0b',
     files: [
-      { name: 'run.ts',            size: 31679, desc: 'Main CLI entry – init / run / generate / convert / validate commands' },
+      { name: 'run.ts',            size: 34610, desc: 'Main CLI entry – init / run / generate / convert / validate / templates / docs commands' },
       { name: 'init.ts',           size: 11450, desc: 'Project initialisation wizard + $schema scaffolding' },
+      { name: 'new.ts',            size:  2338, desc: 'Interactive wizard to create configs from templates' },
       { name: 'generate.ts',       size:  5298, desc: 'K6 script generation command' },
       { name: 'generate-byos.ts',  size:  2357, desc: 'Bring-Your-Own-Script generation' },
       { name: 'convert.ts',        size:  2325, desc: 'HAR → K6 conversion command' },
-      { name: 'validate.ts',       size:  1896, desc: 'Test-plan schema validation command' },
+      { name: 'validate.ts',       size:  3212, desc: 'Test-plan schema validation & config completeness' },
+      { name: 'templates.ts',      size:  1985, desc: 'Template library discovery and viewing commands' },
+      { name: 'features.ts',       size:  1347, desc: 'Framework capabilities discovery command' },
+      { name: 'config-inspect.ts', size:  1906, desc: 'Inspects final merged config resolution chain' },
+      { name: 'docs.ts',           size:  2978, desc: 'Auto-generates Markdown reference docs from JSON Schemas' },
       { name: 'LifecyclePrompt.ts',size:  2349, desc: 'Interactive VU lifecycle prompts' },
     ]
   },
   {
     id: 'config',     label: 'Config',      color: '#22d3ee',
     files: [
-      { name: 'ConfigurationManager.ts',  size: 5098, desc: 'Merges env, plan, and runtime config sources' },
+      { name: 'ConfigurationManager.ts',  size: 5311, desc: 'Merges env, plan, and runtime config sources; resolves environment baseUrl into runtime metadata' },
       { name: 'EnvResolver.ts',           size: 2199, desc: 'Resolves .env and environment variables' },
       { name: 'GatekeeperValidator.ts',   size: 8819, desc: 'Pre-run gatekeeper validation rules' },
       { name: 'RuntimeConfigManager.ts',  size: 5510, desc: 'Live runtime configuration updates' },
-      { name: 'SchemaValidator.ts',       size: 8023, desc: 'JSON Schema validation via AJV – loads external .schema.json files' },
+      { name: 'SchemaValidator.ts',       size: 10409, desc: 'JSON Schema validation via AJV with Levenshtein did-you-mean suggestions' },
     ]
   },
   {
@@ -239,7 +244,7 @@ const LAYERS = [
     files: [
       { name: 'test-plan.schema.json',         size: 13041, desc: 'JSON Schema for test plans – SLAs, debug, hybrid, per-journey overrides' },
       { name: 'runtime-settings.schema.json',  size: 10902, desc: 'JSON Schema for runtime settings – thinkTime, pacing, errors, monitoring' },
-      { name: 'environment.schema.json',       size:  2009, desc: 'JSON Schema for environment configs – baseUrl, serviceUrls, custom' },
+      { name: 'environment.schema.json',       size:  2009, desc: 'JSON Schema for environment configs – baseUrl, serviceUrls, custom metadata' },
     ]
   },
   {
@@ -258,7 +263,7 @@ const LAYERS = [
       { name: 'ScenarioBuilder.ts',   size: 12367, desc: 'Builds K6 scenario definitions from test plans' },
       { name: 'WorkloadModels.ts',    size:  3353, desc: 'Load / stress / soak / spike / iteration profiles' },
       { name: 'ExecutorFactory.ts',   size:  2733, desc: 'Creates K6 executor configs per profile type' },
-      { name: 'TestPlanLoader.ts',    size:  1351, desc: 'Loads and parses test-plan JSON files' },
+      { name: 'TestPlanLoader.ts',    size:  1531, desc: 'Loads and parses test-plan JSONC files' },
     ]
   },
   {
@@ -354,8 +359,8 @@ const LAYERS = [
       { name: 'lifecycle.ts',    size: 10829, desc: 'K6-side VU lifecycle helper + getFrameworkThinkTime (runs inside K6)' },
       { name: 'logger.ts',       size: 3896, desc: 'Structured console logger with log levels' },
       { name: 'replayLogger.ts', size: 13854, desc: 'Logs HTTP exchanges for diff debugging' },
-      { name: 'session.ts',      size: 1617, desc: 'Session state helpers for K6 scripts' },
-      { name: 'transaction.ts',  size: 1465, desc: 'Transaction start/end helpers' },
+      { name: 'session.ts',      size: 1617, desc: 'Session state helpers for K6 scripts; registerBaseUrl is currently fed by discovered request URLs for cookie clearing' },
+      { name: 'transaction.ts',  size: 1465, desc: 'Transaction start/end helpers; emits Trend duration metrics and <transaction>_count counters' },
     ]
   },
 ];

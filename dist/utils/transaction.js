@@ -7,6 +7,7 @@ exports.endTransaction = endTransaction;
 const metrics_1 = require("k6/metrics");
 const txnStarts = {};
 const txnTrends = {};
+const txnCounters = {};
 /**
  * Initializes Trends for the specified transactions.
  * Uses the transaction name directly as the k6 Trend metric name.
@@ -21,6 +22,9 @@ function initTransactions(names) {
         if (!txnTrends[name]) {
             txnTrends[name] = new metrics_1.Trend(`${name}`);
         }
+        if (!txnCounters[name]) {
+            txnCounters[name] = new metrics_1.Counter(`${name}_count`);
+        }
     });
 }
 /**
@@ -30,6 +34,12 @@ function initTransactions(names) {
  */
 function startTransaction(name) {
     txnStarts[name] = Date.now();
+    if (txnCounters[name]) {
+        txnCounters[name].add(1);
+    }
+    else {
+        console.error(`Transaction "${name}" counter was not initialized in init context`);
+    }
 }
 /**
  * End a transaction (LoadRunner equivalent)

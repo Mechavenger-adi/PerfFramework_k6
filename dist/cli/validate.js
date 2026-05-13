@@ -44,7 +44,7 @@ const ConfigurationManager_1 = require("../config/ConfigurationManager");
 const GatekeeperValidator_1 = require("../config/GatekeeperValidator");
 const TestPlanLoader_1 = require("../scenario/TestPlanLoader");
 function runValidate(opts) {
-    const { planPath, dataRoot = 'scrum-suites', envFilePath, } = opts;
+    const { planPath, dataRoot = 'scrum-suites', envFilePath, verbose = false, } = opts;
     console.log('\n  Running pre-flight validation...\n');
     // 1. Load test plan
     let plan;
@@ -76,6 +76,32 @@ function runValidate(opts) {
     const gatekeeper = new GatekeeperValidator_1.GatekeeperValidator();
     const result = gatekeeper.validate(resolvedConfig, plan, dataRoot);
     gatekeeper.printResult(result);
+    // 5. Config Completeness Score
+    if (verbose) {
+        try {
+            const fs = require('fs');
+            const { parse } = require('jsonc-parser');
+            const absPath = path.resolve(process.cwd(), runtimeSettingsPath);
+            if (fs.existsSync(absPath)) {
+                const rawRuntime = parse(fs.readFileSync(absPath, 'utf-8')) || {};
+                const expectedFields = ['thinkTime', 'pacing', 'http', 'errorBehavior', 'reporting', 'errors', 'monitoring', 'debugMode'];
+                const configuredFields = expectedFields.filter(f => rawRuntime[f] !== undefined);
+                const missingFields = expectedFields.filter(f => rawRuntime[f] === undefined);
+                const score = Math.round((configuredFields.length / expectedFields.length) * 100);
+                console.log(`\nConfig completeness: ${score}% (${configuredFields.length}/${expectedFields.length} sections configured)`);
+                for (const field of configuredFields) {
+                    console.log(`  \x1b[32m✔\x1b[0m ${field}`);
+                }
+                for (const field of missingFields) {
+                    console.log(`  \x1b[33m○\x1b[0m ${field} (using default)`);
+                }
+                console.log('\n');
+            }
+        }
+        catch (err) {
+            // Ignore if failed to parse for completeness calculation
+        }
+    }
     return result.passed;
 }
 //# sourceMappingURL=validate.js.map

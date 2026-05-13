@@ -42,6 +42,7 @@ exports.TestPlanLoader = void 0;
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const SchemaValidator_1 = require("../config/SchemaValidator");
+const jsonc_parser_1 = require("jsonc-parser");
 class TestPlanLoader {
     constructor() {
         this.schemaValidator = new SchemaValidator_1.SchemaValidator();
@@ -57,10 +58,14 @@ class TestPlanLoader {
         }
         let raw;
         try {
-            raw = JSON.parse(fs.readFileSync(abs, 'utf-8'));
+            const fileContent = fs.readFileSync(abs, 'utf-8');
+            raw = (0, jsonc_parser_1.parse)(fileContent);
+            if (raw === undefined) {
+                throw new Error('Invalid JSONC format or empty file');
+            }
         }
         catch (err) {
-            throw new Error(`[TestPlanLoader] Failed to parse JSON at ${abs}: ${err.message}`);
+            throw new Error(`[TestPlanLoader] Failed to parse JSONC at ${abs}: ${err.message}`);
         }
         const result = this.schemaValidator.validatePlan(raw);
         if (!result.valid) {

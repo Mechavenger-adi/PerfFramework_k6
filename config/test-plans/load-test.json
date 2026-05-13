@@ -7,8 +7,8 @@
     "executor": "ramping-vus",
     "startVUs": 0,
     "stages": [
-      { "duration": "5s", "target": 3 },
-      { "duration": "15s",  "target": 3 },
+      { "duration": "5s", "target": 5 },
+      { "duration": "15s",  "target": 5 },
       { "duration": "5s", "target": 0  }
     ]
   },
@@ -17,12 +17,7 @@
     {
       "name": "buyanimal_1_framework_lifecycle",
       "scriptPath": "buyanimal_1_framework_lifecycle.js",
-      "weight": 50
-    },
-    {
-      "name": "buyanimal_1_framework_lifecycle_copy",
-      "scriptPath": "buyanimal_1_framework_lifecycle_copy.js",
-      "weight": 50
+      "weight": 100
     }
   ],
   "global_sla": {

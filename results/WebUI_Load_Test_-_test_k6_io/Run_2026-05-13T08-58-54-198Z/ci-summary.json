@@ -1,0 +1,105 @@
+{
+  "status": "passed",
+  "runId": "Run_2026-05-13T08-58-54-198Z",
+  "plan": "WebUI Load Test - test.k6.io",
+  "environment": "dev",
+  "thresholdFailures": 0,
+  "errorCount": 0,
+  "warningCount": 0,
+  "aborted": false,
+  "transactions": [
+    {
+      "name": "tx01_launch",
+      "count": 1,
+      "pass": 1,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 736,
+      "min": 736,
+      "max": 736
+    },
+    {
+      "name": "tx02_login",
+      "count": 1,
+      "pass": 1,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 579,
+      "min": 579,
+      "max": 579
+    },
+    {
+      "name": "tx03_search_animal",
+      "count": 2,
+      "pass": 2,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 197,
+      "min": 192,
+      "max": 202
+    },
+    {
+      "name": "tx04_select_product",
+      "count": 2,
+      "pass": 2,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 210.5,
+      "min": 208,
+      "max": 213
+    },
+    {
+      "name": "tx05_add_to_cart",
+      "count": 2,
+      "pass": 2,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 375,
+      "min": 374,
+      "max": 376
+    },
+    {
+      "name": "tx06_increase_quantity_to_2_and_proceed_to_checkout",
+      "count": 2,
+      "pass": 2,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 378,
+      "min": 376,
+      "max": 380
+    },
+    {
+      "name": "tx07_click_continue",
+      "count": 2,
+      "pass": 2,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 198,
+      "min": 193,
+      "max": 203
+    },
+    {
+      "name": "tx08_click_confirm",
+      "count": 2,
+      "pass": 2,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 454,
+      "min": 442,
+      "max": 466
+    },
+    {
+      "name": "tx09_logout",
+      "count": 1,
+      "pass": 1,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 377,
+      "min": 377,
+      "max": 377
+    }
+  ],
+  "gate": {
+    "failedRules": []
+  }
+}

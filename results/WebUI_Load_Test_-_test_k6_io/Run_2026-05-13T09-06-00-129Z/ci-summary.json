@@ -1,0 +1,108 @@
+{
+  "status": "failed",
+  "runId": "Run_2026-05-13T09-06-00-129Z",
+  "plan": "WebUI Load Test - test.k6.io",
+  "environment": "dev",
+  "thresholdFailures": 2,
+  "errorCount": 9,
+  "warningCount": 2,
+  "aborted": false,
+  "transactions": [
+    {
+      "name": "tx01_launch",
+      "count": 5,
+      "pass": 5,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 526.2,
+      "min": 368,
+      "max": 665
+    },
+    {
+      "name": "tx02_login",
+      "count": 5,
+      "pass": 5,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 690.4,
+      "min": 570,
+      "max": 875
+    },
+    {
+      "name": "tx03_search_animal",
+      "count": 12,
+      "pass": 12,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 206.16666666666666,
+      "min": 189,
+      "max": 227
+    },
+    {
+      "name": "tx04_select_product",
+      "count": 12,
+      "pass": 10,
+      "fail": 2,
+      "errorPct": 16.67,
+      "avg": 198.16666666666666,
+      "min": 99,
+      "max": 238
+    },
+    {
+      "name": "tx05_add_to_cart",
+      "count": 12,
+      "pass": 10,
+      "fail": 2,
+      "errorPct": 16.67,
+      "avg": 392.3333333333333,
+      "min": 198,
+      "max": 592
+    },
+    {
+      "name": "tx06_increase_quantity_to_2_and_proceed_to_checkout",
+      "count": 12,
+      "pass": 12,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 347,
+      "min": 168,
+      "max": 461
+    },
+    {
+      "name": "tx07_click_continue",
+      "count": 12,
+      "pass": 7,
+      "fail": 5,
+      "errorPct": 41.67,
+      "avg": 162.16666666666666,
+      "min": 85,
+      "max": 226
+    },
+    {
+      "name": "tx08_click_confirm",
+      "count": 12,
+      "pass": 5,
+      "fail": 7,
+      "errorPct": 58.33,
+      "avg": 326,
+      "min": 163,
+      "max": 524
+    },
+    {
+      "name": "tx09_logout",
+      "count": 4,
+      "pass": 0,
+      "fail": 4,
+      "errorPct": 100,
+      "avg": 363.75,
+      "min": 277,
+      "max": 520
+    }
+  ],
+  "gate": {
+    "failedRules": [
+      "http_req_failed:rate<0.1",
+      "http_req_failed{scenario:buyanimal_1_framework_lifecycle}:rate<0.05"
+    ]
+  }
+}

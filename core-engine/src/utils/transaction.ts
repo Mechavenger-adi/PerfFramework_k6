@@ -1,8 +1,9 @@
 // @ts-ignore
-import { Trend } from 'k6/metrics';
+import { Counter, Trend } from 'k6/metrics';
 
 const txnStarts: Record<string, number> = {};
 const txnTrends: Record<string, Trend> = {};
+const txnCounters: Record<string, Counter> = {};
 
 /**
  * Initializes Trends for the specified transactions.
@@ -18,6 +19,9 @@ export function initTransactions(names: string[]): void {
     if (!txnTrends[name]) {
       txnTrends[name] = new Trend(`${name}`);
     }
+    if (!txnCounters[name]) {
+      txnCounters[name] = new Counter(`${name}_count`);
+    }
   });
 }
 
@@ -28,6 +32,12 @@ export function initTransactions(names: string[]): void {
  */
 export function startTransaction(name: string): void {
   txnStarts[name] = Date.now();
+
+  if (txnCounters[name]) {
+    txnCounters[name].add(1);
+  } else {
+    console.error(`Transaction "${name}" counter was not initialized in init context`);
+  }
 }
 
 /**
