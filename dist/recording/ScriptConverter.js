@@ -480,7 +480,7 @@ class ScriptConverter {
         }
         // logExchange + trackCorrelation + trackParameter + trackDataRow
         lines.push(`import { logExchange, trackCorrelation, trackParameter, trackDataRow } from '../../../dist/utils/replayLogger.js';`);
-        lines.push(`import { createJourneyLifecycleStore, runJourneyLifecycle } from '../../../dist/utils/lifecycle.js';`);
+        lines.push(`import { createJourneyLifecycleStore, runJourneyLifecycle, thinktime } from '../../../dist/utils/lifecycle.js';`);
         lines.push(`import { clearCookies, registerBaseUrl, getEnvContext } from '../../../dist/utils/session.js';`);
         // Preserve any other imports (CorrelationEngine, RuleProcessor, etc.)
         const srcLines = source.split('\n');
@@ -861,15 +861,40 @@ class ScriptConverter {
         const trackCalls = []; // trackDataRow / trackParameter → initPhase only
         const regexDecls = []; // let match; let regex; → phases using correlation
         const otherPrelude = []; // everything else → all phases
+        const initGroupStmts = [];
+        const actionGroupStmts = [];
+        const endGroupStmts = [];
+        let lastPhase = null;
         for (const statement of statements) {
             const name = this.extractGroupName(statement);
             if (name) {
-                groupStatements.push({ name, statement });
+                if (initSet.has(name)) {
+                    initGroupStmts.push(statement);
+                    lastPhase = 'init';
+                }
+                else if (endSet.has(name)) {
+                    endGroupStmts.push(statement);
+                    lastPhase = 'end';
+                }
+                else {
+                    actionGroupStmts.push(statement);
+                    lastPhase = 'action';
+                }
                 continue;
             }
             if (!statement.trim())
                 continue;
-            // Split multi-line statements into individual lines for classification
+            const sleepMatch = statement.match(/^\s*sleep\s*\(\s*([^)]*)\s*\)\s*;?/);
+            if (sleepMatch) {
+                const thinktimeStmt = `thinktime(${sleepMatch[1]});`;
+                if (lastPhase === 'init')
+                    initGroupStmts.push(thinktimeStmt);
+                else if (lastPhase === 'action')
+                    actionGroupStmts.push(thinktimeStmt);
+                else if (lastPhase === 'end')
+                    endGroupStmts.push(thinktimeStmt);
+                continue;
+            }
             const lines = statement.split('\n').map((l) => l.trim()).filter(Boolean);
             for (const line of lines) {
                 if (/^\s*const\s+correlation_vars\s*=/.test(line)) {
@@ -889,10 +914,6 @@ class ScriptConverter {
                 }
             }
         }
-        // Determine which phases use correlation (have groups with correlation_vars references)
-        const initGroupStmts = groupStatements.filter((g) => initSet.has(g.name)).map((g) => g.statement);
-        const actionGroupStmts = groupStatements.filter((g) => !initSet.has(g.name) && !endSet.has(g.name)).map((g) => g.statement);
-        const endGroupStmts = groupStatements.filter((g) => endSet.has(g.name)).map((g) => g.statement);
         const usesCorrelation = (stmts) => stmts.some((s) => /correlation_vars/.test(s));
         // Build per-phase preludes
         // initPhase: correlation bridge + data setup + tracking + regex (if needed) + other
@@ -1026,7 +1047,7 @@ class ScriptConverter {
             const parsedUrl = new URL(rawUrl);
             const normalizedOrigin = parsedUrl.origin + '/';
             if (normalizedOrigin === primaryBaseUrl) {
-                const pathWithQuery = `${parsedUrl.pathname}${parsedUrl.search}${parsedUrl.hash}`;
+                const pathWithQuery = rawUrl.slice(parsedUrl.origin.length);
                 return `\`\${env.baseUrl}${pathWithQuery}\``;
             }
         }

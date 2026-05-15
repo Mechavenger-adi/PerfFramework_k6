@@ -26,7 +26,8 @@ export function getEnvContext(teamName: string, fallbackBaseUrl?: string): TeamE
     if (fallbackBaseUrl) {
       return { baseUrl: fallbackBaseUrl };
     }
-    throw new Error(`Environment config missing for '${teamName}' and no fallback provided. Please run via k6-perf CLI or provide a fallback.`);
+    const envFileName = __ENV.K6_PERF_ENVIRONMENT ? `${__ENV.K6_PERF_ENVIRONMENT}.json` : 'the loaded environment config';
+    throw new Error(`Environment config missing for '${teamName}' in ${envFileName} and no fallback provided. Please run via k6-perf CLI or provide a fallback.`);
   }
 
   try {
@@ -38,7 +39,8 @@ export function getEnvContext(teamName: string, fallbackBaseUrl?: string): TeamE
     if (fallbackBaseUrl) {
       return { baseUrl: fallbackBaseUrl };
     }
-    throw new Error(`Environment config missing for '${teamName}' in dev.json and no fallback provided.`);
+    const envFileName = __ENV.K6_PERF_ENVIRONMENT ? `${__ENV.K6_PERF_ENVIRONMENT}.json` : 'the loaded environment config';
+    throw new Error(`Environment config missing for '${teamName}' in ${envFileName} and no fallback provided.`);
   } catch (err) {
     if (fallbackBaseUrl) {
       return { baseUrl: fallbackBaseUrl };

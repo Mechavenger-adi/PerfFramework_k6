@@ -17,7 +17,7 @@ export class ScriptGenerator {
     let script = `import http from 'k6/http';\n`;
     script += `import { check, sleep, group } from 'k6';\n`;
     script += `import { initTransactions, startTransaction, endTransaction } from '../../../dist/utils/transaction.js';\n`;
-    script += `import { createJourneyLifecycleStore, runJourneyLifecycle, getFrameworkThinkTime } from '../../../dist/utils/lifecycle.js';\n`;
+    script += `import { createJourneyLifecycleStore, runJourneyLifecycle, thinktime } from '../../../dist/utils/lifecycle.js';\n`;
     script += `import { logExchange, trackCorrelation, trackParameter } from '../../../dist/utils/replayLogger.js';\n`;
     script += `import { clearCookies, registerBaseUrl, getEnvContext } from '../../../dist/utils/session.js';\n\n`;
 
@@ -108,7 +108,7 @@ export class ScriptGenerator {
       script += `  });\n\n`;
 
       if (groupIndex < groups.length - 1) {
-        script += `  sleep(getFrameworkThinkTime());\n\n`;
+        script += `  thinktime();\n\n`;
       }
     });
 

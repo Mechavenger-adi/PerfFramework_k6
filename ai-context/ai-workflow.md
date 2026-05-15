@@ -8,12 +8,13 @@
 2. Read `ai-context/architecture-laws.md` — know the inviolable rules
 3. Identify which subsystem your task touches → load only those context files
 4. Check `ai-context/decisions.md` + `rejected-approaches.md` before proposing solutions
+5. Read and update `ai-context/todos.md` to track task completion and maintain the backlog.
 
 ## File Reading Priority
 
 ```
 High: overview.md → architecture-laws.md → module-map.md
-Med:  execution-flow.md → change-impact-map.md → fragile-areas.md
+Med:  execution-flow.md → change-impact-map.md → fragile-areas.md → todos.md
 Low:  All other files (load on-demand per task)
 ```
 

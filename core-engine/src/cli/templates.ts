@@ -8,7 +8,7 @@ import * as path from 'path';
 import { parse } from 'jsonc-parser';
 
 export function listTemplates(type: 'test-plans' | 'runtime-settings') {
-  const templatesDir = path.resolve(process.cwd(), `config/templates/${type}`);
+  const templatesDir = path.resolve(process.cwd(), `templates/${type}`);
   if (!fs.existsSync(templatesDir)) {
     console.log(`\nNo templates found in ${templatesDir}\n`);
     return;
@@ -42,15 +42,15 @@ export function showTemplate(type: 'test-plans' | 'runtime-settings', name: stri
     fileName += '.jsonc';
   }
 
-  const templatePath = path.resolve(process.cwd(), `config/templates/${type}`, fileName);
+  const templatePath = path.resolve(process.cwd(), `templates/${type}`, fileName);
   if (!fs.existsSync(templatePath)) {
     // Try .json if .jsonc failed
-    const altPath = path.resolve(process.cwd(), `config/templates/${type}`, name + '.json');
+    const altPath = path.resolve(process.cwd(), `templates/${type}`, name + '.json');
     if (fs.existsSync(altPath)) {
       console.log(fs.readFileSync(altPath, 'utf-8'));
       return;
     }
-    console.error(`\n[FAIL] Template '${name}' not found in config/templates/${type}/\n`);
+    console.error(`\n[FAIL] Template '${name}' not found in templates/${type}/\n`);
     process.exit(1);
   }
 

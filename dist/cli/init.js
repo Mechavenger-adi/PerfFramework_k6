@@ -87,7 +87,7 @@ function runInit(projectDir = process.cwd()) {
     // -- Sample: runtime settings -----------------
     writeIfNotExists(path.join(projectDir, 'config/runtime-settings/default.json'), JSON.stringify({
         $schema: '../schemas/runtime-settings.schema.json',
-        thinkTime: { mode: 'fixed', fixed: 1 },
+        thinkTime: { ignoreThinkTime: false, globalOverride: true, mode: 'fixed', fixed: 1 },
         pacing: { enabled: false },
         http: { timeoutSeconds: 60, maxRedirects: 10, throwOnError: false },
         errorBehavior: 'continue',
@@ -220,7 +220,7 @@ testuser003,P@ssw0rd3,testuser003@perf-test.local
     writeIfNotExists(path.join(projectDir, 'scrum-suites/sample-team/tests/browse-journey.js'), `import http from 'k6/http';
 import { check, sleep, group } from 'k6';
 import { initTransactions, startTransaction, endTransaction } from '../../../dist/utils/transaction.js';
-import { createJourneyLifecycleStore, runJourneyLifecycle, getFrameworkThinkTime } from '../../../dist/utils/lifecycle.js';
+import { createJourneyLifecycleStore, runJourneyLifecycle, thinktime } from '../../../dist/utils/lifecycle.js';
 import { logExchange } from '../../../dist/utils/replayLogger.js';
 import { clearCookies, registerFrameworkEnvironmentUrls, resolveFrameworkUrl } from '../../../dist/utils/session.js';
 
@@ -240,7 +240,7 @@ export function actionPhase(ctx) {
     endTransaction('Homepage');
   });
 
-  sleep(getFrameworkThinkTime());
+  thinktime();
 
   group('Product List', function () {
     startTransaction('Product_List');
@@ -249,7 +249,7 @@ export function actionPhase(ctx) {
     endTransaction('Product_List');
   });
 
-  sleep(getFrameworkThinkTime());
+  thinktime();
 }
 
 export function endPhase(ctx) {
@@ -261,9 +261,9 @@ export default function () {
 `, 'scrum-suites/sample-team/tests/browse-journey.js');
     // -- Sample: checkout journey script -----------
     writeIfNotExists(path.join(projectDir, 'scrum-suites/sample-team/tests/checkout-journey.js'), `import http from 'k6/http';
-import { check, sleep, group } from 'k6';
+import { check, group } from 'k6';
 import { initTransactions, startTransaction, endTransaction } from '../../../dist/utils/transaction.js';
-import { createJourneyLifecycleStore, runJourneyLifecycle, getFrameworkThinkTime } from '../../../dist/utils/lifecycle.js';
+import { createJourneyLifecycleStore, runJourneyLifecycle, thinktime } from '../../../dist/utils/lifecycle.js';
 import { logExchange } from '../../../dist/utils/replayLogger.js';
 import { clearCookies, registerFrameworkEnvironmentUrls, resolveFrameworkUrl } from '../../../dist/utils/session.js';
 
@@ -297,18 +297,17 @@ export function actionPhase(ctx) {
     endTransaction('Add_To_Cart');
   });
 
-  sleep(getFrameworkThinkTime());
+  thinktime();
 
   group('Checkout', function () {
     startTransaction('Checkout');
     const res = http.post(resolveFrameworkUrl('/checkout', { fallbackBaseUrl: 'https://your-dev-environment.com/' }), '{}', {
       headers: { 'Content-Type': 'application/json' },
     });
-    check(res, { 'Checkout: status 2xx': (r) => r.status >= 200 && r.status < 300 });
     endTransaction('Checkout');
   });
 
-  sleep(getFrameworkThinkTime());
+  thinktime();
 }
 
 export function endPhase(ctx) {

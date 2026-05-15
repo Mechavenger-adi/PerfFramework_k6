@@ -51,7 +51,7 @@ function runNewWizard() {
     console.log('============================================\n');
     rl.question('What would you like to create? (1: test-plan, 2: runtime-settings): ', (typeChoice) => {
         const typeStr = typeChoice.trim() === '2' ? 'runtime-settings' : 'test-plans';
-        const templatesDir = path.resolve(process.cwd(), `config/templates/${typeStr}`);
+        const templatesDir = path.resolve(process.cwd(), `templates/${typeStr}`);
         if (!fs.existsSync(templatesDir)) {
             console.log(`\n[FAIL] No templates found in ${templatesDir}\n`);
             rl.close();

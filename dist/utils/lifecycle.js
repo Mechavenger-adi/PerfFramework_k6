@@ -4,7 +4,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createJourneyLifecycleStore = createJourneyLifecycleStore;
-exports.getFrameworkThinkTime = getFrameworkThinkTime;
+exports.thinktime = thinktime;
 exports.runJourneyLifecycle = runJourneyLifecycle;
 // @ts-ignore - K6 runtime module
 const k6_1 = require("k6");
@@ -70,25 +70,29 @@ function getInstantaneousState(phases) {
     const elapsedMs = Date.now() - execution_1.default.scenario.startTime;
     let previousVUs = Number(phases.startVUs || 0);
     let previousEndMs = 0;
-    for (let i = 0; i < phases.timeline.length; i += 1) {
-        const stage = phases.timeline[i];
+    const timeline = phases.timeline;
+    const lastStageIdx = timeline.length - 1;
+    for (let i = 0; i < timeline.length; i += 1) {
+        const stage = timeline[i];
         const stageEndMs = Number(stage.endMs || 0);
         const stageVUs = Number(stage.vus || 0);
         if (elapsedMs <= stageEndMs) {
             // We are inside this stage — interpolate
             const stageDuration = stageEndMs - previousEndMs;
+            const isDecreasing = stageVUs < previousVUs;
+            const isFinalRampDown = i === lastStageIdx && isDecreasing;
             if (stageDuration <= 0) {
-                return { target: stageVUs, isDecreasing: stageVUs < previousVUs };
+                return { target: stageVUs, isDecreasing, isFinalRampDown };
             }
             const progress = (elapsedMs - previousEndMs) / stageDuration;
             const target = previousVUs + progress * (stageVUs - previousVUs);
-            return { target, isDecreasing: stageVUs < previousVUs };
+            return { target, isDecreasing, isFinalRampDown };
         }
         previousVUs = stageVUs;
         previousEndMs = stageEndMs;
     }
     // Past all stages — scenario ending
-    return { target: previousVUs, isDecreasing: true };
+    return { target: previousVUs, isDecreasing: true, isFinalRampDown: true };
 }
 /**
  * Determine whether this VU should transition to endPhase.
@@ -130,20 +134,15 @@ function getEndSignal(phases) {
     }
     // --- Ramping VUs (handles load, spike, step, soak, stress, constant-vus) ---
     if (phases.mode === 'ramping-vus' && Array.isArray(phases.timeline)) {
-        const { target, isDecreasing } = getInstantaneousState(phases);
+        const { target, isDecreasing, isFinalRampDown } = getInstantaneousState(phases);
         const vuId = execution_1.default.vu.idInInstance;
-        // Only trigger endPhase during decreasing stages.
-        // During ramp-up, a newly spawned VU's ID may momentarily exceed
-        // the interpolated target — that's expected and should NOT trigger end.
-        //
-        // Direct float comparison: vuId > target (no rounding).
-        // This is the most precise check — VU 10 triggers as soon as target
-        // drops below 10.0 (e.g., 9.99), VU 9 triggers when target drops
-        // below 9.0, etc. This aligns exactly with k6's own VU removal:
-        // k6 removes highest-numbered VUs first as the interpolated count
-        // decreases, so our check fires at the same boundary.
-        const shouldEnd = isDecreasing && vuId > target;
-        return { beforeAction: shouldEnd, afterAction: shouldEnd };
+        // Only trigger endPhase during DECREASING stages to prevent false triggers
+        // during ramp-up. Additionally, only mark the VU as permanently ended if
+        // this is the FINAL ramp-down — intermediate decreases in step-up or
+        // multi-spike tests must NOT permanently end the VU (it will ramp back up).
+        const shouldRunEndPhase = isDecreasing && vuId > target;
+        const shouldPermanentlyEnd = shouldRunEndPhase && isFinalRampDown;
+        return { beforeAction: shouldPermanentlyEnd, afterAction: shouldPermanentlyEnd };
     }
     return { beforeAction: false, afterAction: false };
 }
@@ -179,41 +178,50 @@ function createJourneyLifecycleStore() {
         state: createState(),
     };
 }
-/**
- * Returns the framework-configured think time in seconds.
- *
- * Reads the thinkTime block from K6_PERF_RUNTIME_METADATA:
- *   - mode 'fixed' → returns `fixed` value (default 1s)
- *   - mode 'random' → returns random value in [min, max] (defaults 0.5–3s)
- *
- * Falls back to 1 second when no runtime metadata is available.
- */
-function getFrameworkThinkTime() {
+function thinktime(minOrFixed, max) {
     const runtime = getRuntimeMetadata();
     const thinkTime = runtime.thinkTime;
-    if (!thinkTime) {
-        return 1;
+    if (thinkTime?.ignoreThinkTime) {
+        return; // Skip think time completely
     }
-    if (thinkTime.mode === 'random') {
-        const min = Number(thinkTime.min ?? 0.5);
-        const max = Number(thinkTime.max ?? 3);
-        return min + Math.random() * (max - min);
+    let durationToSleep = 1;
+    if (minOrFixed !== undefined && max !== undefined) {
+        // User provided a range in the script: thinktime(2, 5)
+        durationToSleep = minOrFixed + Math.random() * (max - minOrFixed);
     }
-    // fixed mode (default)
-    return Number(thinkTime.fixed ?? 1);
+    else if (minOrFixed !== undefined) {
+        // User provided a fixed value in the script: thinktime(3)
+        durationToSleep = minOrFixed;
+    }
+    if (!thinkTime || thinkTime.globalOverride !== false) {
+        // Apply global framework think time
+        if (thinkTime?.mode === 'random') {
+            const min = Number(thinkTime.min ?? 0.5);
+            const max = Number(thinkTime.max ?? 3);
+            durationToSleep = min + Math.random() * (max - min);
+        }
+        else {
+            // fixed mode
+            durationToSleep = Number(thinkTime?.fixed ?? 1);
+        }
+    }
+    if (durationToSleep > 0) {
+        (0, k6_1.sleep)(durationToSleep);
+    }
 }
 function runJourneyLifecycle(store, phaseFns) {
     const runtime = getRuntimeMetadata();
     const phases = getPhaseMetadata();
     const state = store.state;
     if (state.terminated || state.ended) {
-        (0, k6_1.sleep)(1);
+        // VU was terminated (stop_vu) or has run its endPhase — return immediately.
+        // Sleeping here wastes a VU slot; k6 will recycle the VU naturally.
         return;
     }
     if (!state.initialized) {
         const initBehavior = runSafely(store, 'init', phaseFns.initPhase, runtime);
         state.initialized = true;
-        if (initBehavior === 'stop_iteration' || state.terminated) {
+        if (initBehavior !== 'continue' || state.terminated) {
             return;
         }
     }
@@ -228,7 +236,7 @@ function runJourneyLifecycle(store, phaseFns) {
     }
     frameworkIterations.add(1);
     const actionBehavior = runSafely(store, 'action', phaseFns.actionPhase, runtime);
-    if (actionBehavior === 'stop_iteration' || state.terminated) {
+    if (actionBehavior !== 'continue' || state.terminated) {
         return;
     }
     if (runtime.pacingEnabled && Number(runtime.pacingSeconds || 0) > 0) {

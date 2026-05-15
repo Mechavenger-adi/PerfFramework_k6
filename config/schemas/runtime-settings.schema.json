@@ -22,6 +22,16 @@
       "required": ["mode"],
       "additionalProperties": false,
       "properties": {
+        "ignoreThinkTime": {
+          "type": "boolean",
+          "description": "If true, skips think time (sleep) entirely regardless of other settings.",
+          "default": false
+        },
+        "globalOverride": {
+          "type": "boolean",
+          "description": "If true, forces the global think time settings (fixed or random) to override any specific think time values provided in the script.",
+          "default": true
+        },
         "mode": {
           "type": "string",
           "enum": ["fixed", "random"],

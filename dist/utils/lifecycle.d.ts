@@ -19,16 +19,7 @@ export interface PhaseFns {
     endPhase?: (ctx: JourneyContext) => void;
 }
 export declare function createJourneyLifecycleStore(): JourneyLifecycleStore;
-/**
- * Returns the framework-configured think time in seconds.
- *
- * Reads the thinkTime block from K6_PERF_RUNTIME_METADATA:
- *   - mode 'fixed' → returns `fixed` value (default 1s)
- *   - mode 'random' → returns random value in [min, max] (defaults 0.5–3s)
- *
- * Falls back to 1 second when no runtime metadata is available.
- */
-export declare function getFrameworkThinkTime(): number;
+export declare function thinktime(minOrFixed?: number, max?: number): void;
 export declare function runJourneyLifecycle(store: JourneyLifecycleStore, phaseFns: PhaseFns): void;
 export {};
 //# sourceMappingURL=lifecycle.d.ts.map
