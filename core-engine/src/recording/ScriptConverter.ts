@@ -21,20 +21,24 @@ export class ScriptConverter {
   /**
    * Read a script file and return the converted source.
    */
-  static convertFile(filePath: string, lifecycle?: LifecycleSelection): string {
+  static convertFile(filePath: string, teamName?: string, lifecycle?: LifecycleSelection): string {
     const source = fs.readFileSync(filePath, 'utf-8');
-    return this.convert(source, lifecycle);
+    if (!teamName) {
+      const match = filePath.match(/[\\/]scrum-suites[\\/]([^\\/]+)[\\/]/);
+      teamName = match ? match[1] : 'unknown_team';
+    }
+    return this.convert(source, teamName, lifecycle);
   }
 
   /**
    * Convert a raw k6 script string to a framework-compatible script.
    */
-  static convert(source: string, lifecycle?: LifecycleSelection): string {
+  static convert(source: string, teamName: string, lifecycle?: LifecycleSelection): string {
     const lines = source.split('\n');
 
     const hasLogExchange = /import\s+\{[^}]*logExchange[^}]*\}/.test(source);
     if (hasLogExchange) {
-      return this.applyPhaseContract(source, lifecycle); // already converted
+      return this.applyPhaseContract(source, teamName, lifecycle); // already converted
     }
 
     const hasTransactionImport = /import\s+\{[^}]*initTransactions[^}]*\}/.test(source);
@@ -43,6 +47,8 @@ export class ScriptConverter {
 
     // Collect group names from `group('name', ...)` calls
     const groupNames = this.extractGroupNames(source);
+    const detectedBaseUrls = this.extractBaseUrlsFromSource(source);
+    const primaryBaseUrl = detectedBaseUrls[0];
 
     // Build output
     const result: string[] = [];
@@ -127,6 +133,8 @@ export class ScriptConverter {
     // Phase 1: Emit imports
     const importBlock = this.buildImportBlock(source, hasTransactionImport, hasLogReplayExchange);
     result.push(importBlock);
+    result.push(`\nconst env = getEnvContext('${teamName}', ${primaryBaseUrl ? `'${primaryBaseUrl}'` : 'undefined'});`);
+    result.push(`registerBaseUrl(env.baseUrl);`);
 
     // Skip original import lines and Trend declarations
     const importEndIndex = this.findImportBlockEnd(lines);
@@ -358,6 +366,7 @@ export class ScriptConverter {
           body,
           resolvedParams,
           indent,
+          primaryBaseUrl,
         );
 
         result.push(`${indent}const ${reqName} = ${reqDef};`);
@@ -458,7 +467,7 @@ export class ScriptConverter {
       i++;
     }
 
-    return this.applyPhaseContract(result.join('\n'), lifecycle);
+    return this.applyPhaseContract(result.join('\n'), teamName, lifecycle);
   }
 
   // ── Helpers ──────────────────────────────────────────────────
@@ -505,7 +514,7 @@ export class ScriptConverter {
       `import { createJourneyLifecycleStore, runJourneyLifecycle } from '../../../dist/utils/lifecycle.js';`,
     );
     lines.push(
-      `import { clearCookies, registerBaseUrl } from '../../../dist/utils/session.js';`,
+      `import { clearCookies, registerBaseUrl, getEnvContext } from '../../../dist/utils/session.js';`,
     );
 
     // Preserve any other imports (CorrelationEngine, RuleProcessor, etc.)
@@ -690,6 +699,7 @@ export class ScriptConverter {
     body: string | null,
     paramsStr: string | null,
     indent: string,
+    primaryBaseUrl?: string,
   ): string {
     const inner = indent + '  ';
     const innerInner = indent + '    ';
@@ -702,7 +712,7 @@ export class ScriptConverter {
     s += `${inner}transaction: ${JSON.stringify(sanitizedTxn)},\n`;
     s += `${inner}recordingStartedAt: new Date().toISOString(),\n`;
     s += `${inner}method: ${JSON.stringify(m)},\n`;
-    s += `${inner}url: ${url},\n`;
+    s += `${inner}url: ${this.toRuntimeUrlExpression(url, primaryBaseUrl)},\n`;
 
     // Body
     if (!body || body === 'null' || body === 'undefined') {
@@ -855,7 +865,7 @@ export class ScriptConverter {
     return sanitized.slice(0, 128);
   }
 
-  private static applyPhaseContract(source: string, lifecycle?: LifecycleSelection): string {
+  private static applyPhaseContract(source: string, teamName: string, lifecycle?: LifecycleSelection): string {
     // Match both `export default function () {` and `export default function() {`
     const markerMatch = source.match(/export\s+default\s+function\s*\(\s*\)\s*\{/);
     if (!markerMatch) {
@@ -881,10 +891,11 @@ export class ScriptConverter {
 
     // Extract and register base URLs from the source script
     const baseUrls = this.extractBaseUrlsFromSource(source);
-    const registerBlock = baseUrls.map(u => `registerBaseUrl(${JSON.stringify(u)});`).join('\n');
+    const primaryBaseUrl = baseUrls[0];
+    const registerBlock = `const env = getEnvContext('${teamName}', ${primaryBaseUrl ? `'${primaryBaseUrl}'` : 'undefined'});\nregisterBaseUrl(env.baseUrl);`;
 
     return beforeDefault
-      + (registerBlock ? registerBlock + '\n' : '')
+      + (baseUrls.length > 0 ? registerBlock + '\n\n' : '')
       + `const __journeyLifecycleStore = createJourneyLifecycleStore();\n\n`
       + this.renderPhaseFunction('initPhase', grouped.initPrelude, grouped.initGroups)
       + `\n`
@@ -1099,5 +1110,44 @@ export class ScriptConverter {
       } catch { /* skip malformed */ }
     }
     return [...origins];
+  }
+
+  private static toRuntimeUrlExpression(url: string, primaryBaseUrl?: string): string {
+    const rawUrl = url.replace(/^['"`]|['"`]$/g, '');
+    if (!primaryBaseUrl) return `\`\${env.baseUrl}${rawUrl}\``;
+
+    try {
+      const parsedUrl = new URL(rawUrl);
+      const normalizedOrigin = parsedUrl.origin + '/';
+      if (normalizedOrigin === primaryBaseUrl) {
+        const pathWithQuery = rawUrl.slice(parsedUrl.origin.length);
+        return `\`\${env.baseUrl}${pathWithQuery}\``;
+      }
+    } catch {
+      // Not a valid absolute URL, assume relative
+      return `\`\${env.baseUrl}${rawUrl.startsWith('/') ? '' : '/'}${rawUrl}\``;
+    }
+
+    return url; // fallback to keeping it as is
+  }
+
+  private static extractStringLiteralValue(value: string): string | null {
+    const trimmed = value.trim();
+    if (trimmed.length < 2) {
+      return null;
+    }
+
+    const quote = trimmed[0];
+    const lastQuote = trimmed[trimmed.length - 1];
+    if ((quote !== '"' && quote !== '\'' && quote !== '`') || quote !== lastQuote) {
+      return null;
+    }
+
+    const inner = trimmed.slice(1, -1);
+    if (quote === '`' && inner.includes('${')) {
+      return null;
+    }
+
+    return inner;
   }
 }

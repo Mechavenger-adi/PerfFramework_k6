@@ -72,7 +72,7 @@ async function runGenerate(harPath, teamName, outName) {
     finally {
         rl.close();
     }
-    const scriptContent = ScriptGenerator_1.ScriptGenerator.generate(groups, lifecycleSelection);
+    const scriptContent = ScriptGenerator_1.ScriptGenerator.generate(groups, lifecycleSelection, teamName);
     const recordingLog = ExchangeLog_1.ExchangeLogBuilder.fromGroups(groups);
     const suiteDir = path.join(process.cwd(), 'scrum-suites', teamName);
     const targetDir = path.join(suiteDir, 'tests');

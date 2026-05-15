@@ -1,3 +1,17 @@
+interface ResolveFrameworkUrlOptions {
+    fallbackBaseUrl?: string;
+    service?: string;
+}
+export interface TeamEnvironmentOverride {
+    baseUrl: string;
+    serviceUrls?: Record<string, string>;
+    custom?: Record<string, string | number | boolean>;
+}
+/**
+ * Get the environment context for a specific team.
+ * Throws a descriptive error if the environment is missing and no fallback is provided.
+ */
+export declare function getEnvContext(teamName: string, fallbackBaseUrl?: string): TeamEnvironmentOverride;
 /**
  * Register a base URL so clearCookies() can clear it without manual arguments.
  * Called automatically by the framework at script init; users can also call it
@@ -6,6 +20,18 @@
  * @param url - A base URL (e.g., 'https://myapp.example.com/')
  */
 export declare function registerBaseUrl(url: string): void;
+/**
+ * @deprecated Use `getEnvContext` and register the `env.baseUrl` directly using `registerBaseUrl()`.
+ * Register environment URLs from K6_PERF_* env vars, falling back to the
+ * provided recorded URLs when runtime env URLs are unavailable.
+ */
+export declare function registerFrameworkEnvironmentUrls(fallbackUrls?: string[]): void;
+/**
+ * @deprecated Use `${env.baseUrl}/path` literals with `getEnvContext()` instead.
+ * Resolve a relative request path against the framework-injected base URL.
+ * Falls back to a recorded base URL when env injection is not available.
+ */
+export declare function resolveFrameworkUrl(pathOrUrl: string, options?: ResolveFrameworkUrlOptions): string;
 /**
  * Clear all cookies from the VU's cookie jar.
  * - With no arguments: clears cookies for ALL registered base URLs.
@@ -28,4 +54,5 @@ export declare function clearCookies(...urls: string[]): void;
  *   deleteCookie('https://myapp.example.com/', 'JSESSIONID');
  */
 export declare function deleteCookie(url: string, name: string): void;
+export {};
 //# sourceMappingURL=session.d.ts.map

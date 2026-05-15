@@ -8,15 +8,15 @@
     "startVUs": 0,
     "stages": [
       { "duration": "5s", "target": 5 },
-      { "duration": "15s",  "target": 5 },
+      { "duration": "30s",  "target": 5 },
       { "duration": "5s", "target": 0  }
     ]
   },
   "noCookiesReset": true,
   "user_journeys": [
     {
-      "name": "buyanimal_1_framework_lifecycle",
-      "scriptPath": "buyanimal_1_framework_lifecycle.js",
+      "name": "buy_animal_14thmay",
+      "scriptPath": "buy_animal_14thmay.js",
       "weight": 100
     }
   ],
@@ -25,14 +25,14 @@
     "errorRate": 10
   },
   "journey_slas": {
-    "buyanimal_1_framework_lifecycle": {
+    "buy_animal_14thmay": {
       "p95": 1500,
       "errorRate": 5
     }
   },
   "transaction_slas": {
-    "tx01_launch": { "p95": 800 },
-    "tx02_login": { "p95": 1000 },
-    "tx08_click_confirm": { "p95": 1500, "p99": 3000 }
+    "t01_launch": { "p95": 800 },
+    "t02_login": { "p95": 1000 },
+    "click_confirm": { "p95": 1500, "p99": 3000 }
   }
 }

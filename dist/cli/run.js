@@ -299,7 +299,7 @@ program
     // -- Step 4: Prepare run metadata and output paths ---------------
     const { reportDir, safeReportDir, runId, runManifestPath } = prepareRunArtifacts(plan, resolvedConfig);
     const scenarioRuntimeMetadata = buildScenarioRuntimeMetadata(plan, resolvedConfig, runId, safeReportDir);
-    const runtimeEnv = buildRunEnvironment(plan, runId, safeReportDir, runManifestPath);
+    const runtimeEnv = buildRunEnvironment(plan, resolvedConfig, runId, safeReportDir, runManifestPath);
     writeRunManifest(runManifestPath, plan, resolvedConfig, scenarioRuntimeMetadata);
     // -- Step 5: Build k6 options ---------------
     let k6Options;
@@ -531,7 +531,7 @@ function buildScenarioRuntimeMetadata(plan, resolvedConfig, runId, safeReportDir
         },
     };
 }
-function buildRunEnvironment(plan, runId, safeReportDir, runManifestPath) {
+function buildRunEnvironment(plan, resolvedConfig, runId, safeReportDir, runManifestPath) {
     return {
         K6_PERF_RUN_ID: runId,
         K6_PERF_PLAN_NAME: plan.name,
@@ -539,6 +539,7 @@ function buildRunEnvironment(plan, runId, safeReportDir, runManifestPath) {
         K6_PERF_EXECUTION_MODE: plan.execution_mode,
         K6_PERF_REPORT_DIR: safeReportDir,
         K6_PERF_RUN_MANIFEST_PATH: runManifestPath.replace(/\\/g, '/'),
+        K6_PERF_TEAM_ENVIRONMENTS: JSON.stringify(resolvedConfig.environment.scrum_suites || {}),
     };
 }
 function writeRunManifest(runManifestPath, plan, resolvedConfig, scenarioMetadata) {
@@ -573,7 +574,7 @@ function writeRunManifest(runManifestPath, plan, resolvedConfig, scenarioMetadat
         },
         environment: {
             name: resolvedConfig.environment.name,
-            baseUrl: resolvedConfig.environment.baseUrl,
+            scrum_suites: resolvedConfig.environment.scrum_suites,
         },
     };
     fs.writeFileSync(runManifestPath, JSON.stringify(manifest, null, 2), 'utf-8');

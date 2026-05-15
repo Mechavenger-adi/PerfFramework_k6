@@ -55,24 +55,30 @@ class ScriptConverter {
     /**
      * Read a script file and return the converted source.
      */
-    static convertFile(filePath, lifecycle) {
+    static convertFile(filePath, teamName, lifecycle) {
         const source = fs.readFileSync(filePath, 'utf-8');
-        return this.convert(source, lifecycle);
+        if (!teamName) {
+            const match = filePath.match(/[\\/]scrum-suites[\\/]([^\\/]+)[\\/]/);
+            teamName = match ? match[1] : 'unknown_team';
+        }
+        return this.convert(source, teamName, lifecycle);
     }
     /**
      * Convert a raw k6 script string to a framework-compatible script.
      */
-    static convert(source, lifecycle) {
+    static convert(source, teamName, lifecycle) {
         const lines = source.split('\n');
         const hasLogExchange = /import\s+\{[^}]*logExchange[^}]*\}/.test(source);
         if (hasLogExchange) {
-            return this.applyPhaseContract(source, lifecycle); // already converted
+            return this.applyPhaseContract(source, teamName, lifecycle); // already converted
         }
         const hasTransactionImport = /import\s+\{[^}]*initTransactions[^}]*\}/.test(source);
         const hasTrendImport = /import\s+\{[^}]*Trend[^}]*\}/.test(source);
         const hasLogReplayExchange = /import\s+\{[^}]*logReplayExchange[^}]*\}/.test(source);
         // Collect group names from `group('name', ...)` calls
         const groupNames = this.extractGroupNames(source);
+        const detectedBaseUrls = this.extractBaseUrlsFromSource(source);
+        const primaryBaseUrl = detectedBaseUrls[0];
         // Build output
         const result = [];
         let requestCounter = 0;
@@ -151,6 +157,8 @@ class ScriptConverter {
         // Phase 1: Emit imports
         const importBlock = this.buildImportBlock(source, hasTransactionImport, hasLogReplayExchange);
         result.push(importBlock);
+        result.push(`\nconst env = getEnvContext('${teamName}', ${primaryBaseUrl ? `'${primaryBaseUrl}'` : 'undefined'});`);
+        result.push(`registerBaseUrl(env.baseUrl);`);
         // Skip original import lines and Trend declarations
         const importEndIndex = this.findImportBlockEnd(lines);
         // Emit initTransactions if not already present
@@ -365,7 +373,7 @@ class ScriptConverter {
                 const resolvedUrl = pendingUrl || url;
                 // Resolve params: prefer buffered pendingParams (inline object), then parsed
                 const resolvedParams = pendingParams || params;
-                const reqDef = this.buildRequestDefString(reqName, entryId, currentGroupName, method, resolvedUrl, body, resolvedParams, indent);
+                const reqDef = this.buildRequestDefString(reqName, entryId, currentGroupName, method, resolvedUrl, body, resolvedParams, indent, primaryBaseUrl);
                 result.push(`${indent}const ${reqName} = ${reqDef};`);
                 // Reset buffers
                 pendingParams = null;
@@ -441,7 +449,7 @@ class ScriptConverter {
             result.push(emitLine);
             i++;
         }
-        return this.applyPhaseContract(result.join('\n'), lifecycle);
+        return this.applyPhaseContract(result.join('\n'), teamName, lifecycle);
     }
     // ── Helpers ──────────────────────────────────────────────────
     static extractGroupNames(source) {
@@ -473,7 +481,7 @@ class ScriptConverter {
         // logExchange + trackCorrelation + trackParameter + trackDataRow
         lines.push(`import { logExchange, trackCorrelation, trackParameter, trackDataRow } from '../../../dist/utils/replayLogger.js';`);
         lines.push(`import { createJourneyLifecycleStore, runJourneyLifecycle } from '../../../dist/utils/lifecycle.js';`);
-        lines.push(`import { clearCookies, registerBaseUrl } from '../../../dist/utils/session.js';`);
+        lines.push(`import { clearCookies, registerBaseUrl, getEnvContext } from '../../../dist/utils/session.js';`);
         // Preserve any other imports (CorrelationEngine, RuleProcessor, etc.)
         const srcLines = source.split('\n');
         for (const srcLine of srcLines) {
@@ -630,7 +638,7 @@ class ScriptConverter {
             args.push(current.trim());
         return args;
     }
-    static buildRequestDefString(_reqName, id, transaction, method, url, body, paramsStr, indent) {
+    static buildRequestDefString(_reqName, id, transaction, method, url, body, paramsStr, indent, primaryBaseUrl) {
         const inner = indent + '  ';
         const innerInner = indent + '    ';
         const innerInnerInner = indent + '      ';
@@ -641,7 +649,7 @@ class ScriptConverter {
         s += `${inner}transaction: ${JSON.stringify(sanitizedTxn)},\n`;
         s += `${inner}recordingStartedAt: new Date().toISOString(),\n`;
         s += `${inner}method: ${JSON.stringify(m)},\n`;
-        s += `${inner}url: ${url},\n`;
+        s += `${inner}url: ${this.toRuntimeUrlExpression(url, primaryBaseUrl)},\n`;
         // Body
         if (!body || body === 'null' || body === 'undefined') {
             s += `${inner}body: null,\n`;
@@ -787,7 +795,7 @@ class ScriptConverter {
         }
         return sanitized.slice(0, 128);
     }
-    static applyPhaseContract(source, lifecycle) {
+    static applyPhaseContract(source, teamName, lifecycle) {
         // Match both `export default function () {` and `export default function() {`
         const markerMatch = source.match(/export\s+default\s+function\s*\(\s*\)\s*\{/);
         if (!markerMatch) {
@@ -809,9 +817,10 @@ class ScriptConverter {
         }
         // Extract and register base URLs from the source script
         const baseUrls = this.extractBaseUrlsFromSource(source);
-        const registerBlock = baseUrls.map(u => `registerBaseUrl(${JSON.stringify(u)});`).join('\n');
+        const primaryBaseUrl = baseUrls[0];
+        const registerBlock = `const env = getEnvContext('${teamName}', ${primaryBaseUrl ? `'${primaryBaseUrl}'` : 'undefined'});\nregisterBaseUrl(env.baseUrl);`;
         return beforeDefault
-            + (registerBlock ? registerBlock + '\n' : '')
+            + (baseUrls.length > 0 ? registerBlock + '\n\n' : '')
             + `const __journeyLifecycleStore = createJourneyLifecycleStore();\n\n`
             + this.renderPhaseFunction('initPhase', grouped.initPrelude, grouped.initGroups)
             + `\n`
@@ -1008,6 +1017,40 @@ class ScriptConverter {
             catch { /* skip malformed */ }
         }
         return [...origins];
+    }
+    static toRuntimeUrlExpression(url, primaryBaseUrl) {
+        const rawUrl = url.replace(/^['"`]|['"`]$/g, '');
+        if (!primaryBaseUrl)
+            return `\`\${env.baseUrl}${rawUrl}\``;
+        try {
+            const parsedUrl = new URL(rawUrl);
+            const normalizedOrigin = parsedUrl.origin + '/';
+            if (normalizedOrigin === primaryBaseUrl) {
+                const pathWithQuery = `${parsedUrl.pathname}${parsedUrl.search}${parsedUrl.hash}`;
+                return `\`\${env.baseUrl}${pathWithQuery}\``;
+            }
+        }
+        catch {
+            // Not a valid absolute URL, assume relative
+            return `\`\${env.baseUrl}${rawUrl.startsWith('/') ? '' : '/'}${rawUrl}\``;
+        }
+        return url; // fallback to keeping it as is
+    }
+    static extractStringLiteralValue(value) {
+        const trimmed = value.trim();
+        if (trimmed.length < 2) {
+            return null;
+        }
+        const quote = trimmed[0];
+        const lastQuote = trimmed[trimmed.length - 1];
+        if ((quote !== '"' && quote !== '\'' && quote !== '`') || quote !== lastQuote) {
+            return null;
+        }
+        const inner = trimmed.slice(1, -1);
+        if (quote === '`' && inner.includes('${')) {
+            return null;
+        }
+        return inner;
     }
 }
 exports.ScriptConverter = ScriptConverter;

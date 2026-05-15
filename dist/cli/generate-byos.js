@@ -55,11 +55,16 @@ import { check, sleep, group } from 'k6';
 import { initTransactions, startTransaction, endTransaction } from '../../../dist/utils/transaction.js';
 import { createJourneyLifecycleStore, runJourneyLifecycle } from '../../../dist/utils/lifecycle.js';
 import { logExchange } from '../../../dist/utils/replayLogger.js';
+import { clearCookies, registerBaseUrl, getEnvContext } from '../../../dist/utils/session.js';
+
+const env = getEnvContext('${teamName}', 'https://your-dev-environment.com');
 
 initTransactions(['BYOS_Custom_Logic']);
+registerBaseUrl(env.baseUrl);
 const lifecycleStore = createJourneyLifecycleStore();
 
 export function initPhase(ctx) {
+  clearCookies();
 }
 
 export function actionPhase(ctx) {
@@ -71,13 +76,9 @@ export function actionPhase(ctx) {
     // ==========================================================
 
     /* 
-    const res = http.get('https://test-api.k6.io/public/crocodiles/');
+    const res = http.get(\`\${env.baseUrl}/public/crocodiles/\`);
     check(res, { 'status 200': (r) => r.status === 200 });
     */
-
-    // ==========================================================
-    //   PASTE YOUR GRAFANA STUDIO / CUSTOM K6 SCRIPT ABOVE  
-    // ==========================================================
 
     endTransaction('BYOS_Custom_Logic');
   });

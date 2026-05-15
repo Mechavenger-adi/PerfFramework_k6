@@ -1,47 +1,57 @@
 import http from 'k6/http';
 import { check, sleep, group } from 'k6';
 import { initTransactions, startTransaction, endTransaction } from '../../../dist/utils/transaction.js';
+import { createJourneyLifecycleStore, runJourneyLifecycle, getFrameworkThinkTime } from '../../../dist/utils/lifecycle.js';
+import { logExchange } from '../../../dist/utils/replayLogger.js';
+import { clearCookies, registerFrameworkEnvironmentUrls, resolveFrameworkUrl } from '../../../dist/utils/session.js';
 
-initTransactions(['ListCrocodiles', 'CreateCrocodile', 'ViewCrocodile']);
+initTransactions(['Login', 'Add_To_Cart', 'Checkout']);
+registerFrameworkEnvironmentUrls(['https://your-dev-environment.com/']);
+const lifecycleStore = createJourneyLifecycleStore();
 
-export default function () {
-  console.log('[k6-perf] [INFO] Starting Checkout Journey (Crocodiles API)');
+export function initPhase(ctx) {
+  clearCookies();
+  group('Login', function () {
+    startTransaction('Login');
+    const res = http.post(resolveFrameworkUrl('/auth/login', { fallbackBaseUrl: 'https://your-dev-environment.com/' }), JSON.stringify({
+      // TODO: parameterize with p_username and p_password from data file
+      username: 'testuser001',
+      password: 'P@ssw0rd1',
+    }), { headers: { 'Content-Type': 'application/json' } });
+    check(res, { 'Login: status 200': (r) => r.status === 200 });
+    // TODO: Correlate auth token -> c_authToken
+    endTransaction('Login');
+  });
+}
 
-  // -- Transaction: List public crocodiles ------------------
-  group('List Crocodiles', function () {
-    startTransaction('ListCrocodiles');
-    const res = http.get('https://test-api.k6.io/public/crocodiles/');
-    check(res, { 'List Crocodiles: status 200': (r) => r.status === 200 });
-    endTransaction('ListCrocodiles');
+export function actionPhase(ctx) {
+  group('Add To Cart', function () {
+    startTransaction('Add_To_Cart');
+    const res = http.post(resolveFrameworkUrl('/cart/add', { fallbackBaseUrl: 'https://your-dev-environment.com/' }), JSON.stringify({
+      productId: 'PROD-001',
+      quantity: 1,
+    }), { headers: { 'Content-Type': 'application/json' } });
+    check(res, { 'AddToCart: status 2xx': (r) => r.status >= 200 && r.status < 300 });
+    endTransaction('Add_To_Cart');
   });
 
-  sleep(1);
+  sleep(getFrameworkThinkTime());
 
-  // -- Transaction: Create a crocodile (requires auth, will fail gracefully) --
-  group('Create Crocodile', function () {
-    startTransaction('CreateCrocodile');
-    const payload = JSON.stringify({
-      name: 'Perf Test Croc',
-      sex: 'M',
-      date_of_birth: '2020-01-01',
-    });
-    const res = http.post('https://test-api.k6.io/my/crocodiles/', payload, {
+  group('Checkout', function () {
+    startTransaction('Checkout');
+    const res = http.post(resolveFrameworkUrl('/checkout', { fallbackBaseUrl: 'https://your-dev-environment.com/' }), '{}', {
       headers: { 'Content-Type': 'application/json' },
     });
-    // Expect 401 since we aren't authenticated — validates the framework handles non-200 gracefully
-    check(res, { 'Create Crocodile: status 401 (expected, no auth)': (r) => r.status === 401 });
-    endTransaction('CreateCrocodile');
+    check(res, { 'Checkout: status 2xx': (r) => r.status >= 200 && r.status < 300 });
+    endTransaction('Checkout');
   });
 
-  sleep(1);
+  sleep(getFrameworkThinkTime());
+}
 
-  // -- Transaction: View a single crocodile -----------------
-  group('View Crocodile', function () {
-    startTransaction('ViewCrocodile');
-    const res = http.get('https://test-api.k6.io/public/crocodiles/2/');
-    check(res, { 'View Crocodile: status 200': (r) => r.status === 200 });
-    endTransaction('ViewCrocodile');
-  });
+export function endPhase(ctx) {
+}
 
-  sleep(1);
+export default function () {
+  runJourneyLifecycle(lifecycleStore, { initPhase, actionPhase, endPhase });
 }

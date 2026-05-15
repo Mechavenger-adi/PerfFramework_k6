@@ -4,6 +4,7 @@
  * This is the bridge between the human-facing test plan and k6's execution model.
  */
 
+import { EnvironmentConfig } from '../types/ConfigContracts';
 import { TestPlan, UserJourney, GlobalLoadProfile } from '../types/TestPlanSchema';
 import { ExecutorFactory } from './ExecutorFactory';
 
@@ -61,6 +62,8 @@ interface ScenarioPhaseEnvelope {
   }>;
 }
 
+
+
 export class ScenarioBuilder {
   /**
    * Build a k6 options.scenarios map from a test plan.
@@ -83,7 +86,10 @@ export class ScenarioBuilder {
   // Parallel Mode – all journeys run concurrently
   // ---------------------------------------------
 
-  private static buildParallel(plan: TestPlan, metadata?: ScenarioRuntimeMetadata): K6ScenariosMap {
+  private static buildParallel(
+    plan: TestPlan,
+    metadata?: ScenarioRuntimeMetadata,
+  ): K6ScenariosMap {
     const scenarios: K6ScenariosMap = {};
 
     for (const journey of plan.user_journeys) {
@@ -107,7 +113,10 @@ export class ScenarioBuilder {
   // Uses startTime offsets calculated from cumulative stage durations
   // ---------------------------------------------
 
-  private static buildSequential(plan: TestPlan, metadata?: ScenarioRuntimeMetadata): K6ScenariosMap {
+  private static buildSequential(
+    plan: TestPlan,
+    metadata?: ScenarioRuntimeMetadata,
+  ): K6ScenariosMap {
     const scenarios: K6ScenariosMap = {};
     let offsetSeconds = 0;
 
@@ -136,7 +145,10 @@ export class ScenarioBuilder {
   // Hybrid Mode – groups of journeys with mixed modes
   // ---------------------------------------------
 
-  private static buildHybrid(plan: TestPlan, metadata?: ScenarioRuntimeMetadata): K6ScenariosMap {
+  private static buildHybrid(
+    plan: TestPlan,
+    metadata?: ScenarioRuntimeMetadata,
+  ): K6ScenariosMap {
     if (!plan.hybrid_groups || plan.hybrid_groups.length === 0) {
       throw new Error('[ScenarioBuilder] Hybrid mode requires hybrid_groups to be defined.');
     }

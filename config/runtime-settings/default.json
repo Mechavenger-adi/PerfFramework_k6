@@ -12,7 +12,7 @@
     "maxRedirects": 10,
     "throwOnError": true
   },
-  "errorBehavior": "continue",
+  "errorBehavior": "stop_iteration",
   "reporting": {
     "transactionStats": ["count", "pass", "fail", "avg", "min", "max", "p(90)", "p(97)"],
     "includeTransactionTable": true,
@@ -31,10 +31,10 @@
     "includeResponseBody": false
   },
   "monitoring": {
-    "enabled": false,
+    "enabled": true,
     "cpuWarningPercent": 80,
     "memoryWarningPercent": 80,
-    "sampleIntervalSeconds": 10
+    "sampleIntervalSeconds": 30
   },
   "debugMode": true
 }

@@ -15,6 +15,7 @@ import { ReplayRunner } from '../debug/ReplayRunner';
 import { HostMonitor, HostSnapshot } from '../execution/HostMonitor';
 import { ParallelExecutionManager } from '../execution/ParallelExecutionManager';
 import { PipelineRunner } from '../execution/PipelineRunner';
+import { ScenarioBuilder } from '../scenario/ScenarioBuilder';
 import { ArtifactWriter } from '../reporting/ArtifactWriter';
 import { EventArtifactBuilder } from '../reporting/EventArtifactBuilder';
 import { RunReportGenerator } from '../reporting/RunReportGenerator';
@@ -306,7 +307,7 @@ program
     // -- Step 4: Prepare run metadata and output paths ---------------
     const { reportDir, safeReportDir, runId, runManifestPath } = prepareRunArtifacts(plan, resolvedConfig);
     const scenarioRuntimeMetadata = buildScenarioRuntimeMetadata(plan, resolvedConfig, runId, safeReportDir);
-    const runtimeEnv = buildRunEnvironment(plan, runId, safeReportDir, runManifestPath);
+    const runtimeEnv = buildRunEnvironment(plan, resolvedConfig, runId, safeReportDir, runManifestPath);
     writeRunManifest(runManifestPath, plan, resolvedConfig, scenarioRuntimeMetadata);
 
     // -- Step 5: Build k6 options ---------------
@@ -589,6 +590,7 @@ function buildScenarioRuntimeMetadata(
 
 function buildRunEnvironment(
   plan: TestPlan,
+  resolvedConfig: ResolvedConfig,
   runId: string,
   safeReportDir: string,
   runManifestPath: string,
@@ -600,6 +602,7 @@ function buildRunEnvironment(
     K6_PERF_EXECUTION_MODE: plan.execution_mode,
     K6_PERF_REPORT_DIR: safeReportDir,
     K6_PERF_RUN_MANIFEST_PATH: runManifestPath.replace(/\\/g, '/'),
+    K6_PERF_TEAM_ENVIRONMENTS: JSON.stringify(resolvedConfig.environment.scrum_suites || {}),
   };
 }
 
@@ -640,7 +643,7 @@ function writeRunManifest(
     },
     environment: {
       name: resolvedConfig.environment.name,
-      baseUrl: resolvedConfig.environment.baseUrl,
+      scrum_suites: resolvedConfig.environment.scrum_suites,
     },
   };
 

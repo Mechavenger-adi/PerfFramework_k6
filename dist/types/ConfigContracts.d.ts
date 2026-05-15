@@ -1,14 +1,19 @@
 import { DataOverflowStrategy } from './TestPlanSchema';
 export { DataOverflowStrategy };
+export type EnvironmentCustomValue = string | number | boolean;
+export interface TeamEnvironmentOverride {
+    /** Optional per-team base URL override */
+    baseUrl?: string;
+    /** Optional per-team secondary base URLs keyed by service name */
+    serviceUrls?: Record<string, string>;
+    /** Optional per-team custom environment values */
+    custom?: Record<string, EnvironmentCustomValue>;
+}
 export interface EnvironmentConfig {
     /** Logical name of the environment: dev | staging | uat | prod */
     name: string;
-    /** Base URL of the system under test */
-    baseUrl: string;
-    /** Optional secondary base URLs keyed by service name */
-    serviceUrls?: Record<string, string>;
-    /** Any additional environment-specific key-value pairs */
-    custom?: Record<string, string | number | boolean>;
+    /** Per-team configurations keyed by scrum-suites/<team> folder name */
+    scrum_suites?: Record<string, TeamEnvironmentOverride>;
 }
 export type ErrorBehavior = 'continue' | 'stop_iteration' | 'stop_vu' | 'abort_test';
 export type ThinkTimeMode = 'fixed' | 'random';

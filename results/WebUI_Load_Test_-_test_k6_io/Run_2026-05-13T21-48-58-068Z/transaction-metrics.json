@@ -1,0 +1,132 @@
+{
+  "runId": "Run_2026-05-13T21-48-58-068Z",
+  "stats": [
+    "count",
+    "pass",
+    "fail",
+    "avg",
+    "min",
+    "max",
+    "p(90)",
+    "p(97)"
+  ],
+  "transactions": [
+    {
+      "journey": "buy_animal_14thmay",
+      "transaction": "add to cart",
+      "count": 5,
+      "pass": 5,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 474.6,
+      "min": 451,
+      "max": 490,
+      "p(90)": 489.6,
+      "p(97)": 489.88
+    },
+    {
+      "journey": "buy_animal_14thmay",
+      "transaction": "click confirm",
+      "count": 5,
+      "pass": 5,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 464.4,
+      "min": 443,
+      "max": 495,
+      "p(90)": 488.2,
+      "p(97)": 492.96
+    },
+    {
+      "journey": "buy_animal_14thmay",
+      "transaction": "click continue",
+      "count": 5,
+      "pass": 5,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 196.4,
+      "min": 187,
+      "max": 203,
+      "p(90)": 202.2,
+      "p(97)": 202.76
+    },
+    {
+      "journey": "buy_animal_14thmay",
+      "transaction": "increase quantity to 2 and proceed to checkout",
+      "count": 5,
+      "pass": 5,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 476.8,
+      "min": 453,
+      "max": 493,
+      "p(90)": 492.2,
+      "p(97)": 492.76
+    },
+    {
+      "journey": "buy_animal_14thmay",
+      "transaction": "logout",
+      "count": 2,
+      "pass": 2,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 475.5,
+      "min": 452,
+      "max": 499,
+      "p(90)": 494.3,
+      "p(97)": 497.59
+    },
+    {
+      "journey": "buy_animal_14thmay",
+      "transaction": "search_animal",
+      "count": 5,
+      "pass": 5,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 197,
+      "min": 188,
+      "max": 205,
+      "p(90)": 203.4,
+      "p(97)": 204.52
+    },
+    {
+      "journey": "buy_animal_14thmay",
+      "transaction": "select product",
+      "count": 5,
+      "pass": 5,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 301.4,
+      "min": 284,
+      "max": 316,
+      "p(90)": 314.8,
+      "p(97)": 315.64
+    },
+    {
+      "journey": "buy_animal_14thmay",
+      "transaction": "t01_launch",
+      "count": 2,
+      "pass": 2,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 496.5,
+      "min": 359,
+      "max": 634,
+      "p(90)": 606.5,
+      "p(97)": 625.75
+    },
+    {
+      "journey": "buy_animal_14thmay",
+      "transaction": "t02_login",
+      "count": 2,
+      "pass": 2,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 768,
+      "min": 643,
+      "max": 893,
+      "p(90)": 868,
+      "p(97)": 885.5
+    }
+  ]
+}

@@ -38,7 +38,7 @@ export async function runGenerate(harPath: string, teamName: string, outName: st
   } finally {
     rl.close();
   }
-  const scriptContent = ScriptGenerator.generate(groups, lifecycleSelection);
+  const scriptContent = ScriptGenerator.generate(groups, lifecycleSelection, teamName);
   const recordingLog = ExchangeLogBuilder.fromGroups(groups);
 
   const suiteDir = path.join(process.cwd(), 'scrum-suites', teamName);

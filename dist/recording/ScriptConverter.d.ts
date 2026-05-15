@@ -19,11 +19,11 @@ export declare class ScriptConverter {
     /**
      * Read a script file and return the converted source.
      */
-    static convertFile(filePath: string, lifecycle?: LifecycleSelection): string;
+    static convertFile(filePath: string, teamName?: string, lifecycle?: LifecycleSelection): string;
     /**
      * Convert a raw k6 script string to a framework-compatible script.
      */
-    static convert(source: string, lifecycle?: LifecycleSelection): string;
+    static convert(source: string, teamName: string, lifecycle?: LifecycleSelection): string;
     static extractGroupNames(source: string): string[];
     private static buildImportBlock;
     private static findImportBlockEnd;
@@ -62,5 +62,7 @@ export declare class ScriptConverter {
     private static indentBlock;
     /** Extract unique base URLs (origin) from URL literals in source code. */
     private static extractBaseUrlsFromSource;
+    private static toRuntimeUrlExpression;
+    private static extractStringLiteralValue;
 }
 //# sourceMappingURL=ScriptConverter.d.ts.map

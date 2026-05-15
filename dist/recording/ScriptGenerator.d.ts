@@ -7,13 +7,15 @@ export declare class ScriptGenerator {
     /**
      * Generates formatted TypeScript/JavaScript source code based on Transaction Groups.
      */
-    static generate(groups: TransactionGroup[], lifecycle?: LifecycleSelection): string;
+    static generate(groups: TransactionGroup[], lifecycle: LifecycleSelection | undefined, teamName: string): string;
     private static buildPhaseFunction;
     private static buildRequestDefinition;
     private static buildRequestParams;
     private static buildRequestBody;
     private static formatArray;
     private static formatValue;
+    private static buildRuntimeUrlExpression;
+    private static isRawJavaScriptExpression;
     /** Extract unique origin URLs (protocol+host) from all HAR entries in all groups. */
     private static extractBaseUrls;
 }

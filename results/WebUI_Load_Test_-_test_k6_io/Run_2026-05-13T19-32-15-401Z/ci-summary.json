@@ -1,0 +1,108 @@
+{
+  "status": "failed",
+  "runId": "Run_2026-05-13T19-32-15-401Z",
+  "plan": "WebUI Load Test - test.k6.io",
+  "environment": "dev",
+  "thresholdFailures": 2,
+  "errorCount": 15,
+  "warningCount": 2,
+  "aborted": false,
+  "transactions": [
+    {
+      "name": "add to cart",
+      "count": 1,
+      "pass": 0,
+      "fail": 1,
+      "errorPct": 100,
+      "avg": 17,
+      "min": 17,
+      "max": 17
+    },
+    {
+      "name": "click confirm",
+      "count": 1,
+      "pass": 0,
+      "fail": 1,
+      "errorPct": 100,
+      "avg": 0,
+      "min": 0,
+      "max": 0
+    },
+    {
+      "name": "click continue",
+      "count": 1,
+      "pass": 0,
+      "fail": 1,
+      "errorPct": 100,
+      "avg": 0,
+      "min": 0,
+      "max": 0
+    },
+    {
+      "name": "increase quantity to 2 and proceed to checkout",
+      "count": 1,
+      "pass": 0,
+      "fail": 1,
+      "errorPct": 100,
+      "avg": 1,
+      "min": 1,
+      "max": 1
+    },
+    {
+      "name": "select product",
+      "count": 1,
+      "pass": 1,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 554,
+      "min": 554,
+      "max": 554
+    },
+    {
+      "name": "t01_launch",
+      "count": 1,
+      "pass": 0,
+      "fail": 1,
+      "errorPct": 100,
+      "avg": 155,
+      "min": 155,
+      "max": 155
+    },
+    {
+      "name": "t02_login",
+      "count": 1,
+      "pass": 0,
+      "fail": 1,
+      "errorPct": 100,
+      "avg": 3,
+      "min": 3,
+      "max": 3
+    },
+    {
+      "name": "t03_search_animal",
+      "count": 1,
+      "pass": 1,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 614,
+      "min": 614,
+      "max": 614
+    },
+    {
+      "name": "t09_logout",
+      "count": 1,
+      "pass": 0,
+      "fail": 1,
+      "errorPct": 100,
+      "avg": 1,
+      "min": 1,
+      "max": 1
+    }
+  ],
+  "gate": {
+    "failedRules": [
+      "http_req_failed{scenario:buy_animal_14thmay}:rate<0.05",
+      "http_req_failed:rate<0.1"
+    ]
+  }
+}

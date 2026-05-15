@@ -1,0 +1,108 @@
+{
+  "status": "failed",
+  "runId": "Run_2026-05-13T21-44-57-760Z",
+  "plan": "WebUI Load Test - test.k6.io",
+  "environment": "dev",
+  "thresholdFailures": 2,
+  "errorCount": 1,
+  "warningCount": 2,
+  "aborted": false,
+  "transactions": [
+    {
+      "name": "add to cart",
+      "count": 1,
+      "pass": 1,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 501,
+      "min": 501,
+      "max": 501
+    },
+    {
+      "name": "click confirm",
+      "count": 1,
+      "pass": 1,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 476,
+      "min": 476,
+      "max": 476
+    },
+    {
+      "name": "click continue",
+      "count": 1,
+      "pass": 1,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 205,
+      "min": 205,
+      "max": 205
+    },
+    {
+      "name": "increase quantity to 2 and proceed to checkout",
+      "count": 1,
+      "pass": 1,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 500,
+      "min": 500,
+      "max": 500
+    },
+    {
+      "name": "logout",
+      "count": 1,
+      "pass": 1,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 494,
+      "min": 494,
+      "max": 494
+    },
+    {
+      "name": "search_animal",
+      "count": 1,
+      "pass": 1,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 209,
+      "min": 209,
+      "max": 209
+    },
+    {
+      "name": "select product",
+      "count": 1,
+      "pass": 1,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 331,
+      "min": 331,
+      "max": 331
+    },
+    {
+      "name": "t01_launch",
+      "count": 1,
+      "pass": 1,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 627,
+      "min": 627,
+      "max": 627
+    },
+    {
+      "name": "t02_login",
+      "count": 1,
+      "pass": 1,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 704,
+      "min": 704,
+      "max": 704
+    }
+  ],
+  "gate": {
+    "failedRules": [
+      "http_req_failed{scenario:buy_animal_14thmay}:rate<0.05",
+      "http_req_failed:rate<0.1"
+    ]
+  }
+}

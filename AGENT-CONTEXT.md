@@ -714,7 +714,7 @@ For each journey in test plan:
 { "name": "dev", "baseUrl": "https://test-api.k6.io" }
 ```
 
-**Current behavior note:** `baseUrl` is loaded into resolved environment config and written into run-manifest metadata, but it is not yet auto-injected into journey scripts as a request base URL or runtime env var. Generated and converted scripts currently use discovered request URLs for `registerBaseUrl()` cookie-jar registration.
+**Current behavior note:** `baseUrl` is loaded into resolved environment config, injected into k6 runtime via `K6_PERF_BASE_URL`, and consumed by generated/converted scripts through `resolveFrameworkUrl()`. Optional `teamOverrides` let multiple teams share the same environment name while targeting different URLs.
 
 ### config/runtime-settings/default.json
 ```json
@@ -1870,3 +1870,12 @@ npm run cli -- run --plan config/test-plans/debug-test.json
   - `risk-zones.md` — 10 hidden complexity areas (RZ1-RZ10)
 - **Design:** All content derived from actual repository analysis (code, change logs, graph.html, implementation history). Zero generic documentation. Each file is self-contained, concise, and scannable.
 - **Usage:** AI agents should read `ai-context/overview.md` first, then load only task-relevant files. AGENT-CONTEXT.md remains the canonical record but should NOT be the primary AI loading target.
+
+### 2026-05-14 - Environment Base URL Injection + Team Overrides
+- **What:** Wired environment `baseUrl` into generated, converted, and BYOS scripts and added optional team-specific environment overrides.
+- **Config model:** `EnvironmentConfig` now supports `teamOverrides` keyed by `scrum-suites/<team>` folder name. Each override can supply `baseUrl`, `serviceUrls`, and `custom`.
+- **Scenario wiring:** `ParallelExecutionManager.resolve()` now passes resolved environment config into `ScenarioBuilder`. `ScenarioBuilder` resolves the effective per-journey environment using the journey script path and injects `K6_PERF_BASE_URL`, `K6_PERF_SERVICE_URLS`, `K6_PERF_ENV_CUSTOM`, and `K6_PERF_TEAM`.
+- **k6 runtime helpers:** `session.ts` now exposes `registerFrameworkEnvironmentUrls()` and `resolveFrameworkUrl()`. Generated and converted scripts register runtime env URLs for cookie clearing, with recorded-origin fallbacks preserved for debug replay and older flows.
+- **Script behavior:** `ScriptGenerator.ts` emits relative primary-host request URLs resolved at runtime via `resolveFrameworkUrl(..., { fallbackBaseUrl })`. `ScriptConverter.ts` applies the same conversion when it can safely detect primary-host URL literals.
+- **Templates updated:** `init.ts` sample environment config now demonstrates `teamOverrides`; scaffolded sample scripts and the BYOS template now use `resolveFrameworkUrl()` and environment-aware cookie registration.
+- **Remaining gap:** Automatic mapping of captured secondary origins to named `serviceUrls` is still manual; this remains tracked as technical debt.

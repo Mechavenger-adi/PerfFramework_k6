@@ -1,0 +1,108 @@
+{
+  "status": "failed",
+  "runId": "Run_2026-05-14T18-50-07-909Z",
+  "plan": "WebUI Load Test - test.k6.io",
+  "environment": "dev",
+  "thresholdFailures": 2,
+  "errorCount": 7,
+  "warningCount": 2,
+  "aborted": false,
+  "transactions": [
+    {
+      "name": "add to cart",
+      "count": 9,
+      "pass": 5,
+      "fail": 4,
+      "errorPct": 44.44,
+      "avg": 449.22222222222223,
+      "min": 269,
+      "max": 619
+    },
+    {
+      "name": "click confirm",
+      "count": 9,
+      "pass": 5,
+      "fail": 4,
+      "errorPct": 44.44,
+      "avg": 482,
+      "min": 440,
+      "max": 507
+    },
+    {
+      "name": "click continue",
+      "count": 9,
+      "pass": 4,
+      "fail": 5,
+      "errorPct": 55.56,
+      "avg": 163.55555555555554,
+      "min": 84,
+      "max": 227
+    },
+    {
+      "name": "increase quantity to 2 and proceed to checkout",
+      "count": 9,
+      "pass": 9,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 436.1111111111111,
+      "min": 249,
+      "max": 544
+    },
+    {
+      "name": "logout",
+      "count": 1,
+      "pass": 1,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 533,
+      "min": 533,
+      "max": 533
+    },
+    {
+      "name": "search_animal",
+      "count": 9,
+      "pass": 9,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 213.11111111111111,
+      "min": 196,
+      "max": 227
+    },
+    {
+      "name": "select product",
+      "count": 9,
+      "pass": 6,
+      "fail": 3,
+      "errorPct": 33.33,
+      "avg": 281,
+      "min": 179,
+      "max": 342
+    },
+    {
+      "name": "t01_launch",
+      "count": 5,
+      "pass": 5,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 610.6,
+      "min": 568,
+      "max": 640
+    },
+    {
+      "name": "t02_login",
+      "count": 5,
+      "pass": 5,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 791,
+      "min": 651,
+      "max": 955
+    }
+  ],
+  "gate": {
+    "failedRules": [
+      "http_req_failed{scenario:buy_animal_14thmay}:rate<0.05",
+      "http_req_failed:rate<0.1"
+    ]
+  }
+}

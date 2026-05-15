@@ -1,0 +1,108 @@
+{
+  "status": "failed",
+  "runId": "Run_2026-05-13T19-29-01-449Z",
+  "plan": "WebUI Load Test - test.k6.io",
+  "environment": "dev",
+  "thresholdFailures": 2,
+  "errorCount": 15,
+  "warningCount": 2,
+  "aborted": false,
+  "transactions": [
+    {
+      "name": "add to cart",
+      "count": 7,
+      "pass": 0,
+      "fail": 7,
+      "errorPct": 100,
+      "avg": 8.857142857142858,
+      "min": 2,
+      "max": 21
+    },
+    {
+      "name": "click confirm",
+      "count": 7,
+      "pass": 0,
+      "fail": 7,
+      "errorPct": 100,
+      "avg": 0,
+      "min": 0,
+      "max": 0
+    },
+    {
+      "name": "click continue",
+      "count": 7,
+      "pass": 0,
+      "fail": 7,
+      "errorPct": 100,
+      "avg": 0.7142857142857143,
+      "min": 0,
+      "max": 2
+    },
+    {
+      "name": "increase quantity to 2 and proceed to checkout",
+      "count": 7,
+      "pass": 0,
+      "fail": 7,
+      "errorPct": 100,
+      "avg": 1.7142857142857142,
+      "min": 1,
+      "max": 3
+    },
+    {
+      "name": "select product",
+      "count": 7,
+      "pass": 7,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 346.7142857142857,
+      "min": 285,
+      "max": 519
+    },
+    {
+      "name": "t01_launch",
+      "count": 5,
+      "pass": 0,
+      "fail": 5,
+      "errorPct": 100,
+      "avg": 37.2,
+      "min": 0,
+      "max": 183
+    },
+    {
+      "name": "t02_login",
+      "count": 5,
+      "pass": 0,
+      "fail": 5,
+      "errorPct": 100,
+      "avg": 3,
+      "min": 2,
+      "max": 4
+    },
+    {
+      "name": "t03_search_animal",
+      "count": 7,
+      "pass": 7,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 834.8571428571429,
+      "min": 203,
+      "max": 3117
+    },
+    {
+      "name": "t09_logout",
+      "count": 4,
+      "pass": 0,
+      "fail": 4,
+      "errorPct": 100,
+      "avg": 1.75,
+      "min": 1,
+      "max": 2
+    }
+  ],
+  "gate": {
+    "failedRules": [
+      "http_req_failed:rate<0.1",
+      "http_req_failed{scenario:buy_animal_14thmay}:rate<0.05"
+    ]
+  }
+}

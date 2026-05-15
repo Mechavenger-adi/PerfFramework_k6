@@ -49,7 +49,7 @@ function runGenerate(harPath, teamName, outName) {
     // Using sensible defaults for refinement
     const entries = HARParser_1.HARParser.parse(absoluteHarPath, { excludeStaticAssets: true });
     const groups = TransactionGrouper_1.TransactionGrouper.group(entries);
-    const scriptContent = ScriptGenerator_1.ScriptGenerator.generate(groups);
+    const scriptContent = ScriptGenerator_1.ScriptGenerator.generate(groups, undefined, 'unknown_team');
     const targetDir = path.join(process.cwd(), 'scrum-suites', teamName, 'tests');
     if (!fs.existsSync(targetDir)) {
         fs.mkdirSync(targetDir, { recursive: true });

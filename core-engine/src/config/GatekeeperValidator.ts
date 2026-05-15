@@ -32,8 +32,8 @@ export class GatekeeperValidator {
     const autoResolveRecordingLog = plan.debug?.autoResolveRecordingLog !== false;
 
     // -- 1. Environment checks ------------------
-    if (!config.environment.baseUrl) {
-      failures.push('[Environment] baseUrl is missing or empty.');
+    if (!config.environment.scrum_suites || Object.keys(config.environment.scrum_suites).length === 0) {
+      warnings.push('[Environment] No scrum_suites defined. Scripts will fall back to recorded URLs.');
     }
     if (!config.environment.name) {
       failures.push('[Environment] name is missing or empty.');

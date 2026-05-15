@@ -1,0 +1,108 @@
+{
+  "status": "failed",
+  "runId": "Run_2026-05-14T19-10-54-483Z",
+  "plan": "WebUI Load Test - test.k6.io",
+  "environment": "dev",
+  "thresholdFailures": 2,
+  "errorCount": 9,
+  "warningCount": 2,
+  "aborted": false,
+  "transactions": [
+    {
+      "name": "add to cart",
+      "count": 14,
+      "pass": 9,
+      "fail": 5,
+      "errorPct": 35.71,
+      "avg": 431.5,
+      "min": 248,
+      "max": 678
+    },
+    {
+      "name": "click confirm",
+      "count": 14,
+      "pass": 7,
+      "fail": 7,
+      "errorPct": 50,
+      "avg": 498,
+      "min": 314,
+      "max": 699
+    },
+    {
+      "name": "click continue",
+      "count": 14,
+      "pass": 9,
+      "fail": 5,
+      "errorPct": 35.71,
+      "avg": 161.07142857142858,
+      "min": 84,
+      "max": 214
+    },
+    {
+      "name": "increase quantity to 2 and proceed to checkout",
+      "count": 14,
+      "pass": 14,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 410.85714285714283,
+      "min": 250,
+      "max": 537
+    },
+    {
+      "name": "logout",
+      "count": 4,
+      "pass": 3,
+      "fail": 1,
+      "errorPct": 25,
+      "avg": 460.75,
+      "min": 383,
+      "max": 527
+    },
+    {
+      "name": "search_animal",
+      "count": 14,
+      "pass": 14,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 201.14285714285714,
+      "min": 193,
+      "max": 212
+    },
+    {
+      "name": "select product",
+      "count": 14,
+      "pass": 9,
+      "fail": 5,
+      "errorPct": 35.71,
+      "avg": 274.2857142857143,
+      "min": 164,
+      "max": 504
+    },
+    {
+      "name": "t01_launch",
+      "count": 5,
+      "pass": 5,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 550.8,
+      "min": 422,
+      "max": 590
+    },
+    {
+      "name": "t02_login",
+      "count": 5,
+      "pass": 5,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 767,
+      "min": 678,
+      "max": 871
+    }
+  ],
+  "gate": {
+    "failedRules": [
+      "http_req_failed:rate<0.1",
+      "http_req_failed{scenario:buy_animal_14thmay}:rate<0.05"
+    ]
+  }
+}

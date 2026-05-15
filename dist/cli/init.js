@@ -72,6 +72,17 @@ function runInit(projectDir = process.cwd()) {
         custom: {
             tenantId: 'tenant-001',
         },
+        teamOverrides: {
+            'sample-team': {
+                baseUrl: 'https://sample-team.dev.your-company.com',
+                serviceUrls: {
+                    auth: 'https://auth.sample-team.dev.your-company.com',
+                },
+                custom: {
+                    tenantId: 'sample-team-dev',
+                },
+            },
+        },
     }, null, 2), 'config/environments/dev.json');
     // -- Sample: runtime settings -----------------
     writeIfNotExists(path.join(projectDir, 'config/runtime-settings/default.json'), JSON.stringify({
@@ -168,7 +179,7 @@ function runInit(projectDir = process.cwd()) {
     writeIfNotExists(path.join(projectDir, '.env.template'), `# Copy this file to .env and fill in your values
 # NEVER commit .env to source control
 
-K6_BASE_URL=https://your-environment.com
+# Base URLs belong in config/environments/*.json
 K6_API_KEY=your-api-key-here
 K6_DEBUG=false
 `, '.env.template');
@@ -211,18 +222,20 @@ import { check, sleep, group } from 'k6';
 import { initTransactions, startTransaction, endTransaction } from '../../../dist/utils/transaction.js';
 import { createJourneyLifecycleStore, runJourneyLifecycle, getFrameworkThinkTime } from '../../../dist/utils/lifecycle.js';
 import { logExchange } from '../../../dist/utils/replayLogger.js';
+import { clearCookies, registerFrameworkEnvironmentUrls, resolveFrameworkUrl } from '../../../dist/utils/session.js';
 
 initTransactions(['Homepage', 'Product_List']);
+registerFrameworkEnvironmentUrls(['https://your-dev-environment.com/']);
 const lifecycleStore = createJourneyLifecycleStore();
 
 export function initPhase(ctx) {
+  clearCookies();
 }
 
 export function actionPhase(ctx) {
   group('Homepage', function () {
     startTransaction('Homepage');
-    // TODO: Replace with your baseUrl from config
-    const res = http.get('https://your-dev-environment.com/');
+    const res = http.get(resolveFrameworkUrl('/', { fallbackBaseUrl: 'https://your-dev-environment.com/' }));
     check(res, { 'Homepage: status 2xx': (r) => r.status >= 200 && r.status < 300 });
     endTransaction('Homepage');
   });
@@ -231,7 +244,7 @@ export function actionPhase(ctx) {
 
   group('Product List', function () {
     startTransaction('Product_List');
-    const res = http.get('https://your-dev-environment.com/products');
+    const res = http.get(resolveFrameworkUrl('/products', { fallbackBaseUrl: 'https://your-dev-environment.com/' }));
     check(res, { 'ProductList: status 2xx': (r) => r.status >= 200 && r.status < 300 });
     endTransaction('Product_List');
   });
@@ -252,14 +265,17 @@ import { check, sleep, group } from 'k6';
 import { initTransactions, startTransaction, endTransaction } from '../../../dist/utils/transaction.js';
 import { createJourneyLifecycleStore, runJourneyLifecycle, getFrameworkThinkTime } from '../../../dist/utils/lifecycle.js';
 import { logExchange } from '../../../dist/utils/replayLogger.js';
+import { clearCookies, registerFrameworkEnvironmentUrls, resolveFrameworkUrl } from '../../../dist/utils/session.js';
 
 initTransactions(['Login', 'Add_To_Cart', 'Checkout']);
+registerFrameworkEnvironmentUrls(['https://your-dev-environment.com/']);
 const lifecycleStore = createJourneyLifecycleStore();
 
 export function initPhase(ctx) {
+  clearCookies();
   group('Login', function () {
     startTransaction('Login');
-    const res = http.post('https://your-dev-environment.com/auth/login', JSON.stringify({
+    const res = http.post(resolveFrameworkUrl('/auth/login', { fallbackBaseUrl: 'https://your-dev-environment.com/' }), JSON.stringify({
       // TODO: parameterize with p_username and p_password from data file
       username: 'testuser001',
       password: 'P@ssw0rd1',
@@ -273,7 +289,7 @@ export function initPhase(ctx) {
 export function actionPhase(ctx) {
   group('Add To Cart', function () {
     startTransaction('Add_To_Cart');
-    const res = http.post('https://your-dev-environment.com/cart/add', JSON.stringify({
+    const res = http.post(resolveFrameworkUrl('/cart/add', { fallbackBaseUrl: 'https://your-dev-environment.com/' }), JSON.stringify({
       productId: 'PROD-001',
       quantity: 1,
     }), { headers: { 'Content-Type': 'application/json' } });
@@ -285,7 +301,7 @@ export function actionPhase(ctx) {
 
   group('Checkout', function () {
     startTransaction('Checkout');
-    const res = http.post('https://your-dev-environment.com/checkout', '{}', {
+    const res = http.post(resolveFrameworkUrl('/checkout', { fallbackBaseUrl: 'https://your-dev-environment.com/' }), '{}', {
       headers: { 'Content-Type': 'application/json' },
     });
     check(res, { 'Checkout: status 2xx': (r) => r.status >= 200 && r.status < 300 });

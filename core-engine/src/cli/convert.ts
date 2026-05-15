@@ -40,7 +40,7 @@ export async function runConvert(
     }
   }
 
-  const converted = ScriptConverter.convert(source, lifecycleSelection);
+  const converted = ScriptConverter.convert(source, teamName, lifecycleSelection);
 
   if (options.inPlace) {
     fs.writeFileSync(absoluteInput, converted, 'utf-8');

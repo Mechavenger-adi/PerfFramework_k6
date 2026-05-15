@@ -74,7 +74,17 @@ Read from `K6_PERF_RUNTIME_METADATA`:
 ## Session Contract
 
 `registerBaseUrl(url)`: Adds URL to `_registeredUrls` Set.
+`registerFrameworkEnvironmentUrls(fallbackUrls?)`: Registers runtime env URLs (`K6_PERF_BASE_URL`, `K6_PERF_SERVICE_URLS`) when present, otherwise registers recorded fallback URLs.
+`resolveFrameworkUrl(pathOrUrl, options?)`: Resolves a relative path against `K6_PERF_BASE_URL` or a named service URL. Falls back to the provided recorded base URL when runtime env injection is unavailable.
 `clearCookies(...urls)`: Clears cookie jar for given URLs or all registered URLs.
 `deleteCookie(url, name)`: Removes specific named cookie.
 
-Generated/converted scripts call `registerBaseUrl()` at module init and `clearCookies()` in `initPhase()`.
+Generated/converted scripts call `registerFrameworkEnvironmentUrls()` at module init and `clearCookies()` in `initPhase()`.
+
+## Environment URL Contract
+
+Scenario env injection may provide:
+- `K6_PERF_BASE_URL`: Effective primary base URL for the current journey/team/environment
+- `K6_PERF_SERVICE_URLS`: JSON object of named service URLs
+- `K6_PERF_ENV_CUSTOM`: JSON object of custom environment values
+- `K6_PERF_TEAM`: Optional team name resolved from `scrum-suites/<team>/...`

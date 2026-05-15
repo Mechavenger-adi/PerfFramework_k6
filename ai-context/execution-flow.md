@@ -15,12 +15,14 @@
 6. RuntimeConfigManager wraps resolved config for typed access
 7. prepareRunArtifacts() → creates results/<PlanName>/Run_<timestamp>/
 8. buildScenarioRuntimeMetadata() → thinkTime, errorBehavior, pacing config
-9. ParallelExecutionManager.resolve(plan, metadata):
+9. ParallelExecutionManager.resolve(plan, metadata, resolvedConfig.environment):
    a. JourneyAllocator.allocate() → weight-based VU distribution
    b. ScenarioBuilder.build() → k6 scenarios with injected env vars:
       - K6_PERF_RUN_ID, K6_PERF_PLAN_NAME, K6_PERF_ENVIRONMENT
       - K6_PERF_RUNTIME_METADATA (JSON), K6_PERF_SCENARIO_METADATA (JSON)
       - K6_PERF_PHASES (JSON) — lifecycle phase envelope
+      - K6_PERF_BASE_URL / K6_PERF_SERVICE_URLS / K6_PERF_ENV_CUSTOM per journey
+      - team-specific environment overrides resolved from scrum-suites/<team>/... when configured
    c. ThresholdManager.apply() → dynamic SLA thresholds (global + journey + transaction)
    d. buildSummaryTrendStats() → custom percentiles for k6
 10. writeRunManifest() → run-manifest.json
@@ -74,7 +76,7 @@ For each journey in plan.user_journeys:
 ```
 Script loads:
   1. createJourneyLifecycleStore() → per-script state
-  2. registerBaseUrl() → cookie jar URL registry
+  2. registerFrameworkEnvironmentUrls() → cookie jar URL registry using runtime env URLs or recorded fallbacks
   
 Default function called per VU iteration:
   3. runJourneyLifecycle(store, { initPhase, actionPhase, endPhase }):
@@ -82,6 +84,7 @@ Default function called per VU iteration:
         - clearCookies() → clean session
         - Login, data setup, etc.
      b. Every call → actionPhase(ctx)
+        - resolveFrameworkUrl() → relative request paths mapped to current env/team base URL
         - startTransaction()/endTransaction() around groups
         - logExchange() per request (gated by K6_PERF_DEBUG)
         - sleep(getFrameworkThinkTime()) between groups

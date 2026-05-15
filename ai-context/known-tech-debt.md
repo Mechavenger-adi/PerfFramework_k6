@@ -48,11 +48,11 @@
 **Impact:** Changes are risky (see fragile-areas.md F1).
 **Potential improvement:** Extract CSS/JS into template files or use a lightweight template engine.
 
-## TD8 — baseUrl Not Injected Into Scripts
+## TD8 — Secondary Service URL Auto-Mapping Missing
 
 **Severity:** Low
-**Description:** `config/environments/*.json` `baseUrl` is resolved by ConfigurationManager and carried into run-manifest metadata, but generated/converted scripts don't consume it for request construction.
-**Impact:** Scripts use discovered HAR URLs, not environment-configured base URLs.
+**Description:** Generated and converted scripts now resolve primary-host requests through environment `baseUrl`, but captured multi-origin traffic is not automatically mapped to named `serviceUrls`.
+**Impact:** Secondary domains may still remain as recorded absolute URLs unless the script explicitly uses `resolveFrameworkUrl(..., { service: 'name' })` or is manually refined.
 
 ## TD9 — `config/correlation-rules/` Directory Empty
 

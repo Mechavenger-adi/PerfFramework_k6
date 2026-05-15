@@ -5,24 +5,28 @@ export interface LifecycleSelection {
   endGroups: string[];
 }
 
+interface RawJavaScriptExpression {
+  __raw: string;
+}
+
 export class ScriptGenerator {
   /**
    * Generates formatted TypeScript/JavaScript source code based on Transaction Groups.
    */
-  static generate(groups: TransactionGroup[], lifecycle?: LifecycleSelection): string {
+  static generate(groups: TransactionGroup[], lifecycle: LifecycleSelection | undefined, teamName: string): string {
     let script = `import http from 'k6/http';\n`;
     script += `import { check, sleep, group } from 'k6';\n`;
     script += `import { initTransactions, startTransaction, endTransaction } from '../../../dist/utils/transaction.js';\n`;
     script += `import { createJourneyLifecycleStore, runJourneyLifecycle, getFrameworkThinkTime } from '../../../dist/utils/lifecycle.js';\n`;
     script += `import { logExchange, trackCorrelation, trackParameter } from '../../../dist/utils/replayLogger.js';\n`;
-    script += `import { clearCookies, registerBaseUrl } from '../../../dist/utils/session.js';\n\n`;
+    script += `import { clearCookies, registerBaseUrl, getEnvContext } from '../../../dist/utils/session.js';\n\n`;
 
-    // Extract unique base URLs from all request entries for registerBaseUrl
+    // Extract unique base URLs from all request entries for fallback
     const baseUrls = this.extractBaseUrls(groups);
-    for (const baseUrl of baseUrls) {
-      script += `registerBaseUrl(${JSON.stringify(baseUrl)});\n`;
-    }
-    if (baseUrls.length > 0) script += `\n`;
+    const primaryBaseUrl = baseUrls[0];
+    
+    script += `const env = getEnvContext('${teamName}', ${primaryBaseUrl ? `'${primaryBaseUrl}'` : 'undefined'});\n`;
+    script += `registerBaseUrl(env.baseUrl);\n\n`;
 
     const transactionNames = groups.map((g) => g.name);
     const initSet = new Set(lifecycle?.initGroups ?? []);
@@ -34,11 +38,11 @@ export class ScriptGenerator {
     script += `initTransactions(${this.formatArray(transactionNames)});\n\n`;
     script += `const __journeyLifecycleStore = createJourneyLifecycleStore();\n\n`;
 
-    script += this.buildPhaseFunction('initPhase', initGroups);
+    script += this.buildPhaseFunction('initPhase', initGroups, primaryBaseUrl);
     script += `\n`;
-    script += this.buildPhaseFunction('actionPhase', actionGroups);
+    script += this.buildPhaseFunction('actionPhase', actionGroups, primaryBaseUrl);
     script += `\n`;
-    script += this.buildPhaseFunction('endPhase', endGroups);
+    script += this.buildPhaseFunction('endPhase', endGroups, primaryBaseUrl);
     script += `\n`;
     script += `export default function () {\n`;
     script += `  runJourneyLifecycle(__journeyLifecycleStore, { initPhase, actionPhase, endPhase });\n`;
@@ -46,7 +50,11 @@ export class ScriptGenerator {
     return script;
   }
 
-  private static buildPhaseFunction(functionName: string, groups: TransactionGroup[]): string {
+  private static buildPhaseFunction(
+    functionName: string,
+    groups: TransactionGroup[],
+    primaryBaseUrl?: string,
+  ): string {
     let script = `export function ${functionName}(ctx) {\n`;
     let globalRequestId = 0;
 
@@ -72,7 +80,7 @@ export class ScriptGenerator {
         const requestName = `request_${reqIndex + 1}`;
         const responseName = `res_${reqIndex + 1}`;
         const sequentialId = `req_${globalRequestId}`;
-        const requestDefinition = this.buildRequestDefinition(req, groupItem.name, method, sequentialId);
+        const requestDefinition = this.buildRequestDefinition(req, groupItem.name, method, sequentialId, primaryBaseUrl);
 
         script += `    const ${requestName} = ${this.formatValue(requestDefinition, 4)};\n`;
         if (method === 'GET') {
@@ -113,12 +121,13 @@ export class ScriptGenerator {
     transactionName: string,
     method: string,
     sequentialId: string,
+    primaryBaseUrl?: string,
   ): {
     id: string;
     transaction: string;
     recordingStartedAt: string;
     method: string;
-    url: string;
+    url: string | RawJavaScriptExpression;
     body: string | null;
     params: { headers?: Record<string, string>; cookies: Record<string, string>; redirects: number; tags: Record<string, string> };
   } {
@@ -127,7 +136,7 @@ export class ScriptGenerator {
       transaction: transactionName,
       recordingStartedAt: req.startedDateTime,
       method,
-      url: req.url,
+      url: this.buildRuntimeUrlExpression(req.url, primaryBaseUrl),
       body: this.buildRequestBody(req.postData),
       params: this.buildRequestParams(req, transactionName, sequentialId),
     };
@@ -185,20 +194,57 @@ export class ScriptGenerator {
   private static formatValue(value: unknown, indentLevel: number): string {
     if (value === null) return 'null';
     if (value === undefined) return 'undefined';
+    if (this.isRawJavaScriptExpression(value)) return value.__raw;
     if (typeof value === 'string') return JSON.stringify(value);
     if (typeof value === 'number' || typeof value === 'boolean') return String(value);
-
-    const json = JSON.stringify(value, null, 2);
-    if (!json) return 'null';
-
-    const indent = ' '.repeat(indentLevel);
-    return json
-      .split('\n')
-      .map((line, index) => (index === 0 ? line : `${indent}${line}`))
-      .join('\n')
-      .replace(/"([^"]+)":/g, (_match, key: string) => {
-        return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(key) ? `${key}:` : `"${key}":`;
+    if (Array.isArray(value)) {
+      if (value.length === 0) return '[]';
+      const childIndent = ' '.repeat(indentLevel + 2);
+      const closingIndent = ' '.repeat(indentLevel);
+      const items = value.map((item) => `${childIndent}${this.formatValue(item, indentLevel + 2)}`);
+      return `[\n${items.join(',\n')}\n${closingIndent}]`;
+    }
+    if (typeof value === 'object') {
+      const entries = Object.entries(value);
+      if (entries.length === 0) return '{}';
+      const childIndent = ' '.repeat(indentLevel + 2);
+      const closingIndent = ' '.repeat(indentLevel);
+      const props = entries.map(([key, entryValue]) => {
+        const label = /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(key) ? key : JSON.stringify(key);
+        return `${childIndent}${label}: ${this.formatValue(entryValue, indentLevel + 2)}`;
       });
+      return `{\n${props.join(',\n')}\n${closingIndent}}`;
+    }
+
+    return JSON.stringify(value);
+  }
+
+  private static buildRuntimeUrlExpression(
+    absoluteUrl: string,
+    primaryBaseUrl?: string,
+  ): string | RawJavaScriptExpression {
+    if (!primaryBaseUrl) {
+      return absoluteUrl;
+    }
+
+    try {
+      const resolvedUrl = new URL(absoluteUrl);
+      const normalizedOrigin = resolvedUrl.origin + '/';
+      if (normalizedOrigin !== primaryBaseUrl) {
+        return absoluteUrl;
+      }
+
+      const pathWithQuery = absoluteUrl.slice(resolvedUrl.origin.length);
+      return {
+        __raw: `\`\${env.baseUrl}${pathWithQuery}\``,
+      };
+    } catch {
+      return absoluteUrl;
+    }
+  }
+
+  private static isRawJavaScriptExpression(value: unknown): value is RawJavaScriptExpression {
+    return typeof value === 'object' && value !== null && typeof (value as RawJavaScriptExpression).__raw === 'string';
   }
 
   /** Extract unique origin URLs (protocol+host) from all HAR entries in all groups. */

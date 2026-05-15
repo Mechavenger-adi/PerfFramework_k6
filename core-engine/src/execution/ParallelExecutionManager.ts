@@ -22,7 +22,10 @@ export class ParallelExecutionManager {
    * Resolve the full k6 options object from a test plan.
    * Handles VU allocation for parallel weighted journeys.
    */
-  static resolve(plan: TestPlan, runtimeMetadata?: ScenarioRuntimeMetadata): K6Options {
+  static resolve(
+    plan: TestPlan,
+    runtimeMetadata?: ScenarioRuntimeMetadata,
+  ): K6Options {
     const summaryTrendStats = this.buildSummaryTrendStats(runtimeMetadata);
 
     // For parallel execution with weights, we recalculate per-journey VUs
@@ -59,7 +62,7 @@ export class ParallelExecutionManager {
       }
     }
 
-    return { 
+      return { 
       noCookiesReset: plan.noCookiesReset !== false,
       summaryTrendStats,
       scenarios: ScenarioBuilder.build(plan, runtimeMetadata),

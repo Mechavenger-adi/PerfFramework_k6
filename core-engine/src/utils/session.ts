@@ -1,8 +1,99 @@
 // @ts-ignore - K6 runtime module
 import http from 'k6/http';
 
+declare const __ENV: Record<string, string | undefined>;
+
 // Registry of base URLs seen by this VU — used by clearCookies() to clear all.
 const _registeredUrls = new Set<string>();
+
+interface ResolveFrameworkUrlOptions {
+  fallbackBaseUrl?: string;
+  service?: string;
+}
+
+export interface TeamEnvironmentOverride {
+  baseUrl: string;
+  serviceUrls?: Record<string, string>;
+  custom?: Record<string, string | number | boolean>;
+}
+
+/**
+ * Get the environment context for a specific team.
+ * Throws a descriptive error if the environment is missing and no fallback is provided.
+ */
+export function getEnvContext(teamName: string, fallbackBaseUrl?: string): TeamEnvironmentOverride {
+  if (!__ENV.K6_PERF_TEAM_ENVIRONMENTS) {
+    if (fallbackBaseUrl) {
+      return { baseUrl: fallbackBaseUrl };
+    }
+    throw new Error(`Environment config missing for '${teamName}' and no fallback provided. Please run via k6-perf CLI or provide a fallback.`);
+  }
+
+  try {
+    const allEnvs = JSON.parse(__ENV.K6_PERF_TEAM_ENVIRONMENTS);
+    const teamEnv = allEnvs[teamName];
+    if (teamEnv && teamEnv.baseUrl) {
+      return teamEnv;
+    }
+    if (fallbackBaseUrl) {
+      return { baseUrl: fallbackBaseUrl };
+    }
+    throw new Error(`Environment config missing for '${teamName}' in dev.json and no fallback provided.`);
+  } catch (err) {
+    if (fallbackBaseUrl) {
+      return { baseUrl: fallbackBaseUrl };
+    }
+    throw err;
+  }
+}
+
+function normalizeBaseUrl(url: string): string {
+  return url.replace(/\/+$/, '') + '/';
+}
+
+function isAbsoluteUrl(url: string): boolean {
+  return /^https?:\/\//i.test(url);
+}
+
+function parseJsonEnv<T>(name: string, fallback: T): T {
+  const raw = __ENV[name];
+  if (!raw) {
+    return fallback;
+  }
+
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+function joinBaseAndPath(baseUrl: string, pathOrUrl: string): string {
+  const normalizedBase = normalizeBaseUrl(baseUrl);
+
+  if (!pathOrUrl) {
+    return normalizedBase;
+  }
+
+  if (pathOrUrl.startsWith('/')) {
+    return normalizedBase.replace(/\/$/, '') + pathOrUrl;
+  }
+
+  if (pathOrUrl.startsWith('?') || pathOrUrl.startsWith('#')) {
+    return normalizedBase.replace(/\/$/, '') + '/' + pathOrUrl;
+  }
+
+  return normalizedBase + pathOrUrl;
+}
+
+function getFrameworkBaseUrl(): string | undefined {
+  const baseUrl = __ENV.K6_PERF_BASE_URL;
+  return baseUrl ? normalizeBaseUrl(baseUrl) : undefined;
+}
+
+function getFrameworkServiceUrls(): Record<string, string> {
+  return parseJsonEnv<Record<string, string>>('K6_PERF_SERVICE_URLS', {});
+}
 
 /**
  * Register a base URL so clearCookies() can clear it without manual arguments.
@@ -12,7 +103,62 @@ const _registeredUrls = new Set<string>();
  * @param url - A base URL (e.g., 'https://myapp.example.com/')
  */
 export function registerBaseUrl(url: string): void {
-  if (url) _registeredUrls.add(url);
+  if (url) _registeredUrls.add(normalizeBaseUrl(url));
+}
+
+/**
+ * @deprecated Use `getEnvContext` and register the `env.baseUrl` directly using `registerBaseUrl()`.
+ * Register environment URLs from K6_PERF_* env vars, falling back to the
+ * provided recorded URLs when runtime env URLs are unavailable.
+ */
+export function registerFrameworkEnvironmentUrls(fallbackUrls: string[] = []): void {
+  const runtimeUrls = new Set<string>();
+  const baseUrl = getFrameworkBaseUrl();
+  if (baseUrl) {
+    runtimeUrls.add(baseUrl);
+  }
+
+  for (const serviceUrl of Object.values(getFrameworkServiceUrls())) {
+    if (serviceUrl) {
+      runtimeUrls.add(normalizeBaseUrl(serviceUrl));
+    }
+  }
+
+  const urlsToRegister = runtimeUrls.size > 0 ? [...runtimeUrls] : fallbackUrls;
+  for (const url of urlsToRegister) {
+    registerBaseUrl(url);
+  }
+}
+
+/**
+ * @deprecated Use `${env.baseUrl}/path` literals with `getEnvContext()` instead.
+ * Resolve a relative request path against the framework-injected base URL.
+ * Falls back to a recorded base URL when env injection is not available.
+ */
+export function resolveFrameworkUrl(pathOrUrl: string, options: ResolveFrameworkUrlOptions = {}): string {
+  if (!pathOrUrl) {
+    return pathOrUrl;
+  }
+
+  if (isAbsoluteUrl(pathOrUrl)) {
+    return pathOrUrl;
+  }
+
+  const serviceUrls = getFrameworkServiceUrls();
+  const candidateBaseUrl = options.service
+    ? serviceUrls[options.service]
+    : getFrameworkBaseUrl();
+  const fallbackBaseUrl = options.fallbackBaseUrl;
+
+  if (candidateBaseUrl) {
+    return joinBaseAndPath(candidateBaseUrl, pathOrUrl);
+  }
+
+  if (fallbackBaseUrl) {
+    return joinBaseAndPath(fallbackBaseUrl, pathOrUrl);
+  }
+
+  return pathOrUrl;
 }
 
 /**

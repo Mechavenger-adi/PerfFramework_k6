@@ -66,7 +66,7 @@ async function runConvert(inputPath, teamName, scriptName, options) {
             rl.close();
         }
     }
-    const converted = ScriptConverter_1.ScriptConverter.convert(source, lifecycleSelection);
+    const converted = ScriptConverter_1.ScriptConverter.convert(source, teamName, lifecycleSelection);
     if (options.inPlace) {
         fs.writeFileSync(absoluteInput, converted, 'utf-8');
         logger_1.Logger.pass(`Converted in-place: ${absoluteInput}`);
