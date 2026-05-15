@@ -26,7 +26,11 @@ export class ScriptGenerator {
     const primaryBaseUrl = baseUrls[0];
     
     script += `const env = getEnvContext('${teamName}', ${primaryBaseUrl ? `'${primaryBaseUrl}'` : 'undefined'});\n`;
-    script += `registerBaseUrl(env.baseUrl);\n\n`;
+    script += `registerBaseUrl(env.baseUrl);\n`;
+    for (let i = 1; i < baseUrls.length; i++) {
+      script += `registerBaseUrl('${baseUrls[i]}');\n`;
+    }
+    script += `\n`;
 
     const transactionNames = groups.map((g) => g.name);
     const initSet = new Set(lifecycle?.initGroups ?? []);

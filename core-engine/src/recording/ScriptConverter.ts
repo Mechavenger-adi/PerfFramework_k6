@@ -135,6 +135,9 @@ export class ScriptConverter {
     result.push(importBlock);
     result.push(`\nconst env = getEnvContext('${teamName}', ${primaryBaseUrl ? `'${primaryBaseUrl}'` : 'undefined'});`);
     result.push(`registerBaseUrl(env.baseUrl);`);
+    for (let j = 1; j < detectedBaseUrls.length; j++) {
+      result.push(`registerBaseUrl('${detectedBaseUrls[j]}');`);
+    }
 
     // Skip original import lines and Trend declarations
     const importEndIndex = this.findImportBlockEnd(lines);
