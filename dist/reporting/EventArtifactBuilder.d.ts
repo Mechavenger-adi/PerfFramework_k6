@@ -44,4 +44,3 @@ export declare class EventArtifactBuilder {
     private static toCheckArray;
 }
 export {};
-//# sourceMappingURL=EventArtifactBuilder.d.ts.map

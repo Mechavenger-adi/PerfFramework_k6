@@ -5,4 +5,3 @@ export declare class GrafanaReporter {
      */
     static push(result: ResultContract, url: string): void;
 }
-//# sourceMappingURL=GrafanaReporter.d.ts.map

@@ -162,4 +162,3 @@ class EventArtifactBuilder {
     }
 }
 exports.EventArtifactBuilder = EventArtifactBuilder;
-//# sourceMappingURL=EventArtifactBuilder.js.map

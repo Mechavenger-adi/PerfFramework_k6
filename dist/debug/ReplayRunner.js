@@ -425,4 +425,3 @@ class ReplayRunner {
 exports.ReplayRunner = ReplayRunner;
 ReplayRunner.REPLAY_PREFIX = '[k6-perf][replay-log] ';
 ReplayRunner.STATIC_EXT_RE = /\.(?:png|jpe?g|gif|svg|ico|webp|avif|bmp|tiff?|woff2?|ttf|otf|eot|mp[34]|webm|ogg|flac|wav|zip|gz|br|pdf)(?:[?#]|$)/i;
-//# sourceMappingURL=ReplayRunner.js.map

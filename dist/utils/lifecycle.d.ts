@@ -20,6 +20,11 @@ export interface PhaseFns {
 }
 export declare function createJourneyLifecycleStore(): JourneyLifecycleStore;
 export declare function thinktime(minOrFixed?: number, max?: number): void;
+export interface TransactionGate {
+    shouldSkipBeforeStart: boolean;
+    errorBehavior: string;
+    onSkip: (name: string) => void;
+}
+export declare function getTransactionGate(): TransactionGate;
 export declare function runJourneyLifecycle(store: JourneyLifecycleStore, phaseFns: PhaseFns): void;
 export {};
-//# sourceMappingURL=lifecycle.d.ts.map

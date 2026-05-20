@@ -34,7 +34,11 @@ export declare class ScriptConverter {
      * braces, brackets, parens, and strings).
      */
     private static splitTopLevelArgs;
-    private static buildRequestDefString;
+    /**
+     * Build a `request()` call string using the framework helper.
+     * Replaces the old request-def + http.* + logExchange pattern.
+     */
+    private static buildRequestCallString;
     /**
      * Extract a property value from an object literal string.
      */
@@ -43,10 +47,8 @@ export declare class ScriptConverter {
      * Re-indent a multi-line string to align with the given base indent.
      */
     private static reindent;
-    private static buildHttpCallString;
     private static isTrendAddLine;
     private static getLeadingWhitespace;
-    private static formatTransactionArray;
     /**
      * Sanitize a group name for use as a k6 metric name.
      * k6 metrics must only include ASCII letters, numbers, or underscores
@@ -65,4 +67,3 @@ export declare class ScriptConverter {
     private static toRuntimeUrlExpression;
     private static extractStringLiteralValue;
 }
-//# sourceMappingURL=ScriptConverter.d.ts.map

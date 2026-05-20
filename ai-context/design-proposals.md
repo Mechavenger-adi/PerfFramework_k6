@@ -3,326 +3,507 @@
 > Approved architectural proposals awaiting implementation.
 > AI agents MUST read this file before modifying related subsystems.
 
+This file is not a brainstorming note. It is the implementation-direction contract for the pending DX simplification work. Any implementation of these proposals MUST preserve:
+
+- `initPhase(ctx)` / `actionPhase(ctx)` / `endPhase(ctx)` + compatibility `default` export
+- Existing replay-log schema and extraction contract
+- Existing artifact schemas and reporting pipeline
+- Existing non-lifecycle scripts continuing to run
+- Existing lifecycle behavior across all supported executor modes and load-test shapes
+
 ---
 
-## Proposal 1: `transaction()` Wrapper — Group-Level Error Boundaries
+## Cross-Cutting Constraints
 
-**Status:** ✅ Approved — pending implementation
-**Affects:** `transaction.ts`, `lifecycle.ts`, `ScriptGenerator.ts`, `ScriptConverter.ts`
+### C1. Single Owner For Lifecycle End Detection
+
+`lifecycle.ts` remains the only owner of executor-aware end detection and "should this VU start more work?" logic.
+
+Do NOT introduce a second ramp-down algorithm inside `transaction.ts`, `request.ts`, generators, or converters.
+
+### C2. Explicit Runtime Contracts Only
+
+If `transaction()` or `request()` needs lifecycle state, it must obtain it through an explicit k6-side runtime helper contract, not by parsing `execution.test.options` ad hoc and not by introducing undocumented cross-module globals.
+
+### C3. Init-Context Metric Registration Remains Mandatory
+
+k6 custom metrics must still be created in init context. `transaction()` does not remove that requirement.
+
+The revised direction is to move transaction metric registration out of user scripts and into framework-managed runtime bootstrap.
+
+Required contract:
+
+- the Node-side framework injects a transaction manifest before k6 execution starts
+- the k6-side transaction runtime auto-registers those metrics during module init
+- generated and converted scripts should not need to call `initTransactions([...])` manually
+
+`initTransactions([...])` remains available only as a backward-compatibility fallback for legacy or non-framework-managed scripts.
+
+### C4. Replay And Snapshot Contracts Must Be Reused
+
+Proposal 2 must reuse the existing replay-log and snapshot/event contracts rather than inventing parallel output formats.
+
+### C5. Unsupported Executor Modes Must Fail Fast
+
+If lifecycle semantics are not explicitly defined for a supported k6 executor, `ScenarioBuilder` / `ExecutorFactory` must fail fast with a descriptive error. Silent downgrade to `"unsupported"` is not acceptable once these proposals are implemented.
+
+---
+
+## Proposal 1: `transaction()` Wrapper - Group-Level Error Boundaries
+
+**Status:** Approved - revised for implementation
+**Affects:** `transaction.ts`, `lifecycle.ts`, `ScriptGenerator.ts`, `ScriptConverter.ts`, runtime contract docs
 
 ### Problem
-Error behavior (`continue`, `stop_iteration`, `stop_vu`, `abort_test`) currently only applies at the **phase level**. If the 3rd API inside a transaction fails, the entire remaining phase is skipped — even for `"continue"`. Transaction metrics are also lost because `endTransaction()` never fires.
 
-### Solution
-A single `transaction(name, fn)` function that wraps `group()` + `startTransaction()` + `endTransaction()` + error handling.
+Error behavior (`continue`, `stop_iteration`, `stop_vu`, `abort_test`) currently applies at the phase level. If one request inside a transaction fails, the rest of that phase may be skipped even when the configured behavior is `"continue"`.
 
-**Backend implementation:**
+The current generated pattern also has two DX and correctness issues:
+
+- `endTransaction()` is easy to miss on failure paths, which can lose transaction timing metrics
+- transaction boundaries do not currently participate in lifecycle gating, so a VU may begin a new action transaction even when the lifecycle has already decided it should transition to `endPhase()`
+
+### Revised Solution
+
+Introduce a `transaction(name, fn)` wrapper that is responsible for:
+
+- `group(name, fn)` wrapping
+- `startTransaction(name)` / `endTransaction(name)` pairing
+- transaction-local error boundary behavior
+- consulting a lifecycle-owned "transaction gate" before starting a new action-phase transaction
+
+It is NOT responsible for owning executor math itself.
+
+Additionally, transaction metric initialization moves behind the framework/runtime boundary:
+
+- before the script executes, the framework provides the full list of declared transaction names
+- at k6 init time, `transaction.ts` auto-registers Trend + Counter metrics from that list
+- by the time `transaction(name, fn)` is first called, the corresponding metrics are already initialized
+
+### Public API
+
+```typescript
+export function transaction(
+  name: string,
+  fn: () => void,
+): void;
+```
+
+No extra user-facing parameters are required in generated scripts. Any lifecycle-aware gating must be resolved through an explicit helper imported from `lifecycle.ts` or a dedicated k6-side runtime contract.
+
+Framework/runtime bootstrap contract:
+
+```typescript
+// Node-side framework injects:
+K6_PERF_TRANSACTION_NAMES='["Login","Search","Checkout"]'
+
+// k6-side transaction runtime performs during module init:
+autoInitTransactionsFromEnv();
+```
+
+The exact env var name may change, but the design requires a framework-injected transaction manifest that is consumed in k6 init context before VU execution begins.
+
+### Required Behavior
+
 ```typescript
 export function transaction(name: string, fn: () => void): void {
+  const gate = getTransactionGate();
+
+  if (gate.shouldSkipBeforeStart) {
+    gate.onSkip(name);
+    return;
+  }
+
   group(name, () => {
     startTransaction(name);
     try {
+      gate.onTransactionStart?.(name);
       fn();
     } catch (error) {
-      applyErrorBehavior(error, name);
+      applyTransactionErrorBehavior(error, name);
     } finally {
-      endTransaction(name);  // ALWAYS runs — metrics never lost
+      endTransaction(name);
+      gate.onTransactionEnd?.(name);
     }
   });
 }
 ```
 
-**`applyErrorBehavior` logic:**
+The important part is not the exact helper names above. The important part is the ownership split:
 
-| Behavior | Action |
+- `transaction.ts` owns transaction wrapping and metric closure
+- `lifecycle.ts` owns executor-aware decisions about whether another action transaction may start
+- framework bootstrap owns pre-test transaction manifest injection
+
+### Automatic Transaction Registration
+
+The framework must initialize transactions automatically at the very start of the test.
+
+Required behavior:
+
+- `ScenarioBuilder` or the execution pipeline injects all transaction names for the journey/script before k6 starts
+- `transaction.ts` consumes that manifest in init context and calls the internal registration logic automatically
+- new generated and converted scripts only import and use `transaction(...)`
+- no explicit `initTransactions([...])` line should be required in new script output
+
+Important boundary:
+
+- Node-side code does not directly construct k6 `Trend` / `Counter` objects
+- Node-side code only provides metadata
+- k6-side code still performs the actual metric creation during init context
+
+### Error Behavior Mapping
+
+| Behavior | Transaction wrapper action |
 |---|---|
-| `continue` | Log error → return (next transaction runs) |
-| `stop_iteration` | Log error → re-throw (runSafely catches → skip iteration) |
-| `stop_vu` | Log error → set terminated → re-throw |
-| `abort_test` | `exec.test.abort()` immediately |
+| `continue` | Log error with VU/iteration/transaction context, swallow, continue to next transaction |
+| `stop_iteration` | Log error, re-throw so lifecycle skips the rest of the current iteration |
+| `stop_vu` | Log error, mark VU terminated through lifecycle/runtime contract, re-throw |
+| `abort_test` | Abort immediately through `exec.test.abort()` |
 
-### Script pattern change
+### Phase Scope Rules
 
-**Before (current — 3 calls per group):**
-```javascript
-group('search_animal', function () {
-  startTransaction('search_animal');
-  // requests...
-  endTransaction('search_animal');
-});
-```
+Lifecycle gating applies only when deciding whether to start the next **action-phase** transaction.
 
-**After (1 call per group):**
-```javascript
-transaction('search_animal', function () {
-  // requests...
-});
-```
+Rules:
+
+- `initPhase` transactions always run once `initPhase` has started
+- `actionPhase` transactions may be skipped if lifecycle says "transition to end now"
+- `endPhase` transactions always run once `endPhase` has started
+- active/in-flight transactions are never interrupted mid-transaction
+
+### Nested Transaction Rule
+
+Nested `transaction()` calls are not part of the supported contract for the first implementation.
+
+Required behavior:
+
+- either explicitly reject nesting with a descriptive runtime error
+- or define stack semantics before implementation begins
+
+Default recommendation: reject nested transactions to keep metrics, active-transaction tags, and lifecycle gating unambiguous.
+
+### Lifecycle Coverage Requirement
+
+Proposal 1 must preserve or extend lifecycle correctness across all supported k6 executor modes and framework load-test shapes.
+
+#### Executor coverage matrix
+
+| Executor mode | Lifecycle behavior requirement |
+|---|---|
+| `ramping-vus` | Use existing interpolated VU-target logic; only final ramp-down permanently ends the VU |
+| `constant-vus` | Convert to a duration-based synthetic final ramp-down buffer so `endPhase()` still runs |
+| `shared-iterations` | Run `endPhase()` after the last iteration assigned to that VU |
+| `per-vu-iterations` | Run `endPhase()` after the VU completes its configured final iteration |
+| `ramping-arrival-rate` | Define a time-window-based lifecycle gate so no new action transaction starts after the executor enters its final shutdown window, while in-flight transactions finish cleanly |
+| `constant-arrival-rate` | Define a duration-based shutdown window equivalent to `constant-vus`, but for arrival-rate scheduling |
+
+#### Load-test shape coverage
+
+The lifecycle contract must continue to work for:
+
+- standard load
+- stress
+- soak
+- spike
+- step / staircase
+- custom multi-stage ramping profiles
+- iteration-based test plans
+- arrival-rate-based test plans
+
+For ramp-shaped profiles, intermediate decreases must not permanently end VUs unless the lifecycle is in the final shutdown segment.
+
+### Implementation Notes
+
+- Replace manual `initTransactions([...])` in generated and converted scripts with framework-driven auto-registration
+- Inject transaction names through scenario/runtime metadata before k6 execution begins
+- Perform actual `Trend` / `Counter` creation in `transaction.ts` module init, not in Node-side code
+- The generator may emit `transaction(...)` instead of `group(...) + startTransaction(...) + endTransaction(...)`
+- Backward compatibility for old scripts remains mandatory
+- Legacy scripts that continue to call `group()` + `startTransaction()` + `endTransaction()` still work, but will not gain the new transaction-local error boundary automatically
+- Legacy scripts may continue calling `initTransactions([...])` explicitly when they are not run through framework-managed bootstrap
 
 ### Backward Compatibility
-- Old scripts using `group()` + `startTransaction()` + `endTransaction()` continue to work
-- They just don't get per-group error handling (errors propagate to phase-level as before)
+
+- Existing scripts using the old manual transaction pattern continue to run
+- Existing scripts that explicitly call `initTransactions([...])` continue to run
+- Existing transaction metric names remain unchanged
+- Existing lifecycle contract remains unchanged at the script export surface
 
 ---
 
-## Proposal 2: Unified `request()` Function — All-in-One HTTP Execution
+## Proposal 2: Unified `request()` Function - Single-Entry HTTP Execution
 
-**Status:** ✅ Approved — pending implementation  
-**Affects:** New `request.ts` utility, `ScriptGenerator.ts`, `ScriptConverter.ts`
+**Status:** Approved - revised for implementation
+**Affects:** new `request.ts` k6-side helper, `replayLogger.ts`, `session.ts`, `ScriptGenerator.ts`, `ScriptConverter.ts`, runtime/reporting contract docs
 
 ### Problem
-Every single HTTP request in the script currently requires **4 separate steps**:
 
-```javascript
-// Step 1: Build request definition object (10+ lines)
-const request_1 = {
-  id: "req_1",
-  transaction: "search_animal",
-  recordingStartedAt: new Date().toISOString(),
-  method: "GET",
-  url: `${env.baseUrl}/action/Catalog.action`,
-  body: null,
-  params: {
-    headers: { "accept": "text/html" },
-    cookies: {},
-    redirects: 0,
-    tags: { transaction: "search_animal", har_entry_id: "req_1" }
-  }
-};
+Generated and converted scripts currently emit too much boilerplate per request:
 
-// Step 2: Execute HTTP call
-const res_1 = http.get(request_1.url, request_1.params);
+- request definition object construction
+- raw `http.*` call
+- explicit `logExchange(...)`
+- separate assertion block
 
-// Step 3: Log exchange for debug replay
-logExchange(request_1, res_1);
+This reduces readability and makes the intent of the business flow hard to scan. It also leaves too much diagnostics wiring in generated script output.
 
-// Step 4: Check response
-check(res_1, { "status equals 200": (r) => r.status === 200 });
-```
+### Revised Solution
 
-**Issues:**
-- ~15 lines per request × 50 requests = 750 lines of boilerplate
-- Low readability — hard to see what the test actually does
-- `logExchange` must be manually called (easy to forget)
-- No VU/iteration context in error messages
-- Snapshot capture is separate from the request flow
+Introduce a unified `request()` helper that owns transport execution and request diagnostics, while preserving native k6 `check()` as a separate concern.
 
-### Solution
-A unified `request()` function that handles everything in a single call.
+This helper is intentionally narrower than the original draft. It should do one thing well: execute a request in a framework-aware way and return the native k6 `Response`.
 
-**Proposed API:**
-```javascript
-// Simple GET — 1 line instead of 15
-const res = request("GET", `${env.baseUrl}/action/Catalog.action`, {
-  name: "req_1",
-  check: { status: 200 }
-});
+### Non-Goals
 
-// POST with body and headers
-const res = request("POST", `${env.baseUrl}/auth/login`, {
-  name: "req_2",
-  body: JSON.stringify({ username: user.p_username, password: user.p_password }),
-  headers: { "Content-Type": "application/json" },
-  check: { status: 200 }
-});
+`request()` does NOT:
 
-// Full options (when needed)
-const res = request("GET", `${env.baseUrl}/products?q=${query}`, {
-  name: "req_3",
-  headers: { "Authorization": `Bearer ${token}` },
-  cookies: { sessionId: sid },
-  check: { status: 200 },
-  redirects: 5
-});
-```
+- replace native k6 `check()`
+- own lifecycle end detection
+- invent a second snapshot schema
+- hide all data/correlation tracking behind magic
 
-### What `request()` does internally (all auto-handled):
-
-```
-request("GET", url, options)
-  │
-  ├─ 1. Build request definition object (id, transaction, tags, etc.)
-  │     → Transaction name auto-detected from active transaction()
-  │
-  ├─ 2. Execute HTTP call (http.get/post/put/patch/del)
-  │
-  ├─ 3. If debugMode=true → logExchange(reqDef, response) automatically
-  │
-  ├─ 4. If check option provided → run check() assertions
-  │     → On failure: capture snapshot if configured
-  │     → On failure: log VU ID + iteration + transaction + request name
-  │
-  ├─ 5. Return response object for correlation/further use
-  │
-  └─ Done
-```
-
-### Script comparison — Full transaction
-
-**Before (current):**
-```javascript
-group('search_animal', function () {
-  startTransaction('search_animal');
-
-  const request_1 = {
-    id: "req_1",
-    transaction: "search_animal",
-    recordingStartedAt: new Date().toISOString(),
-    method: "GET",
-    url: `${env.baseUrl}/action/Catalog.action?viewCategory=&categoryId=FISH`,
-    body: null,
-    params: {
-      headers: { "accept": "text/html" },
-      cookies: {},
-      redirects: 0,
-      tags: { transaction: "search_animal", har_entry_id: "req_1" }
-    }
-  };
-  const res_1 = http.get(request_1.url, request_1.params);
-  logExchange(request_1, res_1);
-  check(res_1, { "search_animal - status is 200": (r) => r.status === 200 });
-
-  const request_2 = {
-    id: "req_2",
-    transaction: "search_animal",
-    recordingStartedAt: new Date().toISOString(),
-    method: "GET",
-    url: `${env.baseUrl}/action/Catalog.action?productId=FI-SW-01`,
-    body: null,
-    params: {
-      headers: { "accept": "text/html" },
-      cookies: {},
-      redirects: 0,
-      tags: { transaction: "search_animal", har_entry_id: "req_2" }
-    }
-  };
-  const res_2 = http.get(request_2.url, request_2.params);
-  logExchange(request_2, res_2);
-  check(res_2, { "search_animal - status is 200": (r) => r.status === 200 });
-
-  endTransaction('search_animal');
-});
-```
-
-**After (proposed):**
-```javascript
-transaction('search_animal', function () {
-  const res1 = request("GET", `${env.baseUrl}/action/Catalog.action?viewCategory=&categoryId=FISH`, {
-    check: { status: 200 }
-  });
-
-  const res2 = request("GET", `${env.baseUrl}/action/Catalog.action?productId=FI-SW-01`, {
-    check: { status: 200 }
-  });
-});
-```
-
-**~35 lines → 8 lines** (77% reduction) with zero loss of functionality.
-
-### `request()` function signature:
+### Public API
 
 ```typescript
+interface RequestReplayMeta {
+  harEntryId?: string;
+  recordingStartedAt?: string;
+}
+
 interface RequestOptions {
-  name?: string;            // auto-generated if not provided (req_1, req_2...)
+  name?: string;
   headers?: Record<string, string>;
   cookies?: Record<string, string>;
-  body?: string | object;   // auto JSON.stringify if object
-  check?: {
-    status?: number;        // shorthand: check status code
-    body?: string;          // shorthand: check body contains string
-    custom?: Record<string, (r: Response) => boolean>;  // full check()
-  };
-  redirects?: number;       // default: 0
+  body?: string | Record<string, unknown>;
+  redirects?: number;
+  service?: string;
+  tags?: Record<string, string>;
+  replay?: RequestReplayMeta;
 }
 
 export function request(
   method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
-  url: string,
-  options?: RequestOptions
+  pathOrUrl: string,
+  options?: RequestOptions,
 ): Response;
 ```
 
-### Auto-handled features:
+### Responsibilities Of `request()`
 
-| Feature | How |
+`request()` must:
+
+1. Resolve relative path vs absolute URL using the existing environment/session contract
+2. Build the internal request definition required for replay logging
+3. Attach transaction tags from the active transaction context
+4. Execute the underlying `http.*` call
+5. Auto-call replay logging when debug mode is enabled
+6. Return the native k6 `Response`
+7. Emit a failure/snapshot event through the existing snapshot contract when configured and applicable
+
+### Responsibilities That Stay Outside `request()`
+
+- assertions stay in `check(...)`
+- correlation extraction stays explicit in script code
+- parameter/data tracking remains explicit, though helpers may be improved later
+
+This keeps transport, diagnostics, and business assertions from being conflated.
+
+### Request Flow
+
+```text
+request(method, pathOrUrl, options)
+  -> resolveFrameworkUrl(pathOrUrl, { service })
+  -> build replay-aware request metadata
+  -> execute http call
+  -> if K6_PERF_DEBUG=true, call logExchange(...)
+  -> if configured failure conditions match, emit snapshot/error payload
+  -> return native Response
+```
+
+### Request Metadata Rules
+
+Generated and converted scripts must preserve replay fidelity.
+
+That means:
+
+- generated/replayed requests should pass stable replay metadata such as `harEntryId` and `recordingStartedAt`
+- hand-written scripts may omit replay metadata and allow auto-generated request names/IDs
+- request numbering used for replay/debug must remain deterministic within a VU iteration
+
+### Context And Tracking Rules
+
+The earlier draft proposed a generic centralized Context that would eliminate `trackDataRow(...)`.
+
+That is too vague for implementation.
+
+The revised rule is:
+
+- lifecycle context (`ctx.data`, `ctx.correlation`, `ctx.session`, `ctx.meta`) remains the primary per-VU lifecycle state
+- replay/debug variable tracking must either reuse that state explicitly or document a single k6-side registry contract
+- do not maintain two parallel "truth" models for tracked variables without a documented bridge
+
+The first implementation may keep `trackCorrelation`, `trackParameter`, and `trackDataRow` explicit if that is the safer path.
+
+### Snapshot Rules
+
+If snapshot capture is triggered, Proposal 2 must reuse the existing snapshot/error artifact contract.
+
+Minimum rules:
+
+- respect runtime settings such as `captureSnapshotOnFailure` and `maxSnapshotsPerRun`
+- reuse the existing `SnapshotPayload` shape
+- include VU, iteration, journey, transaction, request name, request details, and response details where configured
+- do not create a debug-only snapshot format that bypasses the reporting pipeline
+
+### Failure Semantics
+
+Proposal 2 must define failure classes explicitly:
+
+| Failure class | Required behavior |
 |---|---|
-| **Debug logging** | If `debugMode=true` in runtime → `logExchange()` called automatically |
-| **Snapshot capture** | If check fails + `captureSnapshotOnFailure=true` → snapshot auto-captured |
-| **VU/Iteration tracking** | Error messages include `VU #${exec.vu.idInInstance}, Iteration #${exec.vu.iterationInScenario}` |
-| **Transaction tagging** | Tags auto-populated from the active `transaction()` wrapper |
-| **Request numbering** | Sequential `req_N` IDs auto-generated per transaction |
-| **Correlation** | Response returned for `response.body`, `response.headers` extraction |
+| Transport/runtime exception | Always participate in error behavior handling |
+| HTTP `4xx/5xx` response | Eligible for snapshot/error emission when configured; does not automatically replace `check()` |
+| Failed k6 `check()` | Remains a separate assertion concern unless a future proposal explicitly unifies it |
 
-### Impact on Generator/Converter
-- `ScriptGenerator.ts`: Emit `request()` calls instead of request definition + http call + logExchange + check
-- `ScriptConverter.ts`: Recognize the old pattern and collapse it into `request()` calls
-- Import line changes: `import { request } from '../../../dist/utils/request.js';`
+### Environment And URL Resolution
+
+`request()` must align with the existing team-aware environment model.
+
+It must support:
+
+- relative paths resolved against the effective runtime base URL
+- absolute URLs passed through unchanged
+- optional named service resolution via runtime service URLs
+- recorded fallback behavior where the framework already supports it
+
+### Generator / Converter Output
+
+#### Before
+
+```javascript
+const request_1 = { ... };
+const res_1 = http.get(request_1.url, request_1.params);
+logExchange(request_1, res_1);
+check(res_1, { "status 200": (r) => r.status === 200 });
+```
+
+#### After
+
+```javascript
+const res1 = request("GET", "/action/Catalog.action?categoryId=FISH", {
+  replay: {
+    harEntryId: "req_1",
+    recordingStartedAt: "2026-01-01T10:00:00.000Z",
+  },
+});
+
+check(res1, { "status 200": (r) => r.status === 200 });
+```
+
+### Import Strategy
+
+Do not assume a new `dist/k6-perf.js` barrel exists unless it is implemented intentionally.
+
+Implementation options:
+
+- keep importing k6-side helpers from `dist/utils/*.js`
+- or add a dedicated k6-safe barrel as its own explicit deliverable
+
+If a barrel is introduced, it must contain only k6-safe runtime helpers.
 
 ---
 
-## Combined Effect: Complete Script Transformation
+## Combined Generated Script Direction
 
-### Before (current framework output):
+### Target Pattern
+
 ```javascript
-import http from 'k6/http';
-import { check, sleep, group } from 'k6';
-import { initTransactions, startTransaction, endTransaction } from '../../../dist/utils/transaction.js';
+import { check } from 'k6';
+import { transaction } from '../../../dist/utils/transaction.js';
+import { request } from '../../../dist/utils/request.js';
 import { createJourneyLifecycleStore, runJourneyLifecycle, thinktime } from '../../../dist/utils/lifecycle.js';
-import { logExchange, trackCorrelation, trackParameter } from '../../../dist/utils/replayLogger.js';
 import { clearCookies, registerBaseUrl, getEnvContext } from '../../../dist/utils/session.js';
 
 const env = getEnvContext('Jpet_new', 'https://jpetstore.aspectran.com');
 registerBaseUrl(env.baseUrl);
 
-initTransactions(["t01_launch", "t02_login", "search_animal"]);
 const __journeyLifecycleStore = createJourneyLifecycleStore();
 
 export function actionPhase(ctx) {
-  group('t01_launch', function () {
-    startTransaction('t01_launch');
-    const request_1 = { id: "req_1", ... 12 more lines ... };
-    const res_1 = http.get(request_1.url, request_1.params);
-    logExchange(request_1, res_1);
-    check(res_1, { "status 200": (r) => r.status === 200 });
-    endTransaction('t01_launch');
-  });
-
-  thinktime();
-
-  group('search_animal', function () {
-    startTransaction('search_animal');
-    const request_1 = { id: "req_2", ... 12 more lines ... };
-    const res_1 = http.get(request_1.url, request_1.params);
-    logExchange(request_1, res_1);
-    check(res_1, { "status 200": (r) => r.status === 200 });
-    const request_2 = { id: "req_3", ... 12 more lines ... };
-    const res_2 = http.get(request_2.url, request_2.params);
-    logExchange(request_2, res_2);
-    check(res_2, { "status 200": (r) => r.status === 200 });
-    endTransaction('search_animal');
-  });
-}
-```
-
-### After (both proposals implemented):
-```javascript
-import { transaction, thinktime, request } from '../../../dist/k6-perf.js';
-import { getEnvContext } from '../../../dist/utils/session.js';
-
-const env = getEnvContext('Jpet_new', 'https://jpetstore.aspectran.com');
-
-export function actionPhase(ctx) {
   transaction('t01_launch', function () {
-    request("GET", `${env.baseUrl}/`, { check: { status: 200 } });
+    const res = request("GET", "/");
+    check(res, { "status 200": (r) => r.status === 200 });
   });
 
   thinktime();
 
   transaction('search_animal', function () {
-    request("GET", `${env.baseUrl}/action/Catalog.action?categoryId=FISH`, { check: { status: 200 } });
-    request("GET", `${env.baseUrl}/action/Catalog.action?productId=FI-SW-01`, { check: { status: 200 } });
+    const res1 = request("GET", "/action/Catalog.action?categoryId=FISH");
+    check(res1, { "status 200": (r) => r.status === 200 });
+
+    const res2 = request("GET", "/action/Catalog.action?productId=FI-SW-01");
+    check(res2, { "status 200": (r) => r.status === 200 });
   });
 }
 ```
 
-**~60+ lines → ~15 lines.** Clean, readable, and all error handling + debug logging + snapshot capture happens automatically at the backend.
+### What Changes
+
+- transaction wrapper removes manual start/end pairing from most generated code
+- request helper removes manual request-def + logExchange boilerplate from most generated code
+- checks remain explicit and readable
+
+### What Does Not Change
+
+- phase-based script contract
+- init-context metric registration still happens, but automatically via framework bootstrap
+- debug replay contract
+- reporting/snapshot artifact contracts
+- lifecycle correctness across executor modes
+
+---
+
+## Acceptance Criteria
+
+Implementation is not complete until all of the following are true:
+
+1. Generated scripts are materially shorter and easier to read.
+2. Existing generated and converted scripts continue to run.
+3. Replay debug output remains consumable by the current replay pipeline.
+4. Snapshot/error events continue to feed the existing reporting artifacts.
+5. New generated and converted scripts do not need to emit `initTransactions([...])`.
+6. Transaction metrics are initialized automatically before VU execution begins.
+7. Legacy scripts that still call `initTransactions([...])` continue to work.
+8. Lifecycle behavior remains correct for:
+   - `ramping-vus`
+   - `constant-vus`
+   - `shared-iterations`
+   - `per-vu-iterations`
+   - `ramping-arrival-rate`
+   - `constant-arrival-rate`
+9. Load-test shapes remain correct for:
+   - load
+   - stress
+   - soak
+   - spike
+   - step / staircase
+   - iteration-based
+   - arrival-rate-based
+10. Intermediate stage decreases do not permanently end VUs unless the final shutdown window has begun.
+11. `endTransaction()` always runs for transactions that have started.
+12. If an executor cannot support lifecycle semantics safely, the framework fails fast with a descriptive message instead of silently degrading.
+
+---
+
+## Suggested Implementation Order
+
+1. Extend the lifecycle phase envelope and runtime contract so all supported executor modes have explicit end-detection semantics.
+2. Add framework-driven transaction manifest injection to scenario/runtime metadata.
+3. Update `transaction.ts` to auto-register transaction metrics during k6 init context from the injected manifest.
+4. Introduce the lifecycle-owned transaction gate API.
+5. Add `transaction()` wrapper and remove mandatory `initTransactions([...])` from new generated/converter output.
+6. Introduce `request()` with replay logging and URL-resolution support first.
+7. Integrate snapshot/error emission into `request()` using the existing artifact contract.
+8. Update generator and converter output.
+9. Add regression coverage for executor modes, load shapes, replay logging, automatic transaction initialization, and backward compatibility.

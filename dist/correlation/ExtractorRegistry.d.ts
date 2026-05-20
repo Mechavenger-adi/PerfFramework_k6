@@ -19,4 +19,3 @@ export declare class ExtractorRegistry {
     static register(type: string, fn: ExtractorFn): void;
     static get(type: string): ExtractorFn | undefined;
 }
-//# sourceMappingURL=ExtractorRegistry.d.ts.map

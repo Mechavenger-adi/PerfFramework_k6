@@ -22,4 +22,3 @@ class SLARegistry {
 }
 exports.SLARegistry = SLARegistry;
 SLARegistry.registry = new Map();
-//# sourceMappingURL=SLARegistry.js.map

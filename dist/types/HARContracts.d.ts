@@ -43,4 +43,3 @@ export interface HARRefinementOptions {
     excludeStaticAssets?: boolean;
     stripHeaders?: string[];
 }
-//# sourceMappingURL=HARContracts.d.ts.map

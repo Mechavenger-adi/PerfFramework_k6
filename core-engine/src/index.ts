@@ -13,27 +13,27 @@ export * from './types/ReportingContracts';
 export * from './types/TestPlanSchema';
 
 // -- Config Layer -----------------------------
-export { EnvResolver } from './config/EnvResolver';
-export { SchemaValidator } from './config/SchemaValidator';
 export { ConfigurationManager } from './config/ConfigurationManager';
-export { RuntimeConfigManager } from './config/RuntimeConfigManager';
+export { EnvResolver } from './config/EnvResolver';
 export { GatekeeperValidator } from './config/GatekeeperValidator';
 export type { GatekeeperResult } from './config/GatekeeperValidator';
+export { RuntimeConfigManager } from './config/RuntimeConfigManager';
+export { SchemaValidator } from './config/SchemaValidator';
 
 // -- Scenario Layer ---------------------------
-export { buildLoadProfile, buildStressProfile, buildSoakProfile, buildSpikeProfile, buildIterationProfile, toK6ExecutorConfig } from './scenario/WorkloadModels';
+export { buildLoadProfile, buildStressProfile, buildSoakProfile, buildSpikeProfile, buildIterationProfile, buildConstantArrivalRateProfile, buildRampingArrivalRateProfile, buildExternallyControlledProfile, toK6ExecutorConfig } from './scenario/WorkloadModels';
 export { ExecutorFactory } from './scenario/ExecutorFactory';
-export { TestPlanLoader } from './scenario/TestPlanLoader';
 export { ScenarioBuilder } from './scenario/ScenarioBuilder';
 export type { K6ScenarioDefinition, K6ScenariosMap } from './scenario/ScenarioBuilder';
+export { TestPlanLoader } from './scenario/TestPlanLoader';
 
 // -- Execution Layer --------------------------
+export { HostMonitor } from './execution/HostMonitor';
 export { JourneyAllocator } from './execution/JourneyAllocator';
 export type { JourneyAllocation } from './execution/JourneyAllocator';
 export { ParallelExecutionManager } from './execution/ParallelExecutionManager';
 export type { K6Options } from './execution/ParallelExecutionManager';
 export { PipelineRunner } from './execution/PipelineRunner';
-export { HostMonitor } from './execution/HostMonitor';
 
 // -- Data Layer -------------------------------
 export { DataFactory } from './data/DataFactory';
@@ -44,10 +44,10 @@ export type { DataValidationResult } from './data/DataValidator';
 export { DynamicValueFactory } from './data/DynamicValueFactory';
 
 // -- Runtime Layer ----------------------------
-export { LifecycleRuntime } from './runtime/LifecycleRuntime';
-export type { JourneyContext, LifecyclePhaseFns, LifecycleRunState, JourneyPhase, LifecycleDecision } from './runtime/LifecycleRuntime';
 export { ErrorRuntime } from './runtime/ErrorRuntime';
 export type { ErrorRuntimeContext } from './runtime/ErrorRuntime';
+export { LifecycleRuntime } from './runtime/LifecycleRuntime';
+export type { JourneyContext, JourneyPhase, LifecycleDecision, LifecyclePhaseFns, LifecycleRunState } from './runtime/LifecycleRuntime';
 export { MetricsRuntime } from './runtime/MetricsRuntime';
 export type { TransactionAggregate } from './runtime/MetricsRuntime';
 export { SnapshotRuntime } from './runtime/SnapshotRuntime';
@@ -56,43 +56,44 @@ export { TimeseriesRuntime } from './runtime/TimeseriesRuntime';
 // -- Utils Layer --------------------------------
 export { Logger } from './utils/logger';
 export { PathResolver } from './utils/PathResolver';
-export { initTransactions, startTransaction, endTransaction } from './utils/transaction';
+export { endTransaction, getCurrentTransaction, initTransactions, startTransaction, transaction } from './utils/transaction';
 
 // -- Recording Layer ----------------------------
-export { HARParser } from './recording/HARParser';
 export { DomainFilter } from './recording/DomainFilter';
+export { HARParser } from './recording/HARParser';
 export { ScriptGenerator } from './recording/ScriptGenerator';
 export { TransactionGrouper } from './recording/TransactionGrouper';
 
 // -- Assertions Layer ---------------------------
+export { JourneyAssertionResolver } from './assertions/JourneyAssertionResolver';
 export { SLARegistry } from './assertions/SLARegistry';
 export { ThresholdManager } from './assertions/ThresholdManager';
-export { JourneyAssertionResolver } from './assertions/JourneyAssertionResolver';
 
 // -- Correlation Layer --------------------------
 export { CorrelationEngine } from './correlation/CorrelationEngine';
-export { RuleProcessor } from './correlation/RuleProcessor';
 export { ExtractorRegistry } from './correlation/ExtractorRegistry';
 export { FallbackHandler } from './correlation/FallbackHandler';
+export { RuleProcessor } from './correlation/RuleProcessor';
 
 // -- Debug Layer --------------------------------
-export { ReplayRunner } from './debug/ReplayRunner';
 export { DiffChecker } from './debug/DiffChecker';
-export { HTMLDiffReporter } from './debug/HTMLDiffReporter';
 export { ExchangeLogBuilder } from './debug/ExchangeLog';
 export type { TaggedExchangeLogEntry, VariableEvent } from './debug/ExchangeLog';
+export { HTMLDiffReporter } from './debug/HTMLDiffReporter';
 export { RecordingLogResolver } from './debug/RecordingLogResolver';
+export { ReplayRunner } from './debug/ReplayRunner';
 
 // -- Reporters Layer ----------------------------
-export { ResultTransformer } from './reporters/ResultTransformer';
-export { GrafanaReporter } from './reporters/GrafanaReporter';
 export { AzureReporter } from './reporters/AzureReporter';
 export { CustomUploader } from './reporters/CustomUploader';
+export { GrafanaReporter } from './reporters/GrafanaReporter';
+export { ResultTransformer } from './reporters/ResultTransformer';
 
 // -- Reporting Layer ----------------------------
 export { ArtifactWriter } from './reporting/ArtifactWriter';
 export { EventArtifactBuilder } from './reporting/EventArtifactBuilder';
-export { TransactionMetricsBuilder } from './reporting/TransactionMetricsBuilder';
-export { RunSummaryBuilder } from './reporting/RunSummaryBuilder';
 export { RunReportGenerator } from './reporting/RunReportGenerator';
+export { RunSummaryBuilder } from './reporting/RunSummaryBuilder';
 export { TimeseriesArtifactBuilder } from './reporting/TimeseriesArtifactBuilder';
+export { TransactionMetricsBuilder } from './reporting/TransactionMetricsBuilder';
+

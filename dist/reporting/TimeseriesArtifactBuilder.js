@@ -64,4 +64,3 @@ class TimeseriesArtifactBuilder {
     }
 }
 exports.TimeseriesArtifactBuilder = TimeseriesArtifactBuilder;
-//# sourceMappingURL=TimeseriesArtifactBuilder.js.map

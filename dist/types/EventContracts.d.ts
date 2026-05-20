@@ -91,4 +91,3 @@ export interface SnapshotPayload {
     correlation?: VariableUsage;
     data?: VariableUsage;
 }
-//# sourceMappingURL=EventContracts.d.ts.map

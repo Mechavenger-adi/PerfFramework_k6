@@ -103,4 +103,3 @@ function generateDocs() {
     fs.writeFileSync(outputPath, markdown, 'utf-8');
     console.log(`\n[PASS] Generated ${path.relative(process.cwd(), outputPath)}\n`);
 }
-//# sourceMappingURL=docs.js.map

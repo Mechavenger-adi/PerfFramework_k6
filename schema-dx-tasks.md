@@ -17,7 +17,7 @@
 - [x] **1.7** Add `$schema` to `config/environments/dev.json`
 - [x] **1.8** Update `SchemaValidator.ts` to load schemas from `.schema.json` files instead of inline objects
 - [x] **1.9** Update `init.ts` scaffold to include `$schema` in generated configs
-- [ ] **1.10** Verify: open configs in editor → confirm autocomplete, hover, validation all work
+- [x] **1.10** Verify: open configs in editor → confirm autocomplete, hover, validation all work
 
 ## Phase 2: Validation UX (P1 — Actionable Errors)
 

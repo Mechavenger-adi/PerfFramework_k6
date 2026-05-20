@@ -49,4 +49,3 @@ export declare class DataPoolManager {
     listPools(): string[];
     private resolveIndex;
 }
-//# sourceMappingURL=DataPoolManager.d.ts.map

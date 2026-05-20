@@ -465,4 +465,3 @@ class DiffChecker {
 exports.DiffChecker = DiffChecker;
 DiffChecker.LARGE_BODY_THRESHOLD = 4000;
 DiffChecker.REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
-//# sourceMappingURL=DiffChecker.js.map

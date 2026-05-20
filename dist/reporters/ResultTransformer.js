@@ -16,4 +16,3 @@ class ResultTransformer {
     }
 }
 exports.ResultTransformer = ResultTransformer;
-//# sourceMappingURL=ResultTransformer.js.map

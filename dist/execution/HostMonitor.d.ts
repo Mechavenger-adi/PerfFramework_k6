@@ -16,4 +16,3 @@ export declare class HostMonitor {
     private static readCpuTimes;
     private static delay;
 }
-//# sourceMappingURL=HostMonitor.d.ts.map

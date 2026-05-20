@@ -243,38 +243,31 @@ testuser003,P@ssw0rd3,testuser003@perf-test.local
   // -- Sample: browse journey script -------------
   writeIfNotExists(
     path.join(projectDir, 'scrum-suites/sample-team/tests/browse-journey.js'),
-    `import http from 'k6/http';
-import { check, sleep, group } from 'k6';
-import { initTransactions, startTransaction, endTransaction } from '../../../dist/utils/transaction.js';
+    `import { check } from 'k6';
+import { transaction } from '../../../dist/utils/transaction.js';
+import { request } from '../../../dist/utils/request.js';
 import { createJourneyLifecycleStore, runJourneyLifecycle, thinktime } from '../../../dist/utils/lifecycle.js';
-import { logExchange } from '../../../dist/utils/replayLogger.js';
 import { clearCookies, registerBaseUrl, getEnvContext } from '../../../dist/utils/session.js';
 
-const env = getEnvContext('sample-team', 'https://your-dev-environment.com');
-
-initTransactions(['Homepage', 'Product_List']);
+const env = getEnvContext('sample-team', 'https://your-dev-environment.com/');
 registerBaseUrl(env.baseUrl);
-const lifecycleStore = createJourneyLifecycleStore();
+const __journeyLifecycleStore = createJourneyLifecycleStore();
 
 export function initPhase(ctx) {
   clearCookies();
 }
 
 export function actionPhase(ctx) {
-  group('Homepage', function () {
-    startTransaction('Homepage');
-    const res = http.get(\`\${env.baseUrl}/\`);
-    check(res, { 'Homepage: status 2xx': (r) => r.status >= 200 && r.status < 300 });
-    endTransaction('Homepage');
+  transaction('Homepage', () => {
+    const res1 = request('GET', '/');
+    check(res1, { 'Homepage: status 2xx': (r) => r.status >= 200 && r.status < 300 });
   });
 
   thinktime();
 
-  group('Product List', function () {
-    startTransaction('Product_List');
-    const res = http.get(\`\${env.baseUrl}/products\`);
-    check(res, { 'ProductList: status 2xx': (r) => r.status >= 200 && r.status < 300 });
-    endTransaction('Product_List');
+  transaction('Product_List', () => {
+    const res1 = request('GET', '/products');
+    check(res1, { 'ProductList: status 2xx': (r) => r.status >= 200 && r.status < 300 });
   });
 
   thinktime();
@@ -284,7 +277,7 @@ export function endPhase(ctx) {
 }
 
 export default function () {
-  runJourneyLifecycle(lifecycleStore, { initPhase, actionPhase, endPhase });
+  runJourneyLifecycle(__journeyLifecycleStore, { initPhase, actionPhase, endPhase });
 }
 `,
     'scrum-suites/sample-team/tests/browse-journey.js',
@@ -293,53 +286,47 @@ export default function () {
   // -- Sample: checkout journey script -----------
   writeIfNotExists(
     path.join(projectDir, 'scrum-suites/sample-team/tests/checkout-journey.js'),
-    `import http from 'k6/http';
-import { check, group } from 'k6';
-import { initTransactions, startTransaction, endTransaction } from '../../../dist/utils/transaction.js';
+    `import { check } from 'k6';
+import { transaction } from '../../../dist/utils/transaction.js';
+import { request } from '../../../dist/utils/request.js';
 import { createJourneyLifecycleStore, runJourneyLifecycle, thinktime } from '../../../dist/utils/lifecycle.js';
-import { logExchange } from '../../../dist/utils/replayLogger.js';
 import { clearCookies, registerBaseUrl, getEnvContext } from '../../../dist/utils/session.js';
 
-const env = getEnvContext('sample-team', 'https://your-dev-environment.com');
-
-initTransactions(['Login', 'Add_To_Cart', 'Checkout']);
+const env = getEnvContext('sample-team', 'https://your-dev-environment.com/');
 registerBaseUrl(env.baseUrl);
-const lifecycleStore = createJourneyLifecycleStore();
+const __journeyLifecycleStore = createJourneyLifecycleStore();
 
 export function initPhase(ctx) {
   clearCookies();
-  group('Login', function () {
-    startTransaction('Login');
-    const res = http.post(\`\${env.baseUrl}/auth/login\`, JSON.stringify({
-      // TODO: parameterize with p_username and p_password from data file
-      username: 'testuser001',
-      password: 'P@ssw0rd1',
-    }), { headers: { 'Content-Type': 'application/json' } });
-    check(res, { 'Login: status 200': (r) => r.status === 200 });
+
+  transaction('Login', () => {
+    // TODO: parameterize with p_username and p_password from data file
+    const res1 = request('POST', '/auth/login', {
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: 'testuser001', password: 'P@ssw0rd1' }),
+    });
+    check(res1, { 'Login: status 200': (r) => r.status === 200 });
     // TODO: Correlate auth token -> c_authToken
-    endTransaction('Login');
   });
 }
 
 export function actionPhase(ctx) {
-  group('Add To Cart', function () {
-    startTransaction('Add_To_Cart');
-    const res = http.post(\`\${env.baseUrl}/cart/add\`, JSON.stringify({
-      productId: 'PROD-001',
-      quantity: 1,
-    }), { headers: { 'Content-Type': 'application/json' } });
-    check(res, { 'AddToCart: status 2xx': (r) => r.status >= 200 && r.status < 300 });
-    endTransaction('Add_To_Cart');
+  transaction('Add_To_Cart', () => {
+    const res1 = request('POST', '/cart/add', {
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ productId: 'PROD-001', quantity: 1 }),
+    });
+    check(res1, { 'AddToCart: status 2xx': (r) => r.status >= 200 && r.status < 300 });
   });
 
   thinktime();
 
-  group('Checkout', function () {
-    startTransaction('Checkout');
-    const res = http.post(\`\${env.baseUrl}/checkout\`, '{}', {
+  transaction('Checkout', () => {
+    const res1 = request('POST', '/checkout', {
       headers: { 'Content-Type': 'application/json' },
+      body: '{}',
     });
-    endTransaction('Checkout');
+    check(res1, { 'Checkout: status 2xx': (r) => r.status >= 200 && r.status < 300 });
   });
 
   thinktime();
@@ -349,7 +336,7 @@ export function endPhase(ctx) {
 }
 
 export default function () {
-  runJourneyLifecycle(lifecycleStore, { initPhase, actionPhase, endPhase });
+  runJourneyLifecycle(__journeyLifecycleStore, { initPhase, actionPhase, endPhase });
 }
 `,
     'scrum-suites/sample-team/tests/checkout-journey.js',

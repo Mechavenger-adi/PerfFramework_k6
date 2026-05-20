@@ -23,4 +23,3 @@ export declare class JourneyAllocator {
     /** Print allocation table to console */
     static printTable(allocations: JourneyAllocation[]): void;
 }
-//# sourceMappingURL=JourneyAllocator.d.ts.map

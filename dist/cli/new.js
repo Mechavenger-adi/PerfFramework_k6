@@ -87,4 +87,3 @@ function runNewWizard() {
         });
     });
 }
-//# sourceMappingURL=new.js.map

@@ -75,4 +75,3 @@ export declare function logReplayExchange(meta: ExchangeMeta, requestInfo: Reque
  */
 export declare function logExchange(req: RequestDefinition, res: K6Response | null | undefined): void;
 export {};
-//# sourceMappingURL=replayLogger.d.ts.map

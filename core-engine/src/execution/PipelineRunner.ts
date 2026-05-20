@@ -23,6 +23,8 @@ export interface RunOptions {
   env?: Record<string, string>;
   /** Capture stdout/stderr instead of inheriting them */
   captureOutput?: boolean;
+  /** Called for each line of stdout/stderr (only when captureOutput is false). Used for live event interception. */
+  onLine?: (line: string) => void;
   /** Logical run identifier for metadata/artifact naming */
   runId?: string;
   /** Report directory prepared by the CLI */
@@ -163,6 +165,7 @@ export class PipelineRunner {
       cwd = process.cwd(),
       env = {},
       captureOutput = false,
+      onLine,
       runId,
       reportDir,
       runManifestPath,
@@ -189,9 +192,11 @@ export class PipelineRunner {
 
     const k6Args = ['run', absScript, '--config', optionsFile, ...extraK6Args];
 
+    const needsPipe = captureOutput || !!onLine;
+
     return new Promise((resolve, reject) => {
       const child = childProcess.spawn('k6', k6Args, {
-        stdio: captureOutput ? 'pipe' : 'inherit',
+        stdio: needsPipe ? 'pipe' : 'inherit',
         cwd,
         env: {
           ...process.env,
@@ -201,16 +206,30 @@ export class PipelineRunner {
 
       let stdout = '';
       let stderr = '';
+      const stdoutBuf = { val: '' };
+      const stderrBuf = { val: '' };
 
-      if (captureOutput && child.stdout) {
-        child.stdout.on('data', (chunk) => {
-          stdout += chunk.toString();
+      function processChunk(chunk: Buffer, buf: { val: string }): void {
+        if (!onLine) return;
+        buf.val += chunk.toString();
+        const lines = buf.val.split(/\r?\n/);
+        buf.val = lines.pop() ?? '';
+        for (const line of lines) onLine(line);
+      }
+
+      if (child.stdout) {
+        child.stdout.on('data', (chunk: Buffer) => {
+          if (captureOutput) stdout += chunk.toString();
+          else process.stdout.write(chunk);
+          processChunk(chunk, stdoutBuf);
         });
       }
 
-      if (captureOutput && child.stderr) {
-        child.stderr.on('data', (chunk) => {
-          stderr += chunk.toString();
+      if (child.stderr) {
+        child.stderr.on('data', (chunk: Buffer) => {
+          if (captureOutput) stderr += chunk.toString();
+          else process.stderr.write(chunk);
+          processChunk(chunk, stderrBuf);
         });
       }
 
@@ -219,6 +238,12 @@ export class PipelineRunner {
       });
 
       child.on('close', (code) => {
+        // Flush any partial line remaining in buffers
+        if (onLine) {
+          if (stdoutBuf.val) onLine(stdoutBuf.val);
+          if (stderrBuf.val) onLine(stderrBuf.val);
+        }
+
         if (!captureOutput) {
           try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch { /* ignore */ }
         }

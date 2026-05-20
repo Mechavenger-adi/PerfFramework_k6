@@ -86,4 +86,3 @@ function showTemplate(type, name) {
     }
     console.log('\n' + fs.readFileSync(templatePath, 'utf-8') + '\n');
 }
-//# sourceMappingURL=templates.js.map

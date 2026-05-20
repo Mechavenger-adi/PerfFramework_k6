@@ -4,4 +4,3 @@
  * Creates the standard folder structure, example config files, and a sample journey.
  */
 export declare function runInit(projectDir?: string): void;
-//# sourceMappingURL=init.d.ts.map

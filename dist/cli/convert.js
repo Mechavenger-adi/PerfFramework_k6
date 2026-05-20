@@ -85,4 +85,3 @@ async function runConvert(inputPath, teamName, scriptName, options) {
     logger_1.Logger.detail(`Team  : ${teamName}`);
     logger_1.Logger.detail(`Script: ${outFileName}\n`);
 }
-//# sourceMappingURL=convert.js.map

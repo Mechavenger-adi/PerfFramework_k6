@@ -9,4 +9,3 @@ export declare class MetricsRuntime {
     recordTransaction(transaction: string, durationMs: number, passed: boolean): void;
     getSnapshot(): Record<string, TransactionAggregate>;
 }
-//# sourceMappingURL=MetricsRuntime.d.ts.map

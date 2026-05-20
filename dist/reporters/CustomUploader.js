@@ -13,4 +13,3 @@ class CustomUploader {
     }
 }
 exports.CustomUploader = CustomUploader;
-//# sourceMappingURL=CustomUploader.js.map

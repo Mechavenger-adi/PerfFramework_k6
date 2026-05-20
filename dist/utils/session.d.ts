@@ -21,6 +21,19 @@ export declare function getEnvContext(teamName: string, fallbackBaseUrl?: string
  */
 export declare function registerBaseUrl(url: string): void;
 /**
+ * Resolve a relative path or absolute URL to a full URL.
+ *
+ * Resolution priority:
+ * 1. Absolute URLs → returned unchanged
+ * 2. Named service → K6_PERF_SERVICE_URLS[service]
+ * 3. K6_PERF_BASE_URL env var (set by CLI)
+ * 4. First URL registered via registerBaseUrl() (standalone execution fallback)
+ * 5. Path returned as-is if no base is available
+ *
+ * This is the URL resolution contract used by request().
+ */
+export declare function resolvePath(pathOrUrl: string, service?: string): string;
+/**
  * @deprecated Use `getEnvContext` and register the `env.baseUrl` directly using `registerBaseUrl()`.
  * Register environment URLs from K6_PERF_* env vars, falling back to the
  * provided recorded URLs when runtime env URLs are unavailable.
@@ -55,4 +68,3 @@ export declare function clearCookies(...urls: string[]): void;
  */
 export declare function deleteCookie(url: string, name: string): void;
 export {};
-//# sourceMappingURL=session.d.ts.map

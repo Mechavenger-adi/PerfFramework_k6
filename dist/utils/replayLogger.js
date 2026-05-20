@@ -299,4 +299,3 @@ function logExchange(req, res) {
         k6ResponseCookies: res?.cookies || {}, // k6's parsed response Set-Cookie data
     }, res);
 }
-//# sourceMappingURL=replayLogger.js.map

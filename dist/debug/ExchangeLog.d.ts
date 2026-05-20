@@ -63,4 +63,3 @@ export declare class ExchangeLogBuilder {
     private static extractQueryParams;
     private static extractCookies;
 }
-//# sourceMappingURL=ExchangeLog.d.ts.map

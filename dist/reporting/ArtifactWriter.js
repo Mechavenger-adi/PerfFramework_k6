@@ -51,4 +51,3 @@ class ArtifactWriter {
     }
 }
 exports.ArtifactWriter = ArtifactWriter;
-//# sourceMappingURL=ArtifactWriter.js.map

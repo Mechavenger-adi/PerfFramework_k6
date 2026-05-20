@@ -39,4 +39,3 @@ export declare class Logger {
     private static print;
 }
 export { ansi };
-//# sourceMappingURL=logger.d.ts.map

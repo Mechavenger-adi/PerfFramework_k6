@@ -48,9 +48,17 @@ class ExecutorFactory {
     }
     /**
      * Build a k6-compatible executor config from a GlobalLoadProfile.
-     * Validates required fields first.
+     * Validates required fields first and rejects arrival-rate executors that
+     * lack phase-envelope support in the framework lifecycle engine.
      */
     static build(profile) {
+        const unsupported = new Set(['ramping-arrival-rate', 'constant-arrival-rate']);
+        if (unsupported.has(profile.executor)) {
+            throw new Error(`[ExecutorFactory] Executor '${profile.executor}' is not yet supported by the framework lifecycle engine. ` +
+                `The lifecycle end-detection model (initPhase/actionPhase/endPhase) requires explicit phase-envelope support ` +
+                `which has not been implemented for arrival-rate executors. ` +
+                `Use 'ramping-vus', 'constant-vus', 'per-vu-iterations', or 'shared-iterations' instead.`);
+        }
         const errors = this.validate(profile);
         if (errors.length > 0) {
             throw new Error(`[ExecutorFactory] Invalid profile:\n${errors.join('\n')}`);
@@ -66,4 +74,3 @@ class ExecutorFactory {
     }
 }
 exports.ExecutorFactory = ExecutorFactory;
-//# sourceMappingURL=ExecutorFactory.js.map

@@ -6,4 +6,3 @@
 export declare function runConvert(inputPath: string, teamName: string, scriptName: string, options: {
     inPlace?: boolean;
 }): Promise<void>;
-//# sourceMappingURL=convert.d.ts.map

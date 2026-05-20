@@ -4,8 +4,7 @@
  * This is the bridge between the human-facing test plan and k6's execution model.
  */
 
-import { EnvironmentConfig } from '../types/ConfigContracts';
-import { TestPlan, UserJourney, GlobalLoadProfile } from '../types/TestPlanSchema';
+import { GlobalLoadProfile, TestPlan, UserJourney } from '../types/TestPlanSchema';
 import { ExecutorFactory } from './ExecutorFactory';
 
 /** k6-native scenario definition (what goes into options.scenarios) */
@@ -17,6 +16,10 @@ export interface K6ScenarioDefinition {
   vus?: number;
   duration?: string;
   iterations?: number;
+  rate?: number;
+  timeUnit?: string;
+  preAllocatedVUs?: number;
+  maxVUs?: number;
   startTime?: string;
   tags?: Record<string, string>;
   env?: Record<string, string>;
@@ -31,6 +34,8 @@ export interface ScenarioRuntimeMetadata {
   executionMode: TestPlan['execution_mode'];
   reportDir: string;
   generatedAt: string;
+  /** Per-journey transaction names injected as K6_PERF_TRANSACTION_NAMES for auto-registration. */
+  journeyTransactionNames?: Record<string, string[]>;
   runtime: {
     errorBehavior: string;
     thinkTime: {
@@ -48,14 +53,33 @@ export interface ScenarioRuntimeMetadata {
       timeseriesEnabled: boolean;
       timeseriesBucketSizeSeconds: number;
     };
+    errors: {
+      captureSnapshotOnFailure: boolean;
+      maxSnapshotsPerRun: number;
+      includeRequestHeaders: boolean;
+      includeRequestBody: boolean;
+      includeResponseHeaders: boolean;
+      includeResponseBody: boolean;
+    };
   };
 }
 
 interface ScenarioPhaseEnvelope {
-  mode: 'ramping-vus' | 'per-vu-iterations' | 'shared-iterations' | 'unsupported';
+  mode:
+    | 'ramping-vus'
+    | 'per-vu-iterations'
+    | 'shared-iterations'
+    | 'constant-arrival-rate'
+    | 'ramping-arrival-rate'
+    | 'externally-controlled'
+    | 'unsupported';
   startVUs?: number;
   totalIterations?: number;
   vus?: number;
+  rate?: number;
+  timeUnit?: string;
+  preAllocatedVUs?: number;
+  maxVUs?: number;
   timeline?: Array<{
     endMs: number;
     vus: number;
@@ -231,35 +255,38 @@ export class ScenarioBuilder {
 
     const scenarioMetadata = metadata
       ? JSON.stringify({
-          runId: metadata.runId,
-          planName: metadata.planName,
-          environment: metadata.environment,
-          executionMode: metadata.executionMode,
-          reportDir: metadata.reportDir,
-          generatedAt: metadata.generatedAt,
-          journeyName: journey.name,
-          execName,
-        })
+        runId: metadata.runId,
+        planName: metadata.planName,
+        environment: metadata.environment,
+        executionMode: metadata.executionMode,
+        reportDir: metadata.reportDir,
+        generatedAt: metadata.generatedAt,
+        journeyName: journey.name,
+        execName,
+      })
       : undefined;
 
     const runtimeMetadata = metadata ? JSON.stringify(metadata.runtime) : undefined;
     const phaseMetadata = this.computePhaseEnvelope(journey.loadProfile ?? plan.global_load_profile, existingEnv);
 
+    const transactionNames = metadata?.journeyTransactionNames?.[journey.name];
+
     return {
       ...existingEnv,
       ...(metadata
         ? {
-            K6_PERF_RUN_ID: metadata.runId,
-            K6_PERF_PLAN_NAME: metadata.planName,
-            K6_PERF_ENVIRONMENT: metadata.environment,
-            K6_PERF_EXECUTION_MODE: plan.execution_mode,
-            K6_PERF_REPORT_DIR: metadata.reportDir,
-            K6_PERF_JOURNEY_NAME: journey.name,
-            K6_PERF_EXEC_NAME: execName,
-            K6_PERF_SCENARIO_METADATA: scenarioMetadata ?? '',
-            K6_PERF_RUNTIME_METADATA: runtimeMetadata ?? '',
-            K6_PERF_PHASES: JSON.stringify(phaseMetadata),
-          }
+          K6_PERF_RUN_ID: metadata.runId,
+          K6_PERF_PLAN_NAME: metadata.planName,
+          K6_PERF_ENVIRONMENT: metadata.environment,
+          K6_PERF_EXECUTION_MODE: plan.execution_mode,
+          K6_PERF_REPORT_DIR: metadata.reportDir,
+          K6_PERF_JOURNEY_NAME: journey.name,
+          K6_PERF_EXEC_NAME: execName,
+          K6_PERF_SCENARIO_METADATA: scenarioMetadata ?? '',
+          K6_PERF_RUNTIME_METADATA: runtimeMetadata ?? '',
+          K6_PERF_PHASES: JSON.stringify(phaseMetadata),
+          ...(transactionNames ? { K6_PERF_TRANSACTION_NAMES: JSON.stringify(transactionNames) } : {}),
+        }
         : {}),
     };
   }
@@ -327,6 +354,52 @@ export class ScenarioBuilder {
         mode: 'shared-iterations',
         vus: profile.vus,
         totalIterations: profile.iterations ?? 1,
+      };
+    }
+
+    // --- constant-arrival-rate: duration-based exit with rate metadata ---
+    if (profile.executor === 'constant-arrival-rate' && profile.rate && profile.duration) {
+      const totalMs = this.parseDurationToSeconds(profile.duration) * 1000;
+      return {
+        mode: 'constant-arrival-rate',
+        rate: profile.rate,
+        timeUnit: profile.timeUnit ?? '1s',
+        preAllocatedVUs: profile.preAllocatedVUs,
+        maxVUs: profile.maxVUs,
+        timeline: [{ endMs: totalMs, vus: profile.preAllocatedVUs ?? 0 }],
+      };
+    }
+
+    // --- ramping-arrival-rate: stage-based rate ramp with timeline ---
+    if (
+      profile.executor === 'ramping-arrival-rate' &&
+      profile.stages &&
+      profile.stages.length > 0
+    ) {
+      let cumulativeMs = 0;
+      const timeline = profile.stages.map((stage) => {
+        cumulativeMs += this.parseDurationToSeconds(stage.duration) * 1000;
+        return {
+          endMs: cumulativeMs,
+          vus: stage.target,
+        };
+      });
+
+      return {
+        mode: 'ramping-arrival-rate',
+        preAllocatedVUs: profile.preAllocatedVUs,
+        maxVUs: profile.maxVUs,
+        timeUnit: profile.timeUnit ?? '1s',
+        timeline,
+      };
+    }
+
+    // --- externally-controlled: open-ended, VU count managed via k6 REST API ---
+    if (profile.executor === 'externally-controlled' && profile.maxVUs) {
+      return {
+        mode: 'externally-controlled',
+        vus: profile.vus ?? 0,
+        maxVUs: profile.maxVUs,
       };
     }
 

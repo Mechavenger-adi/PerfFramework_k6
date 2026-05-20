@@ -114,4 +114,3 @@ class HARParser {
     }
 }
 exports.HARParser = HARParser;
-//# sourceMappingURL=HARParser.js.map

@@ -76,4 +76,3 @@ function inspectConfig(planPath, envConfigPath, runtimeSettingsPath, envFilePath
         process.exit(1);
     }
 }
-//# sourceMappingURL=config-inspect.js.map

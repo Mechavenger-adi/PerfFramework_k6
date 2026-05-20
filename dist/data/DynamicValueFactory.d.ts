@@ -47,4 +47,3 @@ export declare class DynamicValueFactory {
      */
     static epochSecs(): number;
 }
-//# sourceMappingURL=DynamicValueFactory.d.ts.map

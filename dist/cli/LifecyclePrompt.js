@@ -55,4 +55,3 @@ function parseSelections(answer, groupNames) {
     }
     return Array.from(chosen);
 }
-//# sourceMappingURL=LifecyclePrompt.js.map

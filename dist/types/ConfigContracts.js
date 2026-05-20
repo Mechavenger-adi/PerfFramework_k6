@@ -34,4 +34,3 @@ exports.FRAMEWORK_DEFAULTS = {
     },
     debugMode: false,
 };
-//# sourceMappingURL=ConfigContracts.js.map

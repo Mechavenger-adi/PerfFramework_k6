@@ -13,4 +13,3 @@ class GrafanaReporter {
     }
 }
 exports.GrafanaReporter = GrafanaReporter;
-//# sourceMappingURL=GrafanaReporter.js.map

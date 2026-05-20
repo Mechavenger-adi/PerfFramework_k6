@@ -1,21 +1,59 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.initTransactions = initTransactions;
+exports.getCurrentTransaction = getCurrentTransaction;
 exports.startTransaction = startTransaction;
 exports.endTransaction = endTransaction;
+exports.transaction = transaction;
 // @ts-ignore
+const k6_1 = require("k6");
+// @ts-ignore - K6 runtime module
 const metrics_1 = require("k6/metrics");
+// @ts-ignore - K6 runtime module
+const execution_1 = __importDefault(require("k6/execution"));
+// Reads errorBehavior from the framework-injected runtime metadata env var.
+// Avoids a local file import (require("./lifecycle")) which k6 cannot resolve
+// for extension-less paths when the dist is compiled as CommonJS.
+function getRuntimeErrorBehavior() {
+    try {
+        const raw = typeof __ENV !== 'undefined' ? __ENV.K6_PERF_RUNTIME_METADATA : undefined;
+        if (raw) {
+            const parsed = JSON.parse(raw);
+            return parsed.errorBehavior || 'continue';
+        }
+    }
+    catch { /* silent */ }
+    return 'continue';
+}
 const txnStarts = {};
 const txnTrends = {};
 const txnCounters = {};
+// Tracks the active transaction name within this VU's context (per-VU module scope in k6).
+let _activeTransaction = '';
+// ── Auto-register from framework-injected manifest ────────────
+// Reads K6_PERF_TRANSACTION_NAMES (injected by ScenarioBuilder) and pre-registers
+// all metrics during k6 init context so VU functions never create metrics at runtime.
+(function autoInitTransactionsFromEnv() {
+    try {
+        const raw = typeof __ENV !== 'undefined' ? __ENV.K6_PERF_TRANSACTION_NAMES : undefined;
+        if (raw) {
+            const names = JSON.parse(raw);
+            if (Array.isArray(names)) {
+                initTransactions(names);
+            }
+        }
+    }
+    catch { /* silent — fallback: scripts may still call initTransactions([...]) explicitly */ }
+})();
 /**
- * Initializes Trends for the specified transactions.
- * Uses the transaction name directly as the k6 Trend metric name.
+ * Initializes Trends and Counters for the specified transactions.
+ * MUST be called in the script's init context (global scope), not inside VU functions.
  *
- * **CRITICAL**: This MUST be called in the script's init context (global scope),
- * not inside the default function or VU execution context.
- *
- * @param names Array of transaction names
+ * @deprecated New generated scripts use framework-managed auto-registration via
+ * K6_PERF_TRANSACTION_NAMES. Keep calling this for legacy scripts and standalone execution.
  */
 function initTransactions(names) {
     names.forEach(name => {
@@ -28,9 +66,15 @@ function initTransactions(names) {
     });
 }
 /**
- * Start a transaction (LoadRunner equivalent)
- *
- * @param name Transaction name
+ * Returns the name of the currently active transaction for this VU, or '' if none.
+ * Used by request() to auto-attach transaction context to replay log entries.
+ */
+function getCurrentTransaction() {
+    return _activeTransaction;
+}
+/**
+ * Start a transaction (LoadRunner equivalent).
+ * @param name Transaction name — must have been registered via initTransactions or auto-init.
  */
 function startTransaction(name) {
     txnStarts[name] = Date.now();
@@ -42,10 +86,8 @@ function startTransaction(name) {
     }
 }
 /**
- * End a transaction (LoadRunner equivalent)
- * Calculates the duration since startTransaction was called and records it.
- *
- * @param name Transaction name
+ * End a transaction (LoadRunner equivalent).
+ * Records elapsed duration since startTransaction; safe to call in finally blocks.
  */
 function endTransaction(name) {
     const startTime = txnStarts[name];
@@ -62,4 +104,54 @@ function endTransaction(name) {
     }
     delete txnStarts[name];
 }
-//# sourceMappingURL=transaction.js.map
+/**
+ * Execute a named transaction with group wrapping, metric recording, and lifecycle gating.
+ *
+ * Replaces the manual pattern:
+ *   group('name', () => { startTransaction('name'); ...; endTransaction('name'); });
+ *
+ * Behavior:
+ * - Checks lifecycle gate: if the VU is ramping down for the final time, skips the transaction.
+ * - Wraps the body in k6 group() for hierarchical result grouping.
+ * - Guarantees endTransaction() runs even if fn() throws (finally block).
+ * - Applies the configured errorBehavior (continue | stop_iteration | stop_vu | abort_test).
+ *
+ * Nesting: nested transaction() calls are rejected with a descriptive error.
+ */
+function transaction(name, fn) {
+    if (_activeTransaction !== '') {
+        throw new Error(`[k6-perf] Nested transaction detected: '${name}' called inside '${_activeTransaction}'. ` +
+            `Nested transactions are not supported.`);
+    }
+    const errorBehavior = getRuntimeErrorBehavior();
+    _activeTransaction = name;
+    try {
+        (0, k6_1.group)(name, () => {
+            startTransaction(name);
+            try {
+                fn();
+            }
+            catch (error) {
+                const behavior = errorBehavior;
+                const message = error && typeof error === 'object' && 'message' in error
+                    ? error.message
+                    : String(error);
+                console.error(`[k6-perf][transaction:${name}] ${message}`);
+                if (behavior === 'abort_test') {
+                    execution_1.default.test.abort(`[k6-perf][transaction:${name}] Aborting test: ${message}`);
+                    return;
+                }
+                if (behavior === 'stop_iteration' || behavior === 'stop_vu') {
+                    throw error;
+                }
+                // 'continue' — swallow and continue to next transaction
+            }
+            finally {
+                endTransaction(name);
+            }
+        });
+    }
+    finally {
+        _activeTransaction = '';
+    }
+}

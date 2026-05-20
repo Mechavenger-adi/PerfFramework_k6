@@ -146,4 +146,3 @@ async function promptForStaticAssetPreference(rl) {
     const includeStatic = normalized === 'y' || normalized === 'yes';
     return !includeStatic;
 }
-//# sourceMappingURL=generate.js.map

@@ -304,6 +304,30 @@ export function thinktime(minOrFixed?: number, max?: number): void {
   }
 }
 
+// ── Transaction Gate ──────────────────────────────────────────
+// Provides executor-aware lifecycle state to the transaction() wrapper.
+// C1: lifecycle.ts is the only owner of ramp-down / end-detection logic.
+// C2: transaction.ts must obtain this state through this explicit contract.
+
+export interface TransactionGate {
+  shouldSkipBeforeStart: boolean;
+  errorBehavior: string;
+  onSkip: (name: string) => void;
+}
+
+export function getTransactionGate(): TransactionGate {
+  const phases = getPhaseMetadata();
+  const runtime = getRuntimeMetadata();
+  const endSignal = getEndSignal(phases);
+  return {
+    shouldSkipBeforeStart: endSignal.beforeAction,
+    errorBehavior: runtime.errorBehavior || 'continue',
+    onSkip: (name: string) => {
+      console.log(`[k6-perf][lifecycle] Skipping action transaction '${name}' — VU lifecycle ending`);
+    },
+  };
+}
+
 export function runJourneyLifecycle(store: JourneyLifecycleStore, phaseFns: PhaseFns): void {
   const runtime = getRuntimeMetadata();
   const phases = getPhaseMetadata();

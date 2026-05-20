@@ -42,4 +42,3 @@ export declare class HTMLDiffReporter {
     private static bodyPreview;
     private static detectRedirect;
 }
-//# sourceMappingURL=HTMLDiffReporter.d.ts.map

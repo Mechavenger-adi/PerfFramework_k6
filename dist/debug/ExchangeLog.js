@@ -127,4 +127,3 @@ ExchangeLogBuilder.BINARY_MIME_TYPES = new Set([
     'application/vnd.ms-fontobject',
 ]);
 ExchangeLogBuilder.STATIC_EXT_RE = /\.(?:png|jpe?g|gif|svg|ico|webp|avif|bmp|tiff?|woff2?|ttf|otf|eot|mp[34]|webm|ogg|flac|wav|zip|gz|br|pdf)(?:[?#]|$)/i;
-//# sourceMappingURL=ExchangeLog.js.map

@@ -79,4 +79,3 @@ function toK6ExecutorConfig(profile) {
         iterations: profile.iterations,
     };
 }
-//# sourceMappingURL=WorkloadModels.js.map

@@ -331,7 +331,6 @@ program
     fs.mkdirSync(entryScriptDir, { recursive: true });
 
     let entryCode = '';
-    // k6-reporter: generates a standalone 3rd-party HTML report for validation
     entryCode += `import { htmlReport } from "https://raw.githubusercontent.com/benc-uk/k6-reporter/main/dist/bundle.js";\n`;
     entryCode += `import { textSummary } from "https://jslib.k6.io/k6-summary/0.0.1/index.js";\n`;
     for (const journey of plan.user_journeys) {
@@ -399,6 +398,7 @@ program
     Logger.detail('Launching k6...\n');
     let runResult;
     const k6StartTime = new Date().toISOString();
+    const onLine = buildSnapshotLineHandler(reportDir);
     try {
       runResult = await PipelineRunner.executeAsync({
         scriptPath: entryScriptPath,
@@ -408,6 +408,7 @@ program
         reportDir,
         runId,
         runManifestPath,
+        onLine,
       });
     } finally {
       await hostSampler.stop();
@@ -559,6 +560,7 @@ function buildScenarioRuntimeMetadata(
   safeReportDir: string,
 ): ScenarioRuntimeMetadata {
   const runtime = new RuntimeConfigManager(resolvedConfig.runtime);
+  const journeyTransactionNames = extractJourneyTransactionNames(plan);
 
   return {
     runId,
@@ -567,6 +569,7 @@ function buildScenarioRuntimeMetadata(
     executionMode: plan.execution_mode,
     reportDir: safeReportDir,
     generatedAt: new Date().toISOString(),
+    journeyTransactionNames,
     runtime: {
       errorBehavior: runtime.getErrorBehavior(),
       thinkTime: {
@@ -584,6 +587,14 @@ function buildScenarioRuntimeMetadata(
         timeseriesEnabled: runtime.isTimeseriesEnabled(),
         timeseriesBucketSizeSeconds: runtime.getTimeseriesBucketSizeSeconds(),
       },
+      errors: {
+        captureSnapshotOnFailure: runtime.shouldCaptureSnapshotOnFailure(),
+        maxSnapshotsPerRun: runtime.getMaxSnapshotsPerRun(),
+        includeRequestHeaders: runtime.shouldIncludeRequestHeadersInSnapshots(),
+        includeRequestBody: runtime.shouldIncludeRequestBodyInSnapshots(),
+        includeResponseHeaders: runtime.shouldIncludeResponseHeadersInSnapshots(),
+        includeResponseBody: runtime.shouldIncludeResponseBodyInSnapshots(),
+      },
     },
   };
 }
@@ -595,6 +606,8 @@ function buildRunEnvironment(
   safeReportDir: string,
   runManifestPath: string,
 ): Record<string, string> {
+  const transactionNames = collectUniqueTransactionNames(extractJourneyTransactionNames(plan));
+
   return {
     K6_PERF_RUN_ID: runId,
     K6_PERF_PLAN_NAME: plan.name,
@@ -603,7 +616,64 @@ function buildRunEnvironment(
     K6_PERF_REPORT_DIR: safeReportDir,
     K6_PERF_RUN_MANIFEST_PATH: runManifestPath.replace(/\\/g, '/'),
     K6_PERF_TEAM_ENVIRONMENTS: JSON.stringify(resolvedConfig.environment.scrum_suites || {}),
+    ...(transactionNames.length > 0
+      ? { K6_PERF_TRANSACTION_NAMES: JSON.stringify(transactionNames) }
+      : {}),
   };
+}
+
+function extractJourneyTransactionNames(plan: TestPlan): Record<string, string[]> {
+  const journeyTransactionNames: Record<string, string[]> = {};
+
+  for (const journey of plan.user_journeys) {
+    const resolvedScriptPath = path.isAbsolute(journey.scriptPath)
+      ? journey.scriptPath
+      : path.resolve(journey.scriptPath);
+
+    if (!fs.existsSync(resolvedScriptPath)) {
+      continue;
+    }
+
+    const source = fs.readFileSync(resolvedScriptPath, 'utf-8');
+    const names = extractTransactionNamesFromSource(source);
+    if (names.length > 0) {
+      journeyTransactionNames[journey.name] = names;
+    }
+  }
+
+  return journeyTransactionNames;
+}
+
+function collectUniqueTransactionNames(journeyTransactionNames: Record<string, string[]>): string[] {
+  const unique = new Set<string>();
+
+  for (const names of Object.values(journeyTransactionNames)) {
+    for (const name of names) {
+      unique.add(name);
+    }
+  }
+
+  return [...unique];
+}
+
+function extractTransactionNamesFromSource(source: string): string[] {
+  const matches = new Set<string>();
+  const patterns = [
+    /transaction\(\s*(['"`])([^'"`]+)\1\s*,/g,
+    /startTransaction\(\s*(['"`])([^'"`]+)\1\s*\)/g,
+  ];
+
+  for (const pattern of patterns) {
+    let match: RegExpExecArray | null;
+    while ((match = pattern.exec(source)) !== null) {
+      const name = match[2]?.trim();
+      if (name) {
+        matches.add(name);
+      }
+    }
+  }
+
+  return [...matches];
 }
 
 function writeRunManifest(
@@ -769,6 +839,17 @@ function finalizeRunArtifacts(options: {
     snapshots: options.hostSnapshots,
   });
 
+  const snapshotDir = path.join(options.reportDir, 'snapshots');
+  const snapshotFiles: Array<Record<string, unknown>> = [];
+  if (fs.existsSync(snapshotDir)) {
+    for (const file of fs.readdirSync(snapshotDir).sort()) {
+      if (!file.endsWith('.json')) continue;
+      try {
+        snapshotFiles.push(JSON.parse(fs.readFileSync(path.join(snapshotDir, file), 'utf-8')) as Record<string, unknown>);
+      } catch { /* skip malformed */ }
+    }
+  }
+
   const reportBundle: ReportBundle = {
     meta: {
       runId: options.runId,
@@ -792,7 +873,7 @@ function finalizeRunArtifacts(options: {
     timeseries,
     errors: eventArtifacts.errors as unknown as Array<Record<string, unknown>>,
     warnings: eventArtifacts.warnings as unknown as Array<Record<string, unknown>>,
-    snapshots: [],
+    snapshots: snapshotFiles,
     system: {
       agents: reportAgents,
       snapshots: options.hostSnapshots,
@@ -927,6 +1008,53 @@ function formatCell(value: unknown, column: string): string {
     return Number.isInteger(value) ? value.toString() : value.toFixed(1);
   }
   return String(value);
+}
+
+// ---------------------------------------------
+// Snapshot event handler
+// ---------------------------------------------
+
+const SNAPSHOT_EVENT_PREFIX = '[k6-perf][snapshot-event] ';
+
+function buildSnapshotLineHandler(reportDir: string): (line: string) => void {
+  const snapshotDir = path.join(reportDir, 'snapshots');
+  let count = 0;
+  let dirCreated = false;
+
+  return function handleLine(line: string): void {
+    let payload: string | null = null;
+
+    // k6 logfmt format: level=info msg="[k6-perf][snapshot-event] {...}" source=console
+    const consoleMatch = line.match(/msg="((?:\\.|[^"])*)"\s+source=console/);
+    if (consoleMatch) {
+      let rawMessage: string;
+      try {
+        rawMessage = JSON.parse(`"${consoleMatch[1]}"`) as string;
+      } catch {
+        rawMessage = consoleMatch[1].replace(/\\"/g, '"');
+      }
+      const idx = rawMessage.indexOf(SNAPSHOT_EVENT_PREFIX);
+      if (idx !== -1) payload = rawMessage.slice(idx + SNAPSHOT_EVENT_PREFIX.length).trim();
+    } else {
+      const idx = line.indexOf(SNAPSHOT_EVENT_PREFIX);
+      if (idx !== -1) payload = line.slice(idx + SNAPSHOT_EVENT_PREFIX.length).trim();
+    }
+
+    if (!payload) return;
+
+    try {
+      const snapshot = JSON.parse(payload) as Record<string, unknown>;
+      if (!dirCreated) {
+        fs.mkdirSync(snapshotDir, { recursive: true });
+        dirCreated = true;
+      }
+      count++;
+      const fileName = `snapshot-${String(count).padStart(3, '0')}.json`;
+      fs.writeFileSync(path.join(snapshotDir, fileName), JSON.stringify(snapshot, null, 2), 'utf-8');
+    } catch {
+      // Ignore malformed snapshot events
+    }
+  };
 }
 
 // ---------------------------------------------

@@ -104,4 +104,3 @@ function runValidate(opts) {
     }
     return result.passed;
 }
-//# sourceMappingURL=validate.js.map

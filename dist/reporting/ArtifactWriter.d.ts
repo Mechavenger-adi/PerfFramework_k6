@@ -3,4 +3,3 @@ export declare class ArtifactWriter {
     static writeJson(filePath: string, data: unknown): void;
     static writeNdjson(filePath: string, rows: Array<Record<string, unknown>>): void;
 }
-//# sourceMappingURL=ArtifactWriter.d.ts.map

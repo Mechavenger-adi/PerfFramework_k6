@@ -98,4 +98,3 @@ export default function () {
     console.log(`   ${scriptPath}\n`);
     console.log(`Open the file and paste your Grafana Studio script in the designated area.`);
 }
-//# sourceMappingURL=generate-byos.js.map

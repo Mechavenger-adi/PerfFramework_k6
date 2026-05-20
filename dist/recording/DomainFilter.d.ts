@@ -13,4 +13,3 @@ export declare class DomainFilter {
      */
     static filter(entries: HAREntry[], allowedDomains: string[]): HAREntry[];
 }
-//# sourceMappingURL=DomainFilter.d.ts.map

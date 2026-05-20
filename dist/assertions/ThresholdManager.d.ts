@@ -17,4 +17,3 @@ export declare class ThresholdManager {
      */
     static collectPercentiles(testPlan: TestPlan): string[];
 }
-//# sourceMappingURL=ThresholdManager.d.ts.map

@@ -42,4 +42,3 @@ export declare class RuntimeConfigManager {
     /** Return all settings (useful for logging) */
     dump(): RuntimeSettings;
 }
-//# sourceMappingURL=RuntimeConfigManager.d.ts.map

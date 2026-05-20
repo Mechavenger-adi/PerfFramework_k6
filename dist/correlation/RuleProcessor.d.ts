@@ -13,4 +13,3 @@ export declare class RuleProcessor {
      */
     static loadRules(filePath: string): CorrelationRule[];
 }
-//# sourceMappingURL=RuleProcessor.d.ts.map

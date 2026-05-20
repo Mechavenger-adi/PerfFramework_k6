@@ -8,4 +8,3 @@ export declare class SnapshotRuntime {
     register(path: string): SnapshotReference;
     buildPayload(payload: SnapshotPayload): SnapshotPayload;
 }
-//# sourceMappingURL=SnapshotRuntime.d.ts.map

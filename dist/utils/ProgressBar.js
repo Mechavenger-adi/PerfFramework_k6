@@ -77,4 +77,3 @@ exports.ProgressBar = ProgressBar;
 function createSpinner(label) {
     return new ProgressBar(label, 1);
 }
-//# sourceMappingURL=ProgressBar.js.map

@@ -13,4 +13,3 @@ class AzureReporter {
     }
 }
 exports.AzureReporter = AzureReporter;
-//# sourceMappingURL=AzureReporter.js.map

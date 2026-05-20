@@ -33,4 +33,3 @@ export declare class DataFactory {
     /** Attempt to coerce a string cell value to a native type */
     private static coerceValue;
 }
-//# sourceMappingURL=DataFactory.d.ts.map

@@ -11,7 +11,8 @@ export type ExecutorType =
   | 'ramping-arrival-rate'
   | 'constant-arrival-rate'
   | 'shared-iterations'
-  | 'per-vu-iterations';
+  | 'per-vu-iterations'
+  | 'externally-controlled';
 
 export type WorkloadModelType = 'load' | 'stress' | 'soak' | 'spike' | 'iteration';
 export type DataOverflowStrategy = 'terminate' | 'cycle' | 'continue_with_last';
@@ -39,10 +40,18 @@ export interface GlobalLoadProfile {
   stages?: LoadStage[];
   /** Fixed VU count (constant executors) */
   vus?: number;
-  /** Duration for constant executors */
+  /** Duration for constant/arrival-rate executors */
   duration?: string;
   /** Total iterations for iteration-based executors */
   iterations?: number;
+  /** Arrival rate — requests per timeUnit (arrival-rate executors) */
+  rate?: number;
+  /** Time unit for rate, e.g. '1s', '1m' (arrival-rate executors) */
+  timeUnit?: string;
+  /** Pre-allocated VUs for arrival-rate executors (pool size at start) */
+  preAllocatedVUs?: number;
+  /** Maximum VUs the executor can scale to (arrival-rate and externally-controlled) */
+  maxVUs?: number;
 }
 
 // ---------------------------------------------

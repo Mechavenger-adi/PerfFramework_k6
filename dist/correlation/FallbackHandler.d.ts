@@ -5,4 +5,3 @@ export declare class FallbackHandler {
      */
     static handle(rule: CorrelationRule): string;
 }
-//# sourceMappingURL=FallbackHandler.d.ts.map

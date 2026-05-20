@@ -3,4 +3,3 @@
  * Phase 5 – Config resolution inspection
  */
 export declare function inspectConfig(planPath: string, envConfigPath?: string, runtimeSettingsPath?: string, envFilePath?: string): void;
-//# sourceMappingURL=config-inspect.d.ts.map

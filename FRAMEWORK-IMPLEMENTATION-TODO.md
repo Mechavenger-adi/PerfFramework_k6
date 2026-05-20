@@ -159,7 +159,7 @@ This checklist tracks the agreed lifecycle, reporting, observability, and CI/CD 
   - `endPhase(ctx)` remains empty
 
 **Completed (2026-04-09)**
-- broader executor support: `computePhaseEnvelope` now handles `ramping-vus`, `constant-vus`, `per-vu-iterations`, `shared-iterations`
+- full executor support: `computePhaseEnvelope` now handles all 7 k6 executors: `ramping-vus`, `constant-vus`, `per-vu-iterations`, `shared-iterations`, `constant-arrival-rate`, `ramping-arrival-rate`, `externally-controlled`
 - lifecycle.js `getEndSignal()` uses instantaneous VU target interpolation for all ramping profiles
 - `isDecreasing` guard prevents false triggers during ramp-up
 - richer per-phase state mapping for converted scripts:
@@ -482,6 +482,24 @@ This checklist tracks the agreed lifecycle, reporting, observability, and CI/CD 
   - updated generator/BYOS behavior
   - CI/CD artifact guidance
 
+## Completed: Full Executor Support (2026-05-20)
+
+**All 7 k6 executor types now supported:**
+- `ramping-vus`, `constant-vus`, `shared-iterations`, `per-vu-iterations` — already had full lifecycle support
+- `constant-arrival-rate`, `ramping-arrival-rate` — fixed required fields, added phase envelopes
+- `externally-controlled` — added from scratch
+
+**Files changed:** TestPlanSchema.ts, ExecutorFactory.ts, WorkloadModels.ts, ScenarioBuilder.ts, SchemaValidator.ts, index.ts
+**Templates added:** `config/test-plans/templates/` — one per executor type
+
+## Completed: ScriptConverter Modernization (2026-05-20)
+
+**ScriptConverter aligned with ScriptGenerator conventions:**
+- Import block now includes `clearCookies`/`registerBaseUrl` from session.js, `trackDataRow` from replayLogger.js
+- `applyPhaseContract()` strips stale `variableEvents: []` fields, fixes `dist/` → `core-engine/src/` import paths
+- Import path consistency: all imports now use `../../../core-engine/src/utils/` paths
+- Duplicate import prevention for lifecycle.js and session.js when preserving source imports
+
 ## Verification Checklist
 
 - Existing CLI commands still work
@@ -491,3 +509,5 @@ This checklist tracks the agreed lifecycle, reporting, observability, and CI/CD 
 - New reporting artifacts are generated correctly
 - Unified HTML report opens and filters correctly
 - CI gate can run from `ci-summary.json`
+- All 7 executor types validated in schema and ExecutorFactory
+- ScriptConverter output matches ScriptGenerator patterns

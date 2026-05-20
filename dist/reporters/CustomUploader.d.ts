@@ -5,4 +5,3 @@ export declare class CustomUploader {
      */
     static push(result: ResultContract, url: string): void;
 }
-//# sourceMappingURL=CustomUploader.d.ts.map

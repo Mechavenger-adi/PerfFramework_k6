@@ -11,4 +11,3 @@ export declare class ResultTransformer {
      */
     static transform(k6Data: any): ResultContract;
 }
-//# sourceMappingURL=ResultTransformer.d.ts.map

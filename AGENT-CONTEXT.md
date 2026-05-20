@@ -9,7 +9,7 @@
 > 6. KEEP THE STRUCTURAL FLOW MAP UPDATED - treat it as a Tree-sitter-backed structural map of the codebase. When files, imports, module boundaries, execution flow, or ownership change, update the diagram and summary so future AI assistants get precise incremental context quickly.
 > 7. KEEP AGENT-CONTEXT AND THE FLOW DIAGRAM SYNCHRONIZED - if one changes, review the other in the same pass so AI models can use this file as a token-saving orientation layer instead of rediscovering the repo from scratch.
 
-**Last Updated:** 2026-04-13
+**Last Updated:** 2026-05-20
 **Workspace:** d:\repos\K6-PerfFramework
 **Status:** Phase 1-3 complete (54/67 items = 81%), Phase 4 not started
 
@@ -86,6 +86,7 @@ K6-PerfFramework/
 |  |- environments/                    # Environment JSON files
 |  |- runtime-settings/                # Runtime, reporting, error, monitoring defaults
 |  |- test-plans/                      # debug-test.json, load-test.json, webui-load-test.json
+|  |  `- templates/                    # Executor templates: ramping-vus, constant-vus, shared-iterations, per-vu-iterations, constant-arrival-rate, ramping-arrival-rate, externally-controlled
 |  `- correlation-rules/               # Reserved global rules folder
 |- core-engine/
 |  |- DOCS_METHODS.md                  # API reference
@@ -432,8 +433,8 @@ flowchart LR
 
 | File | Class | Purpose |
 |------|-------|---------|
-| WorkloadModels.ts | (functions) | `buildLoadProfile()` (ramp-up → steady → ramp-down), `buildStressProfile()` (aggressive ramp), `buildSoakProfile()` (low sustained), `buildSpikeProfile()` (sudden surge), `buildIterationProfile()` (fixed iterations), `toK6ExecutorConfig()` (translates to k6-native) |
-| ExecutorFactory.ts | `ExecutorFactory` | `validate()` checks required fields per executor, `build()` → k6 executor config, `listSupported()` prints all 6 types. Supports: ramping-vus, constant-vus, ramping-arrival-rate, constant-arrival-rate, shared-iterations, per-vu-iterations |
+| WorkloadModels.ts | (functions) | `buildLoadProfile()` (ramp-up → steady → ramp-down), `buildStressProfile()` (aggressive ramp), `buildSoakProfile()` (low sustained), `buildSpikeProfile()` (sudden surge), `buildIterationProfile()` (fixed iterations), `buildConstantArrivalRateProfile()` (fixed RPS), `buildRampingArrivalRateProfile()` (ramping RPS), `buildExternallyControlledProfile()` (REST API controlled), `toK6ExecutorConfig()` (translates to k6-native) |
+| ExecutorFactory.ts | `ExecutorFactory` | `validate()` checks required fields per executor, `build()` → k6 executor config, `listSupported()` prints all 7 types. Supports all k6 executors: ramping-vus, constant-vus, ramping-arrival-rate, constant-arrival-rate, shared-iterations, per-vu-iterations, externally-controlled |
 | TestPlanLoader.ts | `TestPlanLoader` | `load(planPath)` → reads JSON, validates schema via SchemaValidator, returns typed TestPlan |
 | ScenarioBuilder.ts | `ScenarioBuilder` | `build(plan)` → K6ScenariosMap. Routes to `buildParallel()`, `buildSequential()` (startTime offsets), `buildHybrid()` (mixed groups). Helpers: `sanitizeExecName()`, `estimateTotalDurationSeconds()`, `parseDurationToSeconds()`. `ScenarioRuntimeMetadata` interface carries `runtime.thinkTime: { mode, fixed?, min?, max? }` (replaced flat `thinkTimeMode` string) |
 
@@ -478,7 +479,7 @@ flowchart LR
 | DomainFilter.ts | `DomainFilter` | `summarize(entries)` → `DomainStat[] { host, count }` sorted by count desc. `filter(entries, allowedDomains)` → substring match filtering with removal logging |
 | ScriptGenerator.ts | `ScriptGenerator` | `generate(groups)` → full k6 script string with: k6 imports, framework helpers (initTransactions/startTransaction/endTransaction), logReplayExchange calls, status checks. Supports GET/POST/PUT/PATCH/DELETE. Tags each request with transaction + harEntryId + recordingStartedAt |
 | TransactionGrouper.ts | `TransactionGrouper` | `group(entries)` → `TransactionGroup[] { name, entries[] }`. Groups by `pageref`, fallback names `Group_1`, `Group_2`, etc. Sanitizes names (non-alphanumeric → underscore) |
-| ScriptConverter.ts | `ScriptConverter` | `convert(source)` / `convertFile(filePath)` → transforms conventional k6 scripts to framework format. Handles Pattern A (Studio/Trend-based) and Pattern B (semi-framework). Adds `logExchange()`, request definition objects, `initTransactions/startTransaction/endTransaction`. Uses dual counters: `requestCounter` (per-group, for variable names) and `globalRequestId` (sequential across all groups, for `id`/`har_entry_id`). Preserves original `// har_entry: req_N` IDs when present. Skips `let params;`/`let url;`/`let resp;` (inlined) but preserves `let match;`/`let regex;` (used for correlation extraction). Pre-scans for `getUniqueItem(FILES["xxx"])["p_yyy"]` patterns and injects `trackParameter()` calls before the first group. Rewrites `correlation_vars["key"] = expr;` → `correlation_vars["key"] = trackCorrelation("key", expr, "body");`. Idempotent. |
+| ScriptConverter.ts | `ScriptConverter` | `convert(source)` / `convertFile(filePath)` → transforms conventional k6 scripts to framework format. Handles Pattern A (Studio/Trend-based) and Pattern B (semi-framework). Adds `logExchange()`, request definition objects with `cookies:{}`, `redirects:0`, proper `tags`, `initTransactions/startTransaction/endTransaction`. Uses dual counters: `requestCounter` (per-group, for variable names) and `globalRequestId` (sequential across all groups, for `id`/`har_entry_id`). Preserves original `// har_entry: req_N` IDs when present. Skips `let params;`/`let url;`/`let resp;` (inlined) but preserves `let match;`/`let regex;` (used for correlation extraction). Pre-scans for `getUniqueItem(FILES["xxx"])` patterns and injects `trackDataRow()` / `trackParameter()` calls (routed to initPhase prelude by lifecycle partitioner). Rewrites `correlation_vars["key"] = expr;` → `correlation_vars["key"] = trackCorrelation("key", expr, "body");`. `applyPhaseContract()` normalizes stale patterns: strips `variableEvents:[]`, fixes `dist/` → `core-engine/src/` import paths. Imports aligned with ScriptGenerator: `clearCookies`/`registerBaseUrl` from session.js, `trackDataRow` from replayLogger.js. Idempotent. |
 
 ### 7. DEBUG LAYER (`core-engine/src/debug/`)
 
@@ -587,16 +588,16 @@ flowchart LR
 ### GlobalLoadProfile
 ```typescript
 {
-  executor: ExecutorType;           // 'ramping-vus' | 'constant-vus' | 'shared-iterations' | etc.
-  startVUs?: number;
-  stages?: LoadStage[];             // { duration: string, target: number }
-  vus?: number;
-  duration?: string;
-  iterations?: number;
-  rate?: number;
-  timeUnit?: string;
-  preAllocatedVUs?: number;
-  maxVUs?: number;
+  executor: ExecutorType;           // All 7 k6 executors: 'ramping-vus' | 'constant-vus' | 'ramping-arrival-rate' | 'constant-arrival-rate' | 'shared-iterations' | 'per-vu-iterations' | 'externally-controlled'
+  startVUs?: number;               // ramping executors
+  stages?: LoadStage[];             // { duration: string, target: number } — ramping-vus, ramping-arrival-rate
+  vus?: number;                    // constant-vus, iteration-based, externally-controlled (initial)
+  duration?: string;               // constant-vus, arrival-rate, externally-controlled
+  iterations?: number;             // shared-iterations, per-vu-iterations
+  rate?: number;                   // arrival-rate executors (requests per timeUnit)
+  timeUnit?: string;               // arrival-rate executors (e.g. '1s', '1m')
+  preAllocatedVUs?: number;        // arrival-rate executors (VU pool size at start)
+  maxVUs?: number;                 // arrival-rate + externally-controlled (VU ceiling)
 }
 ```
 
@@ -1492,10 +1493,14 @@ npm run cli -- run --plan config/test-plans/debug-test.json
     - `abort_test`
 - **ScenarioBuilder update:**
   - now emits `K6_PERF_PHASES` in scenario env for supported executors
-  - current supported phase envelopes:
-    - `ramping-vus`
-    - `per-vu-iterations`
-  - unsupported executors still fall back safely
+  - phase envelopes now supported for all 7 k6 executors:
+    - `ramping-vus` — timeline from stages
+    - `constant-vus` — synthetic ramp-down before duration end
+    - `per-vu-iterations` — iteration count tracking
+    - `shared-iterations` — explicit iteration metadata
+    - `constant-arrival-rate` — duration-based with rate metadata
+    - `ramping-arrival-rate` — stage-based rate ramp with timeline
+    - `externally-controlled` — open-ended, VU count via k6 REST API
 - **Generator / converter update:**
   - generated and converted scripts now import:
     - `createJourneyLifecycleStore`
@@ -1777,6 +1782,7 @@ npm run cli -- run --plan config/test-plans/debug-test.json
   - end-to-end runtime flow from plan loading through reporting/artifact generation
 - **Instruction added:** Future agents should update both the flow diagram and surrounding agent context together so this file stays usable as a token-saving orientation layer for AI assistants.
 
+
 ### 2026-04-20 - Utils Layer TypeScript Migration
 - **What:** Converted transaction.js, session.js, replayLogger.js, and lifecycle.js to TypeScript (.ts) in core-engine/src/utils/
 - **Why:** To bring type-safety to the last remaining loose JS files in the core framework architecture.
@@ -1879,3 +1885,34 @@ npm run cli -- run --plan config/test-plans/debug-test.json
 - **Script behavior:** `ScriptGenerator.ts` emits relative primary-host request URLs resolved at runtime via `resolveFrameworkUrl(..., { fallbackBaseUrl })`. `ScriptConverter.ts` applies the same conversion when it can safely detect primary-host URL literals.
 - **Templates updated:** `init.ts` sample environment config now demonstrates `teamOverrides`; scaffolded sample scripts and the BYOS template now use `resolveFrameworkUrl()` and environment-aware cookie registration.
 - **Remaining gap:** Automatic mapping of captured secondary origins to named `serviceUrls` is still manual; this remains tracked as technical debt.
+
+
+### 2026-05-20 - Full Support For All 7 K6 Executor Types
+- **What:** Extended the framework to support all 7 k6 executor types. Previously only 4 had full lifecycle support (ramping-vus, constant-vus, shared-iterations, per-vu-iterations). Arrival-rate executors had specs but wrong required fields and no phase envelope. externally-controlled was absent.
+- **Changes:**
+  - `TestPlanSchema.ts` — Added `externally-controlled` to `ExecutorType`. Added `rate`, `timeUnit`, `preAllocatedVUs`, `maxVUs` fields to `GlobalLoadProfile`.
+  - `ExecutorFactory.ts` — Fixed arrival-rate required fields (constant-arrival-rate: rate+duration+preAllocatedVUs; ramping-arrival-rate: stages+preAllocatedVUs). Added externally-controlled spec (maxVUs required).
+  - `WorkloadModels.ts` — Added `rate`, `timeUnit`, `preAllocatedVUs`, `maxVUs` to `K6ExecutorConfig`. Updated `toK6ExecutorConfig()` to pass through new fields. Added builder functions: `buildConstantArrivalRateProfile()`, `buildRampingArrivalRateProfile()`, `buildExternallyControlledProfile()`.
+  - `ScenarioBuilder.ts` — Added arrival-rate fields to `K6ScenarioDefinition`. Extended `ScenarioPhaseEnvelope` mode union. Implemented `computePhaseEnvelope()` for constant-arrival-rate (duration-based), ramping-arrival-rate (stage timeline), and externally-controlled (open-ended).
+  - `SchemaValidator.ts` — Added `rate`, `timeUnit`, `preAllocatedVUs`, `maxVUs` properties. Added executor enum with all 7 types.
+  - `index.ts` — Exported new builder functions.
+  - `config/test-plans/templates/` — Created 7 template JSON files, one per executor type.
+- **Executor field requirements (k6-native):**
+  | Executor | Required | Optional |
+  |----------|----------|----------|
+  | ramping-vus | stages | startVUs |
+  | constant-vus | vus, duration | — |
+  | shared-iterations | vus, iterations | — |
+  | per-vu-iterations | vus, iterations | — |
+  | constant-arrival-rate | rate, duration, preAllocatedVUs | maxVUs, timeUnit |
+  | ramping-arrival-rate | stages, preAllocatedVUs | maxVUs, timeUnit |
+  | externally-controlled | maxVUs | vus, duration |
+
+### 2026-05-20 - ScriptConverter Modernization — Aligned With ScriptGenerator Conventions
+- **What:** Updated `core-engine/src/recording/ScriptConverter.ts` to align its output with the current framework conventions used by ScriptGenerator.
+- **Changes:**
+  - `buildImportBlock()` — Now imports `clearCookies`/`registerBaseUrl` from session.js, `trackDataRow` from replayLogger.js, `createJourneyLifecycleStore`/`runJourneyLifecycle` from lifecycle.js. Fixes stale `dist/` import paths to `core-engine/src/` paths. Skips re-adding lifecycle/session imports that are already handled.
+  - `applyPhaseContract()` — Now normalizes stale patterns before phase splitting: strips `variableEvents: []` fields from request definitions (auto-detected by replayLogger now), fixes `../dist/utils/` → `../core-engine/src/utils/` import paths. All internal references updated from `source` to `cleaned`.
+  - Import preservation — Converter now detects and skips duplicate lifecycle.js and session.js imports when preserving source imports.
+- **Why:** ScriptConverter's output had diverged from ScriptGenerator's conventions: used `dist/` paths, didn't import session utilities, didn't clean up `variableEvents`, and didn't fix stale import paths in re-converted scripts.
+- **Verification:** `tsc --noEmit` passes. Converter output now matches ScriptGenerator patterns for imports, request definition shape, and lifecycle contract.

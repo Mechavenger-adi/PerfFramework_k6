@@ -139,7 +139,7 @@ class PipelineRunner {
         };
     }
     static executeAsync(options) {
-        const { scriptPath, k6Options, extraK6Args = [], cwd = process.cwd(), env = {}, captureOutput = false, runId, reportDir, runManifestPath, } = options;
+        const { scriptPath, k6Options, extraK6Args = [], cwd = process.cwd(), env = {}, captureOutput = false, onLine, runId, reportDir, runManifestPath, } = options;
         const absScript = path.resolve(cwd, scriptPath);
         if (!fs.existsSync(absScript)) {
             return Promise.reject(new Error(`[PipelineRunner] Script not found: ${absScript}`));
@@ -157,9 +157,10 @@ class PipelineRunner {
             logger_1.Logger.info(`  Journeys: ${Object.keys(k6Options.scenarios ?? {}).join(', ')}\n`);
         }
         const k6Args = ['run', absScript, '--config', optionsFile, ...extraK6Args];
+        const needsPipe = captureOutput || !!onLine;
         return new Promise((resolve, reject) => {
             const child = childProcess.spawn('k6', k6Args, {
-                stdio: captureOutput ? 'pipe' : 'inherit',
+                stdio: needsPipe ? 'pipe' : 'inherit',
                 cwd,
                 env: {
                     ...process.env,
@@ -168,20 +169,46 @@ class PipelineRunner {
             });
             let stdout = '';
             let stderr = '';
-            if (captureOutput && child.stdout) {
+            const stdoutBuf = { val: '' };
+            const stderrBuf = { val: '' };
+            function processChunk(chunk, buf) {
+                if (!onLine)
+                    return;
+                buf.val += chunk.toString();
+                const lines = buf.val.split(/\r?\n/);
+                buf.val = lines.pop() ?? '';
+                for (const line of lines)
+                    onLine(line);
+            }
+            if (child.stdout) {
                 child.stdout.on('data', (chunk) => {
-                    stdout += chunk.toString();
+                    if (captureOutput)
+                        stdout += chunk.toString();
+                    else
+                        process.stdout.write(chunk);
+                    processChunk(chunk, stdoutBuf);
                 });
             }
-            if (captureOutput && child.stderr) {
+            if (child.stderr) {
                 child.stderr.on('data', (chunk) => {
-                    stderr += chunk.toString();
+                    if (captureOutput)
+                        stderr += chunk.toString();
+                    else
+                        process.stderr.write(chunk);
+                    processChunk(chunk, stderrBuf);
                 });
             }
             child.on('error', (error) => {
                 reject(new Error(`[PipelineRunner] Failed to start k6: ${error.message}\nMake sure k6 is installed and available in PATH.`));
             });
             child.on('close', (code) => {
+                // Flush any partial line remaining in buffers
+                if (onLine) {
+                    if (stdoutBuf.val)
+                        onLine(stdoutBuf.val);
+                    if (stderrBuf.val)
+                        onLine(stderrBuf.val);
+                }
                 if (!captureOutput) {
                     try {
                         fs.rmSync(tempDir, { recursive: true, force: true });
@@ -221,4 +248,3 @@ class PipelineRunner {
     }
 }
 exports.PipelineRunner = PipelineRunner;
-//# sourceMappingURL=PipelineRunner.js.map

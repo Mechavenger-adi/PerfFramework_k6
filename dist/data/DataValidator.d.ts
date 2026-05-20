@@ -25,4 +25,3 @@ export declare class DataValidator {
     /** Print a validation result to console */
     static printResult(result: DataValidationResult): void;
 }
-//# sourceMappingURL=DataValidator.d.ts.map

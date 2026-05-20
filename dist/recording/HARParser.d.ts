@@ -9,4 +9,3 @@ export declare class HARParser {
      */
     static readEntries(filePath: string): HAREntry[];
 }
-//# sourceMappingURL=HARParser.d.ts.map

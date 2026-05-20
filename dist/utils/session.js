@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getEnvContext = getEnvContext;
 exports.registerBaseUrl = registerBaseUrl;
+exports.resolvePath = resolvePath;
 exports.registerFrameworkEnvironmentUrls = registerFrameworkEnvironmentUrls;
 exports.resolveFrameworkUrl = resolveFrameworkUrl;
 exports.clearCookies = clearCookies;
@@ -13,6 +14,8 @@ exports.deleteCookie = deleteCookie;
 const http_1 = __importDefault(require("k6/http"));
 // Registry of base URLs seen by this VU — used by clearCookies() to clear all.
 const _registeredUrls = new Set();
+// The first URL registered (primary base URL) — used by resolvePath() when no env var is set.
+let _primaryBaseUrl;
 /**
  * Get the environment context for a specific team.
  * Throws a descriptive error if the environment is missing and no fallback is provided.
@@ -90,8 +93,44 @@ function getFrameworkServiceUrls() {
  * @param url - A base URL (e.g., 'https://myapp.example.com/')
  */
 function registerBaseUrl(url) {
-    if (url)
-        _registeredUrls.add(normalizeBaseUrl(url));
+    if (url) {
+        const normalized = normalizeBaseUrl(url);
+        _registeredUrls.add(normalized);
+        if (!_primaryBaseUrl) {
+            _primaryBaseUrl = normalized;
+        }
+    }
+}
+/**
+ * Resolve a relative path or absolute URL to a full URL.
+ *
+ * Resolution priority:
+ * 1. Absolute URLs → returned unchanged
+ * 2. Named service → K6_PERF_SERVICE_URLS[service]
+ * 3. K6_PERF_BASE_URL env var (set by CLI)
+ * 4. First URL registered via registerBaseUrl() (standalone execution fallback)
+ * 5. Path returned as-is if no base is available
+ *
+ * This is the URL resolution contract used by request().
+ */
+function resolvePath(pathOrUrl, service) {
+    if (!pathOrUrl || isAbsoluteUrl(pathOrUrl)) {
+        return pathOrUrl;
+    }
+    if (service) {
+        const serviceUrls = getFrameworkServiceUrls();
+        if (serviceUrls[service]) {
+            return joinBaseAndPath(serviceUrls[service], pathOrUrl);
+        }
+    }
+    const envBaseUrl = getFrameworkBaseUrl();
+    if (envBaseUrl) {
+        return joinBaseAndPath(envBaseUrl, pathOrUrl);
+    }
+    if (_primaryBaseUrl) {
+        return joinBaseAndPath(_primaryBaseUrl, pathOrUrl);
+    }
+    return pathOrUrl;
 }
 /**
  * @deprecated Use `getEnvContext` and register the `env.baseUrl` directly using `registerBaseUrl()`.
@@ -170,4 +209,3 @@ function deleteCookie(url, name) {
     const jar = http_1.default.cookieJar();
     jar.delete(url, name);
 }
-//# sourceMappingURL=session.js.map

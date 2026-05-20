@@ -12,4 +12,3 @@ export interface ValidateOptions {
     verbose?: boolean;
 }
 export declare function runValidate(opts: ValidateOptions): boolean;
-//# sourceMappingURL=validate.d.ts.map

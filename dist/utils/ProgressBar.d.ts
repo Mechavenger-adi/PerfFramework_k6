@@ -24,4 +24,3 @@ export declare class ProgressBar {
 }
 /** Create a phase spinner for a single blocking operation */
 export declare function createSpinner(label: string): ProgressBar;
-//# sourceMappingURL=ProgressBar.d.ts.map

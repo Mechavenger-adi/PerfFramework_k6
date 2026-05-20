@@ -49,4 +49,3 @@ ExtractorRegistry.register('jsonpath', (res, pattern) => {
 ExtractorRegistry.register('header', (res, pattern) => {
     return (res.headers && res.headers[pattern]) ? String(res.headers[pattern]) : null;
 });
-//# sourceMappingURL=ExtractorRegistry.js.map

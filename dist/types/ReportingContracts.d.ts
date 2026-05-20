@@ -90,4 +90,3 @@ export interface ReportBundle {
         [key: string]: unknown;
     };
 }
-//# sourceMappingURL=ReportingContracts.d.ts.map

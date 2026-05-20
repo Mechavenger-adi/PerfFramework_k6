@@ -13,10 +13,10 @@ export declare class ExecutorFactory {
     static validate(profile: GlobalLoadProfile): string[];
     /**
      * Build a k6-compatible executor config from a GlobalLoadProfile.
-     * Validates required fields first.
+     * Validates required fields first and rejects arrival-rate executors that
+     * lack phase-envelope support in the framework lifecycle engine.
      */
     static build(profile: GlobalLoadProfile): K6ExecutorConfig;
     /** Return human-readable descriptions of all supported executors. */
     static listSupported(): void;
 }
-//# sourceMappingURL=ExecutorFactory.d.ts.map

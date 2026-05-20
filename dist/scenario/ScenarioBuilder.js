@@ -149,6 +149,7 @@ class ScenarioBuilder {
             : undefined;
         const runtimeMetadata = metadata ? JSON.stringify(metadata.runtime) : undefined;
         const phaseMetadata = this.computePhaseEnvelope(journey.loadProfile ?? plan.global_load_profile, existingEnv);
+        const transactionNames = metadata?.journeyTransactionNames?.[journey.name];
         return {
             ...existingEnv,
             ...(metadata
@@ -163,6 +164,7 @@ class ScenarioBuilder {
                     K6_PERF_SCENARIO_METADATA: scenarioMetadata ?? '',
                     K6_PERF_RUNTIME_METADATA: runtimeMetadata ?? '',
                     K6_PERF_PHASES: JSON.stringify(phaseMetadata),
+                    ...(transactionNames ? { K6_PERF_TRANSACTION_NAMES: JSON.stringify(transactionNames) } : {}),
                 }
                 : {}),
         };
@@ -266,4 +268,3 @@ class ScenarioBuilder {
     }
 }
 exports.ScenarioBuilder = ScenarioBuilder;
-//# sourceMappingURL=ScenarioBuilder.js.map

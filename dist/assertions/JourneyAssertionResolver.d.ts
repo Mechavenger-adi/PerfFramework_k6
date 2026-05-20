@@ -5,4 +5,3 @@ export declare class JourneyAssertionResolver {
      */
     static printReport(k6Data: any): void;
 }
-//# sourceMappingURL=JourneyAssertionResolver.d.ts.map

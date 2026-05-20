@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createJourneyLifecycleStore = createJourneyLifecycleStore;
 exports.thinktime = thinktime;
+exports.getTransactionGate = getTransactionGate;
 exports.runJourneyLifecycle = runJourneyLifecycle;
 // @ts-ignore - K6 runtime module
 const k6_1 = require("k6");
@@ -209,6 +210,18 @@ function thinktime(minOrFixed, max) {
         (0, k6_1.sleep)(durationToSleep);
     }
 }
+function getTransactionGate() {
+    const phases = getPhaseMetadata();
+    const runtime = getRuntimeMetadata();
+    const endSignal = getEndSignal(phases);
+    return {
+        shouldSkipBeforeStart: endSignal.beforeAction,
+        errorBehavior: runtime.errorBehavior || 'continue',
+        onSkip: (name) => {
+            console.log(`[k6-perf][lifecycle] Skipping action transaction '${name}' — VU lifecycle ending`);
+        },
+    };
+}
 function runJourneyLifecycle(store, phaseFns) {
     const runtime = getRuntimeMetadata();
     const phases = getPhaseMetadata();
@@ -252,4 +265,3 @@ function runJourneyLifecycle(store, phaseFns) {
         state.ended = true;
     }
 }
-//# sourceMappingURL=lifecycle.js.map

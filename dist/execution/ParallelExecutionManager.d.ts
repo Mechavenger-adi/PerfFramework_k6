@@ -36,4 +36,3 @@ export declare class ParallelExecutionManager {
      */
     private static buildSummaryTrendStats;
 }
-//# sourceMappingURL=ParallelExecutionManager.d.ts.map

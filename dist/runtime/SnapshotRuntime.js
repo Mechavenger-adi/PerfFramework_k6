@@ -44,4 +44,3 @@ class SnapshotRuntime {
     }
 }
 exports.SnapshotRuntime = SnapshotRuntime;
-//# sourceMappingURL=SnapshotRuntime.js.map

@@ -21,4 +21,3 @@ export declare class RecordingLogResolver {
     private static readRegistry;
     private static normalizePath;
 }
-//# sourceMappingURL=RecordingLogResolver.d.ts.map

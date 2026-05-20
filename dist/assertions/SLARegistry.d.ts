@@ -9,4 +9,3 @@ export declare class SLARegistry {
     static get(targetName: string): SLADefinition | undefined;
     static getAll(): Record<string, SLADefinition>;
 }
-//# sourceMappingURL=SLARegistry.d.ts.map

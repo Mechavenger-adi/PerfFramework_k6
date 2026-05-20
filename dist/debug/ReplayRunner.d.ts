@@ -82,4 +82,3 @@ export declare class ReplayRunner {
     private static extractK6Metrics;
     private static defaultReplayLogPath;
 }
-//# sourceMappingURL=ReplayRunner.d.ts.map

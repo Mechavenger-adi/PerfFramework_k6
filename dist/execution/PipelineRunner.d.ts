@@ -17,6 +17,8 @@ export interface RunOptions {
     env?: Record<string, string>;
     /** Capture stdout/stderr instead of inheriting them */
     captureOutput?: boolean;
+    /** Called for each line of stdout/stderr (only when captureOutput is false). Used for live event interception. */
+    onLine?: (line: string) => void;
     /** Logical run identifier for metadata/artifact naming */
     runId?: string;
     /** Report directory prepared by the CLI */
@@ -49,4 +51,3 @@ export declare class PipelineRunner {
     static printCapturedOutput(result: PipelineRunResult): void;
     static ensureSuccess(result: PipelineRunResult): void;
 }
-//# sourceMappingURL=PipelineRunner.d.ts.map

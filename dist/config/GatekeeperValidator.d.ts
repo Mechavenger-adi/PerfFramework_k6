@@ -28,4 +28,3 @@ export declare class GatekeeperValidator {
     private extractDataReferences;
     private estimateRequestedVUs;
 }
-//# sourceMappingURL=GatekeeperValidator.d.ts.map

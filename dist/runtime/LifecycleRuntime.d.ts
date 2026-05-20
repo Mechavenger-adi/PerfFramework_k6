@@ -29,4 +29,3 @@ export declare class LifecycleRuntime {
     static decide(state: LifecycleRunState, shouldEndNow: boolean): LifecycleDecision;
     static applyErrorBehavior(state: LifecycleRunState, behavior: ErrorBehavior): 'continue' | 'stop_iteration' | 'stop_vu' | 'abort_test';
 }
-//# sourceMappingURL=LifecycleRuntime.d.ts.map

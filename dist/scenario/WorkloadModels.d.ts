@@ -52,4 +52,3 @@ export declare function buildIterationProfile(options: {
 }): GlobalLoadProfile;
 /** Translate a GlobalLoadProfile into a k6 executor config block */
 export declare function toK6ExecutorConfig(profile: GlobalLoadProfile): K6ExecutorConfig;
-//# sourceMappingURL=WorkloadModels.d.ts.map

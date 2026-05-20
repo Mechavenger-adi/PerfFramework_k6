@@ -3,7 +3,7 @@
  * Phase 1 – Converts a TestPlan into k6-native options.scenarios object.
  * This is the bridge between the human-facing test plan and k6's execution model.
  */
-import { TestPlan, GlobalLoadProfile } from '../types/TestPlanSchema';
+import { GlobalLoadProfile, TestPlan } from '../types/TestPlanSchema';
 /** k6-native scenario definition (what goes into options.scenarios) */
 export interface K6ScenarioDefinition {
     executor: string;
@@ -28,6 +28,8 @@ export interface ScenarioRuntimeMetadata {
     executionMode: TestPlan['execution_mode'];
     reportDir: string;
     generatedAt: string;
+    /** Per-journey transaction names injected as K6_PERF_TRANSACTION_NAMES for auto-registration. */
+    journeyTransactionNames?: Record<string, string[]>;
     runtime: {
         errorBehavior: string;
         thinkTime: {
@@ -44,6 +46,14 @@ export interface ScenarioRuntimeMetadata {
             includeErrorTable: boolean;
             timeseriesEnabled: boolean;
             timeseriesBucketSizeSeconds: number;
+        };
+        errors: {
+            captureSnapshotOnFailure: boolean;
+            maxSnapshotsPerRun: number;
+            includeRequestHeaders: boolean;
+            includeRequestBody: boolean;
+            includeResponseHeaders: boolean;
+            includeResponseBody: boolean;
         };
     };
 }
@@ -77,4 +87,3 @@ export declare class ScenarioBuilder {
     private static parseDurationToSeconds;
 }
 export {};
-//# sourceMappingURL=ScenarioBuilder.d.ts.map

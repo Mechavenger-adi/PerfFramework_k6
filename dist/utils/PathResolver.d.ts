@@ -11,4 +11,3 @@ export declare class PathResolver {
     static resolve(targetPath: string, searchRoot?: string): string | null;
     private static recursiveSearch;
 }
-//# sourceMappingURL=PathResolver.d.ts.map

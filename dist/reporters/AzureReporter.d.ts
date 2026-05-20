@@ -5,4 +5,3 @@ export declare class AzureReporter {
      */
     static push(result: ResultContract, connectionString: string): void;
 }
-//# sourceMappingURL=AzureReporter.d.ts.map

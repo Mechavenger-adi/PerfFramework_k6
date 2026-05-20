@@ -236,4 +236,3 @@ TransactionMetricsBuilder.BUILT_IN_METRICS = new Set([
     'vus',
     'vus_max',
 ]);
-//# sourceMappingURL=TransactionMetricsBuilder.js.map

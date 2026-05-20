@@ -1974,4 +1974,3 @@ class HTMLDiffReporter {
 exports.HTMLDiffReporter = HTMLDiffReporter;
 HTMLDiffReporter.REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 HTMLDiffReporter.BODY_PREVIEW_MAX = 200;
-//# sourceMappingURL=HTMLDiffReporter.js.map

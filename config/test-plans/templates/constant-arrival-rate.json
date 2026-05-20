@@ -1,0 +1,24 @@
+{
+  "name": "Constant Arrival Rate Template",
+  "environment": "dev",
+  "execution_mode": "parallel",
+  "global_load_profile": {
+    "executor": "constant-arrival-rate",
+    "rate": 50,
+    "timeUnit": "1s",
+    "duration": "10m",
+    "preAllocatedVUs": 20,
+    "maxVUs": 100
+  },
+  "user_journeys": [
+    {
+      "name": "example_journey",
+      "scriptPath": "example-journey.js",
+      "weight": 100
+    }
+  ],
+  "global_sla": {
+    "p95": 3000,
+    "errorRate": 5
+  }
+}

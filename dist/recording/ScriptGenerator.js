@@ -4,26 +4,28 @@ exports.ScriptGenerator = void 0;
 class ScriptGenerator {
     /**
      * Generates formatted TypeScript/JavaScript source code based on Transaction Groups.
+     * Output uses the transaction() wrapper and request() helper from the framework utils.
      */
     static generate(groups, lifecycle, teamName) {
-        let script = `import http from 'k6/http';\n`;
-        script += `import { check, sleep, group } from 'k6';\n`;
-        script += `import { initTransactions, startTransaction, endTransaction } from '../../../dist/utils/transaction.js';\n`;
+        let script = `import { check } from 'k6';\n`;
+        script += `import { transaction } from '../../../dist/utils/transaction.js';\n`;
+        script += `import { request } from '../../../dist/utils/request.js';\n`;
         script += `import { createJourneyLifecycleStore, runJourneyLifecycle, thinktime } from '../../../dist/utils/lifecycle.js';\n`;
-        script += `import { logExchange, trackCorrelation, trackParameter } from '../../../dist/utils/replayLogger.js';\n`;
+        script += `import { logReplayExchange, trackCorrelation, trackParameter } from '../../../dist/utils/replayLogger.js';\n`;
         script += `import { clearCookies, registerBaseUrl, getEnvContext } from '../../../dist/utils/session.js';\n\n`;
-        // Extract unique base URLs from all request entries for fallback
         const baseUrls = this.extractBaseUrls(groups);
         const primaryBaseUrl = baseUrls[0];
         script += `const env = getEnvContext('${teamName}', ${primaryBaseUrl ? `'${primaryBaseUrl}'` : 'undefined'});\n`;
-        script += `registerBaseUrl(env.baseUrl);\n\n`;
-        const transactionNames = groups.map((g) => g.name);
+        script += `registerBaseUrl(env.baseUrl);\n`;
+        for (let i = 1; i < baseUrls.length; i++) {
+            script += `registerBaseUrl('${baseUrls[i]}');\n`;
+        }
+        script += `\n`;
         const initSet = new Set(lifecycle?.initGroups ?? []);
         const endSet = new Set(lifecycle?.endGroups ?? []);
-        const initGroups = groups.filter((groupItem) => initSet.has(groupItem.name));
-        const endGroups = groups.filter((groupItem) => endSet.has(groupItem.name));
-        const actionGroups = groups.filter((groupItem) => !initSet.has(groupItem.name) && !endSet.has(groupItem.name));
-        script += `initTransactions(${this.formatArray(transactionNames)});\n\n`;
+        const initGroups = groups.filter((g) => initSet.has(g.name));
+        const endGroups = groups.filter((g) => endSet.has(g.name));
+        const actionGroups = groups.filter((g) => !initSet.has(g.name) && !endSet.has(g.name));
         script += `const __journeyLifecycleStore = createJourneyLifecycleStore();\n\n`;
         script += this.buildPhaseFunction('initPhase', initGroups, primaryBaseUrl);
         script += `\n`;
@@ -39,7 +41,6 @@ class ScriptGenerator {
     static buildPhaseFunction(functionName, groups, primaryBaseUrl) {
         let script = `export function ${functionName}(ctx) {\n`;
         let globalRequestId = 0;
-        // Clear cookies at the start of initPhase so each VU starts with a clean session
         if (functionName === 'initPhase') {
             script += `  clearCookies();\n\n`;
         }
@@ -48,31 +49,30 @@ class ScriptGenerator {
             return script;
         }
         groups.forEach((groupItem, groupIndex) => {
-            script += `  group('${groupItem.name}', function () {\n`;
-            script += `    startTransaction('${groupItem.name}');\n`;
+            script += `  transaction('${groupItem.name}', function () {\n`;
             groupItem.entries.forEach((req, reqIndex) => {
                 globalRequestId++;
-                script += `    // har_entry: ${req.id}\n`;
                 const method = req.method.toUpperCase();
-                const requestName = `request_${reqIndex + 1}`;
-                const responseName = `res_${reqIndex + 1}`;
+                const responseName = `res${reqIndex + 1}`;
                 const sequentialId = `req_${globalRequestId}`;
-                const requestDefinition = this.buildRequestDefinition(req, groupItem.name, method, sequentialId, primaryBaseUrl);
-                script += `    const ${requestName} = ${this.formatValue(requestDefinition, 4)};\n`;
-                if (method === 'GET') {
-                    script += `    const ${responseName} = http.get(${requestName}.url, ${requestName}.params);\n`;
+                const relativePath = this.buildRelativePath(req.url, primaryBaseUrl);
+                const hasHeaders = req.headers && req.headers.length > 0;
+                const hasBody = !!this.buildRequestBody(req.postData);
+                script += `    const ${responseName} = request('${method}', ${JSON.stringify(relativePath)}, {\n`;
+                if (hasHeaders) {
+                    const headersObj = {};
+                    req.headers.forEach((h) => { headersObj[h.name] = h.value; });
+                    script += `      headers: ${this.formatInlineObject(headersObj, 6)},\n`;
                 }
-                else if (method === 'POST' || method === 'PUT' || method === 'PATCH') {
-                    const methodFunc = method.toLowerCase();
-                    script += `    const ${responseName} = http.${methodFunc}(${requestName}.url, ${requestName}.body, ${requestName}.params);\n`;
+                if (hasBody) {
+                    const body = this.buildRequestBody(req.postData);
+                    script += `      body: ${JSON.stringify(body)},\n`;
                 }
-                else if (method === 'DELETE') {
-                    script += `    const ${responseName} = http.del(${requestName}.url, null, ${requestName}.params);\n`;
-                }
-                else {
-                    script += `    const ${responseName} = http.request(${requestName}.method, ${requestName}.url, ${requestName}.body, ${requestName}.params);\n`;
-                }
-                script += `    logExchange(${requestName}, ${responseName});\n`;
+                script += `      replay: {\n`;
+                script += `        harEntryId: ${JSON.stringify(sequentialId)},\n`;
+                script += `        recordingStartedAt: ${JSON.stringify(req.startedDateTime)},\n`;
+                script += `      },\n`;
+                script += `    });\n`;
                 script += `    check(${responseName}, {\n`;
                 script += `      ${JSON.stringify(`${groupItem.name} - status is ${req.status}`)}: (r) => r.status === ${req.status},\n`;
                 script += `    });\n`;
@@ -80,7 +80,6 @@ class ScriptGenerator {
                     script += `\n`;
                 }
             });
-            script += `    endTransaction('${groupItem.name}');\n`;
             script += `  });\n\n`;
             if (groupIndex < groups.length - 1) {
                 script += `  thinktime();\n\n`;
@@ -89,35 +88,22 @@ class ScriptGenerator {
         script += `}\n`;
         return script;
     }
-    static buildRequestDefinition(req, transactionName, method, sequentialId, primaryBaseUrl) {
-        return {
-            id: sequentialId,
-            transaction: transactionName,
-            recordingStartedAt: req.startedDateTime,
-            method,
-            url: this.buildRuntimeUrlExpression(req.url, primaryBaseUrl),
-            body: this.buildRequestBody(req.postData),
-            params: this.buildRequestParams(req, transactionName, sequentialId),
-        };
-    }
-    static buildRequestParams(req, transactionName, sequentialId) {
-        const params = {
-            cookies: {},
-            redirects: 0,
-            tags: {
-                transaction: transactionName,
-                har_entry_id: sequentialId,
-                recording_started_at: req.startedDateTime,
-            },
-        };
-        if (req.headers && req.headers.length > 0) {
-            const headersObj = {};
-            req.headers.forEach((header) => {
-                headersObj[header.name] = header.value;
-            });
-            params.headers = headersObj;
+    /** Build a relative path from an absolute URL, falling back to the absolute URL if origin differs. */
+    static buildRelativePath(absoluteUrl, primaryBaseUrl) {
+        if (!primaryBaseUrl) {
+            return absoluteUrl;
         }
-        return params;
+        try {
+            const parsed = new URL(absoluteUrl);
+            const normalizedOrigin = parsed.origin + '/';
+            if (normalizedOrigin !== primaryBaseUrl) {
+                return absoluteUrl;
+            }
+            return parsed.pathname + (parsed.search || '') + (parsed.hash || '');
+        }
+        catch {
+            return absoluteUrl;
+        }
     }
     static buildRequestBody(postData) {
         if (!postData)
@@ -129,69 +115,21 @@ class ScriptGenerator {
             return null;
         }
         return postData.params
-            .map((param) => `${encodeURIComponent(param.name)}=${encodeURIComponent(param.value ?? '')}`)
+            .map((p) => `${encodeURIComponent(p.name)}=${encodeURIComponent(p.value ?? '')}`)
             .join('&');
     }
-    static formatArray(items) {
-        if (items.length === 0)
-            return '[]';
-        const lines = items.map((item) => `  ${JSON.stringify(item)}`);
-        return `[\n${lines.join(',\n')}\n]`;
-    }
-    static formatValue(value, indentLevel) {
-        if (value === null)
-            return 'null';
-        if (value === undefined)
-            return 'undefined';
-        if (this.isRawJavaScriptExpression(value))
-            return value.__raw;
-        if (typeof value === 'string')
-            return JSON.stringify(value);
-        if (typeof value === 'number' || typeof value === 'boolean')
-            return String(value);
-        if (Array.isArray(value)) {
-            if (value.length === 0)
-                return '[]';
-            const childIndent = ' '.repeat(indentLevel + 2);
-            const closingIndent = ' '.repeat(indentLevel);
-            const items = value.map((item) => `${childIndent}${this.formatValue(item, indentLevel + 2)}`);
-            return `[\n${items.join(',\n')}\n${closingIndent}]`;
-        }
-        if (typeof value === 'object') {
-            const entries = Object.entries(value);
-            if (entries.length === 0)
-                return '{}';
-            const childIndent = ' '.repeat(indentLevel + 2);
-            const closingIndent = ' '.repeat(indentLevel);
-            const props = entries.map(([key, entryValue]) => {
-                const label = /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(key) ? key : JSON.stringify(key);
-                return `${childIndent}${label}: ${this.formatValue(entryValue, indentLevel + 2)}`;
-            });
-            return `{\n${props.join(',\n')}\n${closingIndent}}`;
-        }
-        return JSON.stringify(value);
-    }
-    static buildRuntimeUrlExpression(absoluteUrl, primaryBaseUrl) {
-        if (!primaryBaseUrl) {
-            return absoluteUrl;
-        }
-        try {
-            const resolvedUrl = new URL(absoluteUrl);
-            const normalizedOrigin = resolvedUrl.origin + '/';
-            if (normalizedOrigin !== primaryBaseUrl) {
-                return absoluteUrl;
-            }
-            const pathWithQuery = absoluteUrl.slice(resolvedUrl.origin.length);
-            return {
-                __raw: `\`\${env.baseUrl}${pathWithQuery}\``,
-            };
-        }
-        catch {
-            return absoluteUrl;
-        }
-    }
-    static isRawJavaScriptExpression(value) {
-        return typeof value === 'object' && value !== null && typeof value.__raw === 'string';
+    /** Inline-format a plain object as a JS object literal at the given indent level. */
+    static formatInlineObject(obj, indent) {
+        const pad = ' '.repeat(indent);
+        const closePad = ' '.repeat(indent - 2);
+        const entries = Object.entries(obj);
+        if (entries.length === 0)
+            return '{}';
+        const lines = entries.map(([k, v]) => {
+            const key = /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(k) ? k : JSON.stringify(k);
+            return `${pad}${key}: ${JSON.stringify(v)}`;
+        });
+        return `{\n${lines.join(',\n')},\n${closePad}}`;
     }
     /** Extract unique origin URLs (protocol+host) from all HAR entries in all groups. */
     static extractBaseUrls(groups) {
@@ -209,4 +147,3 @@ class ScriptGenerator {
     }
 }
 exports.ScriptGenerator = ScriptGenerator;
-//# sourceMappingURL=ScriptGenerator.js.map

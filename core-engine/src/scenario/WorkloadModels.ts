@@ -16,6 +16,10 @@ export interface K6ExecutorConfig {
   vus?: number;
   duration?: string;
   iterations?: number;
+  rate?: number;
+  timeUnit?: string;
+  preAllocatedVUs?: number;
+  maxVUs?: number;
   exec?: string;
   tags?: Record<string, string>;
   env?: Record<string, string>;
@@ -104,6 +108,54 @@ export function buildIterationProfile(options: {
   };
 }
 
+/** Build a constant arrival-rate profile */
+export function buildConstantArrivalRateProfile(options: {
+  rate: number;
+  duration: string;
+  preAllocatedVUs: number;
+  timeUnit?: string;
+  maxVUs?: number;
+}): GlobalLoadProfile {
+  return {
+    executor: 'constant-arrival-rate',
+    rate: options.rate,
+    duration: options.duration,
+    preAllocatedVUs: options.preAllocatedVUs,
+    timeUnit: options.timeUnit ?? '1s',
+    maxVUs: options.maxVUs,
+  };
+}
+
+/** Build a ramping arrival-rate profile */
+export function buildRampingArrivalRateProfile(options: {
+  stages: LoadStage[];
+  preAllocatedVUs: number;
+  timeUnit?: string;
+  maxVUs?: number;
+}): GlobalLoadProfile {
+  return {
+    executor: 'ramping-arrival-rate',
+    stages: options.stages,
+    preAllocatedVUs: options.preAllocatedVUs,
+    timeUnit: options.timeUnit ?? '1s',
+    maxVUs: options.maxVUs,
+  };
+}
+
+/** Build an externally-controlled profile */
+export function buildExternallyControlledProfile(options: {
+  maxVUs: number;
+  vus?: number;
+  duration?: string;
+}): GlobalLoadProfile {
+  return {
+    executor: 'externally-controlled',
+    maxVUs: options.maxVUs,
+    vus: options.vus ?? 0,
+    duration: options.duration ?? '0',
+  };
+}
+
 /** Translate a GlobalLoadProfile into a k6 executor config block */
 export function toK6ExecutorConfig(profile: GlobalLoadProfile): K6ExecutorConfig {
   return {
@@ -113,5 +165,9 @@ export function toK6ExecutorConfig(profile: GlobalLoadProfile): K6ExecutorConfig
     vus: profile.vus,
     duration: profile.duration,
     iterations: profile.iterations,
+    rate: profile.rate,
+    timeUnit: profile.timeUnit,
+    preAllocatedVUs: profile.preAllocatedVUs,
+    maxVUs: profile.maxVUs,
   };
 }

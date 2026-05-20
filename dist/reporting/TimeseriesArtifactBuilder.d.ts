@@ -23,4 +23,3 @@ export declare class TimeseriesArtifactBuilder {
     private static asNumber;
 }
 export {};
-//# sourceMappingURL=TimeseriesArtifactBuilder.d.ts.map

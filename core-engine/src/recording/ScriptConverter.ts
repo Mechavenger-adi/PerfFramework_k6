@@ -41,12 +41,8 @@ export class ScriptConverter {
       return this.applyPhaseContract(source, teamName, lifecycle); // already converted
     }
 
-    const hasTransactionImport = /import\s+\{[^}]*initTransactions[^}]*\}/.test(source);
     const hasTrendImport = /import\s+\{[^}]*Trend[^}]*\}/.test(source);
-    const hasLogReplayExchange = /import\s+\{[^}]*logReplayExchange[^}]*\}/.test(source);
 
-    // Collect group names from `group('name', ...)` calls
-    const groupNames = this.extractGroupNames(source);
     const detectedBaseUrls = this.extractBaseUrlsFromSource(source);
     const primaryBaseUrl = detectedBaseUrls[0];
 
@@ -131,7 +127,7 @@ export class ScriptConverter {
 
     let i = 0;
     // Phase 1: Emit imports
-    const importBlock = this.buildImportBlock(source, hasTransactionImport, hasLogReplayExchange);
+    const importBlock = this.buildImportBlock(source, false, false);
     result.push(importBlock);
     result.push(`\nconst env = getEnvContext('${teamName}', ${primaryBaseUrl ? `'${primaryBaseUrl}'` : 'undefined'});`);
     result.push(`registerBaseUrl(env.baseUrl);`);
@@ -142,14 +138,8 @@ export class ScriptConverter {
     // Skip original import lines and Trend declarations
     const importEndIndex = this.findImportBlockEnd(lines);
 
-    // Emit initTransactions if not already present
-    if (!hasTransactionImport && groupNames.length > 0) {
-      const sanitizedNames = groupNames.map((n) => this.sanitizeTransactionName(n));
-      result.push('');
-      result.push(
-        `initTransactions(${this.formatTransactionArray(sanitizedNames)});`,
-      );
-    }
+    // Transaction names are auto-registered via K6_PERF_TRANSACTION_NAMES env var injected
+    // by the framework at run time — no initTransactions() call needed in generated scripts.
 
     // Phase 2: Process body
     i = importEndIndex;
@@ -188,8 +178,8 @@ export class ScriptConverter {
         continue;
       }
 
-      // Skip existing initTransactions line when we already emitted a replacement
-      if (/^\s*initTransactions\s*\(/.test(line) && !hasTransactionImport) {
+      // Skip any existing initTransactions() call — no longer emitted in new format
+      if (/^\s*initTransactions\s*\(/.test(line)) {
         // Skip potentially multi-line initTransactions call
         let depth = 0;
         for (let j = i; j < lines.length; j++) {
@@ -222,18 +212,16 @@ export class ScriptConverter {
         continue;
       }
 
-      // Detect group start
+      // Detect group start → emit transaction() wrapper
       const groupMatch = line.match(/^(\s*)group\s*\(\s*['"`]([^'"`]+)['"`]/);
       if (groupMatch && !insideGroup) {
         // Inject variable tracking calls before the first group
         if (!paramTrackInjected && (dataRowTracking.size > 0 || paramTracking.length > 0)) {
           paramTrackInjected = true;
           const pIndent = groupMatch[1] || '  ';
-          // trackDataRow for each unique FILES reference (auto-registers all CSV columns)
           for (const [fileName, expr] of dataRowTracking) {
             result.push(`${pIndent}trackDataRow("${fileName}", ${expr});`);
           }
-          // trackParameter for non-FILES expressions
           for (const pt of paramTracking) {
             result.push(`${pIndent}trackParameter("${pt.paramName}", ${pt.expression}, "expression");`);
           }
@@ -247,38 +235,20 @@ export class ScriptConverter {
         lastResponseResName = '';
         pendingParams = null;
         pendingUrl = null;
-        // Count braces on this line to track depth
-        groupBraceDepth = 0;
-        for (const ch of line) {
-          if (ch === '{') groupBraceDepth++;
-          if (ch === '}') groupBraceDepth--;
+
+        // Skip original group(...) lines until we pass the opening { of the group body
+        let braceLineIdx = i;
+        while (braceLineIdx < lines.length && !lines[braceLineIdx].includes('{')) {
+          braceLineIdx++;
         }
+        i = braceLineIdx + 1;
 
-        result.push(line);
+        // Emit transaction() wrapper instead of group() + startTransaction()
+        const groupIndent = groupMatch[1];
+        const sanitizedName = this.sanitizeTransactionName(currentGroupName);
+        result.push(`${groupIndent}transaction('${sanitizedName}', () => {`);
+        groupBraceDepth = 1; // the transaction body { is now open
 
-        // If no transaction wrappers, inject startTransaction after group opening
-        if (!hasTransactionImport) {
-          // Find the opening brace line
-          let braceLineIdx = i;
-          while (braceLineIdx < lines.length && !lines[braceLineIdx].includes('{')) {
-            braceLineIdx++;
-          }
-          // Emit lines up to and including the brace line if different from i
-          while (i < braceLineIdx) {
-            i++;
-            result.push(lines[i]);
-            for (const ch of lines[i]) {
-              if (ch === '{') groupBraceDepth++;
-              if (ch === '}') groupBraceDepth--;
-            }
-          }
-          // Use group indent + standard nesting for the body
-          const groupIndent = groupMatch[1];
-          const bodyIndent = groupIndent + '  ';
-          result.push(`${bodyIndent}startTransaction('${this.sanitizeTransactionName(currentGroupName)}');`);
-        }
-
-        i++;
         continue;
       }
 
@@ -348,7 +318,6 @@ export class ScriptConverter {
           }
         }
 
-        const reqName = `request_${requestCounter}`;
         const resName = `res_${requestCounter}`;
 
         // Always use sequential global ID
@@ -360,35 +329,22 @@ export class ScriptConverter {
         // Resolve params: prefer buffered pendingParams (inline object), then parsed
         const resolvedParams = pendingParams || params;
 
-        const reqDef = this.buildRequestDefString(
-          reqName,
-          entryId,
-          currentGroupName,
-          method,
-          resolvedUrl,
-          body,
-          resolvedParams,
-          indent,
-          primaryBaseUrl,
-        );
-
-        result.push(`${indent}const ${reqName} = ${reqDef};`);
-
         // Reset buffers
         pendingParams = null;
         pendingUrl = null;
 
-        // Emit the HTTP call using request def
-        const httpCall = this.buildHttpCallString(
+        // Emit request() call — resolves URL, sanitizes headers, emits snapshots on failure
+        const requestCall = this.buildRequestCallString(
           method,
-          reqName,
+          resolvedUrl,
+          body,
+          resolvedParams,
+          entryId,
           resName,
           indent,
+          primaryBaseUrl,
         );
-        result.push(httpCall);
-
-        // Emit logExchange
-        result.push(`${indent}logExchange(${reqName}, ${resName});`);
+        result.push(requestCall);
 
         // Track response variable mapping for renaming later references
         if (varName) {
@@ -432,18 +388,14 @@ export class ScriptConverter {
           if (ch === '}') groupBraceDepth--;
         }
 
-        // Group closed when depth reaches 0
+        // Group closed when depth reaches 0 — close the transaction() arrow function
         if (groupBraceDepth <= 0) {
-          if (!hasTransactionImport && currentGroupName) {
-            const groupIndent = this.getLeadingWhitespace(line);
-            const bodyIndent = groupIndent + '  ';
-            result.push(`${bodyIndent}endTransaction('${this.sanitizeTransactionName(currentGroupName)}');`);
-          }
           insideGroup = false;
           currentGroupName = '';
           pendingParams = null;
           pendingUrl = null;
-          result.push(line);
+          const groupIndent = this.getLeadingWhitespace(line);
+          result.push(`${groupIndent}});`);
           i++;
           continue;
         }
@@ -487,49 +439,35 @@ export class ScriptConverter {
 
   private static buildImportBlock(
     source: string,
-    hasTransactionImport: boolean,
-    hasLogReplayExchange: boolean,
+    _hasTransactionImport: boolean,
+    _hasLogReplayExchange: boolean,
   ): string {
     const lines: string[] = [];
 
-    // Always keep http and check/sleep/group
-    lines.push(`import http from 'k6/http';`);
-    lines.push(`import { check, sleep, group } from 'k6';`);
-
-    // Transaction utils
-    if (!hasTransactionImport) {
-      lines.push(
-        `import { initTransactions, startTransaction, endTransaction } from '../../../dist/utils/transaction.js';`,
-      );
-    } else {
-      // Keep existing transaction import as-is
-      const txnImport = source
-        .split('\n')
-        .find((l) => /import\s+\{[^}]*initTransactions/.test(l));
-      if (txnImport) lines.push(txnImport.trim());
-    }
-
-    // logExchange + trackCorrelation + trackParameter + trackDataRow
+    lines.push(`import { check, sleep } from 'k6';`);
+    lines.push(`import { transaction } from '../../../core-engine/src/utils/transaction.js';`);
+    lines.push(`import { request } from '../../../core-engine/src/utils/request.js';`);
+    // trackCorrelation / trackParameter / trackDataRow still needed for correlation/data tracking
     lines.push(
-      `import { logExchange, trackCorrelation, trackParameter, trackDataRow } from '../../../dist/utils/replayLogger.js';`,
+      `import { trackCorrelation, trackParameter, trackDataRow } from '../../../core-engine/src/utils/replayLogger.js';`,
     );
     lines.push(
-      `import { createJourneyLifecycleStore, runJourneyLifecycle, thinktime } from '../../../dist/utils/lifecycle.js';`,
+      `import { createJourneyLifecycleStore, runJourneyLifecycle, thinktime } from '../../../core-engine/src/utils/lifecycle.js';`,
     );
     lines.push(
-      `import { clearCookies, registerBaseUrl, getEnvContext } from '../../../dist/utils/session.js';`,
+      `import { clearCookies, registerBaseUrl, getEnvContext } from '../../../core-engine/src/utils/session.js';`,
     );
 
-    // Preserve any other imports (CorrelationEngine, RuleProcessor, etc.)
+    // Preserve any other imports from the original source (CorrelationEngine, RuleProcessor, etc.)
     const srcLines = source.split('\n');
     for (const srcLine of srcLines) {
       if (!/^\s*import\s/.test(srcLine)) continue;
-      // Skip standard imports we already handle
-      if (/from\s+['"]k6\/http['"]/.test(srcLine)) continue;
-      if (/from\s+['"]k6['"]/.test(srcLine)) continue;
-      if (/from\s+['"]k6\/metrics['"]/.test(srcLine)) continue;
-      if (/initTransactions|startTransaction|endTransaction/.test(srcLine)) continue;
+      if (/from\s+['"]k6(\/http|\/metrics)?['"]/.test(srcLine)) continue;
+      if (/initTransactions|startTransaction|endTransaction|transaction/.test(srcLine)) continue;
       if (/logExchange|logReplayExchange|replayLogger/.test(srcLine)) continue;
+      if (/lifecycle\.js/.test(srcLine)) continue;
+      if (/session\.js/.test(srcLine)) continue;
+      if (/request\.js/.test(srcLine)) continue;
       lines.push(srcLine.trim());
     }
 
@@ -693,78 +631,48 @@ export class ScriptConverter {
   }
 
 
-  private static buildRequestDefString(
-    _reqName: string,
-    id: string,
-    transaction: string,
+  /**
+   * Build a `request()` call string using the framework helper.
+   * Replaces the old request-def + http.* + logExchange pattern.
+   */
+  private static buildRequestCallString(
     method: string,
     url: string,
     body: string | null,
     paramsStr: string | null,
+    entryId: string,
+    resName: string,
     indent: string,
     primaryBaseUrl?: string,
   ): string {
     const inner = indent + '  ';
-    const innerInner = indent + '    ';
-    const innerInnerInner = indent + '      ';
     const m = method === 'DEL' ? 'DELETE' : method;
-    const sanitizedTxn = this.sanitizeTransactionName(transaction);
+    const resolvedUrl = this.toRuntimeUrlExpression(url, primaryBaseUrl);
 
-    let s = '{\n';
-    s += `${inner}id: ${JSON.stringify(id)},\n`;
-    s += `${inner}transaction: ${JSON.stringify(sanitizedTxn)},\n`;
-    s += `${inner}recordingStartedAt: new Date().toISOString(),\n`;
-    s += `${inner}method: ${JSON.stringify(m)},\n`;
-    s += `${inner}url: ${this.toRuntimeUrlExpression(url, primaryBaseUrl)},\n`;
+    let s = `${indent}const ${resName} = request('${m}', ${resolvedUrl}, {\n`;
 
-    // Body
-    if (!body || body === 'null' || body === 'undefined') {
-      s += `${inner}body: null,\n`;
-    } else {
-      s += `${inner}body: ${body},\n`;
-    }
-
-    // Params — always inline with headers, redirects: 0, and tags
-    s += `${inner}params: {\n`;
-
+    // Headers — extract from paramsStr if present
     if (paramsStr && paramsStr !== 'null' && paramsStr !== 'undefined') {
       const isVarRef = /^[a-zA-Z_$]\w*$/.test(paramsStr.trim());
       if (isVarRef) {
-        // Spread a variable reference — fallback case
-        s += `${innerInner}...${paramsStr.trim()},\n`;
+        s += `${inner}headers: ${paramsStr.trim()}.headers,\n`;
       } else {
-        // Inline object — extract headers
         const headersContent = this.extractObjectProperty(paramsStr, 'headers');
         if (headersContent) {
-          s += `${innerInner}headers: ${this.reindent(headersContent, innerInner)},\n`;
+          s += `${inner}headers: ${this.reindent(headersContent, inner)},\n`;
         }
       }
     }
 
-    // Cookies — preserve from source or default to empty object
-    if (paramsStr && paramsStr !== 'null' && paramsStr !== 'undefined') {
-      const cookiesContent = this.extractObjectProperty(paramsStr, 'cookies');
-      if (cookiesContent) {
-        s += `${innerInner}cookies: ${this.reindent(cookiesContent, innerInner)},\n`;
-      } else {
-        s += `${innerInner}cookies: {},\n`;
-      }
-    } else {
-      s += `${innerInner}cookies: {},\n`;
+    // Body
+    if (body && body !== 'null' && body !== 'undefined') {
+      s += `${inner}body: ${body},\n`;
     }
 
-    // Always emit redirects: 0
-    s += `${innerInner}redirects: 0,\n`;
+    // Replay metadata for debug diff tracing
+    s += `${inner}replay: { harEntryId: ${JSON.stringify(entryId)}, recordingStartedAt: 'converted' },\n`;
 
-    // Tags
-    s += `${innerInner}tags: {\n`;
-    s += `${innerInnerInner}transaction: ${JSON.stringify(sanitizedTxn)},\n`;
-    s += `${innerInnerInner}har_entry_id: ${JSON.stringify(id)},\n`;
-    s += `${innerInnerInner}recording_started_at: "converted"\n`;
-    s += `${innerInner}}\n`;
-    s += `${inner}}\n`;
-    s += `${indent}}`;
-
+    s += `${indent}});`;
     return s;
   }
 
@@ -815,24 +723,6 @@ export class ScriptConverter {
       .join('\n');
   }
 
-  private static buildHttpCallString(
-    method: string,
-    reqName: string,
-    resName: string,
-    indent: string,
-  ): string {
-    const m = method === 'DEL' ? 'del' : method.toLowerCase();
-    if (method === 'GET') {
-      return `${indent}const ${resName} = http.get(${reqName}.url, ${reqName}.params);`;
-    } else if (['POST', 'PUT', 'PATCH'].includes(method)) {
-      return `${indent}const ${resName} = http.${m}(${reqName}.url, ${reqName}.body, ${reqName}.params);`;
-    } else if (method === 'DEL' || method === 'DELETE') {
-      return `${indent}const ${resName} = http.del(${reqName}.url, null, ${reqName}.params);`;
-    } else {
-      return `${indent}const ${resName} = http.request(${reqName}.method, ${reqName}.url, ${reqName}.body, ${reqName}.params);`;
-    }
-  }
-
   private static isTrendAddLine(line: string, trendVarNames: Set<string>): boolean {
     if (trendVarNames.size === 0) return false;
     const pattern = new RegExp(
@@ -844,14 +734,6 @@ export class ScriptConverter {
   private static getLeadingWhitespace(line: string): string {
     const match = line.match(/^(\s*)/);
     return match ? match[1] : '';
-  }
-
-  private static formatTransactionArray(names: string[]): string {
-    if (names.length <= 3) {
-      return `[${names.map((n) => JSON.stringify(n)).join(', ')}]`;
-    }
-    const items = names.map((n) => `  ${JSON.stringify(n)}`);
-    return `[\n${items.join(',\n')}\n]`;
   }
 
   /**
@@ -869,31 +751,38 @@ export class ScriptConverter {
   }
 
   private static applyPhaseContract(source: string, teamName: string, lifecycle?: LifecycleSelection): string {
-    // Match both `export default function () {` and `export default function() {`
-    const markerMatch = source.match(/export\s+default\s+function\s*\(\s*\)\s*\{/);
+    // Normalize stale patterns before phase splitting
+    let cleaned = source;
+    cleaned = cleaned.replace(/^\s*variableEvents:\s*\[\],?\n/gm, '');
+    cleaned = cleaned.replace(
+      /from\s+['"](\.\.\/)+(dist\/utils\/)/g,
+      `from '../../../core-engine/src/utils/`,
+    );
+
+    const markerMatch = cleaned.match(/export\s+default\s+function\s*\(\s*\)\s*\{/);
     if (!markerMatch) {
-      return source;
+      return cleaned;
     }
     const defaultStart = markerMatch.index!;
 
-    const bodyStart = source.indexOf('{', defaultStart);
-    const bodyEnd = this.findMatchingBrace(source, bodyStart);
+    const bodyStart = cleaned.indexOf('{', defaultStart);
+    const bodyEnd = this.findMatchingBrace(cleaned, bodyStart);
     if (bodyStart === -1 || bodyEnd === -1) {
-      return source;
+      return cleaned;
     }
 
-    let beforeDefault = source.slice(0, defaultStart);
-    const defaultBody = source.slice(bodyStart + 1, bodyEnd);
-    const afterDefault = source.slice(bodyEnd + 1);
+    let beforeDefault = cleaned.slice(0, defaultStart);
+    const defaultBody = cleaned.slice(bodyStart + 1, bodyEnd);
+    const afterDefault = cleaned.slice(bodyEnd + 1);
     const statements = this.splitTopLevelStatements(defaultBody);
     const grouped = this.partitionLifecycleStatements(statements, lifecycle ?? { initGroups: [], endGroups: [] });
 
     if (!/createJourneyLifecycleStore/.test(beforeDefault)) {
-      beforeDefault += `\nimport { createJourneyLifecycleStore, runJourneyLifecycle } from '../../../dist/utils/lifecycle.js';\n`;
+      beforeDefault += `\nimport { createJourneyLifecycleStore, runJourneyLifecycle } from '../../../core-engine/src/utils/lifecycle.js';\n`;
     }
 
-    // Extract and register base URLs from the source script
-    const baseUrls = this.extractBaseUrlsFromSource(source);
+    // Extract and register base URLs from the cleaned script
+    const baseUrls = this.extractBaseUrlsFromSource(cleaned);
     const primaryBaseUrl = baseUrls[0];
     const registerBlock = `const env = getEnvContext('${teamName}', ${primaryBaseUrl ? `'${primaryBaseUrl}'` : 'undefined'});\nregisterBaseUrl(env.baseUrl);`;
 
@@ -1093,7 +982,7 @@ export class ScriptConverter {
   }
 
   private static extractGroupName(statement: string): string | null {
-    const match = statement.match(/group\s*\(\s*['"`]([^'"`]+)['"`]/);
+    const match = statement.match(/(?:group|transaction)\s*\(\s*['"`]([^'"`]+)['"`]/);
     return match ? match[1] : null;
   }
 

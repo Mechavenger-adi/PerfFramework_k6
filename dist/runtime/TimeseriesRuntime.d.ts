@@ -14,4 +14,3 @@ export declare class TimeseriesRuntime {
     addEvent(ts: string, type: string, severity: 'error' | 'warning', transaction?: string): void;
     build(endTime: string): TimeSeriesFile;
 }
-//# sourceMappingURL=TimeseriesRuntime.d.ts.map

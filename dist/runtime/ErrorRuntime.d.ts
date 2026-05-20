@@ -27,4 +27,3 @@ export declare class ErrorRuntime {
     }): ErrorEvent;
     static buildWarningEvent(runId: string, type: string, message: string, extras?: Partial<WarningEvent>): WarningEvent;
 }
-//# sourceMappingURL=ErrorRuntime.d.ts.map

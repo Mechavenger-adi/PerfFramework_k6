@@ -177,4 +177,3 @@ class RecordingLogResolver {
 }
 exports.RecordingLogResolver = RecordingLogResolver;
 RecordingLogResolver.REGISTRY_FILE = '.recording-index.json';
-//# sourceMappingURL=RecordingLogResolver.js.map

@@ -2,7 +2,7 @@ import http from 'k6/http';
 import { check, sleep, group } from 'k6';
 import { initTransactions, startTransaction, endTransaction } from '../../../dist/utils/transaction.js';
 import { logExchange, trackCorrelation, trackParameter, trackDataRow } from '../../../dist/utils/replayLogger.js';
-import { createJourneyLifecycleStore, runJourneyLifecycle } from '../../../dist/utils/lifecycle.js';
+import { createJourneyLifecycleStore, runJourneyLifecycle, thinktime } from '../../../dist/utils/lifecycle.js';
 import { clearCookies, registerBaseUrl, getEnvContext } from '../../../dist/utils/session.js';
 import execution from "k6/execution";
 import csv from "k6/experimental/csv";
@@ -35,6 +35,8 @@ function getUniqueItem(array) {
   return array[execution.scenario.iterationInTest % array.length];
 }
 
+const env = getEnvContext('Jpet_new', 'https://jpetstore.aspectran.com/');
+registerBaseUrl(env.baseUrl);
 
 const __journeyLifecycleStore = createJourneyLifecycleStore();
 
@@ -44,15 +46,6 @@ export function initPhase(ctx) {
   const correlation_vars = ctx.correlation;
   trackDataRow("userdetails", getUniqueItem(FILES["userdetails"]));
   trackDataRow("pet", getUniqueItem(FILES["pet"]));
-  sleep(1);
-  sleep(1);
-  sleep(1);
-  sleep(1);
-  sleep(1);
-  sleep(1);
-  sleep(1);
-  sleep(1);
-  sleep(1);
 
   group("t01_launch", function () {
       startTransaction('t01_launch');
@@ -94,6 +87,8 @@ export function initPhase(ctx) {
       check(res_1, { "status equals 200": (r) => r.status === 200 });
       endTransaction('t01_launch');
     });
+
+  thinktime(1);
 
   group("t02_login", function () {
       startTransaction('t02_login');
@@ -258,21 +253,14 @@ export function initPhase(ctx) {
       endTransaction('t02_login');
     });
 
+  thinktime(1);
+
 }
 
 export function actionPhase(ctx) {
   const correlation_vars = ctx.correlation;
   let match;
   let regex;
-  sleep(1);
-  sleep(1);
-  sleep(1);
-  sleep(1);
-  sleep(1);
-  sleep(1);
-  sleep(1);
-  sleep(1);
-  sleep(1);
 
   group("search_animal", function () {
       startTransaction('search_animal');
@@ -321,6 +309,8 @@ export function actionPhase(ctx) {
       }
       endTransaction('search_animal');
     });
+
+  thinktime(1);
 
   group("select product", function () {
       startTransaction('select_product');
@@ -402,6 +392,8 @@ export function actionPhase(ctx) {
       check(res_2, { "status equals 200": (r) => r.status === 200 });
       endTransaction('select_product');
     });
+
+  thinktime(1);
 
   group("add to cart", function () {
       startTransaction('add_to_cart');
@@ -521,6 +513,8 @@ export function actionPhase(ctx) {
       check(res_3, { "status equals 200": (r) => r.status === 200 });
       endTransaction('add_to_cart');
     });
+
+  thinktime(1);
 
   group("increase quantity to 2 and proceed to checkout", function () {
       startTransaction('increase_quantity_to_2_and_proceed_to_checkout');
@@ -644,6 +638,8 @@ export function actionPhase(ctx) {
       endTransaction('increase_quantity_to_2_and_proceed_to_checkout');
     });
 
+  thinktime(1);
+
   group("click continue", function () {
       startTransaction('click_continue');
   
@@ -690,6 +686,8 @@ export function actionPhase(ctx) {
       check(res_1, { "status equals 200": (r) => r.status === 200 });
       endTransaction('click_continue');
     });
+
+  thinktime(1);
 
   group("click confirm", function () {
       startTransaction('click_confirm');
@@ -780,6 +778,8 @@ export function actionPhase(ctx) {
       check(res_2, { "status equals 200": (r) => r.status === 200 });
       endTransaction('click_confirm');
     });
+
+  thinktime(1);
 
 }
 
@@ -906,6 +906,8 @@ export function endPhase(ctx) {
       check(res_3, { "status equals 200": (r) => r.status === 200 });
       endTransaction('logout');
     });
+
+  thinktime(1);
 
 }
 

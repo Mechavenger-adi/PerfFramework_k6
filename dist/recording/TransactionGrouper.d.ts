@@ -10,4 +10,3 @@ export declare class TransactionGrouper {
      */
     static group(entries: HAREntry[]): TransactionGroup[];
 }
-//# sourceMappingURL=TransactionGrouper.d.ts.map

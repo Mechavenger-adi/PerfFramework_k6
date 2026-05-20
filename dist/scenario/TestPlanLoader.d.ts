@@ -13,4 +13,3 @@ export declare class TestPlanLoader {
      */
     load(planFilePath: string): TestPlan;
 }
-//# sourceMappingURL=TestPlanLoader.d.ts.map

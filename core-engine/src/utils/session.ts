@@ -6,6 +6,9 @@ declare const __ENV: Record<string, string | undefined>;
 // Registry of base URLs seen by this VU — used by clearCookies() to clear all.
 const _registeredUrls = new Set<string>();
 
+// The first URL registered (primary base URL) — used by resolvePath() when no env var is set.
+let _primaryBaseUrl: string | undefined;
+
 interface ResolveFrameworkUrlOptions {
   fallbackBaseUrl?: string;
   service?: string;
@@ -105,7 +108,49 @@ function getFrameworkServiceUrls(): Record<string, string> {
  * @param url - A base URL (e.g., 'https://myapp.example.com/')
  */
 export function registerBaseUrl(url: string): void {
-  if (url) _registeredUrls.add(normalizeBaseUrl(url));
+  if (url) {
+    const normalized = normalizeBaseUrl(url);
+    _registeredUrls.add(normalized);
+    if (!_primaryBaseUrl) {
+      _primaryBaseUrl = normalized;
+    }
+  }
+}
+
+/**
+ * Resolve a relative path or absolute URL to a full URL.
+ *
+ * Resolution priority:
+ * 1. Absolute URLs → returned unchanged
+ * 2. Named service → K6_PERF_SERVICE_URLS[service]
+ * 3. K6_PERF_BASE_URL env var (set by CLI)
+ * 4. First URL registered via registerBaseUrl() (standalone execution fallback)
+ * 5. Path returned as-is if no base is available
+ *
+ * This is the URL resolution contract used by request().
+ */
+export function resolvePath(pathOrUrl: string, service?: string): string {
+  if (!pathOrUrl || isAbsoluteUrl(pathOrUrl)) {
+    return pathOrUrl;
+  }
+
+  if (service) {
+    const serviceUrls = getFrameworkServiceUrls();
+    if (serviceUrls[service]) {
+      return joinBaseAndPath(serviceUrls[service], pathOrUrl);
+    }
+  }
+
+  const envBaseUrl = getFrameworkBaseUrl();
+  if (envBaseUrl) {
+    return joinBaseAndPath(envBaseUrl, pathOrUrl);
+  }
+
+  if (_primaryBaseUrl) {
+    return joinBaseAndPath(_primaryBaseUrl, pathOrUrl);
+  }
+
+  return pathOrUrl;
 }
 
 /**

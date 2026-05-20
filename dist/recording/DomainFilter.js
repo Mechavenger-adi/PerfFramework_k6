@@ -37,4 +37,3 @@ class DomainFilter {
     }
 }
 exports.DomainFilter = DomainFilter;
-//# sourceMappingURL=DomainFilter.js.map
