@@ -56,6 +56,17 @@ class TransactionMetricsBuilder {
             if (!targetKey) {
                 continue;
             }
+            if (targetKey === 'stddev') {
+                // handleSummary.json includes values.stddev (exact population std dev from k6).
+                // Fall back to percentile approximation only when the real value is absent.
+                const realStddev = metric ? this.metricValue(metric, 'stddev') : undefined;
+                const stddev = realStddev !== undefined ? Math.round(realStddev) : this.approximateStddev(metric);
+                if (stddev !== undefined) {
+                    row[stat] = stddev;
+                    row.stddev = stddev;
+                }
+                continue;
+            }
             if (targetKey === 'count')
                 row.count = row.count ?? 0;
             if (targetKey === 'pass')
@@ -88,6 +99,29 @@ class TransactionMetricsBuilder {
             }
         }
         return row;
+    }
+    /**
+     * Approximate standard deviation from percentile data when handleSummary stddev is absent.
+     * Uses normal-distribution relationship p90 = avg + 1.282*σ (or p95 = avg + 1.645*σ).
+     */
+    static approximateStddev(metric) {
+        if (!metric)
+            return undefined;
+        const avg = this.metricValue(metric, 'avg');
+        const p90 = this.metricValue(metric, 'p(90)');
+        const p95 = this.metricValue(metric, 'p(95)');
+        const minVal = this.metricValue(metric, 'min');
+        const maxVal = this.metricValue(metric, 'max');
+        if (avg !== undefined && p90 !== undefined && p90 >= avg) {
+            return Math.round((p90 - avg) / 1.282);
+        }
+        if (avg !== undefined && p95 !== undefined && p95 >= avg) {
+            return Math.round((p95 - avg) / 1.645);
+        }
+        if (minVal !== undefined && maxVal !== undefined && maxVal > minVal) {
+            return Math.round((maxVal - minVal) / 4);
+        }
+        return undefined;
     }
     static collectGroups(rootGroup) {
         if (!rootGroup?.groups) {
@@ -203,6 +237,8 @@ class TransactionMetricsBuilder {
             return 'min';
         if (normalized === 'max')
             return 'max';
+        if (normalized === 'stddev' || normalized === 'std dev' || normalized === 'std_dev' || normalized === 'std')
+            return 'stddev';
         const percentileMatch = normalized.match(/^p\((\d+(?:\.\d+)?)\)$/);
         if (percentileMatch) {
             return `p(${percentileMatch[1]})`;

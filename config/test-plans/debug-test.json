@@ -2,7 +2,7 @@
   "name": "Sample Debug Test",
   "environment": "dev",
   "execution_mode": "parallel",
-    "global_load_profile": {
+  "global_load_profile": {
     "executor": "ramping-vus",
     "startVUs": 0,
     "stages": [
@@ -25,14 +25,14 @@
     "enabled": true,
     "mode": "diff",
     "vus": 1,
-    "iterations": 5,
+    "iterations": 2,
     "reportDir": "results/debug",
     "failOnMissingRecordingLog": false
   },
   "user_journeys": [
     {
-      "name": "buyanimal_1_framework_lifecycle",
-      "scriptPath": "buyanimal_1_framework_lifecycle.js"
+      "name": "buyanimal_converted_20thmay",
+      "scriptPath": "buyanimal_converted_20thmay.js"
     }
   ]
 }

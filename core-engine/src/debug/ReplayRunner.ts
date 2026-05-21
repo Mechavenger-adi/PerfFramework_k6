@@ -9,6 +9,23 @@ import { DiffChecker, DiffResult } from './DiffChecker';
 import { TaggedExchangeLogEntry } from './ExchangeLog';
 import { HTMLDiffReporter } from './HTMLDiffReporter';
 
+/** Extract transaction names declared in a script source via transaction() or startTransaction(). */
+function extractTransactionNames(source: string): string[] {
+  const matches = new Set<string>();
+  const patterns = [
+    /transaction\(\s*(['"`])([^'"`]+)\1\s*,/g,
+    /startTransaction\(\s*(['"`])([^'"`]+)\1\s*\)/g,
+  ];
+  for (const pattern of patterns) {
+    let match: RegExpExecArray | null;
+    while ((match = pattern.exec(source)) !== null) {
+      const name = match[2]?.trim();
+      if (name) matches.add(name);
+    }
+  }
+  return [...matches];
+}
+
 export interface DebugReplayOptions {
   scriptPath: string;
   recordingLogPath?: string;
@@ -17,6 +34,10 @@ export interface DebugReplayOptions {
   vus?: number;
   iterations?: number;
   noCookiesReset?: boolean;
+  /** Team environment configs (scrum_suites from the loaded environment file). */
+  teamEnvironments?: Record<string, unknown>;
+  /** Error behavior for the debug run (continue | stop_iteration | stop_vu | abort_test). Defaults to 'continue'. */
+  errorBehavior?: string;
 }
 
 export interface DebugReplayResult {
@@ -69,9 +90,20 @@ export class ReplayRunner {
       Logger.detail(`Recording log not found, replay-only mode`);
     }
 
-    const execSpinner = createSpinner('Executing k6 debug run');
-    execSpinner.start();
-    const runResult = PipelineRunner.execute({
+    // Scan script for transaction names so metrics are pre-registered in init context.
+    const scriptSource = fs.readFileSync(absScriptPath, 'utf-8');
+    const transactionNames = extractTransactionNames(scriptSource);
+
+    // Set up a log-capture file so replay entries and user console.log can be
+    // extracted after the run, while stderr stays inherited (TTY → progress bar).
+    const tempDir = path.join(process.cwd(), '.k6-temp');
+    fs.mkdirSync(tempDir, { recursive: true });
+    const scriptName = path.basename(absScriptPath, path.extname(absScriptPath));
+    const stamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+    const logOutputPath = path.join(tempDir, `${scriptName}_debug_${stamp}.log`);
+
+    Logger.info(`\nRunning k6 debug execution for: ${scriptName}\n`);
+    const runResult = await PipelineRunner.executeAsync({
       scriptPath: absScriptPath,
       k6Options: {
         noCookiesReset: options.noCookiesReset !== false,
@@ -92,10 +124,24 @@ export class ReplayRunner {
           }
         }
       },
-      env: { K6_PERF_DEBUG: 'true' },
-      captureOutput: true,
+      env: {
+        K6_PERF_DEBUG: 'true',
+        ...(transactionNames.length > 0
+          ? { K6_PERF_TRANSACTION_NAMES: JSON.stringify(transactionNames) }
+          : {}),
+        ...(options.teamEnvironments
+          ? { K6_PERF_TEAM_ENVIRONMENTS: JSON.stringify(options.teamEnvironments) }
+          : {}),
+        K6_PERF_RUNTIME_METADATA: JSON.stringify({
+          errorBehavior: options.errorBehavior ?? 'continue',
+          thinkTime: { ignoreThinkTime: true },
+          pacingEnabled: false,
+          pacingSeconds: 0,
+        }),
+      },
+      logOutputPath,
     });
-    execSpinner.done('k6 debug execution complete');
+    Logger.info(`\nk6 execution complete.\n`);
 
     const extractSpinner = createSpinner('Extracting replay entries');
     extractSpinner.start();
@@ -103,9 +149,10 @@ export class ReplayRunner {
     this.writeJson(absReplayLogPath, replayEntries);
     extractSpinner.done(`Extracted ${replayEntries.length} replay entries`);
 
-    // Extract k6 runtime errors and performance metrics for the HTML report
+    // Extract k6 runtime errors, performance metrics, and console.log lines
     const k6Errors = this.extractK6Errors(runResult);
     const k6Metrics = this.extractK6Metrics(runResult);
+    const consoleLogs = this.extractConsoleLogs(runResult);
 
     if (replayEntries.length === 0) {
       if (runResult.status !== 0) {
@@ -132,16 +179,22 @@ export class ReplayRunner {
     const diffResults = DiffChecker.compareTaggedLogs(recordingEntries, replayEntries, {
       missingRecordingWarning,
     });
-    HTMLDiffReporter.generateReport(diffResults, absHtmlPath, { k6Errors, k6Metrics });
+    HTMLDiffReporter.generateReport(diffResults, absHtmlPath, { k6Errors, k6Metrics, consoleLogs });
     reportSpinner.done('Diff report generated');
     
-    // Print k6 standard output (which contains the metrics summary) to the terminal
-    const stdoutContent = runResult.stdoutPath && fs.existsSync(runResult.stdoutPath) 
-      ? fs.readFileSync(runResult.stdoutPath, 'utf8') 
-      : (runResult.stdout || '');
-    
-    if (stdoutContent) {
-      console.log(`\n${stdoutContent.trim()}\n`);
+    // Print user console.log lines from the script (filter out framework internals)
+    if (consoleLogs.length > 0) {
+      Logger.info(`\n--- Script Console Output ---`);
+      for (const entry of consoleLogs) {
+        Logger.info(entry);
+      }
+      Logger.info(`-----------------------------\n`);
+    }
+
+
+    // Clean up the temp log file now that all parsing is done
+    if (logOutputPath && fs.existsSync(logOutputPath)) {
+      try { fs.rmSync(logOutputPath); } catch { /* ignore */ }
     }
 
     PipelineRunner.ensureSuccess(runResult);
@@ -447,5 +500,48 @@ export class ReplayRunner {
   private static defaultReplayLogPath(htmlPath: string): string {
     const parsed = path.parse(htmlPath);
     return path.join(parsed.dir, `${parsed.name}.replay-log.json`);
+  }
+
+  /**
+   * Extract user console.log / console.info / console.warn messages from k6 output.
+   * k6 emits these as logfmt lines: level=info msg="..." source=console
+   * Excludes internal framework prefixes like [k6-perf] and [replay-log].
+   */
+  private static extractConsoleLogs(runResult: { stdout?: string; stderr?: string; stdoutPath?: string; stderrPath?: string }): string[] {
+    const logs: string[] = [];
+
+    const processLine = (line: string) => {
+      const consoleMatch = line.match(/level=(info|warn|debug)\s+msg="((?:\\.|[^"])*)"\s+source=console/);
+      if (!consoleMatch) return;
+
+      let msg: string;
+      try {
+        msg = JSON.parse(`"${consoleMatch[2]}"`) as string;
+      } catch {
+        msg = consoleMatch[2].replace(/\\"/g, '"');
+      }
+
+      // Skip internal framework lines
+      if (msg.startsWith('[k6-perf]') || msg.includes('[replay-log]') || msg.includes('[snapshot-event]')) return;
+
+      const level = consoleMatch[1].toUpperCase();
+      logs.push(`[${level}] ${msg}`);
+    };
+
+    const processText = (text?: string) => {
+      if (!text) return;
+      text.split(/\r?\n/).forEach(processLine);
+    };
+
+    processText(runResult.stdout);
+    processText(runResult.stderr);
+    if (runResult.stdoutPath && fs.existsSync(runResult.stdoutPath)) {
+      processText(fs.readFileSync(runResult.stdoutPath, 'utf-8'));
+    }
+    if (runResult.stderrPath && fs.existsSync(runResult.stderrPath)) {
+      processText(fs.readFileSync(runResult.stderrPath, 'utf-8'));
+    }
+
+    return logs;
   }
 }

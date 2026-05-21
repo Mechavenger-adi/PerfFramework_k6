@@ -14,9 +14,19 @@
     "maxRedirects": 10,
     "throwOnError": true
   },
-  "errorBehavior": "stop_iteration",
+  "errorBehavior": "continue",
   "reporting": {
-    "transactionStats": ["count", "pass", "fail", "avg", "min", "max", "p(90)", "p(97)","std"],
+    "transactionStats": [
+      "count",
+      "pass",
+      "fail",
+      "avg",
+      "min",
+      "max",
+      "std",
+      "p(90)",
+      "p(99)"
+    ],
     "includeTransactionTable": true,
     "includeErrorTable": true,
     "timeseries": {
@@ -38,5 +48,5 @@
     "memoryWarningPercent": 80,
     "sampleIntervalSeconds": 30
   },
-  "debugMode": true
+  "debugMode": false
 }

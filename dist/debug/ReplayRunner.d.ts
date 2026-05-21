@@ -7,6 +7,10 @@ export interface DebugReplayOptions {
     vus?: number;
     iterations?: number;
     noCookiesReset?: boolean;
+    /** Team environment configs (scrum_suites from the loaded environment file). */
+    teamEnvironments?: Record<string, unknown>;
+    /** Error behavior for the debug run (continue | stop_iteration | stop_vu | abort_test). Defaults to 'continue'. */
+    errorBehavior?: string;
 }
 export interface DebugReplayResult {
     htmlReportPath: string;
@@ -81,4 +85,10 @@ export declare class ReplayRunner {
      */
     private static extractK6Metrics;
     private static defaultReplayLogPath;
+    /**
+     * Extract user console.log / console.info / console.warn messages from k6 output.
+     * k6 emits these as logfmt lines: level=info msg="..." source=console
+     * Excludes internal framework prefixes like [k6-perf] and [replay-log].
+     */
+    private static extractConsoleLogs;
 }

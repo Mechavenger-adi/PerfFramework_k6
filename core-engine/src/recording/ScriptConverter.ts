@@ -50,6 +50,7 @@ export class ScriptConverter {
     const result: string[] = [];
     let requestCounter = 0;
     let globalRequestId = 0;
+    // Note: globalRequestId is script-wide so IDs are req_1…req_N across all phases
     let currentGroupName = '';
     let insideGroup = false;
     let groupBraceDepth = 0;
@@ -129,11 +130,7 @@ export class ScriptConverter {
     // Phase 1: Emit imports
     const importBlock = this.buildImportBlock(source, false, false);
     result.push(importBlock);
-    result.push(`\nconst env = getEnvContext('${teamName}', ${primaryBaseUrl ? `'${primaryBaseUrl}'` : 'undefined'});`);
-    result.push(`registerBaseUrl(env.baseUrl);`);
-    for (let j = 1; j < detectedBaseUrls.length; j++) {
-      result.push(`registerBaseUrl('${detectedBaseUrls[j]}');`);
-    }
+    result.push(`\nconst env = getEnvContext('${teamName}', ${primaryBaseUrl ? `{ baseUrl: '${primaryBaseUrl}' }` : 'undefined'});`);
 
     // Skip original import lines and Trend declarations
     const importEndIndex = this.findImportBlockEnd(lines);
@@ -246,7 +243,7 @@ export class ScriptConverter {
         // Emit transaction() wrapper instead of group() + startTransaction()
         const groupIndent = groupMatch[1];
         const sanitizedName = this.sanitizeTransactionName(currentGroupName);
-        result.push(`${groupIndent}transaction('${sanitizedName}', () => {`);
+        result.push(`${groupIndent}transaction('${sanitizedName}', function() {`);
         groupBraceDepth = 1; // the transaction body { is now open
 
         continue;
@@ -444,18 +441,18 @@ export class ScriptConverter {
   ): string {
     const lines: string[] = [];
 
-    lines.push(`import { check, sleep } from 'k6';`);
-    lines.push(`import { transaction } from '../../../core-engine/src/utils/transaction.js';`);
-    lines.push(`import { request } from '../../../core-engine/src/utils/request.js';`);
+    lines.push(`import { sleep } from 'k6';`);
+    lines.push(`import { transaction, check } from '../../../dist/utils/transaction.js';`);
+    lines.push(`import { request } from '../../../dist/utils/request.js';`);
     // trackCorrelation / trackParameter / trackDataRow still needed for correlation/data tracking
     lines.push(
-      `import { trackCorrelation, trackParameter, trackDataRow } from '../../../core-engine/src/utils/replayLogger.js';`,
+      `import { trackCorrelation, trackParameter, trackDataRow } from '../../../dist/utils/replayLogger.js';`,
     );
     lines.push(
-      `import { createJourneyLifecycleStore, runJourneyLifecycle, thinktime } from '../../../core-engine/src/utils/lifecycle.js';`,
+      `import { createJourneyLifecycleStore, runJourneyLifecycle, thinktime } from '../../../dist/utils/lifecycle.js';`,
     );
     lines.push(
-      `import { clearCookies, registerBaseUrl, getEnvContext } from '../../../core-engine/src/utils/session.js';`,
+      `import { clearCookies, getEnvContext } from '../../../dist/utils/session.js';`,
     );
 
     // Preserve any other imports from the original source (CorrelationEngine, RuleProcessor, etc.)
@@ -466,7 +463,7 @@ export class ScriptConverter {
       if (/initTransactions|startTransaction|endTransaction|transaction/.test(srcLine)) continue;
       if (/logExchange|logReplayExchange|replayLogger/.test(srcLine)) continue;
       if (/lifecycle\.js/.test(srcLine)) continue;
-      if (/session\.js/.test(srcLine)) continue;
+      if (/session\.js|registerBaseUrl/.test(srcLine)) continue;
       if (/request\.js/.test(srcLine)) continue;
       lines.push(srcLine.trim());
     }
@@ -670,7 +667,7 @@ export class ScriptConverter {
     }
 
     // Replay metadata for debug diff tracing
-    s += `${inner}replay: { harEntryId: ${JSON.stringify(entryId)}, recordingStartedAt: 'converted' },\n`;
+    s += `${inner}replay: { id: ${JSON.stringify(entryId)}, recordingStartedAt: 'converted' },\n`;
 
     s += `${indent}});`;
     return s;
@@ -756,7 +753,7 @@ export class ScriptConverter {
     cleaned = cleaned.replace(/^\s*variableEvents:\s*\[\],?\n/gm, '');
     cleaned = cleaned.replace(
       /from\s+['"](\.\.\/)+(dist\/utils\/)/g,
-      `from '../../../core-engine/src/utils/`,
+      `from '../../../dist/utils/`,
     );
 
     const markerMatch = cleaned.match(/export\s+default\s+function\s*\(\s*\)\s*\{/);
@@ -778,16 +775,22 @@ export class ScriptConverter {
     const grouped = this.partitionLifecycleStatements(statements, lifecycle ?? { initGroups: [], endGroups: [] });
 
     if (!/createJourneyLifecycleStore/.test(beforeDefault)) {
-      beforeDefault += `\nimport { createJourneyLifecycleStore, runJourneyLifecycle } from '../../../core-engine/src/utils/lifecycle.js';\n`;
+      beforeDefault += `\nimport { createJourneyLifecycleStore, runJourneyLifecycle } from '../../../dist/utils/lifecycle.js';\n`;
     }
 
-    // Extract and register base URLs from the cleaned script
+    // Strip any stale const env / registerBaseUrl declarations that will be re-emitted below.
+    // This prevents duplicate declarations when applyPhaseContract is called on already
+    // partially-converted source (e.g. the output of convert() which emits env itself).
+    beforeDefault = beforeDefault
+      .replace(/^\s*const\s+env\s*=\s*getEnvContext\s*\([^)]*\)\s*;?\s*\n/gm, '')
+      .replace(/^\s*registerBaseUrl\s*\([^)]*\)\s*;?\s*\n/gm, '');
+
     const baseUrls = this.extractBaseUrlsFromSource(cleaned);
     const primaryBaseUrl = baseUrls[0];
-    const registerBlock = `const env = getEnvContext('${teamName}', ${primaryBaseUrl ? `'${primaryBaseUrl}'` : 'undefined'});\nregisterBaseUrl(env.baseUrl);`;
+    const envBlock = `const env = getEnvContext('${teamName}', ${primaryBaseUrl ? `{ baseUrl: '${primaryBaseUrl}' }` : 'undefined'});`;
 
     return beforeDefault
-      + (baseUrls.length > 0 ? registerBlock + '\n\n' : '')
+      + (baseUrls.length > 0 ? envBlock + '\n\n' : '')
       + `const __journeyLifecycleStore = createJourneyLifecycleStore();\n\n`
       + this.renderPhaseFunction('initPhase', grouped.initPrelude, grouped.initGroups)
       + `\n`

@@ -176,7 +176,18 @@ const TEST_PLAN_SCHEMA_INLINE = {
             type: 'object',
             required: ['executor'],
             properties: {
-                executor: { type: 'string' },
+                executor: {
+                    type: 'string',
+                    enum: [
+                        'ramping-vus',
+                        'constant-vus',
+                        'ramping-arrival-rate',
+                        'constant-arrival-rate',
+                        'shared-iterations',
+                        'per-vu-iterations',
+                        'externally-controlled',
+                    ],
+                },
                 startVUs: { type: 'number', minimum: 0 },
                 stages: {
                     type: 'array',
@@ -189,9 +200,13 @@ const TEST_PLAN_SCHEMA_INLINE = {
                         },
                     },
                 },
-                vus: { type: 'number', minimum: 1 },
+                vus: { type: 'number', minimum: 0 },
                 duration: { type: 'string' },
                 iterations: { type: 'number', minimum: 1 },
+                rate: { type: 'number', minimum: 1 },
+                timeUnit: { type: 'string' },
+                preAllocatedVUs: { type: 'number', minimum: 0 },
+                maxVUs: { type: 'number', minimum: 1 },
             },
         },
         user_journeys: {

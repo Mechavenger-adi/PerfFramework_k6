@@ -279,8 +279,8 @@ program
       resolvedConfig = configManager.resolve({
         environmentConfigPath: envConfigPath,
         runtimeSettingsPath: opts.runtime,
-        cliOverrides: { 
-          debugMode: opts.debug !== undefined ? opts.debug : (plan.debug?.enabled ? true : undefined) 
+        cliOverrides: {
+          ...(opts.debug !== undefined ? { debugMode: opts.debug as boolean } : {}),
         },
       });
       Logger.pass(`Config resolved for environment: ${resolvedConfig.environment.name}`);
@@ -300,7 +300,7 @@ program
     }
 
     if (plan.debug?.enabled) {
-      await runPlanDebugMode(plan);
+      await runPlanDebugMode(plan, resolvedConfig);
       return;
     }
 
@@ -371,9 +371,20 @@ program
     process.once('SIGINT', forceExitHandler);
     process.once('SIGTERM', forceExitHandler);
 
+    const metricsStreamPath = path.join(reportDir, 'metrics-stream.json');
+    const safeMetricsStreamPath = metricsStreamPath.replace(/\\/g, '/');
+    const runLogPath = path.join(reportDir, 'k6-run.log');
+    const safeRunLogPath = runLogPath.replace(/\\/g, '/');
+
     const extraArgs: string[] = [
       '--summary-export', `${safeReportDir}/summary.json`,
-      '--out', `web-dashboard=export=${safeReportDir}/TestSummary.html`
+      '--out', `web-dashboard=export=${safeReportDir}/TestSummary.html`,
+      '--out', `json=${safeMetricsStreamPath}`,
+      // Mirror k6 log output (console.log, framework events) to a file for
+      // post-run snapshot parsing. Logs still appear in terminal via stderr;
+      // stdout stays uninherited so k6's animated progress bar renders correctly.
+      '--log-output', 'stderr',
+      '--log-output', `file=${safeRunLogPath}`,
     ];
 
     if (opts.out) {
@@ -398,8 +409,16 @@ program
     Logger.detail('Launching k6...\n');
     let runResult;
     const k6StartTime = new Date().toISOString();
-    const onLine = buildSnapshotLineHandler(reportDir);
+    const txnNamesForLive = runtimeEnv.K6_PERF_TRANSACTION_NAMES
+      ? (JSON.parse(runtimeEnv.K6_PERF_TRANSACTION_NAMES) as string[])
+      : [];
+    const liveRuntime = new RuntimeConfigManager(resolvedConfig.runtime);
+    const liveDisplay = txnNamesForLive.length > 0
+      ? startLiveTransactionDisplay(metricsStreamPath, txnNamesForLive, liveRuntime.getTransactionStats(), runLogPath)
+      : null;
     try {
+      // No onLine → stdio is fully inherited → k6's live progress bar renders correctly.
+      // Snapshot events are captured via --log-output file=... and parsed post-run.
       runResult = await PipelineRunner.executeAsync({
         scriptPath: entryScriptPath,
         k6Options,
@@ -408,9 +427,11 @@ program
         reportDir,
         runId,
         runManifestPath,
-        onLine,
       });
     } finally {
+      if (liveDisplay) liveDisplay.stop();
+      // Parse and persist snapshots from the mirrored log file
+      parseAndFlushSnapshots(runLogPath, reportDir);
       await hostSampler.stop();
       if (resolvedConfig.runtime.monitoring.enabled) {
         hostSnapshots.push(await HostMonitor.captureSnapshot());
@@ -445,7 +466,7 @@ program
     PipelineRunner.ensureSuccess(runResult);
   });
 
-async function runPlanDebugMode(plan: TestPlan): Promise<void> {
+async function runPlanDebugMode(plan: TestPlan, resolvedConfig: ResolvedConfig): Promise<void> {
   const debugSettings = plan.debug ?? { enabled: false };
   const baseDir = debugSettings.reportDir
     ? path.resolve(process.cwd(), debugSettings.reportDir)
@@ -466,7 +487,7 @@ async function runPlanDebugMode(plan: TestPlan): Promise<void> {
   for (const journey of plan.user_journeys) {
     try {
       journeyProgress.update(journeyProgress.current, journey.name);
-      const result = await runJourneyDebug(plan, journey, runDir);
+      const result = await runJourneyDebug(plan, journey, runDir, resolvedConfig);
       journeyProgress.done(`${journey.name} — ${result.results.length} steps`);
       journeyProgress.tick();
       Logger.detail(`  Report: ${path.basename(result.htmlReportPath)}`);
@@ -486,11 +507,12 @@ async function runPlanDebugMode(plan: TestPlan): Promise<void> {
   }
 }
 
-function runJourneyDebug(plan: TestPlan, journey: UserJourney, runDir: string) {
+function runJourneyDebug(plan: TestPlan, journey: UserJourney, runDir: string, resolvedConfig: ResolvedConfig) {
   const safeJourneyName = journey.name.replace(/[^a-zA-Z0-9_\-]/g, '_');
   const outHtmlPath = path.join(runDir, `${safeJourneyName}.diff.html`);
   const replayLogPath = path.join(runDir, `${safeJourneyName}.replay-log.json`);
 
+  const runtime = new RuntimeConfigManager(resolvedConfig.runtime);
   return ReplayRunner.runDebug({
     scriptPath: journey.scriptPath,
     recordingLogPath: journey.recordingLogPath,
@@ -499,6 +521,8 @@ function runJourneyDebug(plan: TestPlan, journey: UserJourney, runDir: string) {
     vus: plan.debug?.vus ?? 1,
     iterations: plan.debug?.iterations ?? 1,
     noCookiesReset: plan.noCookiesReset,
+    teamEnvironments: resolvedConfig.environment.scrum_suites,
+    errorBehavior: runtime.getErrorBehavior(),
   });
 }
 
@@ -839,15 +863,12 @@ function finalizeRunArtifacts(options: {
     snapshots: options.hostSnapshots,
   });
 
-  const snapshotDir = path.join(options.reportDir, 'snapshots');
-  const snapshotFiles: Array<Record<string, unknown>> = [];
-  if (fs.existsSync(snapshotDir)) {
-    for (const file of fs.readdirSync(snapshotDir).sort()) {
-      if (!file.endsWith('.json')) continue;
-      try {
-        snapshotFiles.push(JSON.parse(fs.readFileSync(path.join(snapshotDir, file), 'utf-8')) as Record<string, unknown>);
-      } catch { /* skip malformed */ }
-    }
+  const snapshotsFile = path.join(options.reportDir, 'snapshots.json');
+  let snapshotFiles: Array<Record<string, unknown>> = [];
+  if (fs.existsSync(snapshotsFile)) {
+    try {
+      snapshotFiles = JSON.parse(fs.readFileSync(snapshotsFile, 'utf-8')) as Array<Record<string, unknown>>;
+    } catch { /* skip malformed */ }
   }
 
   const reportBundle: ReportBundle = {
@@ -1011,50 +1032,300 @@ function formatCell(value: unknown, column: string): string {
 }
 
 // ---------------------------------------------
-// Snapshot event handler
+// Live transaction display (reads --out json stream)
+// ---------------------------------------------
+
+const LIVE_TXN_INTERVAL_MS = 5_000;
+
+interface LiveTxnStats {
+  count: number;
+  total: number;
+  min: number;
+  max: number;
+  values: number[];
+  wMean: number;
+  wM2: number;
+  checkPasses: Map<string, number>; // checkName → cumulative pass count
+  checkFails:  Map<string, number>; // checkName → cumulative fail count
+}
+
+function pct(values: number[], p: number): string {
+  if (!values.length) return '-';
+  const sorted = [...values].sort((a, b) => a - b);
+  return String(Math.round(sorted[Math.max(0, Math.ceil(p * sorted.length) - 1)]));
+}
+
+function startLiveTransactionDisplay(
+  metricsStreamPath: string,
+  transactionNames: string[],
+  transactionStats: string[],
+  _logPath: string,
+): { stop: () => void } {
+  const normToDisplay = new Map<string, string>();
+  for (const name of transactionNames) {
+    normToDisplay.set(name, name);
+    normToDisplay.set(name.replace(/[^a-zA-Z0-9]+/g, '_'), name);
+  }
+
+  const stats = new Map<string, LiveTxnStats>();
+  let metricsOffset = 0;
+
+  const isTTY = process.stdout.isTTY === true;
+  // title + top border + header row + header separator + N rows + bottom border
+  const reservedRows = transactionNames.length + 5;
+  const termRows = process.stdout.rows || 40;
+  // k6 prints its startup banner (~15 lines of ASCII art + metadata) before the
+  // progress bar starts. The table must sit BELOW these lines so the banner is
+  // preserved. We cap bannerLines if the terminal is too small.
+  const k6BannerLines = 15;
+  const safetyRows = Math.max(3, Math.ceil(reservedRows / 2));
+  // Keep at least 4 rows for k6's progress bar inside the scroll region.
+  const availableForBanner = termRows - reservedRows - safetyRows - 4;
+  const bannerLines = Math.max(0, Math.min(k6BannerLines, availableForBanner));
+  // Table lives BELOW the banner (rows bannerLines+1 .. bannerLines+reservedRows).
+  // Scroll region covers the BOTTOM portion (scrollTop..termRows) where k6 writes.
+  const tableTop = bannerLines + 1;
+  const scrollTop = tableTop + reservedRows + safetyRows;
+  // Scroll region is deferred to the first tick (~5s after k6 starts) so k6
+  // can detect TTY and start its animated bar before we touch terminal state.
+  let scrollRegionReady = false;
+
+  function tick(): void {
+    try {
+      // ── Read new metric data points ──────────────────────────
+      if (fs.existsSync(metricsStreamPath)) {
+        const metricsSize = fs.statSync(metricsStreamPath).size;
+        if (metricsSize > metricsOffset) {
+          const fd = fs.openSync(metricsStreamPath, 'r');
+          let buf: Buffer;
+          try {
+            buf = Buffer.alloc(metricsSize - metricsOffset);
+            fs.readSync(fd, buf, 0, buf.length, metricsOffset);
+            metricsOffset = metricsSize;
+          } finally {
+            fs.closeSync(fd);
+          }
+          for (const line of buf.toString('utf-8').split('\n')) {
+            if (!line.trim()) continue;
+            try {
+              type StreamEntry = { type?: string; metric?: string; data?: { value?: number; tags?: Record<string, string> } };
+              const entry = JSON.parse(line) as StreamEntry;
+              if (entry.type !== 'Point' || typeof entry.metric !== 'string') continue;
+
+              // ── checks metric → pass/fail counts (mirrors TransactionMetricsBuilder) ──
+              if (entry.metric === 'checks') {
+                const tags = entry.data?.tags;
+                if (!tags?.group || typeof entry.data?.value !== 'number') continue;
+                // group is "::outer::txnName" — last non-empty segment is the transaction
+                const lastName = tags.group.split('::').filter(Boolean).at(-1) ?? '';
+                const checkDisplay = normToDisplay.get(lastName)
+                  ?? normToDisplay.get(lastName.replace(/[^a-zA-Z0-9]+/g, '_'));
+                if (!checkDisplay) continue;
+                const cs: LiveTxnStats = stats.get(checkDisplay) ?? {
+                  count: 0, total: 0, min: Infinity, max: -Infinity,
+                  values: [], wMean: 0, wM2: 0,
+                  checkPasses: new Map(), checkFails: new Map(),
+                };
+                const checkName = tags.check ?? 'check';
+                if (entry.data.value === 1) {
+                  cs.checkPasses.set(checkName, (cs.checkPasses.get(checkName) ?? 0) + 1);
+                } else {
+                  cs.checkFails.set(checkName, (cs.checkFails.get(checkName) ?? 0) + 1);
+                }
+                stats.set(checkDisplay, cs);
+                continue;
+              }
+
+              // ── transaction timing metric → count + timing stats ──
+              const displayName = normToDisplay.get(entry.metric);
+              if (!displayName || typeof entry.data?.value !== 'number') continue;
+              const v = entry.data.value;
+              const s: LiveTxnStats = stats.get(displayName) ?? {
+                count: 0, total: 0, min: Infinity, max: -Infinity,
+                values: [], wMean: 0, wM2: 0,
+                checkPasses: new Map(), checkFails: new Map(),
+              };
+              s.count++;
+              s.total += v;
+              s.min = Math.min(s.min, v);
+              s.max = Math.max(s.max, v);
+              const delta = v - s.wMean;
+              s.wMean += delta / s.count;
+              s.wM2 += delta * (v - s.wMean);
+              s.values.push(v);
+              if (s.values.length > 100_000) s.values = s.values.slice(-50_000);
+              stats.set(displayName, s);
+            } catch { /* skip malformed */ }
+          }
+        }
+      }
+
+      if (stats.size > 0) {
+        if (isTTY && !scrollRegionReady) {
+          // Set scroll region to scrollTop..termRows (bottom portion for k6).
+          // Clear only the table area + safety buffer (rows tableTop..scrollTop-1).
+          // Rows 1..bannerLines are left intact so k6's startup banner remains visible.
+          //
+          // IMPORTANT: do NOT restore k6's cursor (no \x1b8). k6's cursor was at ~row 18
+          // (its progress bar position). Restoring it there means k6's \x1b[0J] fires from
+          // row 18, erasing the table. Instead we place the cursor at scrollTop so k6
+          // redraws its bar from inside the scroll region; its cursor-up N only reaches into
+          // the safety buffer (rows tableTop+reservedRows .. scrollTop-1), never the table.
+          let clearTable = '';
+          for (let row = tableTop; row < scrollTop; row++) clearTable += `\x1b[${row};1H\x1b[2K`;
+          process.stdout.write(`\x1b[${scrollTop};${termRows}r` + clearTable + `\x1b[${scrollTop};1H`);
+          scrollRegionReady = true;
+        }
+        printLiveTable(stats, transactionStats, tableTop, isTTY);
+      }
+    } catch { /* file not ready yet */ }
+  }
+
+  const timer = setInterval(tick, LIVE_TXN_INTERVAL_MS);
+  timer.unref();
+
+  return {
+    stop: () => {
+      clearInterval(timer);
+      if (isTTY) {
+        if (stats.size > 0) printLiveTable(stats, transactionStats, tableTop, isTTY);
+        // Reset full-screen scroll region, advance cursor past the table area
+        process.stdout.write(`\x1b[r\x1b[${termRows};1H\n`);
+      }
+    },
+  };
+}
+
+function printLiveTable(
+  stats: Map<string, LiveTxnStats>,
+  transactionStats: string[],
+  tableTop: number,
+  isTTY: boolean,
+): void {
+  type ColDef = { header: string; width: number; val: (name: string, s: LiveTxnStats) => string };
+  const ALL_COLS: Record<string, ColDef> = {
+    count:   { header: 'Count',   width: 7,  val: (_n, s) => String(s.count) },
+    pass:    { header: 'Pass',    width: 7,  val: (_n, s) => {
+      if (!s.checkPasses.size) return String(s.count);
+      return String(Math.min(...Array.from(s.checkPasses.values())));
+    } },
+    fail:    { header: 'Fail',    width: 6,  val: (_n, s) => {
+      if (!s.checkPasses.size) return '0';
+      const pass = Math.min(...Array.from(s.checkPasses.values()));
+      return String(Math.max(0, s.count - pass));
+    } },
+    avg:     { header: 'Avg(ms)', width: 8,  val: (_n, s) => s.count > 0 ? String(Math.round(s.total / s.count)) : '-' },
+    min:     { header: 'Min(ms)', width: 8,  val: (_n, s) => s.count > 0 ? String(Math.round(s.min)) : '-' },
+    max:     { header: 'Max(ms)', width: 8,  val: (_n, s) => s.count > 0 ? String(Math.round(s.max)) : '-' },
+    'p(90)': { header: 'p90(ms)', width: 8,  val: (_n, s) => pct(s.values, 0.90) },
+    'p(97)': { header: 'p97(ms)', width: 8,  val: (_n, s) => pct(s.values, 0.97) },
+    std:     { header: 'Std(ms)', width: 8,  val: (_n, s) => s.count < 2 ? '-' : String(Math.round(Math.sqrt(s.wM2 / s.count))) },
+  };
+
+  const activeCols = transactionStats.filter((k) => ALL_COLS[k]).map((k) => ({ key: k, ...ALL_COLS[k] }));
+  if (!activeCols.length) return;
+
+  const rows = [...stats.entries()].sort(([a], [b]) => a.localeCompare(b));
+  if (!rows.length) return;
+
+  const c = {
+    dim:   isTTY && !process.env.NO_COLOR ? '\x1b[2m'  : '',
+    reset: isTTY && !process.env.NO_COLOR ? '\x1b[0m'  : '',
+    cyan:  isTTY && !process.env.NO_COLOR ? '\x1b[36m' : '',
+    bold:  isTTY && !process.env.NO_COLOR ? '\x1b[1m'  : '',
+  };
+
+  const txnW = Math.min(48, Math.max(11, ...rows.map(([n]) => n.length)));
+  const widths = [txnW, ...activeCols.map((col) => col.width)];
+  const headers = ['Transaction', ...activeCols.map((col) => col.header)];
+
+  const lines: string[] = [];
+  const now = new Date().toLocaleTimeString();
+  lines.push(`${c.bold}${c.cyan}  Live Metrics  ${c.dim}[updated ${now}]${c.reset}`);
+  lines.push(`  ${c.dim}┌${widths.map((w) => '─'.repeat(w + 2)).join('┬')}┐${c.reset}`);
+
+  const hRow = headers.map((h, i) =>
+    i === 0 ? ` ${h.padEnd(widths[i])} ` : ` ${h.padStart(widths[i])} `,
+  ).join(`${c.dim}│${c.reset}`);
+  lines.push(`  ${c.dim}│${c.reset}${c.bold}${hRow}${c.reset}${c.dim}│${c.reset}`);
+  lines.push(`  ${c.dim}├${widths.map((w) => '─'.repeat(w + 2)).join('┼')}┤${c.reset}`);
+
+  for (const [name, s] of rows) {
+    const label = name.length > txnW ? name.slice(0, txnW - 1) + '…' : name;
+    const cells = [
+      ` ${label.padEnd(txnW)} `,
+      ...activeCols.map((col) => ` ${col.val(name, s).padStart(col.width)} `),
+    ].join(`${c.dim}│${c.reset}`);
+    lines.push(`  ${c.dim}│${c.reset}${cells}${c.dim}│${c.reset}`);
+  }
+
+  lines.push(`  ${c.dim}└${widths.map((w) => '─'.repeat(w + 2)).join('┴')}┘${c.reset}`);
+
+  if (!isTTY) {
+    process.stdout.write('\n' + lines.join('\n') + '\n');
+    return;
+  }
+
+  // Table is at rows 1..N (above k6's scroll region). k6's bar animation uses
+  // \x1b[0J (erase to end of screen) but only from within the scroll region,
+  // which starts below the table. Per-line erase avoids any \x1b[0J of our own.
+  process.stdout.write(
+    '\x1b7' +
+    lines.map((line, i) => `\x1b[${tableTop + i};1H\x1b[2K${line}`).join('') +
+    '\x1b8',
+  );
+}
+
+// ---------------------------------------------
+// Snapshot event parser (reads k6 log file post-run)
 // ---------------------------------------------
 
 const SNAPSHOT_EVENT_PREFIX = '[k6-perf][snapshot-event] ';
 
-function buildSnapshotLineHandler(reportDir: string): (line: string) => void {
-  const snapshotDir = path.join(reportDir, 'snapshots');
-  let count = 0;
-  let dirCreated = false;
-
-  return function handleLine(line: string): void {
-    let payload: string | null = null;
-
-    // k6 logfmt format: level=info msg="[k6-perf][snapshot-event] {...}" source=console
-    const consoleMatch = line.match(/msg="((?:\\.|[^"])*)"\s+source=console/);
-    if (consoleMatch) {
-      let rawMessage: string;
+/**
+ * Reads the mirrored k6 log file, extracts snapshot events emitted during the
+ * run, and writes a consolidated snapshots.json to the report directory.
+ */
+function parseAndFlushSnapshots(runLogPath: string, reportDir: string): void {
+  if (!fs.existsSync(runLogPath)) return;
+  const snapshots: Array<Record<string, unknown>> = [];
+  try {
+    const content = fs.readFileSync(runLogPath, 'utf-8');
+    for (const line of content.split('\n')) {
+      const payload = extractSnapshotPayload(line);
+      if (!payload) continue;
       try {
-        rawMessage = JSON.parse(`"${consoleMatch[1]}"`) as string;
-      } catch {
-        rawMessage = consoleMatch[1].replace(/\\"/g, '"');
-      }
-      const idx = rawMessage.indexOf(SNAPSHOT_EVENT_PREFIX);
-      if (idx !== -1) payload = rawMessage.slice(idx + SNAPSHOT_EVENT_PREFIX.length).trim();
-    } else {
-      const idx = line.indexOf(SNAPSHOT_EVENT_PREFIX);
-      if (idx !== -1) payload = line.slice(idx + SNAPSHOT_EVENT_PREFIX.length).trim();
+        snapshots.push(JSON.parse(payload) as Record<string, unknown>);
+      } catch { /* skip malformed */ }
     }
+  } catch { /* log file unreadable */ }
 
-    if (!payload) return;
+  if (snapshots.length === 0) return;
+  try {
+    fs.writeFileSync(
+      path.join(reportDir, 'snapshots.json'),
+      JSON.stringify(snapshots, null, 2),
+      'utf-8',
+    );
+  } catch { /* ignore */ }
+}
 
+function extractSnapshotPayload(line: string): string | null {
+  // k6 logfmt format: level=info msg="[k6-perf][snapshot-event] {...}" source=console
+  const consoleMatch = line.match(/msg="((?:\\.|[^"])*)"\s+source=console/);
+  if (consoleMatch) {
+    let rawMessage: string;
     try {
-      const snapshot = JSON.parse(payload) as Record<string, unknown>;
-      if (!dirCreated) {
-        fs.mkdirSync(snapshotDir, { recursive: true });
-        dirCreated = true;
-      }
-      count++;
-      const fileName = `snapshot-${String(count).padStart(3, '0')}.json`;
-      fs.writeFileSync(path.join(snapshotDir, fileName), JSON.stringify(snapshot, null, 2), 'utf-8');
+      rawMessage = JSON.parse(`"${consoleMatch[1]}"`) as string;
     } catch {
-      // Ignore malformed snapshot events
+      rawMessage = consoleMatch[1].replace(/\\"/g, '"');
     }
-  };
+    const idx = rawMessage.indexOf(SNAPSHOT_EVENT_PREFIX);
+    if (idx !== -1) return rawMessage.slice(idx + SNAPSHOT_EVENT_PREFIX.length).trim();
+    return null;
+  }
+  const idx = line.indexOf(SNAPSHOT_EVENT_PREFIX);
+  return idx !== -1 ? line.slice(idx + SNAPSHOT_EVENT_PREFIX.length).trim() : null;
 }
 
 // ---------------------------------------------

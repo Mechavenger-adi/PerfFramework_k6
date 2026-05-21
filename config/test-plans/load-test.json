@@ -7,16 +7,33 @@
     "executor": "ramping-vus",
     "startVUs": 0,
     "stages": [
-      { "duration": "5s", "target": 5 },
-      { "duration": "30s",  "target": 5 },
-      { "duration": "5s", "target": 0  }
+      {
+        "duration": "5s",
+        "target": 5
+      },
+      {
+        "duration": "30s",
+        "target": 5
+      },
+       {
+        "duration": "30s",
+        "target": 10
+      },
+          {
+        "duration": "30s",
+        "target": 15
+      },
+      {
+        "duration": "30s",
+        "target": 0
+      }
     ]
   },
   "noCookiesReset": true,
   "user_journeys": [
     {
-      "name": "buyanimal_raw_19thmay",
-      "scriptPath": "buyanimal_raw_19thmay.js",
+      "name": "buyanimal_raw_20thmay",
+      "scriptPath": "buyanimal_raw_20thmay.js",
       "weight": 100
     }
   ],
@@ -31,8 +48,15 @@
     }
   },
   "transaction_slas": {
-    "t01_launch": { "p95": 800 },
-    "t02_login": { "p95": 1000 },
-    "click_confirm": { "p95": 1500, "p99": 3000 }
+    "t01_launch": {
+      "p95": 800
+    },
+    "t02_login": {
+      "p95": 1000
+    },
+    "click_confirm": {
+      "p95": 1500,
+      "p99": 3000
+    }
   }
 }

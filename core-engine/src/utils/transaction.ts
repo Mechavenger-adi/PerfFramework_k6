@@ -1,5 +1,5 @@
 // @ts-ignore
-import { group } from 'k6';
+import { group, check as k6Check } from 'k6';
 // @ts-ignore - K6 runtime module
 import { Counter, Trend } from 'k6/metrics';
 // @ts-ignore - K6 runtime module
@@ -27,6 +27,15 @@ const txnCounters: Record<string, Counter> = {};
 
 // Tracks the active transaction name within this VU's context (per-VU module scope in k6).
 let _activeTransaction: string = '';
+
+// Permanently stops this VU from running any more transactions.
+// Set by stop_vu behavior — persists for the lifetime of the VU module instance.
+let _vuTerminated = false;
+
+/** Returns true if this VU was stopped via stop_vu errorBehavior. */
+export function isVuTerminated(): boolean {
+  return _vuTerminated;
+}
 
 // ── Auto-register from framework-injected manifest ────────────
 // Reads K6_PERF_TRANSACTION_NAMES (injected by ScenarioBuilder) and pre-registers
@@ -121,6 +130,9 @@ export function endTransaction(name: string): void {
  * Nesting: nested transaction() calls are rejected with a descriptive error.
  */
 export function transaction(name: string, fn: () => void): void {
+  // VU was permanently stopped by a previous stop_vu — skip silently.
+  if (_vuTerminated) return;
+
   if (_activeTransaction !== '') {
     throw new Error(
       `[k6-perf] Nested transaction detected: '${name}' called inside '${_activeTransaction}'. ` +
@@ -150,7 +162,16 @@ export function transaction(name: string, fn: () => void): void {
           return;
         }
 
-        if (behavior === 'stop_iteration' || behavior === 'stop_vu') {
+        if (behavior === 'stop_vu') {
+          // Mark VU as permanently terminated — lifecycle will skip all future iterations.
+          // Do NOT re-throw: we want the action phase to return cleanly so k6 doesn't
+          // see an iteration error (which would schedule a new iteration for this VU).
+          _vuTerminated = true;
+          return;
+        }
+
+        if (behavior === 'stop_iteration') {
+          // Re-throw so lifecycle stops the current iteration; VU resumes next iteration.
           throw error;
         }
         // 'continue' — swallow and continue to next transaction
@@ -161,4 +182,30 @@ export function transaction(name: string, fn: () => void): void {
   } finally {
     _activeTransaction = '';
   }
+}
+
+/**
+ * Framework-aware check() that wraps k6's native check() so metrics are always recorded,
+ * then applies errorBehavior when one or more checks fail.
+ *
+ * Drop-in replacement for k6's check() — same signature, same metric output.
+ */
+export function check(
+  val: any,
+  sets: Record<string, (v: any) => boolean>,
+): boolean {
+  const passed = k6Check(val, sets);
+  if (!passed) {
+    const behavior = getRuntimeErrorBehavior();
+    if (behavior === 'abort_test') {
+      exec.test.abort('[k6-perf] check() failed — aborting test');
+    } else if (behavior === 'stop_vu') {
+      _vuTerminated = true;
+      // Don't throw — let the transaction end cleanly; lifecycle will skip future iterations.
+    } else if (behavior === 'stop_iteration') {
+      throw new Error('[k6-perf] check() failed');
+    }
+    // 'continue' — return false, let caller decide
+  }
+  return passed;
 }

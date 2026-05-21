@@ -17,6 +17,10 @@ export interface RunOptions {
     env?: Record<string, string>;
     /** Capture stdout/stderr instead of inheriting them */
     captureOutput?: boolean;
+    /** Pipe and capture stdout only; stderr is inherited (TTY) so k6's progress bar renders. Use with logOutputPath. */
+    captureStdout?: boolean;
+    /** Path to write k6 log output (passes --log-output file=<path>). Use with captureStdout to capture logs while stderr stays as TTY. */
+    logOutputPath?: string;
     /** Called for each line of stdout/stderr (only when captureOutput is false). Used for live event interception. */
     onLine?: (line: string) => void;
     /** Logical run identifier for metadata/artifact naming */

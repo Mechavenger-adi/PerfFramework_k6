@@ -94,6 +94,35 @@ class RunReportGenerator {
     .chart-canvas-wrap canvas { width: 100% !important; }
     .donut-wrap { position: relative; width: 100%; max-width: 280px; margin: 0 auto; }
     @media (max-width: 980px) { .split { grid-template-columns: 1fr; } }
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none;
+      align-items: center; justify-content: center; z-index: 1000;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-panel {
+      background: var(--panel); border: 1px solid var(--border); border-radius: 18px;
+      max-width: 900px; width: 90vw; max-height: 85vh; overflow: hidden;
+      display: flex; flex-direction: column; box-shadow: 0 24px 72px rgba(0,0,0,0.18);
+    }
+    .modal-header {
+      padding: 18px 20px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    }
+    .modal-header h3 { margin: 0; font-size: 16px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .modal-close {
+      background: none; border: 1px solid var(--border); border-radius: 999px;
+      padding: 4px 14px; cursor: pointer; font-weight: 600; flex-shrink: 0;
+    }
+    .modal-body { overflow-y: auto; padding: 16px; }
+    .modal-body pre {
+      background: #1d2731; color: #c8d8e0; border-radius: 12px; padding: 16px;
+      font-size: 12px; line-height: 1.6; overflow-x: auto; white-space: pre-wrap;
+      word-break: break-word; margin: 0;
+    }
+    .view-btn {
+      background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent);
+      border-radius: 999px; padding: 3px 10px; cursor: pointer; font-size: 12px; font-weight: 600;
+    }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 </head>
@@ -117,6 +146,17 @@ class RunReportGenerator {
     <section id="panel-warnings" class="tab-panel"></section>
     <section id="panel-snapshots" class="tab-panel"></section>
     <section id="panel-system" class="tab-panel"></section>
+  </div>
+  <div class="modal-overlay" id="snapshot-modal" onclick="closeSnapshotModal(event)">
+    <div class="modal-panel">
+      <div class="modal-header">
+        <h3 id="snapshot-modal-title">Snapshot Detail</h3>
+        <button class="modal-close" onclick="document.getElementById('snapshot-modal').classList.remove('open')">Close</button>
+      </div>
+      <div class="modal-body">
+        <pre id="snapshot-modal-content"></pre>
+      </div>
+    </div>
   </div>
   <script>
     const reportData = ${serialized};
@@ -354,9 +394,34 @@ class RunReportGenerator {
 
     function renderErrors() {
       const rows = reportData.errors || [];
-      document.getElementById('panel-errors').innerHTML = rows.length
-        ? renderTable(rows, ['ts', 'type', 'transaction', 'vu', 'iteration', 'message'])
-        : '<div class="empty">No structured error events were captured for this run yet.</div>';
+      if (!rows.length) {
+        document.getElementById('panel-errors').innerHTML = '<div class="empty">No structured error events were captured for this run yet.</div>';
+        return;
+      }
+      const snapshots = reportData.snapshots || [];
+      const snapshotByTxn = {};
+      snapshots.forEach(function(snap, idx) {
+        const txn = snap.transaction;
+        if (txn && !(txn in snapshotByTxn)) snapshotByTxn[txn] = idx;
+      });
+      const header = '<tr><th>Timestamp</th><th>Type</th><th>Transaction</th><th>Request</th><th>VU</th><th>Iteration</th><th>Message</th><th></th></tr>';
+      const body = rows.map(function(row) {
+        const snapIdx = snapshotByTxn[row.transaction];
+        const hasSnap = typeof snapIdx === 'number';
+        const vu = row.vu != null ? row.vu : (hasSnap ? snapshots[snapIdx].vu : '');
+        const iteration = row.iteration != null ? row.iteration : (hasSnap ? snapshots[snapIdx].iteration : '');
+        return '<tr>' +
+          '<td style="white-space:nowrap">' + escapeHtml(String(row.ts || '')) + '</td>' +
+          '<td>' + escapeHtml(String(row.type || '')) + '</td>' +
+          '<td>' + escapeHtml(String(row.transaction || '')) + '</td>' +
+          '<td>' + escapeHtml(String(row.requestName || '')) + '</td>' +
+          '<td>' + escapeHtml(String(vu ?? '')) + '</td>' +
+          '<td>' + escapeHtml(String(iteration ?? '')) + '</td>' +
+          '<td style="max-width:320px;word-break:break-word">' + escapeHtml(String(row.message || '')) + '</td>' +
+          '<td>' + (hasSnap ? '<button class="view-btn" onclick="showSnapshotDetail(' + snapIdx + ')">View Request</button>' : '') + '</td>' +
+          '</tr>';
+      }).join('');
+      document.getElementById('panel-errors').innerHTML = '<table><thead>' + header + '</thead><tbody>' + body + '</tbody></table>';
     }
 
     function renderWarnings() {
@@ -368,9 +433,38 @@ class RunReportGenerator {
 
     function renderSnapshots() {
       const rows = reportData.snapshots || [];
-      document.getElementById('panel-snapshots').innerHTML = rows.length
-        ? renderTable(rows, ['ts', 'type', 'transaction', 'vu', 'iteration'])
-        : '<div class="empty">No failure snapshots were captured for this run.</div>';
+      if (!rows.length) {
+        document.getElementById('panel-snapshots').innerHTML = '<div class="empty">No failure snapshots were captured for this run.</div>';
+        return;
+      }
+      const header = '<tr><th>#</th><th>Timestamp</th><th>Type</th><th>Transaction</th><th>VU</th><th>Iteration</th><th></th></tr>';
+      const body = rows.map(function(row, index) {
+        return '<tr>' +
+          '<td>' + escapeHtml(String(index + 1)) + '</td>' +
+          '<td>' + escapeHtml(String(row.ts || '')) + '</td>' +
+          '<td>' + escapeHtml(String(row.type || '')) + '</td>' +
+          '<td>' + escapeHtml(String(row.transaction || '')) + '</td>' +
+          '<td>' + escapeHtml(String(row.vu || '')) + '</td>' +
+          '<td>' + escapeHtml(String(row.iteration || '')) + '</td>' +
+          '<td><button class="view-btn" onclick="showSnapshotDetail(' + index + ')">View</button></td>' +
+          '</tr>';
+      }).join('');
+      document.getElementById('panel-snapshots').innerHTML = '<table><thead>' + header + '</thead><tbody>' + body + '</tbody></table>';
+    }
+
+    function showSnapshotDetail(index) {
+      const snapshot = (reportData.snapshots || [])[index];
+      if (!snapshot) return;
+      const title = 'Snapshot #' + (index + 1) + (snapshot.transaction ? ' — ' + snapshot.transaction : '');
+      document.getElementById('snapshot-modal-title').textContent = title;
+      document.getElementById('snapshot-modal-content').textContent = JSON.stringify(snapshot, null, 2);
+      document.getElementById('snapshot-modal').classList.add('open');
+    }
+
+    function closeSnapshotModal(event) {
+      if (event.target === event.currentTarget) {
+        document.getElementById('snapshot-modal').classList.remove('open');
+      }
     }
 
     function renderSystem() {

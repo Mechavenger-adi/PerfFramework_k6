@@ -14,6 +14,10 @@ export interface K6ExecutorConfig {
     vus?: number;
     duration?: string;
     iterations?: number;
+    rate?: number;
+    timeUnit?: string;
+    preAllocatedVUs?: number;
+    maxVUs?: number;
     exec?: string;
     tags?: Record<string, string>;
     env?: Record<string, string>;
@@ -49,6 +53,27 @@ export declare function buildSpikeProfile(options: {
 export declare function buildIterationProfile(options: {
     vus: number;
     iterations: number;
+}): GlobalLoadProfile;
+/** Build a constant arrival-rate profile */
+export declare function buildConstantArrivalRateProfile(options: {
+    rate: number;
+    duration: string;
+    preAllocatedVUs: number;
+    timeUnit?: string;
+    maxVUs?: number;
+}): GlobalLoadProfile;
+/** Build a ramping arrival-rate profile */
+export declare function buildRampingArrivalRateProfile(options: {
+    stages: LoadStage[];
+    preAllocatedVUs: number;
+    timeUnit?: string;
+    maxVUs?: number;
+}): GlobalLoadProfile;
+/** Build an externally-controlled profile */
+export declare function buildExternallyControlledProfile(options: {
+    maxVUs: number;
+    vus?: number;
+    duration?: string;
 }): GlobalLoadProfile;
 /** Translate a GlobalLoadProfile into a k6 executor config block */
 export declare function toK6ExecutorConfig(profile: GlobalLoadProfile): K6ExecutorConfig;

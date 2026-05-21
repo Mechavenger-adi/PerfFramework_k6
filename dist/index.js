@@ -21,8 +21,8 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
     for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ReplayRunner = exports.RecordingLogResolver = exports.HTMLDiffReporter = exports.ExchangeLogBuilder = exports.DiffChecker = exports.RuleProcessor = exports.FallbackHandler = exports.ExtractorRegistry = exports.CorrelationEngine = exports.ThresholdManager = exports.SLARegistry = exports.JourneyAssertionResolver = exports.TransactionGrouper = exports.ScriptGenerator = exports.HARParser = exports.DomainFilter = exports.transaction = exports.startTransaction = exports.initTransactions = exports.getCurrentTransaction = exports.endTransaction = exports.PathResolver = exports.Logger = exports.TimeseriesRuntime = exports.SnapshotRuntime = exports.MetricsRuntime = exports.LifecycleRuntime = exports.ErrorRuntime = exports.DynamicValueFactory = exports.DataValidator = exports.DataPoolManager = exports.DataFactory = exports.PipelineRunner = exports.ParallelExecutionManager = exports.JourneyAllocator = exports.HostMonitor = exports.toK6ExecutorConfig = exports.buildStressProfile = exports.buildSpikeProfile = exports.buildSoakProfile = exports.buildLoadProfile = exports.buildIterationProfile = exports.TestPlanLoader = exports.ScenarioBuilder = exports.ExecutorFactory = exports.SchemaValidator = exports.RuntimeConfigManager = exports.GatekeeperValidator = exports.EnvResolver = exports.ConfigurationManager = void 0;
-exports.TransactionMetricsBuilder = exports.TimeseriesArtifactBuilder = exports.RunSummaryBuilder = exports.RunReportGenerator = exports.EventArtifactBuilder = exports.ArtifactWriter = exports.ResultTransformer = exports.GrafanaReporter = exports.CustomUploader = exports.AzureReporter = void 0;
+exports.ExchangeLogBuilder = exports.DiffChecker = exports.RuleProcessor = exports.FallbackHandler = exports.ExtractorRegistry = exports.CorrelationEngine = exports.ThresholdManager = exports.SLARegistry = exports.JourneyAssertionResolver = exports.TransactionGrouper = exports.ScriptGenerator = exports.HARParser = exports.DomainFilter = exports.transaction = exports.startTransaction = exports.initTransactions = exports.getCurrentTransaction = exports.endTransaction = exports.PathResolver = exports.Logger = exports.TimeseriesRuntime = exports.SnapshotRuntime = exports.MetricsRuntime = exports.LifecycleRuntime = exports.ErrorRuntime = exports.DynamicValueFactory = exports.DataValidator = exports.DataPoolManager = exports.DataFactory = exports.PipelineRunner = exports.ParallelExecutionManager = exports.JourneyAllocator = exports.HostMonitor = exports.TestPlanLoader = exports.ScenarioBuilder = exports.ExecutorFactory = exports.toK6ExecutorConfig = exports.buildExternallyControlledProfile = exports.buildRampingArrivalRateProfile = exports.buildConstantArrivalRateProfile = exports.buildIterationProfile = exports.buildSpikeProfile = exports.buildSoakProfile = exports.buildStressProfile = exports.buildLoadProfile = exports.SchemaValidator = exports.RuntimeConfigManager = exports.GatekeeperValidator = exports.EnvResolver = exports.ConfigurationManager = void 0;
+exports.TransactionMetricsBuilder = exports.TimeseriesArtifactBuilder = exports.RunSummaryBuilder = exports.RunReportGenerator = exports.EventArtifactBuilder = exports.ArtifactWriter = exports.ResultTransformer = exports.GrafanaReporter = exports.CustomUploader = exports.AzureReporter = exports.ReplayRunner = exports.RecordingLogResolver = exports.HTMLDiffReporter = void 0;
 // -- Types / Contracts ------------------------
 __exportStar(require("./types/ConfigContracts"), exports);
 __exportStar(require("./types/EventContracts"), exports);
@@ -40,19 +40,22 @@ Object.defineProperty(exports, "RuntimeConfigManager", { enumerable: true, get: 
 var SchemaValidator_1 = require("./config/SchemaValidator");
 Object.defineProperty(exports, "SchemaValidator", { enumerable: true, get: function () { return SchemaValidator_1.SchemaValidator; } });
 // -- Scenario Layer ---------------------------
+var WorkloadModels_1 = require("./scenario/WorkloadModels");
+Object.defineProperty(exports, "buildLoadProfile", { enumerable: true, get: function () { return WorkloadModels_1.buildLoadProfile; } });
+Object.defineProperty(exports, "buildStressProfile", { enumerable: true, get: function () { return WorkloadModels_1.buildStressProfile; } });
+Object.defineProperty(exports, "buildSoakProfile", { enumerable: true, get: function () { return WorkloadModels_1.buildSoakProfile; } });
+Object.defineProperty(exports, "buildSpikeProfile", { enumerable: true, get: function () { return WorkloadModels_1.buildSpikeProfile; } });
+Object.defineProperty(exports, "buildIterationProfile", { enumerable: true, get: function () { return WorkloadModels_1.buildIterationProfile; } });
+Object.defineProperty(exports, "buildConstantArrivalRateProfile", { enumerable: true, get: function () { return WorkloadModels_1.buildConstantArrivalRateProfile; } });
+Object.defineProperty(exports, "buildRampingArrivalRateProfile", { enumerable: true, get: function () { return WorkloadModels_1.buildRampingArrivalRateProfile; } });
+Object.defineProperty(exports, "buildExternallyControlledProfile", { enumerable: true, get: function () { return WorkloadModels_1.buildExternallyControlledProfile; } });
+Object.defineProperty(exports, "toK6ExecutorConfig", { enumerable: true, get: function () { return WorkloadModels_1.toK6ExecutorConfig; } });
 var ExecutorFactory_1 = require("./scenario/ExecutorFactory");
 Object.defineProperty(exports, "ExecutorFactory", { enumerable: true, get: function () { return ExecutorFactory_1.ExecutorFactory; } });
 var ScenarioBuilder_1 = require("./scenario/ScenarioBuilder");
 Object.defineProperty(exports, "ScenarioBuilder", { enumerable: true, get: function () { return ScenarioBuilder_1.ScenarioBuilder; } });
 var TestPlanLoader_1 = require("./scenario/TestPlanLoader");
 Object.defineProperty(exports, "TestPlanLoader", { enumerable: true, get: function () { return TestPlanLoader_1.TestPlanLoader; } });
-var WorkloadModels_1 = require("./scenario/WorkloadModels");
-Object.defineProperty(exports, "buildIterationProfile", { enumerable: true, get: function () { return WorkloadModels_1.buildIterationProfile; } });
-Object.defineProperty(exports, "buildLoadProfile", { enumerable: true, get: function () { return WorkloadModels_1.buildLoadProfile; } });
-Object.defineProperty(exports, "buildSoakProfile", { enumerable: true, get: function () { return WorkloadModels_1.buildSoakProfile; } });
-Object.defineProperty(exports, "buildSpikeProfile", { enumerable: true, get: function () { return WorkloadModels_1.buildSpikeProfile; } });
-Object.defineProperty(exports, "buildStressProfile", { enumerable: true, get: function () { return WorkloadModels_1.buildStressProfile; } });
-Object.defineProperty(exports, "toK6ExecutorConfig", { enumerable: true, get: function () { return WorkloadModels_1.toK6ExecutorConfig; } });
 // -- Execution Layer --------------------------
 var HostMonitor_1 = require("./execution/HostMonitor");
 Object.defineProperty(exports, "HostMonitor", { enumerable: true, get: function () { return HostMonitor_1.HostMonitor; } });

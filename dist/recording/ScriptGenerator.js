@@ -7,40 +7,39 @@ class ScriptGenerator {
      * Output uses the transaction() wrapper and request() helper from the framework utils.
      */
     static generate(groups, lifecycle, teamName) {
-        let script = `import { check } from 'k6';\n`;
-        script += `import { transaction } from '../../../dist/utils/transaction.js';\n`;
+        let script = `import { transaction, check } from '../../../dist/utils/transaction.js';\n`;
         script += `import { request } from '../../../dist/utils/request.js';\n`;
         script += `import { createJourneyLifecycleStore, runJourneyLifecycle, thinktime } from '../../../dist/utils/lifecycle.js';\n`;
         script += `import { logReplayExchange, trackCorrelation, trackParameter } from '../../../dist/utils/replayLogger.js';\n`;
-        script += `import { clearCookies, registerBaseUrl, getEnvContext } from '../../../dist/utils/session.js';\n\n`;
+        script += `import { clearCookies, getEnvContext } from '../../../dist/utils/session.js';\n\n`;
         const baseUrls = this.extractBaseUrls(groups);
         const primaryBaseUrl = baseUrls[0];
-        script += `const env = getEnvContext('${teamName}', ${primaryBaseUrl ? `'${primaryBaseUrl}'` : 'undefined'});\n`;
-        script += `registerBaseUrl(env.baseUrl);\n`;
-        for (let i = 1; i < baseUrls.length; i++) {
-            script += `registerBaseUrl('${baseUrls[i]}');\n`;
-        }
-        script += `\n`;
+        const fallbackUrl = primaryBaseUrl ? primaryBaseUrl.replace(/\/+$/, '') : undefined;
+        script += `const env = getEnvContext('${teamName}', ${fallbackUrl ? `{ baseUrl: '${fallbackUrl}' }` : 'undefined'});\n\n`;
         const initSet = new Set(lifecycle?.initGroups ?? []);
         const endSet = new Set(lifecycle?.endGroups ?? []);
         const initGroups = groups.filter((g) => initSet.has(g.name));
         const endGroups = groups.filter((g) => endSet.has(g.name));
         const actionGroups = groups.filter((g) => !initSet.has(g.name) && !endSet.has(g.name));
         script += `const __journeyLifecycleStore = createJourneyLifecycleStore();\n\n`;
-        script += this.buildPhaseFunction('initPhase', initGroups, primaryBaseUrl);
+        // Script-wide request counter so req_1…req_N is sequential across all phases.
+        let scriptRequestId = 0;
+        script += this.buildPhaseFunction('initPhase', initGroups, primaryBaseUrl, scriptRequestId);
+        scriptRequestId += initGroups.reduce((s, g) => s + g.entries.length, 0);
         script += `\n`;
-        script += this.buildPhaseFunction('actionPhase', actionGroups, primaryBaseUrl);
+        script += this.buildPhaseFunction('actionPhase', actionGroups, primaryBaseUrl, scriptRequestId);
+        scriptRequestId += actionGroups.reduce((s, g) => s + g.entries.length, 0);
         script += `\n`;
-        script += this.buildPhaseFunction('endPhase', endGroups, primaryBaseUrl);
+        script += this.buildPhaseFunction('endPhase', endGroups, primaryBaseUrl, scriptRequestId);
         script += `\n`;
         script += `export default function () {\n`;
         script += `  runJourneyLifecycle(__journeyLifecycleStore, { initPhase, actionPhase, endPhase });\n`;
         script += `}\n`;
         return script;
     }
-    static buildPhaseFunction(functionName, groups, primaryBaseUrl) {
+    static buildPhaseFunction(functionName, groups, primaryBaseUrl, startRequestId = 0) {
         let script = `export function ${functionName}(ctx) {\n`;
-        let globalRequestId = 0;
+        let globalRequestId = startRequestId;
         if (functionName === 'initPhase') {
             script += `  clearCookies();\n\n`;
         }
@@ -55,10 +54,10 @@ class ScriptGenerator {
                 const method = req.method.toUpperCase();
                 const responseName = `res${reqIndex + 1}`;
                 const sequentialId = `req_${globalRequestId}`;
-                const relativePath = this.buildRelativePath(req.url, primaryBaseUrl);
+                const urlExpr = this.buildUrlExpression(req.url, primaryBaseUrl);
                 const hasHeaders = req.headers && req.headers.length > 0;
                 const hasBody = !!this.buildRequestBody(req.postData);
-                script += `    const ${responseName} = request('${method}', ${JSON.stringify(relativePath)}, {\n`;
+                script += `    const ${responseName} = request('${method}', ${urlExpr}, {\n`;
                 if (hasHeaders) {
                     const headersObj = {};
                     req.headers.forEach((h) => { headersObj[h.name] = h.value; });
@@ -69,7 +68,7 @@ class ScriptGenerator {
                     script += `      body: ${JSON.stringify(body)},\n`;
                 }
                 script += `      replay: {\n`;
-                script += `        harEntryId: ${JSON.stringify(sequentialId)},\n`;
+                script += `        id: ${JSON.stringify(sequentialId)},\n`;
                 script += `        recordingStartedAt: ${JSON.stringify(req.startedDateTime)},\n`;
                 script += `      },\n`;
                 script += `    });\n`;
@@ -88,21 +87,26 @@ class ScriptGenerator {
         script += `}\n`;
         return script;
     }
-    /** Build a relative path from an absolute URL, falling back to the absolute URL if origin differs. */
-    static buildRelativePath(absoluteUrl, primaryBaseUrl) {
+    /**
+     * Returns the URL expression to embed directly in the generated script (no extra quoting needed).
+     * Same-domain paths become `${env.baseUrl}/path` template literals so request() receives an
+     * absolute URL; different-domain URLs are kept as JSON string literals.
+     */
+    static buildUrlExpression(absoluteUrl, primaryBaseUrl) {
         if (!primaryBaseUrl) {
-            return absoluteUrl;
+            return JSON.stringify(absoluteUrl);
         }
         try {
             const parsed = new URL(absoluteUrl);
             const normalizedOrigin = parsed.origin + '/';
-            if (normalizedOrigin !== primaryBaseUrl) {
-                return absoluteUrl;
+            if (normalizedOrigin === primaryBaseUrl) {
+                const path = parsed.pathname + (parsed.search || '') + (parsed.hash || '');
+                return `\`\${env.baseUrl}${path}\``;
             }
-            return parsed.pathname + (parsed.search || '') + (parsed.hash || '');
+            return JSON.stringify(absoluteUrl);
         }
         catch {
-            return absoluteUrl;
+            return JSON.stringify(absoluteUrl);
         }
     }
     static buildRequestBody(postData) {

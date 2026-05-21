@@ -9,6 +9,33 @@ const _registeredUrls = new Set<string>();
 // The first URL registered (primary base URL) — used by resolvePath() when no env var is set.
 let _primaryBaseUrl: string | undefined;
 
+// Auto-register base URLs from framework env vars at module init (k6 init context).
+// This makes clearCookies() work without an explicit registerBaseUrl() call in scripts.
+// Generated scripts pass absolute URLs (${env.baseUrl}/path) so request() handles
+// per-origin registration automatically; this IIFE is a fallback for standalone runs.
+(function autoRegisterFromFrameworkEnv() {
+  if (typeof __ENV === 'undefined') return;
+  try {
+    const baseUrl = __ENV['K6_PERF_BASE_URL'];
+    if (baseUrl) {
+      const normalized = baseUrl.replace(/\/+$/, '') + '/';
+      _registeredUrls.add(normalized);
+      if (!_primaryBaseUrl) _primaryBaseUrl = normalized;
+    }
+    const serviceUrlsRaw = __ENV['K6_PERF_SERVICE_URLS'];
+    if (serviceUrlsRaw) {
+      const serviceUrls = JSON.parse(serviceUrlsRaw) as Record<string, string>;
+      for (const url of Object.values(serviceUrls)) {
+        if (url) {
+          const normalized = url.replace(/\/+$/, '') + '/';
+          _registeredUrls.add(normalized);
+          if (!_primaryBaseUrl) _primaryBaseUrl = normalized;
+        }
+      }
+    }
+  } catch { /* silent — env vars may not be present in standalone runs */ }
+})();
+
 interface ResolveFrameworkUrlOptions {
   fallbackBaseUrl?: string;
   service?: string;
@@ -22,12 +49,19 @@ export interface TeamEnvironmentOverride {
 
 /**
  * Get the environment context for a specific team.
- * Throws a descriptive error if the environment is missing and no fallback is provided.
+ *
+ * @param teamName - Must match the key in scrum_suites of the loaded environment file.
+ * @param fallback - Full fallback environment used when the CLI has not injected env config
+ *                   (e.g., standalone k6 run). Explicitly typed as TeamEnvironmentOverride so
+ *                   it is clear which fields (baseUrl, serviceUrls, custom) are being overridden.
+ *
+ * Example:
+ *   const env = getEnvContext('jpet_new', { baseUrl: 'https://jpetstore.aspectran.com' });
  */
-export function getEnvContext(teamName: string, fallbackBaseUrl?: string): TeamEnvironmentOverride {
+export function getEnvContext(teamName: string, fallback?: TeamEnvironmentOverride): TeamEnvironmentOverride {
   if (!__ENV.K6_PERF_TEAM_ENVIRONMENTS) {
-    if (fallbackBaseUrl) {
-      return { baseUrl: fallbackBaseUrl };
+    if (fallback) {
+      return fallback;
     }
     const envFileName = __ENV.K6_PERF_ENVIRONMENT ? `${__ENV.K6_PERF_ENVIRONMENT}.json` : 'the loaded environment config';
     throw new Error(`Environment config missing for '${teamName}' in ${envFileName} and no fallback provided. Please run via k6-perf CLI or provide a fallback.`);
@@ -39,14 +73,14 @@ export function getEnvContext(teamName: string, fallbackBaseUrl?: string): TeamE
     if (teamEnv && teamEnv.baseUrl) {
       return teamEnv;
     }
-    if (fallbackBaseUrl) {
-      return { baseUrl: fallbackBaseUrl };
+    if (fallback) {
+      return fallback;
     }
     const envFileName = __ENV.K6_PERF_ENVIRONMENT ? `${__ENV.K6_PERF_ENVIRONMENT}.json` : 'the loaded environment config';
     throw new Error(`Environment config missing for '${teamName}' in ${envFileName} and no fallback provided.`);
   } catch (err) {
-    if (fallbackBaseUrl) {
-      return { baseUrl: fallbackBaseUrl };
+    if (fallback) {
+      return fallback;
     }
     throw err;
   }

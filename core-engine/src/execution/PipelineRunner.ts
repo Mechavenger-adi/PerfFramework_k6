@@ -23,6 +23,10 @@ export interface RunOptions {
   env?: Record<string, string>;
   /** Capture stdout/stderr instead of inheriting them */
   captureOutput?: boolean;
+  /** Pipe and capture stdout only; stderr is inherited (TTY) so k6's progress bar renders. Use with logOutputPath. */
+  captureStdout?: boolean;
+  /** Path to write k6 log output (passes --log-output file=<path>). Use with captureStdout to capture logs while stderr stays as TTY. */
+  logOutputPath?: string;
   /** Called for each line of stdout/stderr (only when captureOutput is false). Used for live event interception. */
   onLine?: (line: string) => void;
   /** Logical run identifier for metadata/artifact naming */
@@ -110,11 +114,21 @@ export class PipelineRunner {
       stdoutPath = path.join(tempDir, `${scriptName}_stdout_${stamp}.log`);
       stderrPath = path.join(tempDir, `${scriptName}_stderr_${stamp}.log`);
       const stdoutFd = fs.openSync(stdoutPath, 'w');
-      const stderrFd = fs.openSync(stderrPath, 'w');
+
+      // Route k6 logs to both the terminal (so the progress bar and console.log appear)
+      // and to a file (so replay log parsing can read them afterward).
+      // k6 supports multiple --log-output flags simultaneously.
+      const captureArgs = [
+        ...k6Args,
+        '--log-output', 'stderr',
+        '--log-output', `file=${stderrPath}`,
+      ];
 
       try {
-        result = childProcess.spawnSync('k6', k6Args, {
-          stdio: ['ignore', stdoutFd, stderrFd],
+        result = childProcess.spawnSync('k6', captureArgs, {
+          // stdout → file for metrics summary; stderr → inherited so k6's
+          // progress bar renders in the terminal and console.log is visible.
+          stdio: ['ignore', stdoutFd, 'inherit'],
           cwd,
           env: {
             ...process.env,
@@ -123,7 +137,6 @@ export class PipelineRunner {
         });
       } finally {
         fs.closeSync(stdoutFd);
-        fs.closeSync(stderrFd);
       }
     } else {
       result = childProcess.spawnSync('k6', k6Args, {
@@ -165,6 +178,8 @@ export class PipelineRunner {
       cwd = process.cwd(),
       env = {},
       captureOutput = false,
+      captureStdout = false,
+      logOutputPath,
       onLine,
       runId,
       reportDir,
@@ -184,19 +199,36 @@ export class PipelineRunner {
     const optionsFile = path.join(tempDir, optionsFileName);
     fs.writeFileSync(optionsFile, JSON.stringify(k6Options, null, 2), 'utf-8');
 
-    if (!captureOutput) {
+    if (!captureOutput && !captureStdout) {
       Logger.info(`[PipelineRunner] Starting k6 execution...`);
       Logger.info(`  Script  : ${absScript}`);
       Logger.info(`  Journeys: ${Object.keys(k6Options.scenarios ?? {}).join(', ')}\n`);
     }
 
-    const k6Args = ['run', absScript, '--config', optionsFile, ...extraK6Args];
-
-    const needsPipe = captureOutput || !!onLine;
+    // Forward slashes required for k6's --log-output file= argument on Windows.
+    // Also explicitly retain --log-output stderr so logs still reach the terminal
+    // when a file destination is added (specifying any --log-output replaces the default).
+    const logPathFwd = logOutputPath ? logOutputPath.replace(/\\/g, '/') : undefined;
+    const k6Args = [
+      'run', absScript, '--config', optionsFile,
+      ...(logPathFwd ? ['--log-output', 'stderr', '--log-output', `file=${logPathFwd}`] : []),
+      ...extraK6Args,
+    ];
 
     return new Promise((resolve, reject) => {
+      // stdio strategy:
+      //   captureOutput=true  → fully piped (no TTY, full capture)
+      //   captureStdout=true  → stdout piped (captured), stderr inherited (TTY → progress bar)
+      //   onLine set          → stdout piped for line interception, stderr inherited (TTY)
+      //   neither             → fully inherited (cleanest output for simple runs)
+      const stdioCfg: childProcess.StdioOptions = captureOutput
+        ? 'pipe'
+        : (captureStdout || onLine)
+          ? ['ignore', 'pipe', 'inherit']
+          : 'inherit';
+
       const child = childProcess.spawn('k6', k6Args, {
-        stdio: needsPipe ? 'pipe' : 'inherit',
+        stdio: stdioCfg,
         cwd,
         env: {
           ...process.env,
@@ -219,8 +251,14 @@ export class PipelineRunner {
 
       if (child.stdout) {
         child.stdout.on('data', (chunk: Buffer) => {
-          if (captureOutput) stdout += chunk.toString();
-          else process.stdout.write(chunk);
+          if (captureOutput) {
+            stdout += chunk.toString();
+          } else if (captureStdout) {
+            stdout += chunk.toString();
+            process.stdout.write(chunk); // tee: live progress visible + captured for HTML report
+          } else {
+            process.stdout.write(chunk);
+          }
           processChunk(chunk, stdoutBuf);
         });
       }
@@ -228,7 +266,7 @@ export class PipelineRunner {
       if (child.stderr) {
         child.stderr.on('data', (chunk: Buffer) => {
           if (captureOutput) stderr += chunk.toString();
-          else process.stderr.write(chunk);
+          else if (!onLine && !captureStdout) process.stderr.write(chunk);
           processChunk(chunk, stderrBuf);
         });
       }
@@ -244,7 +282,7 @@ export class PipelineRunner {
           if (stderrBuf.val) onLine(stderrBuf.val);
         }
 
-        if (!captureOutput) {
+        if (!captureOutput && !captureStdout && !logOutputPath) {
           try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch { /* ignore */ }
         }
 
@@ -252,6 +290,7 @@ export class PipelineRunner {
           status: code ?? 1,
           stdout,
           stderr,
+          stderrPath: logOutputPath,
           optionsPath: optionsFile,
           reportDir,
           runId,

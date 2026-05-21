@@ -12,6 +12,9 @@ exports.buildStressProfile = buildStressProfile;
 exports.buildSoakProfile = buildSoakProfile;
 exports.buildSpikeProfile = buildSpikeProfile;
 exports.buildIterationProfile = buildIterationProfile;
+exports.buildConstantArrivalRateProfile = buildConstantArrivalRateProfile;
+exports.buildRampingArrivalRateProfile = buildRampingArrivalRateProfile;
+exports.buildExternallyControlledProfile = buildExternallyControlledProfile;
 exports.toK6ExecutorConfig = toK6ExecutorConfig;
 // ---------------------------------------------
 // Factory Functions
@@ -68,6 +71,36 @@ function buildIterationProfile(options) {
         iterations: options.iterations,
     };
 }
+/** Build a constant arrival-rate profile */
+function buildConstantArrivalRateProfile(options) {
+    return {
+        executor: 'constant-arrival-rate',
+        rate: options.rate,
+        duration: options.duration,
+        preAllocatedVUs: options.preAllocatedVUs,
+        timeUnit: options.timeUnit ?? '1s',
+        maxVUs: options.maxVUs,
+    };
+}
+/** Build a ramping arrival-rate profile */
+function buildRampingArrivalRateProfile(options) {
+    return {
+        executor: 'ramping-arrival-rate',
+        stages: options.stages,
+        preAllocatedVUs: options.preAllocatedVUs,
+        timeUnit: options.timeUnit ?? '1s',
+        maxVUs: options.maxVUs,
+    };
+}
+/** Build an externally-controlled profile */
+function buildExternallyControlledProfile(options) {
+    return {
+        executor: 'externally-controlled',
+        maxVUs: options.maxVUs,
+        vus: options.vus ?? 0,
+        duration: options.duration ?? '0',
+    };
+}
 /** Translate a GlobalLoadProfile into a k6 executor config block */
 function toK6ExecutorConfig(profile) {
     return {
@@ -77,5 +110,9 @@ function toK6ExecutorConfig(profile) {
         vus: profile.vus,
         duration: profile.duration,
         iterations: profile.iterations,
+        rate: profile.rate,
+        timeUnit: profile.timeUnit,
+        preAllocatedVUs: profile.preAllocatedVUs,
+        maxVUs: profile.maxVUs,
     };
 }

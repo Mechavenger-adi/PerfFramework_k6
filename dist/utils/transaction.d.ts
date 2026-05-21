@@ -1,3 +1,5 @@
+/** Returns true if this VU was stopped via stop_vu errorBehavior. */
+export declare function isVuTerminated(): boolean;
 /**
  * Initializes Trends and Counters for the specified transactions.
  * MUST be called in the script's init context (global scope), not inside VU functions.
@@ -36,3 +38,10 @@ export declare function endTransaction(name: string): void;
  * Nesting: nested transaction() calls are rejected with a descriptive error.
  */
 export declare function transaction(name: string, fn: () => void): void;
+/**
+ * Framework-aware check() that wraps k6's native check() so metrics are always recorded,
+ * then applies errorBehavior when one or more checks fail.
+ *
+ * Drop-in replacement for k6's check() — same signature, same metric output.
+ */
+export declare function check(val: any, sets: Record<string, (v: any) => boolean>): boolean;

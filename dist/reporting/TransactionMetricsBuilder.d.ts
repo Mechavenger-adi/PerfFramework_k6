@@ -36,6 +36,11 @@ export declare class TransactionMetricsBuilder {
     private static buildGroupRow;
     private static buildMetricOnlyRow;
     private static applyConfiguredStats;
+    /**
+     * Approximate standard deviation from percentile data when handleSummary stddev is absent.
+     * Uses normal-distribution relationship p90 = avg + 1.282*σ (or p95 = avg + 1.645*σ).
+     */
+    private static approximateStddev;
     private static collectGroups;
     private static aggregateGroup;
     /** Normalize k6 summary groups (object-map or array) to array. */

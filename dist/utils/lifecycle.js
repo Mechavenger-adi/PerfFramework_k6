@@ -13,6 +13,7 @@ const k6_1 = require("k6");
 const execution_1 = __importDefault(require("k6/execution"));
 // @ts-ignore - K6 runtime module
 const metrics_1 = require("k6/metrics");
+const transaction_js_1 = require("./transaction.js");
 // ── Implementation ────────────────────────────────────────────
 const frameworkIterations = new metrics_1.Counter('framework_iterations');
 function createContext() {
@@ -145,6 +146,19 @@ function getEndSignal(phases) {
         const shouldPermanentlyEnd = shouldRunEndPhase && isFinalRampDown;
         return { beforeAction: shouldPermanentlyEnd, afterAction: shouldPermanentlyEnd };
     }
+    // --- Arrival-Rate executors (constant-arrival-rate / ramping-arrival-rate) ---
+    // k6 controls the VU pool size for these executors — end detection is purely
+    // time-based.  Once elapsed time reaches the total scenario duration, any VU
+    // that is about to start a new action (beforeAction) or has just finished one
+    // (afterAction) will run endPhase instead.
+    if ((phases.mode === 'constant-arrival-rate' || phases.mode === 'ramping-arrival-rate') &&
+        Array.isArray(phases.timeline) &&
+        phases.timeline.length > 0) {
+        const totalDurationMs = phases.timeline[phases.timeline.length - 1].endMs;
+        const elapsedMs = Date.now() - execution_1.default.scenario.startTime;
+        const isDone = elapsedMs >= totalDurationMs;
+        return { beforeAction: isDone, afterAction: isDone };
+    }
     return { beforeAction: false, afterAction: false };
 }
 function handlePhaseError(store, error, phaseName, runtime) {
@@ -226,9 +240,12 @@ function runJourneyLifecycle(store, phaseFns) {
     const runtime = getRuntimeMetadata();
     const phases = getPhaseMetadata();
     const state = store.state;
-    if (state.terminated || state.ended) {
-        // VU was terminated (stop_vu) or has run its endPhase — return immediately.
-        // Sleeping here wastes a VU slot; k6 will recycle the VU naturally.
+    if (state.terminated || state.ended || (0, transaction_js_1.isVuTerminated)()) {
+        // Park the VU for the rest of the scenario. Without this sleep, default()
+        // returns instantly and k6 immediately starts another iteration, tight-looping
+        // at ~300+ iter/s and inflating the iteration counter to hundreds of thousands.
+        // k6 interrupts this sleep cleanly when the scenario ends.
+        (0, k6_1.sleep)(86400);
         return;
     }
     if (!state.initialized) {
@@ -249,7 +266,7 @@ function runJourneyLifecycle(store, phaseFns) {
     }
     frameworkIterations.add(1);
     const actionBehavior = runSafely(store, 'action', phaseFns.actionPhase, runtime);
-    if (actionBehavior !== 'continue' || state.terminated) {
+    if (actionBehavior !== 'continue' || state.terminated || (0, transaction_js_1.isVuTerminated)()) {
         return;
     }
     if (runtime.pacingEnabled && Number(runtime.pacingSeconds || 0) > 0) {

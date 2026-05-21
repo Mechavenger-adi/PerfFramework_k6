@@ -16,6 +16,10 @@ export interface K6ScenarioDefinition {
     vus?: number;
     duration?: string;
     iterations?: number;
+    rate?: number;
+    timeUnit?: string;
+    preAllocatedVUs?: number;
+    maxVUs?: number;
     startTime?: string;
     tags?: Record<string, string>;
     env?: Record<string, string>;
@@ -58,10 +62,14 @@ export interface ScenarioRuntimeMetadata {
     };
 }
 interface ScenarioPhaseEnvelope {
-    mode: 'ramping-vus' | 'per-vu-iterations' | 'shared-iterations' | 'unsupported';
+    mode: 'ramping-vus' | 'per-vu-iterations' | 'shared-iterations' | 'constant-arrival-rate' | 'ramping-arrival-rate' | 'externally-controlled' | 'unsupported';
     startVUs?: number;
     totalIterations?: number;
     vus?: number;
+    rate?: number;
+    timeUnit?: string;
+    preAllocatedVUs?: number;
+    maxVUs?: number;
     timeline?: Array<{
         endMs: number;
         vus: number;

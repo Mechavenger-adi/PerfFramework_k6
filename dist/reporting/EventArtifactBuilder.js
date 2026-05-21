@@ -102,9 +102,8 @@ class EventArtifactBuilder {
                 visit(child);
             }
         };
-        for (const group of this.toGroupArray(root.groups)) {
-            visit(group);
-        }
+        // Process root-level checks (checks placed outside any transaction group)
+        visit(root);
         return failures;
     }
     static collectThresholdWarningEvents(options, agent) {

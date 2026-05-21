@@ -79,6 +79,7 @@ class ScriptConverter {
         const result = [];
         let requestCounter = 0;
         let globalRequestId = 0;
+        // Note: globalRequestId is script-wide so IDs are req_1…req_N across all phases
         let currentGroupName = '';
         let insideGroup = false;
         let groupBraceDepth = 0;
@@ -153,11 +154,7 @@ class ScriptConverter {
         // Phase 1: Emit imports
         const importBlock = this.buildImportBlock(source, false, false);
         result.push(importBlock);
-        result.push(`\nconst env = getEnvContext('${teamName}', ${primaryBaseUrl ? `'${primaryBaseUrl}'` : 'undefined'});`);
-        result.push(`registerBaseUrl(env.baseUrl);`);
-        for (let j = 1; j < detectedBaseUrls.length; j++) {
-            result.push(`registerBaseUrl('${detectedBaseUrls[j]}');`);
-        }
+        result.push(`\nconst env = getEnvContext('${teamName}', ${primaryBaseUrl ? `{ baseUrl: '${primaryBaseUrl}' }` : 'undefined'});`);
         // Skip original import lines and Trend declarations
         const importEndIndex = this.findImportBlockEnd(lines);
         // Transaction names are auto-registered via K6_PERF_TRANSACTION_NAMES env var injected
@@ -263,7 +260,7 @@ class ScriptConverter {
                 // Emit transaction() wrapper instead of group() + startTransaction()
                 const groupIndent = groupMatch[1];
                 const sanitizedName = this.sanitizeTransactionName(currentGroupName);
-                result.push(`${groupIndent}transaction('${sanitizedName}', () => {`);
+                result.push(`${groupIndent}transaction('${sanitizedName}', function() {`);
                 groupBraceDepth = 1; // the transaction body { is now open
                 continue;
             }
@@ -425,13 +422,13 @@ class ScriptConverter {
     }
     static buildImportBlock(source, _hasTransactionImport, _hasLogReplayExchange) {
         const lines = [];
-        lines.push(`import { check, sleep } from 'k6';`);
-        lines.push(`import { transaction } from '../../../dist/utils/transaction.js';`);
+        lines.push(`import { sleep } from 'k6';`);
+        lines.push(`import { transaction, check } from '../../../dist/utils/transaction.js';`);
         lines.push(`import { request } from '../../../dist/utils/request.js';`);
         // trackCorrelation / trackParameter / trackDataRow still needed for correlation/data tracking
         lines.push(`import { trackCorrelation, trackParameter, trackDataRow } from '../../../dist/utils/replayLogger.js';`);
         lines.push(`import { createJourneyLifecycleStore, runJourneyLifecycle, thinktime } from '../../../dist/utils/lifecycle.js';`);
-        lines.push(`import { clearCookies, registerBaseUrl, getEnvContext } from '../../../dist/utils/session.js';`);
+        lines.push(`import { clearCookies, getEnvContext } from '../../../dist/utils/session.js';`);
         // Preserve any other imports from the original source (CorrelationEngine, RuleProcessor, etc.)
         const srcLines = source.split('\n');
         for (const srcLine of srcLines) {
@@ -445,7 +442,7 @@ class ScriptConverter {
                 continue;
             if (/lifecycle\.js/.test(srcLine))
                 continue;
-            if (/session\.js/.test(srcLine))
+            if (/session\.js|registerBaseUrl/.test(srcLine))
                 continue;
             if (/request\.js/.test(srcLine))
                 continue;
@@ -616,7 +613,7 @@ class ScriptConverter {
             s += `${inner}body: ${body},\n`;
         }
         // Replay metadata for debug diff tracing
-        s += `${inner}replay: { harEntryId: ${JSON.stringify(entryId)}, recordingStartedAt: 'converted' },\n`;
+        s += `${inner}replay: { id: ${JSON.stringify(entryId)}, recordingStartedAt: 'converted' },\n`;
         s += `${indent}});`;
         return s;
     }
@@ -696,31 +693,39 @@ class ScriptConverter {
         return sanitized.slice(0, 128);
     }
     static applyPhaseContract(source, teamName, lifecycle) {
-        // Match both `export default function () {` and `export default function() {`
-        const markerMatch = source.match(/export\s+default\s+function\s*\(\s*\)\s*\{/);
+        // Normalize stale patterns before phase splitting
+        let cleaned = source;
+        cleaned = cleaned.replace(/^\s*variableEvents:\s*\[\],?\n/gm, '');
+        cleaned = cleaned.replace(/from\s+['"](\.\.\/)+(dist\/utils\/)/g, `from '../../../dist/utils/`);
+        const markerMatch = cleaned.match(/export\s+default\s+function\s*\(\s*\)\s*\{/);
         if (!markerMatch) {
-            return source;
+            return cleaned;
         }
         const defaultStart = markerMatch.index;
-        const bodyStart = source.indexOf('{', defaultStart);
-        const bodyEnd = this.findMatchingBrace(source, bodyStart);
+        const bodyStart = cleaned.indexOf('{', defaultStart);
+        const bodyEnd = this.findMatchingBrace(cleaned, bodyStart);
         if (bodyStart === -1 || bodyEnd === -1) {
-            return source;
+            return cleaned;
         }
-        let beforeDefault = source.slice(0, defaultStart);
-        const defaultBody = source.slice(bodyStart + 1, bodyEnd);
-        const afterDefault = source.slice(bodyEnd + 1);
+        let beforeDefault = cleaned.slice(0, defaultStart);
+        const defaultBody = cleaned.slice(bodyStart + 1, bodyEnd);
+        const afterDefault = cleaned.slice(bodyEnd + 1);
         const statements = this.splitTopLevelStatements(defaultBody);
         const grouped = this.partitionLifecycleStatements(statements, lifecycle ?? { initGroups: [], endGroups: [] });
         if (!/createJourneyLifecycleStore/.test(beforeDefault)) {
             beforeDefault += `\nimport { createJourneyLifecycleStore, runJourneyLifecycle } from '../../../dist/utils/lifecycle.js';\n`;
         }
-        // Extract and register base URLs from the source script
-        const baseUrls = this.extractBaseUrlsFromSource(source);
+        // Strip any stale const env / registerBaseUrl declarations that will be re-emitted below.
+        // This prevents duplicate declarations when applyPhaseContract is called on already
+        // partially-converted source (e.g. the output of convert() which emits env itself).
+        beforeDefault = beforeDefault
+            .replace(/^\s*const\s+env\s*=\s*getEnvContext\s*\([^)]*\)\s*;?\s*\n/gm, '')
+            .replace(/^\s*registerBaseUrl\s*\([^)]*\)\s*;?\s*\n/gm, '');
+        const baseUrls = this.extractBaseUrlsFromSource(cleaned);
         const primaryBaseUrl = baseUrls[0];
-        const registerBlock = `const env = getEnvContext('${teamName}', ${primaryBaseUrl ? `'${primaryBaseUrl}'` : 'undefined'});\nregisterBaseUrl(env.baseUrl);`;
+        const envBlock = `const env = getEnvContext('${teamName}', ${primaryBaseUrl ? `{ baseUrl: '${primaryBaseUrl}' }` : 'undefined'});`;
         return beforeDefault
-            + (baseUrls.length > 0 ? registerBlock + '\n\n' : '')
+            + (baseUrls.length > 0 ? envBlock + '\n\n' : '')
             + `const __journeyLifecycleStore = createJourneyLifecycleStore();\n\n`
             + this.renderPhaseFunction('initPhase', grouped.initPrelude, grouped.initGroups)
             + `\n`

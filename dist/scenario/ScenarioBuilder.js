@@ -227,6 +227,46 @@ class ScenarioBuilder {
                 totalIterations: profile.iterations ?? 1,
             };
         }
+        // --- constant-arrival-rate: duration-based exit with rate metadata ---
+        if (profile.executor === 'constant-arrival-rate' && profile.rate && profile.duration) {
+            const totalMs = this.parseDurationToSeconds(profile.duration) * 1000;
+            return {
+                mode: 'constant-arrival-rate',
+                rate: profile.rate,
+                timeUnit: profile.timeUnit ?? '1s',
+                preAllocatedVUs: profile.preAllocatedVUs,
+                maxVUs: profile.maxVUs,
+                timeline: [{ endMs: totalMs, vus: profile.preAllocatedVUs ?? 0 }],
+            };
+        }
+        // --- ramping-arrival-rate: stage-based rate ramp with timeline ---
+        if (profile.executor === 'ramping-arrival-rate' &&
+            profile.stages &&
+            profile.stages.length > 0) {
+            let cumulativeMs = 0;
+            const timeline = profile.stages.map((stage) => {
+                cumulativeMs += this.parseDurationToSeconds(stage.duration) * 1000;
+                return {
+                    endMs: cumulativeMs,
+                    vus: stage.target,
+                };
+            });
+            return {
+                mode: 'ramping-arrival-rate',
+                preAllocatedVUs: profile.preAllocatedVUs,
+                maxVUs: profile.maxVUs,
+                timeUnit: profile.timeUnit ?? '1s',
+                timeline,
+            };
+        }
+        // --- externally-controlled: open-ended, VU count managed via k6 REST API ---
+        if (profile.executor === 'externally-controlled' && profile.maxVUs) {
+            return {
+                mode: 'externally-controlled',
+                vus: profile.vus ?? 0,
+                maxVUs: profile.maxVUs,
+            };
+        }
         return {
             mode: 'unsupported',
         };

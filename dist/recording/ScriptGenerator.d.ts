@@ -10,8 +10,12 @@ export declare class ScriptGenerator {
      */
     static generate(groups: TransactionGroup[], lifecycle: LifecycleSelection | undefined, teamName: string): string;
     private static buildPhaseFunction;
-    /** Build a relative path from an absolute URL, falling back to the absolute URL if origin differs. */
-    private static buildRelativePath;
+    /**
+     * Returns the URL expression to embed directly in the generated script (no extra quoting needed).
+     * Same-domain paths become `${env.baseUrl}/path` template literals so request() receives an
+     * absolute URL; different-domain URLs are kept as JSON string literals.
+     */
+    private static buildUrlExpression;
     private static buildRequestBody;
     /** Inline-format a plain object as a JS object literal at the given indent level. */
     private static formatInlineObject;

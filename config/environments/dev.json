@@ -11,7 +11,7 @@
         "tenantId": "sample-team-dev"
       }
     },
-    "Jpet_new": {
+    "jpet_new": {
       "baseUrl": "https://jpetstore.aspectran.com"
     }
   }

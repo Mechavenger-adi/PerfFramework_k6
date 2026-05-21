@@ -9,9 +9,16 @@ export interface TeamEnvironmentOverride {
 }
 /**
  * Get the environment context for a specific team.
- * Throws a descriptive error if the environment is missing and no fallback is provided.
+ *
+ * @param teamName - Must match the key in scrum_suites of the loaded environment file.
+ * @param fallback - Full fallback environment used when the CLI has not injected env config
+ *                   (e.g., standalone k6 run). Explicitly typed as TeamEnvironmentOverride so
+ *                   it is clear which fields (baseUrl, serviceUrls, custom) are being overridden.
+ *
+ * Example:
+ *   const env = getEnvContext('jpet_new', { baseUrl: 'https://jpetstore.aspectran.com' });
  */
-export declare function getEnvContext(teamName: string, fallbackBaseUrl?: string): TeamEnvironmentOverride;
+export declare function getEnvContext(teamName: string, fallback?: TeamEnvironmentOverride): TeamEnvironmentOverride;
 /**
  * Register a base URL so clearCookies() can clear it without manual arguments.
  * Called automatically by the framework at script init; users can also call it

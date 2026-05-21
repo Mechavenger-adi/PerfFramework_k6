@@ -43,6 +43,7 @@ class HTMLDiffReporter {
         const overallScore = this.average(results.map((result) => result.matchScore));
         const k6Errors = options?.k6Errors ?? [];
         const k6Metrics = options?.k6Metrics;
+        const consoleLogs = options?.consoleLogs ?? [];
         const iterationSummaryRows = iterationKeys
             .map((iteration) => this.renderIterationSummaryRow(groupedByIteration.get(iteration)))
             .join('\n');
@@ -724,6 +725,15 @@ class HTMLDiffReporter {
         <h2>k6 Runtime Errors (${k6Errors.length})</h2>
         <ul class="error-list">
           ${k6Errors.map(e => `<li class="error-item">${this.escapeHtml(e)}</li>`).join('\n          ')}
+        </ul>
+      </section>
+      ` : ''}
+
+      ${consoleLogs.length > 0 ? `
+      <section class="error-panel" style="border-color:#0ea5e9;background:#f0f9ff;">
+        <h2 style="color:#0369a1;">Script Console Output (${consoleLogs.length} lines)</h2>
+        <ul class="error-list" style="font-family:var(--font-mono);font-size:12px;">
+          ${consoleLogs.map(l => `<li class="error-item" style="color:#0c4a6e;">${this.escapeHtml(l)}</li>`).join('\n          ')}
         </ul>
       </section>
       ` : ''}

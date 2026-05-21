@@ -1,239 +1,430 @@
-Performance Engineering Framework
-This framework is a performance testing solution for k6 based on the 12-Factor App principles. It provides a structured approach to define, organize, and execute performance tests with advanced features like journey-based execution, variable-driven environments, data-driven testing, and real-time execution insights.
+# K6 Performance Framework
 
-Core Features
-User Journey Execution
-Journeys are composed of distinct user actions, each with:
+A TypeScript-powered performance testing framework on top of Grafana k6. The framework helps teams organize k6 scripts into scrum-suite folders, generate scripts from HAR recordings, validate configuration before execution, run load/debug test plans, and produce structured reports for humans and CI.
 
-Step-based recording/replay execution
-Built-in cookie management
-Action-level response validation
-Smart transaction tagging (with error classification)
-Transaction Instrumentation
-Automatic instrumentation of k6 transactions for k6-to-LoadRunner correlation
-Session-aware metric collectors
-Error tracking for transaction failure analysis
-Test Management
-TestPlan and UserJourney schemas for organizing tests
-Execution Modes
-Parallel — all journeys run concurrently
-Sequential — journeys run one after another with controlled timing
-Hybrid — custom groups of journeys with mixed execution modes
-Scenario Organization
-Dynamic scenario generation based on test plan
-Automatic mapping of journeys to k6 exec functions
-Support for complex execution patterns
-Test Infrastructure
-Variable-driven environments with per-environment configs
-Environment-specific session management
-Flexible test data management
-Execution Flow
-1. Test Plan Definition
-A test plan defines:
+## What This Framework Provides
 
-Overall execution configuration (mode, duration, stages, etc.)
-List of user journeys
-Load profiles for each journey
-Environment variables and base URLs
+- Declarative test plans for parallel, sequential, and hybrid journey execution.
+- Team-owned test suites under `scrum-suites/<team>/`.
+- HAR-to-k6 script generation with transaction grouping and replay metadata.
+- BYOS support for wrapping existing k6 scripts in the framework lifecycle.
+- Environment, runtime, SLA, and secret configuration resolution.
+- Gatekeeper validation before running a test.
+- Transaction metrics, snapshots, warnings, errors, CI summaries, and HTML reports.
+- Debug replay mode for comparing generated scripts with original recordings.
+
+## Repository Layout
+
+```text
+K6-PerfFramework/
+  core-engine/                 Framework TypeScript source
+  dist/                        Compiled JavaScript output
+  config/
+    environments/              Environment configs such as dev.json
+    runtime-settings/          Runtime behavior such as think time and reporting
+    schemas/                   JSON schemas for validation
+    test-plans/                Runnable test plans
+  scrum-suites/
+    <team>/
+      tests/                   k6 journey scripts
+      recordings/              HAR files and normalized recording logs
+      data/                    CSV/JSON test data
+  templates/                   Reusable test-plan and runtime templates
+  results/                     Generated local run artifacts
+```
+
+## Prerequisites
+
+Install these before running the framework:
+
+- Node.js 22 or later
+- npm 11 or later
+- Grafana k6 installed and available on `PATH`
+- Git
+
+Verify the tools:
+
+```bash
+node --version
+npm --version
+k6 version
+git --version
+```
+
+Install k6:
+
+```bash
+# Windows
+winget install k6
+
+# macOS
+brew install k6
+
+# Ubuntu/Debian
+sudo apt-get update
+sudo apt-get install k6
+```
+
+## First-Time Setup
+
+From the repository root:
+
+```bash
+npm install
+npm run build
+```
+
+Create a local `.env` file when secrets or local output overrides are needed:
+
+```bash
+copy .env.template .env
+```
+
+On macOS/Linux:
+
+```bash
+cp .env.template .env
+```
+
+Do not commit `.env`.
+
+Useful `.env` values:
+
+```dotenv
+K6_RESULTS_BASE_DIR=results
+K6_INFLUXDB_URL=http://localhost:8086/k6
+```
+
+`K6_INFLUXDB_URL` is optional. When set, the runner adds an InfluxDB k6 output.
+
+## Common Commands
+
+Run all commands from the repository root.
+
+```bash
+# Show CLI help
+npm run cli -- --help
+
+# Build TypeScript
+npm run build
+
+# Type-check without emitting files
+npm run typecheck
+
+# Validate a test plan
+npm run validate -- --plan config/test-plans/load-test.json
+
+# Run the default load test plan shortcut
+npm run loadtest
+
+# Run the default debug test plan shortcut
+npm run debug
+
+# Run any test plan
+npm run cli -- run --plan config/test-plans/load-test.json
+```
+
+## Configuration Files
+
+### Environment Config
+
+Environment files live in `config/environments/`. The test plan `environment` value must match one of these files.
+
+Example: `config/environments/dev.json`
+
+```json
+{
+  "$schema": "../schemas/environment.schema.json",
+  "name": "dev",
+  "scrum_suites": {
+    "Jpet_new": {
+      "baseUrl": "https://jpetstore.aspectran.com"
+    }
+  }
+}
+```
+
+Use `scrum_suites` keys that match the team folder under `scrum-suites/`.
+
+### Runtime Settings
+
+Runtime settings live in `config/runtime-settings/default.json`. They control think time, pacing, HTTP behavior, error behavior, reporting, snapshots, monitoring, and debug verbosity.
+
+Use a custom runtime file with:
+
+```bash
+npm run cli -- run --plan config/test-plans/load-test.json --runtime config/runtime-settings/default.json
+```
+
+### Test Plan
+
+Test plans live in `config/test-plans/`. A plan selects the environment, workload model, journeys, and SLA rules.
+
 Example:
 
-// testplan.ts
-export const demoTestPlan: TestPlan = {
-  description: 'E-commerce demo test plan',
-  execution_mode: 'parallel',
-  global_load_profile: {
-    stages: [
-      { target: 100, duration: '5m' },
-      { target: 200, duration: '10m' },
-    ],
+```json
+{
+  "$schema": "../schemas/test-plan.schema.json",
+  "name": "WebUI Load Test - jpet",
+  "environment": "dev",
+  "execution_mode": "parallel",
+  "global_load_profile": {
+    "executor": "ramping-vus",
+    "startVUs": 0,
+    "stages": [
+      { "duration": "5s", "target": 5 },
+      { "duration": "30s", "target": 5 },
+      { "duration": "5s", "target": 0 }
+    ]
   },
-  user_journeys: [
+  "noCookiesReset": true,
+  "user_journeys": [
     {
-      name: 'plp_to_pdp',
-      execution_profile: 'random',
-      load_profile: {
-        stages: [
-          { target: 50, duration: '5m' },
-          { target: 100, duration: '5m' },
-        ],
-      },
-      actions: [...],
-    },
+      "name": "buyanimal_raw_19thmay",
+      "scriptPath": "buyanimal_raw_19thmay.js",
+      "weight": 100
+    }
   ],
-  environments: {
-    dev: {
-      base_url: 'https://dev.example.com',
-      vars: {},
-    },
-    qa: {
-      base_url: 'https://qa.example.com',
-      vars: {},
-    },
-  },
-};
-2. Scenario Compilation
-ScenarioBuilder compiles the test plan into k6 scenarios:
+  "global_sla": {
+    "p99": 2000,
+    "errorRate": 10
+  }
+}
+```
 
-Scenarios are generated based on execution mode (parallel, sequential, hybrid)
-Each journey becomes an exec function with unique name
-Load profiles are mapped to appropriate k6 executors (ramping-vus, constant-vus, etc.)
-StartTime offsets are calculated for sequential/hybrid modes
-3. Session Initialization
-clearCookies() clears browser cookies before each VU run
-registerBaseUrl() registers environment-specific base URLs
-Session context manages state per VU and per iteration
-4. VU Execution
-runJourneyLifecycle() executes a journey within a VU: Runs all user actions in order Collects request/response data Tracks session state (cookies, correlation tokens) Applies error behavior rules
-5. Runtime Monitoring
-check()
-Performs step-level response validation
-Critical for catching soft failures
-sleep() Adds realistic delays between steps
-logExchange()
-Records request/response data for analysis
-Tracks correlation variables
-Applies data-driven transforms
-trackDataRow()
-Links data rows to specific journeys
-Supports row-based data mapping
-trackCorrelation()
-Extracts correlation IDs from responses
-Maps correlation values to data table columns
-Error Behavior
-Runtime error behaviors:
+When a journey script path is just a file name, the framework resolves it from the matching scrum-suite test folder. Fully qualified relative paths such as `scrum-suites/Jpet_new/tests/buyanimal_raw_19thmay.js` are also supported.
 
-try_continue — non-critical errors are logged but VU continues
-try_until_stop — continue until a hard error is encountered
-stop — stop the entire scenario on any error
-Application-level error handling within journeys
-Error classification for transactions
-File Management
-CSV parsing for test data management
-CSV file management utilities
-JSON file management utilities
-File-based data transformation with:
+## Creating a New Suite or Script
 
-find_replace
-extract_between
-string_manipulation
-File management for environment data
-Environment Configuration
-Supports multiple environments with:
+### Initialize Project Structure
 
-Environment-specific base URLs
-Environment-specific variables
-File-based variable management
-Environment-aware data transformations
-Performance Optimization
-Load Profile Support
-Support for both stages and standalone duration
-Automatic executor selection based on profile type:
+```bash
+npm run init
+```
 
-stages → ramping-vus or constant-vus (duration-based)
-standalone duration → constant-arrival-rate or constant-vus
-Variable-Driven Design
-Environment variables drive:
+To scaffold into another directory:
 
-Base URLs
-API endpoints
-Test data paths
-Data transformation rules
-Dynamic Data Management
-Row-level test data isolation per journey
-Shared data tables with row-based selection
-Environment-aware CSV and JSON operations
-Smart Metrics & Data Collection
-Transaction-specific metrics
-Request/response logging with correlation tracking
-Data-driven response validation
-Application-specific response extraction
-Data-driven test data transformations
-Execution Management
-Run parallel, sequential, or hybrid execution plans
-Automatic scenario generation for each execution mode
-StartTime offsets for sequential execution
-Hybrid grouping of parallel and sequential journeys
-Error Behavior Control
-Per-transaction error handling
-Runtime error behavior settings
-Error classification and logging
-Test Termination Controls
-Execution Modes
-Parallel — All journeys run at the same time
-Sequential — Journeys run one after another with computed start times
-Hybrid — Group parallel and sequential journeys together
-Error Behavior Policies
-Continue — Keep going even after errors
-Stop — Halt the scenario on first error
-Try_continue — Stop on critical errors only
-Try_until_stop — Continue until hard failure
-Execution Workflow
-TestPlanDefinition
--> ScenarioCompilation
--> EnvironmentConfiguration
--> VUExecution
--> RuntimeMonitoring
--> DataManagement
-Key Components
-test-plan.ts
-Defines overall test plan and execution configuration.
+```bash
+npm run cli -- init --dir path/to/project
+```
 
-user-journey.ts
-Defines individual user actions and their properties.
+### Use the Interactive Wizard
 
-scenario-compiler.ts
-Compiles test plans into k6 scenarios for different execution modes.
+```bash
+npm run cli -- new
+```
 
-scenario-builder.ts
-Builds k6 scenarios from test plans with execution mode support.
+Use this to create test plans or runtime settings from built-in templates.
 
-lifecycle.ts
-Manages VU lifecycle and journey execution control.
+### Create a BYOS Script Template
 
-transaction.ts
-Manages transaction start/end tracking for LoadRunner correlation.
+Use this when you already have a k6 script or want a blank framework-compatible script:
 
-session.ts
-Manages session state and cookie handling.
+```bash
+npm run cli -- generate-byos Jpet_new buyanimal
+```
 
-replayLogger.ts
-Logs request/response exchanges and correlation data.
+This creates a script under:
 
-fileManager.ts
-Handles CSV and JSON file operations for test data.
+```text
+scrum-suites/Jpet_new/tests/
+```
 
-gate.ts
-Manages execution gates for scenarios.
+### Convert an Existing k6 Script
 
-validation.ts
-Performs request response validation.
+```bash
+npm run convert -- path/to/input-script.js Jpet_new converted-script
+```
 
-dataRow.ts
-Manages row-level test data and transformations.
+To overwrite the input file:
 
-dataTable.ts
-Manages shared data tables and lookup operations.
+```bash
+npm run cli -- convert path/to/input-script.js Jpet_new converted-script --in-place
+```
 
-correlate.ts
-Handles correlation variable extraction and management.
+### Generate a Script from HAR
 
-env.ts
-Manages environment-specific configurations.
+Place a browser HAR file under your suite recordings folder, for example:
 
-performanceMetrics.ts
-Collects performance metrics from requests.
+```text
+scrum-suites/Jpet_new/recordings/buyanimal.har
+```
 
-baseMetrics.ts
-Collects base metrics from requests.
+Generate the script:
 
-usageMetrics.ts
-Collects usage metrics from requests.
+```bash
+npm run generate -- Jpet_new buyanimal --har scrum-suites/Jpet_new/recordings/buyanimal.har
+```
 
-correlation Metrics.ts
-Collects correlation metrics from requests.
+The generator prompts for domain selection and whether static assets should be included. It writes the generated k6 script and a normalized recording log for debug comparisons.
 
-errorMetrics.ts
-Collects error metrics from responses.
+## Running a Test
 
-sessionMetrics.ts
-Collects session-related metrics.
+Recommended flow:
+
+```bash
+npm run build
+npm run validate -- --plan config/test-plans/load-test.json --verbose
+npm run cli -- run --plan config/test-plans/load-test.json
+```
+
+Optional run flags:
+
+```bash
+# Use explicit environment config
+npm run cli -- run --plan config/test-plans/load-test.json --env-config config/environments/dev.json
+
+# Use explicit runtime settings
+npm run cli -- run --plan config/test-plans/load-test.json --runtime config/runtime-settings/default.json
+
+# Use a custom .env path
+npm run cli -- run --plan config/test-plans/load-test.json --env-file .env
+
+# Pass an additional k6 output
+npm run cli -- run --plan config/test-plans/load-test.json --out json=results/raw-k6-output.json
+
+# Print resolved config/debug information
+npm run cli -- run --plan config/test-plans/load-test.json --debug
+```
+
+## Debug Replay Mode
+
+Debug mode runs journeys with a small VU/iteration count and generates an HTML diff report against the normalized recording log.
+
+Use the ready-made shortcut:
+
+```bash
+npm run debug
+```
+
+Or run a debug-enabled plan:
+
+```bash
+npm run cli -- run --plan config/test-plans/debug-test.json
+```
+
+Standalone debug for one script:
+
+```bash
+npm run cli -- debug --script scrum-suites/Jpet_new/tests/buyanimal_raw_19thmay.js
+```
+
+With an explicit recording log and output path:
+
+```bash
+npm run cli -- debug ^
+  --script scrum-suites/Jpet_new/tests/buyanimal_raw_19thmay.js ^
+  --recording-log scrum-suites/Jpet_new/recordings/buyanimal_raw_19thmay.recording-log.json ^
+  --out results/debug-diff.html
+```
+
+On macOS/Linux, replace `^` with `\` for multiline commands.
+
+## Reports and Artifacts
+
+Normal runs write timestamped artifacts under:
+
+```text
+results/<safe-test-plan-name>/Run_<timestamp>/
+```
+
+If `K6_RESULTS_BASE_DIR` is set, that directory is used instead of `results`.
+
+Important files:
+
+- `RunReport.html` - primary human-readable report.
+- `TestSummary.html` - k6 web dashboard export.
+- `k6-reporter-summary.html` - k6 reporter HTML summary.
+- `summary.json` and `handleSummary.json` - raw k6 summary outputs.
+- `transaction-metrics.json` - transaction-level performance metrics.
+- `errors.ndjson` - structured run errors.
+- `warnings.ndjson` - structured warnings.
+- `ci-summary.json` - CI-friendly pass/fail summary.
+- `timeseries.json` - bucketed trend data.
+- `system-metrics.json` - host monitoring snapshots.
+- `run-manifest.json` - run metadata and artifact paths.
+
+Debug runs write reports under the configured debug report directory, usually:
+
+```text
+results/debug/<safe-test-plan-name>/Run_<timestamp>/
+```
+
+## Built-In Discovery Commands
+
+```bash
+# List framework capabilities
+npm run cli -- features
+
+# List test-plan templates
+npm run cli -- templates list --type test-plans
+
+# Show a test-plan template
+npm run cli -- templates show smoke --type test-plans
+
+# List runtime-setting templates
+npm run cli -- templates list --type runtime-settings
+
+# Show a runtime-setting template
+npm run cli -- templates show local-debug --type runtime-settings
+
+# Regenerate schema documentation
+npm run cli -- docs
+
+# Inspect final merged configuration
+npm run cli -- config inspect --plan config/test-plans/load-test.json
+```
+
+## Authoring Journey Scripts
+
+Generated and BYOS scripts use a phase-based shape:
+
+```javascript
+import http from 'k6/http';
+import { check, group } from 'k6';
+import { initTransactions, startTransaction, endTransaction } from '../../../core-engine/src/utils/transaction.js';
+import { createJourneyLifecycleStore, runJourneyLifecycle } from '../../../core-engine/src/utils/lifecycle.js';
+
+initTransactions(['Launch']);
+const lifecycleStore = createJourneyLifecycleStore();
+
+export function initPhase(ctx) {
+  // Optional login/setup work.
+}
+
+export function actionPhase(ctx) {
+  group('Launch', function () {
+    startTransaction('Launch');
+    const res = http.get('https://example.com');
+    check(res, { 'Launch status is 200': (r) => r.status === 200 });
+    endTransaction('Launch');
+  });
+}
+
+export function endPhase(ctx) {
+  // Optional logout/cleanup work.
+}
+
+export default function () {
+  runJourneyLifecycle(lifecycleStore, { initPhase, actionPhase, endPhase });
+}
+```
+
+Use transaction names consistently. They appear in console summaries, `transaction-metrics.json`, SLA checks, and `RunReport.html`.
+
+## Troubleshooting
+
+- `k6` command not found: install k6 and ensure it is available on `PATH`.
+- Validation fails for environment: confirm the test plan `environment` matches `config/environments/<name>.json`.
+- Journey script not found: confirm the `scriptPath` and team folder are correct.
+- Missing recording log in debug: pass `recordingLogPath` in the test plan or use `--recording-log`.
+- Reports are not where expected: check `K6_RESULTS_BASE_DIR` in `.env`.
+- TypeScript changes not reflected: run `npm run build`.
+
+## More Documentation
+
+- [Prerequisites.md](Prerequisites.md)
+- [HOW_TO_USE_FRAMEWORK.md](HOW_TO_USE_FRAMEWORK.md)
+- [docs/configuration-reference.md](docs/configuration-reference.md)
+- [HowTo-AutoCorrelation.md](HowTo-AutoCorrelation.md)
+- [HowTo-Parameterisation-And-Correlation.md](HowTo-Parameterisation-And-Correlation.md)
