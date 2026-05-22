@@ -21,6 +21,13 @@ interface RequestInfo {
     k6ResponseCookies?: Record<string, Array<{
         value: string;
     }>>;
+    /** Per-request cookies passed to k6 (from options.cookies). */
+    requestCookiesOption?: Record<string, string | {
+        value: string;
+        replace?: boolean;
+    }>;
+    /** Variable name→value pairs declared inline on the request() call. */
+    variables?: Record<string, string | number | boolean>;
 }
 interface K6Response {
     status?: number;
@@ -45,8 +52,13 @@ interface RequestDefinition {
     body?: string | object | null;
     params?: {
         headers?: Record<string, string>;
+        cookies?: Record<string, string | {
+            value: string;
+            replace?: boolean;
+        }>;
         tags?: Record<string, string>;
     };
+    variables?: Record<string, string | number | boolean>;
 }
 /**
  * Register a correlation variable at the point of extraction.

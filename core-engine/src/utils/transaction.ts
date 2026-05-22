@@ -155,14 +155,14 @@ export function transaction(name: string, fn: () => void): void {
             ? (error as Error).message
             : String(error);
 
-        console.error(`[k6-perf][transaction:${name}] ${message}`);
-
         if (behavior === 'abort_test') {
-          exec.test.abort(`[k6-perf][transaction:${name}] Aborting test: ${message}`);
+          console.error(`[k6-perf][transaction:${name}] ERROR: ${message} → aborting test`);
+          exec.test.abort(`[k6-perf][transaction:${name}] ${message}`);
           return;
         }
 
         if (behavior === 'stop_vu') {
+          console.error(`[k6-perf][transaction:${name}] ERROR: ${message} → stopping VU permanently`);
           // Mark VU as permanently terminated — lifecycle will skip all future iterations.
           // Do NOT re-throw: we want the action phase to return cleanly so k6 doesn't
           // see an iteration error (which would schedule a new iteration for this VU).
@@ -171,10 +171,13 @@ export function transaction(name: string, fn: () => void): void {
         }
 
         if (behavior === 'stop_iteration') {
+          console.error(`[k6-perf][transaction:${name}] ERROR: ${message} → stopping iteration`);
           // Re-throw so lifecycle stops the current iteration; VU resumes next iteration.
           throw error;
         }
-        // 'continue' — swallow and continue to next transaction
+
+        // 'continue' — log with context and swallow, next transaction will run
+        console.error(`[k6-perf][transaction:${name}] ERROR: ${message} → continuing to next transaction`);
       } finally {
         endTransaction(name);
       }
@@ -197,13 +200,19 @@ export function check(
   const passed = k6Check(val, sets);
   if (!passed) {
     const behavior = getRuntimeErrorBehavior();
+    const txn = getCurrentTransaction();
+    const ctx = txn ? `[transaction:${txn}]` : '';
+
     if (behavior === 'abort_test') {
-      exec.test.abort('[k6-perf] check() failed — aborting test');
+      console.error(`[k6-perf]${ctx} check() failed → aborting test`);
+      exec.test.abort(`[k6-perf]${ctx} check() failed — aborting test`);
     } else if (behavior === 'stop_vu') {
+      console.error(`[k6-perf]${ctx} check() failed → stopping VU permanently`);
       _vuTerminated = true;
       // Don't throw — let the transaction end cleanly; lifecycle will skip future iterations.
     } else if (behavior === 'stop_iteration') {
-      throw new Error('[k6-perf] check() failed');
+      console.error(`[k6-perf]${ctx} check() failed → stopping iteration`);
+      throw new Error(`[k6-perf]${ctx} check() failed`);
     }
     // 'continue' — return false, let caller decide
   }

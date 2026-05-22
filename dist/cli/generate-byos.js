@@ -50,47 +50,49 @@ function runGenerateByos(teamName, scriptName) {
         console.error(`[FAIL]  Script already exists at: ${scriptPath}`);
         process.exit(1);
     }
-    const template = `import http from 'k6/http';
-import { check, sleep, group } from 'k6';
-import { initTransactions, startTransaction, endTransaction } from '../../../dist/utils/transaction.js';
-import { createJourneyLifecycleStore, runJourneyLifecycle } from '../../../dist/utils/lifecycle.js';
-import { logExchange } from '../../../dist/utils/replayLogger.js';
-import { clearCookies, registerBaseUrl, getEnvContext } from '../../../dist/utils/session.js';
+    const template = `import { check } from 'k6';
+import { transaction } from '../../../dist/utils/transaction.js';
+import { request } from '../../../dist/utils/request.js';
+import { createJourneyLifecycleStore, runJourneyLifecycle, thinktime } from '../../../dist/utils/lifecycle.js';
+import { clearCookies, getEnvContext } from '../../../dist/utils/session.js';
+// Optional explicit trackers (Proxy on ctx.* auto-registers in most cases):
+// import { trackCorrelation, trackParameter, trackDataRow } from '../../../dist/utils/replayLogger.js';
 
-const env = getEnvContext('${teamName}', 'https://your-dev-environment.com');
-
-initTransactions(['BYOS_Custom_Logic']);
-registerBaseUrl(env.baseUrl);
-const lifecycleStore = createJourneyLifecycleStore();
+const env = getEnvContext('${teamName}', { baseUrl: 'https://your-dev-environment.com/' });
+const __journeyLifecycleStore = createJourneyLifecycleStore();
 
 export function initPhase(ctx) {
   clearCookies();
 }
 
 export function actionPhase(ctx) {
-  group('BYOS Custom Logic', function () {
-    startTransaction('BYOS_Custom_Logic');
-    
-    // ==========================================================
-    //   PASTE YOUR GRAFANA STUDIO / CUSTOM K6 SCRIPT BELOW  
-    // ==========================================================
+  const correlation_vars = ctx.correlation;
 
-    /* 
-    const res = http.get(\`\${env.baseUrl}/public/crocodiles/\`);
-    check(res, { 'status 200': (r) => r.status === 200 });
-    */
-
-    endTransaction('BYOS_Custom_Logic');
+  transaction('BYOS_Custom_Logic', () => {
+    // ==========================================================
+    //   PASTE YOUR GRAFANA STUDIO / CUSTOM K6 SCRIPT BELOW
+    // ==========================================================
+    //
+    // Use the framework's request() helper instead of http.* directly so each
+    // call is auto-tagged with the active transaction, replay-logged in debug
+    // mode, and snapshot-captured on 4xx/5xx.
+    //
+    // Example:
+    //   const res = request('GET', \\\`\\\${env.baseUrl}public/crocodiles/\\\`);
+    //   check(res, { 'status 200': (r) => r.status === 200 });
+    //
+    // For correlation, assign to ctx.correlation[...] (auto-tracked via Proxy):
+    //   correlation_vars["authToken"] = res.json("token");
   });
 
-  sleep(1); // think time between business steps if needed
+  thinktime();
 }
 
 export function endPhase(ctx) {
 }
 
 export default function () {
-  runJourneyLifecycle(lifecycleStore, { initPhase, actionPhase, endPhase });
+  runJourneyLifecycle(__journeyLifecycleStore, { initPhase, actionPhase, endPhase });
 }
 `;
     fs.writeFileSync(scriptPath, template, 'utf8');

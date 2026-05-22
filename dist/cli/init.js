@@ -221,10 +221,9 @@ testuser003,P@ssw0rd3,testuser003@perf-test.local
 import { transaction } from '../../../dist/utils/transaction.js';
 import { request } from '../../../dist/utils/request.js';
 import { createJourneyLifecycleStore, runJourneyLifecycle, thinktime } from '../../../dist/utils/lifecycle.js';
-import { clearCookies, registerBaseUrl, getEnvContext } from '../../../dist/utils/session.js';
+import { clearCookies, getEnvContext } from '../../../dist/utils/session.js';
 
-const env = getEnvContext('sample-team', 'https://your-dev-environment.com/');
-registerBaseUrl(env.baseUrl);
+const env = getEnvContext('sample-team', { baseUrl: 'https://your-dev-environment.com/' });
 const __journeyLifecycleStore = createJourneyLifecycleStore();
 
 export function initPhase(ctx) {
@@ -233,14 +232,14 @@ export function initPhase(ctx) {
 
 export function actionPhase(ctx) {
   transaction('Homepage', () => {
-    const res1 = request('GET', '/');
+    const res1 = request('GET', \`\${env.baseUrl}\`);
     check(res1, { 'Homepage: status 2xx': (r) => r.status >= 200 && r.status < 300 });
   });
 
   thinktime();
 
   transaction('Product_List', () => {
-    const res1 = request('GET', '/products');
+    const res1 = request('GET', \`\${env.baseUrl}products\`);
     check(res1, { 'ProductList: status 2xx': (r) => r.status >= 200 && r.status < 300 });
   });
 
@@ -259,29 +258,30 @@ export default function () {
 import { transaction } from '../../../dist/utils/transaction.js';
 import { request } from '../../../dist/utils/request.js';
 import { createJourneyLifecycleStore, runJourneyLifecycle, thinktime } from '../../../dist/utils/lifecycle.js';
-import { clearCookies, registerBaseUrl, getEnvContext } from '../../../dist/utils/session.js';
+import { clearCookies, getEnvContext } from '../../../dist/utils/session.js';
 
-const env = getEnvContext('sample-team', 'https://your-dev-environment.com/');
-registerBaseUrl(env.baseUrl);
+const env = getEnvContext('sample-team', { baseUrl: 'https://your-dev-environment.com/' });
 const __journeyLifecycleStore = createJourneyLifecycleStore();
 
 export function initPhase(ctx) {
   clearCookies();
 
   transaction('Login', () => {
-    // TODO: parameterize with p_username and p_password from data file
-    const res1 = request('POST', '/auth/login', {
+    // TODO: parameterize with p_username and p_password from data file (use trackDataRow)
+    const res1 = request('POST', \`\${env.baseUrl}auth/login\`, {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username: 'testuser001', password: 'P@ssw0rd1' }),
     });
     check(res1, { 'Login: status 200': (r) => r.status === 200 });
-    // TODO: Correlate auth token -> c_authToken
+    // TODO: extract auth token → ctx.correlation["authToken"] (auto-tracked via Proxy)
   });
 }
 
 export function actionPhase(ctx) {
+  const correlation_vars = ctx.correlation;
+
   transaction('Add_To_Cart', () => {
-    const res1 = request('POST', '/cart/add', {
+    const res1 = request('POST', \`\${env.baseUrl}cart/add\`, {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ productId: 'PROD-001', quantity: 1 }),
     });
@@ -291,7 +291,7 @@ export function actionPhase(ctx) {
   thinktime();
 
   transaction('Checkout', () => {
-    const res1 = request('POST', '/checkout', {
+    const res1 = request('POST', \`\${env.baseUrl}checkout\`, {
       headers: { 'Content-Type': 'application/json' },
       body: '{}',
     });

@@ -11,6 +11,8 @@ export interface DebugReplayOptions {
     teamEnvironments?: Record<string, unknown>;
     /** Error behavior for the debug run (continue | stop_iteration | stop_vu | abort_test). Defaults to 'continue'. */
     errorBehavior?: string;
+    /** Extra CLI flags forwarded verbatim to k6 (e.g. ['--http-debug=full', '--verbose']). */
+    extraK6Args?: string[];
 }
 export interface DebugReplayResult {
     htmlReportPath: string;

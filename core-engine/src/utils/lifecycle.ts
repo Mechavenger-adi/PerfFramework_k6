@@ -5,6 +5,7 @@ import exec from 'k6/execution';
 // @ts-ignore - K6 runtime module
 import { Counter } from 'k6/metrics';
 import { isVuTerminated } from './transaction.js';
+import { trackCorrelation, trackParameter } from './replayLogger.js';
 
 declare const __ENV: Record<string, string | undefined>;
 
@@ -74,12 +75,36 @@ interface EndSignal {
 
 const frameworkIterations = new Counter('framework_iterations');
 
+/**
+ * Wraps a context sub-object in a Proxy so that every scalar assignment
+ * (`ctx.correlation["x"] = v`, `ctx.session.token = v`, etc.) is automatically
+ * registered in the replay variable registry.  detectVariableEvents then finds
+ * those values inside request URLs/bodies/headers and maps them back to their
+ * variable names — no trackCorrelation / trackParameter calls needed in scripts.
+ */
+function createTrackedProxy(sourceName: string, type: 'correlation' | 'parameter'): Record<string, unknown> {
+  return new Proxy({} as Record<string, unknown>, {
+    set(target, prop, value) {
+      target[prop as string] = value;
+      // Only register scalar values — objects/arrays can't appear verbatim in a URL
+      if (value !== null && value !== undefined && typeof value !== 'object') {
+        if (type === 'correlation') {
+          trackCorrelation(String(prop), value, sourceName);
+        } else {
+          trackParameter(String(prop), value, sourceName);
+        }
+      }
+      return true;
+    },
+  });
+}
+
 function createContext(): JourneyContext {
   return {
-    data: {},
-    session: {},
-    correlation: {},
-    meta: {},
+    data: createTrackedProxy('data', 'parameter'),
+    session: createTrackedProxy('session', 'parameter'),
+    correlation: createTrackedProxy('correlation', 'correlation'),
+    meta: createTrackedProxy('meta', 'parameter'),
   };
 }
 

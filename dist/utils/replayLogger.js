@@ -57,16 +57,19 @@ function trackDataRow(sourceName, rowObject) {
 /**
  * Auto-detect which registered variables were used in this request.
  * Scans url, body (stringified), and header values for exact matches of
- * tracked variable values.
+ * tracked variable values. Pass actualHeaders when available so auto-managed
+ * headers (Cookie from jar, etc.) are also scanned.
  */
-function detectVariableEvents(url, body, headers) {
+function detectVariableEvents(url, body, headers, actualHeaders) {
     const events = [];
     const searchTargets = [String(url || '')];
     if (body !== null && body !== undefined) {
         searchTargets.push(typeof body === 'object' ? JSON.stringify(body) : String(body));
     }
-    if (headers && typeof headers === 'object') {
-        for (const val of Object.values(headers)) {
+    // Scan actual sent headers first (richer: includes Cookie from jar, etc.), then declared
+    const headersToScan = (actualHeaders && Object.keys(actualHeaders).length > 0) ? actualHeaders : headers;
+    if (headersToScan && typeof headersToScan === 'object') {
+        for (const val of Object.values(headersToScan)) {
             searchTargets.push(String(val));
         }
     }
@@ -220,19 +223,29 @@ function createVariableEvent(name, type, action, value, source) {
 }
 function logReplayExchange(meta, requestInfo, response) {
     const requestHeaders = requestInfo?.headers || {};
+    const actualRequestHeaders = requestInfo?.actualRequestHeaders || {};
     const responseHeaders = response?.headers || {};
     const iteration = currentIteration();
     const requestSequence = nextRequestSequence(iteration);
-    // Auto-detect variable usage from the registry
-    const autoDetected = detectVariableEvents(meta.url, requestInfo?.body, requestHeaders);
-    // Merge with any explicitly declared events (dedup by name)
+    // Build variable events from three sources (priority: auto-detected > variables option > explicit array):
+    // 1. Auto-detected: scan URL/body/actual-headers against the registry (trackParameter/trackCorrelation values)
+    const autoDetected = detectVariableEvents(meta.url, requestInfo?.body, requestHeaders, actualRequestHeaders);
+    // 2. Explicit variables option: name→value pairs declared inline on request()
+    const fromVariablesOption = requestInfo?.variables
+        ? Object.entries(requestInfo.variables).map(([name, value]) => createVariableEvent(name, 'parameter', 'used', value, 'request'))
+        : [];
+    // 3. Legacy explicit events array (variableEvents field)
     const explicit = Array.isArray(requestInfo?.variableEvents) ? requestInfo.variableEvents : [];
-    const seen = new Set(autoDetected.map((e) => e.name));
-    const merged = [...autoDetected, ...explicit.filter((e) => !seen.has(e.name))];
+    const seenAuto = new Set(autoDetected.map((e) => e.name));
+    const seenAll = new Set([...autoDetected, ...fromVariablesOption.filter((e) => !seenAuto.has(e.name))].map((e) => e.name));
+    const merged = [
+        ...autoDetected,
+        ...fromVariablesOption.filter((e) => !seenAuto.has(e.name)),
+        ...explicit.filter((e) => !seenAll.has(e.name)),
+    ];
     // Extract cookies from the ACTUAL headers k6 sent (includes auto-managed jar cookies)
     // res.request.headers contains the real Cookie header; fall back to declared headers;
     // final fallback: query the VU's cookie jar for cookies it would send to this URL
-    const actualRequestHeaders = requestInfo?.actualRequestHeaders || {};
     const fromActualHeaders = extractCookies(actualRequestHeaders);
     const fromDeclaredHeaders = extractCookies(requestHeaders);
     const requestUrl = typeof meta.url === 'string' ? meta.url : String(meta.url ?? '');
@@ -261,7 +274,11 @@ function logReplayExchange(meta, requestInfo, response) {
         request: {
             method: meta.method,
             url: typeof meta.url === 'string' ? meta.url : String(meta.url ?? ''),
-            headers: normalizeHeaders(requestHeaders),
+            // Prefer actual sent headers (res.request.headers) which include the full Cookie header,
+            // auto-added Content-Type, etc. Fall back to user-declared headers.
+            headers: normalizeHeaders((Object.keys(actualRequestHeaders).length > 0
+                ? actualRequestHeaders
+                : requestHeaders)),
             queryParams: extractQueryParams(typeof meta.url === 'string' ? meta.url : String(meta.url ?? '')),
             cookies: requestCookies,
             body: requestInfo?.body !== null && requestInfo?.body !== undefined
@@ -272,7 +289,11 @@ function logReplayExchange(meta, requestInfo, response) {
             status: response?.status,
             headers: normalizeHeaders(responseHeaders),
             cookies: responseCookies,
-            body: binaryPlaceholder ?? (response?.body ?? undefined),
+            // Guard against ArrayBuffer from responseType:'binary' — JSON.stringify would produce '{}'
+            body: binaryPlaceholder
+                ?? (response?.body instanceof ArrayBuffer || (typeof SharedArrayBuffer !== 'undefined' && response?.body instanceof SharedArrayBuffer)
+                    ? '[binary response]'
+                    : (response?.body ?? undefined)),
         },
     };
     console.log('[k6-perf][replay-log] ' + JSON.stringify(entry));
@@ -297,5 +318,6 @@ function logExchange(req, res) {
         body: req.body,
         actualRequestHeaders: res?.request?.headers || {}, // actual headers k6 sent (includes Cookie from jar)
         k6ResponseCookies: res?.cookies || {}, // k6's parsed response Set-Cookie data
+        variables: req.variables, // inline variable name→value pairs
     }, res);
 }

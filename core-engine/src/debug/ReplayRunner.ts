@@ -38,6 +38,8 @@ export interface DebugReplayOptions {
   teamEnvironments?: Record<string, unknown>;
   /** Error behavior for the debug run (continue | stop_iteration | stop_vu | abort_test). Defaults to 'continue'. */
   errorBehavior?: string;
+  /** Extra CLI flags forwarded verbatim to k6 (e.g. ['--http-debug=full', '--verbose']). */
+  extraK6Args?: string[];
 }
 
 export interface DebugReplayResult {
@@ -99,7 +101,7 @@ export class ReplayRunner {
     const tempDir = path.join(process.cwd(), '.k6-temp');
     fs.mkdirSync(tempDir, { recursive: true });
     const scriptName = path.basename(absScriptPath, path.extname(absScriptPath));
-    const stamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[-:.]/g, '_');
     const logOutputPath = path.join(tempDir, `${scriptName}_debug_${stamp}.log`);
 
     Logger.info(`\nRunning k6 debug execution for: ${scriptName}\n`);
@@ -134,18 +136,18 @@ export class ReplayRunner {
           : {}),
         K6_PERF_RUNTIME_METADATA: JSON.stringify({
           errorBehavior: options.errorBehavior ?? 'continue',
-          thinkTime: { ignoreThinkTime: true },
           pacingEnabled: false,
           pacingSeconds: 0,
         }),
       },
+      extraK6Args: options.extraK6Args ?? [],
       logOutputPath,
     });
     Logger.info(`\nk6 execution complete.\n`);
 
     const extractSpinner = createSpinner('Extracting replay entries');
     extractSpinner.start();
-    const replayEntries = await this.extractReplayEntries(runResult);
+    const replayEntries = await this.extractReplayEntries(runResult, logOutputPath);
     this.writeJson(absReplayLogPath, replayEntries);
     extractSpinner.done(`Extracted ${replayEntries.length} replay entries`);
 
@@ -207,7 +209,10 @@ export class ReplayRunner {
     };
   }
 
-  private static async extractReplayEntries(runResult: { stdout?: string; stderr?: string; stdoutPath?: string; stderrPath?: string }): Promise<TaggedExchangeLogEntry[]> {
+  private static async extractReplayEntries(
+    runResult: { stdout?: string; stderr?: string; stdoutPath?: string; stderrPath?: string },
+    logFilePath?: string,
+  ): Promise<TaggedExchangeLogEntry[]> {
     const entries: TaggedExchangeLogEntry[] = [];
     this.collectReplayEntriesFromText(runResult.stdout, entries);
     this.collectReplayEntriesFromText(runResult.stderr, entries);
@@ -217,6 +222,12 @@ export class ReplayRunner {
     }
     if (runResult.stderrPath && fs.existsSync(runResult.stderrPath)) {
       await this.collectReplayEntriesFromFile(runResult.stderrPath, entries);
+    }
+    // Primary source: k6 writes console.log output to the --log-output file=
+    // path. When stdio is inherited (no capture), stdout/stderr are empty and
+    // the log file is the only place replay entries exist.
+    if (logFilePath && fs.existsSync(logFilePath)) {
+      await this.collectReplayEntriesFromFile(logFilePath, entries);
     }
 
     return entries;

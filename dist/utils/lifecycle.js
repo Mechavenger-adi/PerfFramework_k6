@@ -14,14 +14,39 @@ const execution_1 = __importDefault(require("k6/execution"));
 // @ts-ignore - K6 runtime module
 const metrics_1 = require("k6/metrics");
 const transaction_js_1 = require("./transaction.js");
+const replayLogger_js_1 = require("./replayLogger.js");
 // ── Implementation ────────────────────────────────────────────
 const frameworkIterations = new metrics_1.Counter('framework_iterations');
+/**
+ * Wraps a context sub-object in a Proxy so that every scalar assignment
+ * (`ctx.correlation["x"] = v`, `ctx.session.token = v`, etc.) is automatically
+ * registered in the replay variable registry.  detectVariableEvents then finds
+ * those values inside request URLs/bodies/headers and maps them back to their
+ * variable names — no trackCorrelation / trackParameter calls needed in scripts.
+ */
+function createTrackedProxy(sourceName, type) {
+    return new Proxy({}, {
+        set(target, prop, value) {
+            target[prop] = value;
+            // Only register scalar values — objects/arrays can't appear verbatim in a URL
+            if (value !== null && value !== undefined && typeof value !== 'object') {
+                if (type === 'correlation') {
+                    (0, replayLogger_js_1.trackCorrelation)(String(prop), value, sourceName);
+                }
+                else {
+                    (0, replayLogger_js_1.trackParameter)(String(prop), value, sourceName);
+                }
+            }
+            return true;
+        },
+    });
+}
 function createContext() {
     return {
-        data: {},
-        session: {},
-        correlation: {},
-        meta: {},
+        data: createTrackedProxy('data', 'parameter'),
+        session: createTrackedProxy('session', 'parameter'),
+        correlation: createTrackedProxy('correlation', 'correlation'),
+        meta: createTrackedProxy('meta', 'parameter'),
     };
 }
 function createState() {

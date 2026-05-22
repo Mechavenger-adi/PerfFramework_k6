@@ -37,8 +37,24 @@ export declare class ScriptConverter {
     /**
      * Build a `request()` call string using the framework helper.
      * Replaces the old request-def + http.* + logExchange pattern.
+     *
+     * When `assignOnly` is true, emits `resName = request(...)` (no `const`) so
+     * the caller can place it inside a try block with a preceding `let resName;`.
+     *
+     * Also auto-injects a `variables: { ... }` option from `${...}` template
+     * expressions found in url/body/headers, so every local-scope variable used
+     * in a request shows up in the debug report's Variables section with its
+     * resolved value at the moment of the call. Skips expressions that are
+     * already auto-tracked via Proxy/registry (env.*, ctx.*, correlation_vars[*],
+     * getUniqueItem(FILES[*])).
      */
     private static buildRequestCallString;
+    /**
+     * Scan url/body/headers expression strings for `${...}` template references
+     * and return the names/accessors of variables that aren't already tracked
+     * elsewhere by the framework.
+     */
+    private static extractRequestVars;
     /**
      * Extract a property value from an object literal string.
      */

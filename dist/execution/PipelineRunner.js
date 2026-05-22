@@ -67,7 +67,7 @@ class PipelineRunner {
         const tempDir = path.join(cwd, '.k6-temp');
         fs.mkdirSync(tempDir, { recursive: true });
         const optionsFileName = runId
-            ? `resolved-options-${runId.replace(/[^a-zA-Z0-9_\-]/g, '_')}.json`
+            ? `resolved-options-${runId.replace(/[^a-zA-Z0-9_]/g, '_')}.json`
             : 'resolved-options.json';
         const optionsFile = path.join(tempDir, optionsFileName);
         fs.writeFileSync(optionsFile, JSON.stringify(k6Options, null, 2), 'utf-8');
@@ -87,7 +87,7 @@ class PipelineRunner {
         let stderrPath;
         if (captureOutput) {
             const scriptName = path.basename(absScript, path.extname(absScript));
-            const stamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+            const stamp = new Date().toISOString().slice(0, 19).replace(/[-:.]/g, '_');
             stdoutPath = path.join(tempDir, `${scriptName}_stdout_${stamp}.log`);
             stderrPath = path.join(tempDir, `${scriptName}_stderr_${stamp}.log`);
             const stdoutFd = fs.openSync(stdoutPath, 'w');
@@ -155,7 +155,7 @@ class PipelineRunner {
         const tempDir = path.join(cwd, '.k6-temp');
         fs.mkdirSync(tempDir, { recursive: true });
         const optionsFileName = runId
-            ? `resolved-options-${runId.replace(/[^a-zA-Z0-9_\-]/g, '_')}.json`
+            ? `resolved-options-${runId.replace(/[^a-zA-Z0-9_]/g, '_')}.json`
             : 'resolved-options.json';
         const optionsFile = path.join(tempDir, optionsFileName);
         fs.writeFileSync(optionsFile, JSON.stringify(k6Options, null, 2), 'utf-8');

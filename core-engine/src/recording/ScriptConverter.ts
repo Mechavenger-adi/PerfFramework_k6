@@ -631,6 +631,16 @@ export class ScriptConverter {
   /**
    * Build a `request()` call string using the framework helper.
    * Replaces the old request-def + http.* + logExchange pattern.
+   *
+   * When `assignOnly` is true, emits `resName = request(...)` (no `const`) so
+   * the caller can place it inside a try block with a preceding `let resName;`.
+   *
+   * Also auto-injects a `variables: { ... }` option from `${...}` template
+   * expressions found in url/body/headers, so every local-scope variable used
+   * in a request shows up in the debug report's Variables section with its
+   * resolved value at the moment of the call. Skips expressions that are
+   * already auto-tracked via Proxy/registry (env.*, ctx.*, correlation_vars[*],
+   * getUniqueItem(FILES[*])).
    */
   private static buildRequestCallString(
     method: string,
@@ -641,21 +651,26 @@ export class ScriptConverter {
     resName: string,
     indent: string,
     primaryBaseUrl?: string,
+    assignOnly = false,
   ): string {
     const inner = indent + '  ';
     const m = method === 'DEL' ? 'DELETE' : method;
     const resolvedUrl = this.toRuntimeUrlExpression(url, primaryBaseUrl);
 
-    let s = `${indent}const ${resName} = request('${m}', ${resolvedUrl}, {\n`;
+    const assignPrefix = assignOnly ? `${resName} = ` : `const ${resName} = `;
+    let s = `${indent}${assignPrefix}request('${m}', ${resolvedUrl}, {\n`;
 
     // Headers — extract from paramsStr if present
+    let headersStr: string | null = null;
     if (paramsStr && paramsStr !== 'null' && paramsStr !== 'undefined') {
       const isVarRef = /^[a-zA-Z_$]\w*$/.test(paramsStr.trim());
       if (isVarRef) {
-        s += `${inner}headers: ${paramsStr.trim()}.headers,\n`;
+        headersStr = `${paramsStr.trim()}.headers`;
+        s += `${inner}headers: ${headersStr},\n`;
       } else {
         const headersContent = this.extractObjectProperty(paramsStr, 'headers');
         if (headersContent) {
+          headersStr = headersContent;
           s += `${inner}headers: ${this.reindent(headersContent, inner)},\n`;
         }
       }
@@ -669,8 +684,56 @@ export class ScriptConverter {
     // Replay metadata for debug diff tracing
     s += `${inner}replay: { id: ${JSON.stringify(entryId)}, recordingStartedAt: 'converted' },\n`;
 
+    // Auto-detect template-literal variables used in url/body/headers and inject
+    // them as `variables: { ... }` so the runtime can register their current
+    // values into the replay variable registry at the moment of the call.
+    const trackedVars = this.extractRequestVars(resolvedUrl, body, headersStr);
+    if (trackedVars.length > 0) {
+      const entries = trackedVars
+        .map(({ name, access }) => (name === access ? name : `${JSON.stringify(name)}: ${access}`))
+        .join(', ');
+      s += `${inner}variables: { ${entries} },\n`;
+    }
+
     s += `${indent}});`;
     return s;
+  }
+
+  /**
+   * Scan url/body/headers expression strings for `${...}` template references
+   * and return the names/accessors of variables that aren't already tracked
+   * elsewhere by the framework.
+   */
+  private static extractRequestVars(
+    ...exprs: (string | null | undefined)[]
+  ): { name: string; access: string }[] {
+    const vars = new Map<string, string>();
+    const combined = exprs.filter((e): e is string => !!e).join('\n');
+    const re = /\$\{([^}]+)\}/g;
+    let match: RegExpExecArray | null;
+    while ((match = re.exec(combined)) !== null) {
+      const expr = match[1].trim();
+      // Skip config and runtime references already tracked or not user-controlled
+      if (/^env\./.test(expr)) continue;
+      if (/^correlation_vars\b/.test(expr)) continue;
+      if (/^ctx\./.test(expr)) continue;
+      if (/getUniqueItem\s*\(\s*FILES\b/.test(expr)) continue;
+
+      // Bare identifier: `p_check`, `userId`, etc.
+      if (/^[a-zA-Z_$][\w$]*$/.test(expr)) {
+        if (!vars.has(expr)) vars.set(expr, expr);
+        continue;
+      }
+
+      // Trailing property access: `userdetails["p_username"]` → name = p_username
+      const propMatch = expr.match(/\["(\w+)"\]\s*$/) || expr.match(/\.(\w+)\s*$/);
+      if (propMatch) {
+        const name = propMatch[1];
+        if (!vars.has(name)) vars.set(name, expr);
+      }
+      // Otherwise: complex expression (function call, arithmetic) → skip
+    }
+    return [...vars.entries()].map(([name, access]) => ({ name, access }));
   }
 
   /**
@@ -789,8 +852,16 @@ export class ScriptConverter {
     const primaryBaseUrl = baseUrls[0];
     const envBlock = `const env = getEnvContext('${teamName}', ${primaryBaseUrl ? `{ baseUrl: '${primaryBaseUrl}' }` : 'undefined'});`;
 
+    // Module-level (per-VU, file-scope) declarations — `let match;`, `let regex;`,
+    // and any simple `let varname[=literal];` hoisted out of the original default
+    // function body. Visible from initPhase, actionPhase, and endPhase.
+    const moduleDeclsBlock = grouped.moduleLevelDecls.length > 0
+      ? grouped.moduleLevelDecls.join('\n') + '\n\n'
+      : '';
+
     return beforeDefault
       + (baseUrls.length > 0 ? envBlock + '\n\n' : '')
+      + moduleDeclsBlock
       + `const __journeyLifecycleStore = createJourneyLifecycleStore();\n\n`
       + this.renderPhaseFunction('initPhase', grouped.initPrelude, grouped.initGroups)
       + `\n`
@@ -827,6 +898,7 @@ export class ScriptConverter {
     statements: string[],
     lifecycle: LifecycleSelection,
   ): {
+    moduleLevelDecls: string[];
     initPrelude: string[];
     actionPrelude: string[];
     endPrelude: string[];
@@ -836,13 +908,18 @@ export class ScriptConverter {
   } {
     const initSet = new Set(lifecycle.initGroups ?? []);
     const endSet = new Set(lifecycle.endGroups ?? []);
-    const groupStatements: Array<{ name: string; statement: string }> = [];
+
+    // Pattern: simple `let varname[=literal];` declarations safe to hoist to
+    // module scope. Matches `let p_check;`, `let p_check = 0;`, `let foo = "bar";`,
+    // `let baz = true;`. Rejects anything with a function call or expression so
+    // we don't run side effects at module-load (per-VU, once).
+    const simpleLetDeclRe = /^\s*let\s+\w+(\s*=\s*(?:-?\d+(\.\d+)?|true|false|null|undefined|"[^"$]*"|'[^'$]*'|`[^`$]*`))?\s*;?\s*$/;
 
     // Classify prelude lines by category
     const correlationSetup: string[] = [];   // const correlation_vars = ... → ctx.correlation bridge
     const dataSetup: string[] = [];          // getUniqueItem(FILES[...]) assignments → initPhase only
     const trackCalls: string[] = [];         // trackDataRow / trackParameter → initPhase only
-    const regexDecls: string[] = [];         // let match; let regex; → phases using correlation
+    const moduleLevelDecls: string[] = [];   // let match;/let regex;/let p_check = 0; → module scope (shared across phases)
     const otherPrelude: string[] = [];       // everything else → all phases
 
     const initGroupStmts: string[] = [];
@@ -881,22 +958,28 @@ export class ScriptConverter {
       for (const line of lines) {
         if (/^\s*const\s+correlation_vars\s*=/.test(line)) {
           correlationSetup.push(line);
-        } else if (/^\s*let\s+(match|regex)\s*;/.test(line)) {
-          regexDecls.push(line);
+        } else if (/^\s*let\s+(match|regex)\s*;\s*$/.test(line)) {
+          // Scratch vars used by correlation extraction → module scope so they
+          // survive across phases and never produce ReferenceError.
+          if (!moduleLevelDecls.includes(line)) moduleLevelDecls.push(line);
         } else if (/getUniqueItem\s*\(/.test(line) || /^\s*(const|let|var)\s+\w+\s*=\s*.*FILES\b/.test(line)) {
           dataSetup.push(line);
         } else if (/^\s*trackDataRow\s*\(/.test(line) || /^\s*trackParameter\s*\(/.test(line)) {
           trackCalls.push(line);
+        } else if (simpleLetDeclRe.test(line)) {
+          // Simple `let X;` / `let X = literal;` → hoist to module scope so the
+          // variable is visible from initPhase, actionPhase, and endPhase alike.
+          // Cross-phase mutation (e.g. set in search_animal, read in select_product)
+          // works because k6 instantiates the module per-VU.
+          if (!moduleLevelDecls.includes(line)) moduleLevelDecls.push(line);
         } else {
           otherPrelude.push(line);
         }
       }
     }
 
-    const usesCorrelation = (stmts: string[]) => stmts.some((s) => /correlation_vars/.test(s));
-
     // Build per-phase preludes
-    // initPhase: correlation bridge + data setup + tracking + regex (if needed) + other
+    // initPhase: correlation bridge + data setup + tracking + other (no module decls — those live at file scope)
     const initPrelude: string[] = [];
     initPrelude.push('const correlation_vars = ctx.correlation;');
     for (const line of dataSetup) {
@@ -915,27 +998,20 @@ export class ScriptConverter {
       }
     }
     initPrelude.push(...trackCalls);
-    if (usesCorrelation(initGroupStmts)) {
-      initPrelude.push(...regexDecls);
-    }
     initPrelude.push(...otherPrelude);
 
-    // actionPhase: correlation bridge + local data refs from ctx.data + regex (if needed)
+    // actionPhase: correlation bridge + local data refs from ctx.data
     const actionPrelude: string[] = [];
     actionPrelude.push('const correlation_vars = ctx.correlation;');
-    // Make data vars available from ctx.data
     for (const line of dataSetup) {
       const dataMatch = line.match(/^\s*(?:const|let|var)\s+(\w+)\s*=\s*.+$/);
       if (dataMatch) {
         actionPrelude.push(`const ${dataMatch[1]} = ctx.data.${dataMatch[1]};`);
       }
     }
-    if (usesCorrelation(actionGroupStmts)) {
-      actionPrelude.push(...regexDecls);
-    }
     actionPrelude.push(...otherPrelude);
 
-    // endPhase: correlation bridge + local data refs + regex (if needed)
+    // endPhase: correlation bridge + local data refs
     const endPrelude: string[] = [];
     endPrelude.push('const correlation_vars = ctx.correlation;');
     for (const line of dataSetup) {
@@ -944,11 +1020,9 @@ export class ScriptConverter {
         endPrelude.push(`const ${dataMatch[1]} = ctx.data.${dataMatch[1]};`);
       }
     }
-    if (usesCorrelation(endGroupStmts)) {
-      endPrelude.push(...regexDecls);
-    }
 
     return {
+      moduleLevelDecls,
       initPrelude,
       actionPrelude,
       endPrelude,

@@ -217,8 +217,11 @@ program
     .option('--recording-log <path>', 'Path to the normalized recording-log JSON file')
     .option('--out <path>', 'Path to the HTML diff report', path.join('results', 'debug-diff.html'))
     .option('--replay-log <path>', 'Optional path to save the captured replay-log JSON file')
-    .action(async (opts) => {
+    .allowUnknownOption()
+    .allowExcessArguments()
+    .action(async (opts, cmd) => {
     logger_1.Logger.header('k6 Performance Framework – DEBUG');
+    const passthroughArgs = filterPassthroughArgs(cmd.args);
     try {
         const resolvedRecordingLogPath = opts.recordingLog
             ? opts.recordingLog
@@ -230,6 +233,7 @@ program
             replayLogPath: opts.replayLog,
             vus: 1,
             iterations: 1,
+            extraK6Args: passthroughArgs,
         });
         logger_1.Logger.pass(`Replay log saved: ${result.replayLogPath}`);
         logger_1.Logger.pass(`HTML diff report: ${result.htmlReportPath}`);
@@ -253,7 +257,10 @@ program
     .option('--data-root <path>', 'Root directory for data files', 'scrum-suites')
     .option('--debug', 'Enable debug mode (prints resolved config)')
     .option('--out <k6-output>', 'k6 --out flag value (e.g. json=results.json)')
-    .action(async (opts) => {
+    .allowUnknownOption()
+    .allowExcessArguments()
+    .action(async (opts, cmd) => {
+    const passthroughArgs = filterPassthroughArgs(cmd.args);
     logger_1.Logger.header('k6 Performance Framework – RUN');
     // -- Step 1: Load test plan -----------------
     let plan;
@@ -293,7 +300,7 @@ program
         process.exit(1);
     }
     if (plan.debug?.enabled) {
-        await runPlanDebugMode(plan, resolvedConfig);
+        await runPlanDebugMode(plan, resolvedConfig, passthroughArgs);
         return;
     }
     // -- Step 4: Prepare run metadata and output paths ---------------
@@ -334,7 +341,7 @@ program
     entryCode += `    stdout: textSummary(data, { indent: " ", enableColors: true }),\n`;
     entryCode += `  };\n`;
     entryCode += `}\n`;
-    const entryScriptPath = path.join(entryScriptDir, `.k6-perf-entry-${runId.replace(/[^a-zA-Z0-9_\-]/g, '_')}.js`);
+    const entryScriptPath = path.join(entryScriptDir, `.k6-perf-entry-${runId.replace(/[^a-zA-Z0-9_]/g, '_')}.js`);
     fs.writeFileSync(entryScriptPath, entryCode, 'utf-8');
     // Robust cleanup handlers for the generated orchestration file
     const cleanupEntryScript = () => {
@@ -367,6 +374,8 @@ program
         // stdout stays uninherited so k6's animated progress bar renders correctly.
         '--log-output', 'stderr',
         '--log-output', `file=${safeRunLogPath}`,
+        // User-supplied k6 flags forwarded verbatim (e.g. --http-debug=full).
+        ...passthroughArgs,
     ];
     if (opts.out) {
         extraArgs.push('--out', opts.out);
@@ -441,13 +450,13 @@ program
     }
     PipelineRunner_1.PipelineRunner.ensureSuccess(runResult);
 });
-async function runPlanDebugMode(plan, resolvedConfig) {
+async function runPlanDebugMode(plan, resolvedConfig, passthroughArgs = []) {
     const debugSettings = plan.debug ?? { enabled: false };
     const baseDir = debugSettings.reportDir
         ? path.resolve(process.cwd(), debugSettings.reportDir)
         : path.join(process.cwd(), 'results', 'debug');
-    const safePlanName = plan.name.replace(/[^a-zA-Z0-9_\-]/g, '_');
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const safePlanName = plan.name.replace(/[^a-zA-Z0-9_]/g, '_');
+    const timestamp = new Date().toISOString().replace(/[-:.]/g, '_');
     const runDir = path.join(baseDir, safePlanName, `Run_${timestamp}`);
     fs.mkdirSync(runDir, { recursive: true });
     const journeyCount = plan.user_journeys.length;
@@ -458,7 +467,7 @@ async function runPlanDebugMode(plan, resolvedConfig) {
     for (const journey of plan.user_journeys) {
         try {
             journeyProgress.update(journeyProgress.current, journey.name);
-            const result = await runJourneyDebug(plan, journey, runDir, resolvedConfig);
+            const result = await runJourneyDebug(plan, journey, runDir, resolvedConfig, passthroughArgs);
             journeyProgress.done(`${journey.name} — ${result.results.length} steps`);
             journeyProgress.tick();
             logger_1.Logger.detail(`  Report: ${path.basename(result.htmlReportPath)}`);
@@ -477,8 +486,8 @@ async function runPlanDebugMode(plan, resolvedConfig) {
         process.exit(1);
     }
 }
-function runJourneyDebug(plan, journey, runDir, resolvedConfig) {
-    const safeJourneyName = journey.name.replace(/[^a-zA-Z0-9_\-]/g, '_');
+function runJourneyDebug(plan, journey, runDir, resolvedConfig, passthroughArgs = []) {
+    const safeJourneyName = journey.name.replace(/[^a-zA-Z0-9_]/g, '_');
     const outHtmlPath = path.join(runDir, `${safeJourneyName}.diff.html`);
     const replayLogPath = path.join(runDir, `${safeJourneyName}.replay-log.json`);
     const runtime = new RuntimeConfigManager_1.RuntimeConfigManager(resolvedConfig.runtime);
@@ -492,7 +501,44 @@ function runJourneyDebug(plan, journey, runDir, resolvedConfig) {
         noCookiesReset: plan.noCookiesReset,
         teamEnvironments: resolvedConfig.environment.scrum_suites,
         errorBehavior: runtime.getErrorBehavior(),
+        extraK6Args: passthroughArgs,
     });
+}
+// Flags the framework always injects into the k6 command itself.
+// Passing them again via CLI passthrough would silently override framework
+// internals (--config discards all built scenarios; --summary-export loses
+// the post-run JSON that reporting depends on).
+const FRAMEWORK_OWNED_FLAGS = new Set(['--config', '--summary-export']);
+function filterPassthroughArgs(args) {
+    const filtered = [];
+    let i = 0;
+    while (i < args.length) {
+        const arg = args[i];
+        const flagKey = arg.startsWith('--')
+            ? (arg.includes('=') ? arg.slice(0, arg.indexOf('=')) : arg)
+            : null;
+        if (flagKey && FRAMEWORK_OWNED_FLAGS.has(flagKey)) {
+            logger_1.Logger.warn(`Ignoring passthrough flag '${arg}' — managed by the framework.`);
+            // Standalone form (--flag value or --flag =value): skip the next token too
+            if (!arg.includes('=') && i + 1 < args.length && !args[i + 1].startsWith('-')) {
+                i += 2;
+            }
+            else {
+                i += 1;
+            }
+            continue;
+        }
+        // Merge "--flag =value" (space before =) into "--flag=value" so k6 doesn't
+        // interpret "=value" as a second positional script argument.
+        if (flagKey && !arg.includes('=') && i + 1 < args.length && args[i + 1].startsWith('=')) {
+            filtered.push(arg + args[i + 1]);
+            i += 2;
+            continue;
+        }
+        filtered.push(arg);
+        i++;
+    }
+    return filtered;
 }
 function resolveRecordingLogForStandaloneDebug(scriptPath) {
     const resolution = RecordingLogResolver_1.RecordingLogResolver.resolve(scriptPath);
@@ -515,8 +561,8 @@ function toImportSpecifier(fromDir, targetPath) {
 }
 function prepareRunArtifacts(plan, resolvedConfig) {
     const baseDir = resolvedConfig.secrets['K6_RESULTS_BASE_DIR'] || 'results';
-    const safePlanName = plan.name.replace(/[^a-zA-Z0-9_\-]/g, '_');
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const safePlanName = plan.name.replace(/[^a-zA-Z0-9_]/g, '_');
+    const timestamp = new Date().toISOString().replace(/[-:.]/g, '_');
     const runId = `Run_${timestamp}`;
     const reportDir = path.join(process.cwd(), baseDir, safePlanName, runId);
     fs.mkdirSync(reportDir, { recursive: true });
@@ -911,24 +957,18 @@ function startLiveTransactionDisplay(metricsStreamPath, transactionNames, transa
     const stats = new Map();
     let metricsOffset = 0;
     const isTTY = process.stdout.isTTY === true;
-    // title + top border + header row + header separator + N rows + bottom border
-    const reservedRows = transactionNames.length + 5;
+    const useColor = isTTY && !process.env.NO_COLOR;
+    // Reserve the bottom of the terminal for the live table; confine k6's
+    // output (banner + animated progress bar) to the top region via an ANSI
+    // scroll region. The two never overlap. Falls back to scrollback printing
+    // when stdout is not a TTY or the terminal is too short to fit both areas.
     const termRows = process.stdout.rows || 40;
-    // k6 prints its startup banner (~15 lines of ASCII art + metadata) before the
-    // progress bar starts. The table must sit BELOW these lines so the banner is
-    // preserved. We cap bannerLines if the terminal is too small.
-    const k6BannerLines = 15;
-    const safetyRows = Math.max(3, Math.ceil(reservedRows / 2));
-    // Keep at least 4 rows for k6's progress bar inside the scroll region.
-    const availableForBanner = termRows - reservedRows - safetyRows - 4;
-    const bannerLines = Math.max(0, Math.min(k6BannerLines, availableForBanner));
-    // Table lives BELOW the banner (rows bannerLines+1 .. bannerLines+reservedRows).
-    // Scroll region covers the BOTTOM portion (scrollTop..termRows) where k6 writes.
-    const tableTop = bannerLines + 1;
-    const scrollTop = tableTop + reservedRows + safetyRows;
-    // Scroll region is deferred to the first tick (~5s after k6 starts) so k6
-    // can detect TTY and start its animated bar before we touch terminal state.
-    let scrollRegionReady = false;
+    // title + top border + header row + header separator + N data rows + bottom border
+    const tableRows = transactionNames.length + 5;
+    // k6 needs at least ~12 rows for its banner + progress bar to remain readable
+    const useFixedTable = isTTY && termRows >= tableRows + 12;
+    const tableTop = useFixedTable ? termRows - tableRows + 1 : 0;
+    let scrollRegionSet = false;
     function tick() {
         try {
             // ── Read new metric data points ──────────────────────────
@@ -1004,24 +1044,25 @@ function startLiveTransactionDisplay(metricsStreamPath, transactionNames, transa
                     }
                 }
             }
-            if (stats.size > 0) {
-                if (isTTY && !scrollRegionReady) {
-                    // Set scroll region to scrollTop..termRows (bottom portion for k6).
-                    // Clear only the table area + safety buffer (rows tableTop..scrollTop-1).
-                    // Rows 1..bannerLines are left intact so k6's startup banner remains visible.
-                    //
-                    // IMPORTANT: do NOT restore k6's cursor (no \x1b8). k6's cursor was at ~row 18
-                    // (its progress bar position). Restoring it there means k6's \x1b[0J] fires from
-                    // row 18, erasing the table. Instead we place the cursor at scrollTop so k6
-                    // redraws its bar from inside the scroll region; its cursor-up N only reaches into
-                    // the safety buffer (rows tableTop+reservedRows .. scrollTop-1), never the table.
-                    let clearTable = '';
-                    for (let row = tableTop; row < scrollTop; row++)
-                        clearTable += `\x1b[${row};1H\x1b[2K`;
-                    process.stdout.write(`\x1b[${scrollTop};${termRows}r` + clearTable + `\x1b[${scrollTop};1H`);
-                    scrollRegionReady = true;
+            if (stats.size === 0)
+                return;
+            if (useFixedTable) {
+                // First render: install a scroll region that confines k6's banner +
+                // progress bar to the rows above the table. Anything k6 prints from
+                // here on stays inside rows 1..(tableTop - 1) — our table area is
+                // never overwritten. Done lazily on first tick so k6 has time to draw
+                // its banner before we modify terminal state.
+                if (!scrollRegionSet) {
+                    process.stdout.write(`\x1b[1;${tableTop - 1}r`);
+                    // Place cursor at the bottom of the scroll region so k6's progress
+                    // bar continues redrawing inside it.
+                    process.stdout.write(`\x1b[${tableTop - 1};1H`);
+                    scrollRegionSet = true;
                 }
-                printLiveTable(stats, transactionStats, tableTop, isTTY);
+                renderFixedTable(stats, transactionStats, useColor, tableTop, termRows);
+            }
+            else {
+                renderScrollbackTable(stats, transactionStats, useColor);
             }
         }
         catch { /* file not ready yet */ }
@@ -1031,29 +1072,52 @@ function startLiveTransactionDisplay(metricsStreamPath, transactionNames, transa
     return {
         stop: () => {
             clearInterval(timer);
-            if (isTTY) {
-                if (stats.size > 0)
-                    printLiveTable(stats, transactionStats, tableTop, isTTY);
-                // Reset full-screen scroll region, advance cursor past the table area
+            if (stats.size === 0) {
+                if (scrollRegionSet) {
+                    // Reset scroll region and park cursor below the table area
+                    process.stdout.write(`\x1b[r\x1b[${termRows};1H\n`);
+                }
+                return;
+            }
+            if (useFixedTable && scrollRegionSet) {
+                renderFixedTable(stats, transactionStats, useColor, tableTop, termRows);
+                // Reset full-screen scroll region, then move cursor below the table so
+                // anything that prints after (transaction summary, etc.) appears below.
                 process.stdout.write(`\x1b[r\x1b[${termRows};1H\n`);
+            }
+            else {
+                renderScrollbackTable(stats, transactionStats, useColor);
             }
         },
     };
 }
-function printLiveTable(stats, transactionStats, tableTop, isTTY) {
+/**
+ * Build the rendered table as a list of strings (one per row). Pure helper
+ * shared by both fixed-position and scrollback renderers.
+ */
+function buildLiveTableLines(stats, transactionStats, useColor) {
+    // Per-transaction iterations where AT LEAST ONE check failed. Used as a
+    // lower bound on the failed-iteration count — more defensible than the old
+    // `count - min(passes)` formula, which silently reported 0 fails when the
+    // checkPasses map was empty but checkFails had entries.
+    const failedIterations = (s) => {
+        if (s.checkFails.size === 0)
+            return 0;
+        let maxFails = 0;
+        for (const f of s.checkFails.values())
+            if (f > maxFails)
+                maxFails = f;
+        return Math.min(maxFails, s.count);
+    };
     const ALL_COLS = {
         count: { header: 'Count', width: 7, val: (_n, s) => String(s.count) },
         pass: { header: 'Pass', width: 7, val: (_n, s) => {
-                if (!s.checkPasses.size)
+                // No check data at all → assume the transaction passed (it completed)
+                if (s.checkPasses.size === 0 && s.checkFails.size === 0)
                     return String(s.count);
-                return String(Math.min(...Array.from(s.checkPasses.values())));
+                return String(Math.max(0, s.count - failedIterations(s)));
             } },
-        fail: { header: 'Fail', width: 6, val: (_n, s) => {
-                if (!s.checkPasses.size)
-                    return '0';
-                const pass = Math.min(...Array.from(s.checkPasses.values()));
-                return String(Math.max(0, s.count - pass));
-            } },
+        fail: { header: 'Fail', width: 6, val: (_n, s) => String(failedIterations(s)) },
         avg: { header: 'Avg(ms)', width: 8, val: (_n, s) => s.count > 0 ? String(Math.round(s.total / s.count)) : '-' },
         min: { header: 'Min(ms)', width: 8, val: (_n, s) => s.count > 0 ? String(Math.round(s.min)) : '-' },
         max: { header: 'Max(ms)', width: 8, val: (_n, s) => s.count > 0 ? String(Math.round(s.max)) : '-' },
@@ -1063,15 +1127,15 @@ function printLiveTable(stats, transactionStats, tableTop, isTTY) {
     };
     const activeCols = transactionStats.filter((k) => ALL_COLS[k]).map((k) => ({ key: k, ...ALL_COLS[k] }));
     if (!activeCols.length)
-        return;
+        return [];
     const rows = [...stats.entries()].sort(([a], [b]) => a.localeCompare(b));
     if (!rows.length)
-        return;
+        return [];
     const c = {
-        dim: isTTY && !process.env.NO_COLOR ? '\x1b[2m' : '',
-        reset: isTTY && !process.env.NO_COLOR ? '\x1b[0m' : '',
-        cyan: isTTY && !process.env.NO_COLOR ? '\x1b[36m' : '',
-        bold: isTTY && !process.env.NO_COLOR ? '\x1b[1m' : '',
+        dim: useColor ? '\x1b[2m' : '',
+        reset: useColor ? '\x1b[0m' : '',
+        cyan: useColor ? '\x1b[36m' : '',
+        bold: useColor ? '\x1b[1m' : '',
     };
     const txnW = Math.min(48, Math.max(11, ...rows.map(([n]) => n.length)));
     const widths = [txnW, ...activeCols.map((col) => col.width)];
@@ -1092,16 +1156,37 @@ function printLiveTable(stats, transactionStats, tableTop, isTTY) {
         lines.push(`  ${c.dim}│${c.reset}${cells}${c.dim}│${c.reset}`);
     }
     lines.push(`  ${c.dim}└${widths.map((w) => '─'.repeat(w + 2)).join('┴')}┘${c.reset}`);
-    if (!isTTY) {
-        process.stdout.write('\n' + lines.join('\n') + '\n');
+    return lines;
+}
+/**
+ * Fixed-position rendering: the table lives at rows `tableTop..termRows`,
+ * frozen below k6's scroll region. Save cursor → clear table area → draw
+ * table → restore cursor, so k6's progress bar continues animating above
+ * without ever touching our table area.
+ */
+function renderFixedTable(stats, transactionStats, useColor, tableTop, termRows) {
+    const lines = buildLiveTableLines(stats, transactionStats, useColor);
+    if (lines.length === 0)
         return;
+    let out = '\x1b7'; // save cursor (k6's position in its scroll region)
+    // Clear the table area first (in case previous render was longer)
+    for (let row = tableTop; row <= termRows; row++) {
+        out += `\x1b[${row};1H\x1b[2K`;
     }
-    // Table is at rows 1..N (above k6's scroll region). k6's bar animation uses
-    // \x1b[0J (erase to end of screen) but only from within the scroll region,
-    // which starts below the table. Per-line erase avoids any \x1b[0J of our own.
-    process.stdout.write('\x1b7' +
-        lines.map((line, i) => `\x1b[${tableTop + i};1H\x1b[2K${line}`).join('') +
-        '\x1b8');
+    // Draw the table starting at tableTop
+    out += `\x1b[${tableTop};1H` + lines.join('\n');
+    out += '\x1b8'; // restore cursor → k6 keeps animating where it left off
+    process.stdout.write(out);
+}
+/**
+ * Fallback for non-TTY stdout or terminals too short for fixed positioning:
+ * just append the latest snapshot as scrollback.
+ */
+function renderScrollbackTable(stats, transactionStats, useColor) {
+    const lines = buildLiveTableLines(stats, transactionStats, useColor);
+    if (lines.length === 0)
+        return;
+    process.stdout.write('\n' + lines.join('\n') + '\n');
 }
 // ---------------------------------------------
 // Snapshot event parser (reads k6 log file post-run)

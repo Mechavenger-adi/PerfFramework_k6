@@ -19,7 +19,11 @@ function getUniqueItem(array) {
   return array[execution.scenario.iterationInTest % array.length];
 }
 
-const env = getEnvContext('jpet_new', { baseUrl: 'https://jpetstore.aspectran.com' });
+const env = getEnvContext('jpet_new', { baseUrl: 'https://jpetstore.aspectran.com/' });
+
+let match;
+let regex;
+let p_check;
 
 const __journeyLifecycleStore = createJourneyLifecycleStore();
 
@@ -51,8 +55,6 @@ export function initPhase(ctx) {
       });
   
       check(res_1, { "status equals 200": (r) => r.status === 200 });
-
-      console.log(`Launched the application at ${env.baseUrl}`);
     });
 
   thinktime(1);
@@ -161,8 +163,6 @@ export function initPhase(ctx) {
 
 export function actionPhase(ctx) {
   const correlation_vars = ctx.correlation;
-  let match;
-  let regex;
 
   transaction('search_animal', function() {
   
@@ -192,13 +192,15 @@ export function actionPhase(ctx) {
       if (match) {
         correlation_vars["correlation_0"] = trackCorrelation("correlation_0", match[1], "body");
       }
+
+       p_check=24;
     });
 
   thinktime(1);
 
   transaction('select_product', function() {
   
-      const res_1 = request('GET', `${env.baseUrl}/products/${correlation_vars["correlation_0"]}`, {
+      const res_1 = request('GET', `${env.baseUrl}/products/${correlation_vars["correlation_0"]}&check=${p_check}`, {
         headers: {
           accept: `text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7`,
           "upgrade-insecure-requests": `1`,
@@ -486,8 +488,6 @@ export function actionPhase(ctx) {
 
 export function endPhase(ctx) {
   const correlation_vars = ctx.correlation;
-  let match;
-  let regex;
 
   transaction('logout', function() {
   

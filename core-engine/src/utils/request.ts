@@ -18,15 +18,99 @@ interface RequestReplayMeta {
   recordingStartedAt?: string;
 }
 
+/** Cookie value object — k6's per-request cookie format. */
+export interface CookieValue {
+  value: string;
+  /** When true, replaces any existing cookie with this name in the jar. */
+  replace?: boolean;
+}
+
+/**
+ * All body types k6 accepts natively.
+ *   string                              → sent as-is (set Content-Type header explicitly)
+ *   ArrayBuffer / SharedArrayBuffer     → binary payload
+ *   Record<string, string|number|bool>  → k6 form-encodes as application/x-www-form-urlencoded
+ *   null                                → explicitly empty body
+ */
+export type RequestBody =
+  | string
+  | ArrayBuffer
+  | SharedArrayBuffer
+  | Record<string, string | number | boolean>
+  | null;
+
+/**
+ * Common HTTP methods with IDE autocomplete. Any other string (e.g. 'CONNECT', 'TRACE',
+ * custom verbs) is also accepted and routed through http.request().
+ */
+export type HttpMethod =
+  | 'GET'
+  | 'POST'
+  | 'PUT'
+  | 'PATCH'
+  | 'DELETE'
+  | 'HEAD'
+  | 'OPTIONS'
+  | (string & {});
+
 export interface RequestOptions {
+  /** Metric name for this request (appears in k6 output and transaction grouping). */
   name?: string;
+  /** Request headers. Content-Length, Transfer-Encoding, and Host are stripped automatically. */
   headers?: Record<string, string>;
-  cookies?: Record<string, string>;
-  body?: string | Record<string, unknown>;
+  /**
+   * Per-request cookies. Values can be a plain string or a k6 CookieValue
+   * object { value, replace } to control jar replacement behavior.
+   */
+  cookies?: Record<string, string | CookieValue>;
+  /**
+   * Request body. All types k6 supports are accepted:
+   *   string         → sent as-is; set Content-Type header explicitly
+   *   ArrayBuffer    → binary payload
+   *   SharedArrayBuffer → binary payload
+   *   object         → form-encoded as application/x-www-form-urlencoded
+   *   null           → empty body
+   */
+  body?: RequestBody;
+  /** Maximum number of redirects to follow (default: 0). */
   redirects?: number;
+  /** Named service key for base URL resolution. */
   service?: string;
+  /** Extra metric tags merged with the auto-generated transaction tag. */
   tags?: Record<string, string>;
+  /** Replay metadata (used only when K6_PERF_DEBUG is set). */
   replay?: RequestReplayMeta;
+  /**
+   * Variable name→value pairs to record in the debug replay report.
+   * Use to capture the resolved values of template literals / CSV parameters
+   * without needing trackParameter() / trackDataRow().
+   * e.g. variables: { p_username: p_username, p_password: p_password }
+   */
+  variables?: Record<string, string | number | boolean>;
+  /** Request timeout in milliseconds or k6 duration string (e.g. '30s', '1m'). */
+  timeout?: number | string;
+  /** HTTP auth scheme: 'basic', 'digest', 'negotiate', or 'ntlm'. */
+  auth?: string;
+  /**
+   * How k6 reads the response body:
+   *   'text'   → string (default)
+   *   'binary' → ArrayBuffer (use for file downloads, images, etc.)
+   *   'none'   → body is discarded (use when you don't need the response body)
+   */
+  responseType?: 'text' | 'binary' | 'none';
+  /** Custom k6 CookieJar instance. Overrides the VU's default jar for this request. */
+  jar?: unknown;
+  /** Compress the request body: 'gzip', 'deflate', 'br', or 'zstd'. */
+  compression?: string;
+  /** When true, k6 throws a JS error on non-2xx instead of returning the response object. */
+  throw?: boolean;
+  /** Force HTTP/2 for this request (k6 auto-negotiates h2 when server supports it by default). */
+  http2?: boolean;
+  /**
+   * Override which status codes k6 counts as "expected" (i.e. not http_req_failed).
+   * Build with http.expectedStatuses() — e.g. http.expectedStatuses(200, 201, {min:400,max:499}).
+   */
+  responseCallback?: unknown;
 }
 
 interface SnapshotConfig {
@@ -39,7 +123,7 @@ interface SnapshotConfig {
 }
 
 // ── Error behavior ─────────────────────────────────────────────
-// Read once per request (module-level cache would be stale across scenario reloads).
+
 function getRuntimeErrorBehavior(): string {
   try {
     const raw = typeof __ENV !== 'undefined' ? __ENV.K6_PERF_RUNTIME_METADATA : undefined;
@@ -77,7 +161,6 @@ function nextRequestId(): string {
 }
 
 // ── Snapshot config ───────────────────────────────────────────
-// Cached per-VU module init to avoid repeated JSON.parse on every request.
 
 let _snapshotConfigCache: SnapshotConfig | null = null;
 
@@ -111,14 +194,9 @@ function getSnapshotConfig(): SnapshotConfig {
   return _snapshotConfigCache;
 }
 
-// Per-VU snapshot counter. k6 module scope is per-VU, so this approximates
-// maxSnapshotsPerRun across a VU's lifetime during the run.
 let _snapshotCount = 0;
 
 // ── Header sanitization ───────────────────────────────────────
-// k6 automatically computes Content-Length and manages Transfer-Encoding/Host.
-// Passing these from HAR recordings causes "Content-Length doesn't match body"
-// warnings when the body is re-serialised (e.g. form data recorded as a JS object).
 
 const STRIP_HEADERS = new Set(['content-length', 'transfer-encoding', 'host']);
 
@@ -133,10 +211,16 @@ function sanitizeHeaders(headers?: Record<string, string>): Record<string, strin
   return Object.keys(result).length > 0 ? result : undefined;
 }
 
+// ── Body serialization for logging ───────────────────────────
+
+function serializeBodyForLog(body: RequestBody | undefined): string | undefined {
+  if (body === null || body === undefined) return undefined;
+  if (typeof body === 'string') return body;
+  if (body instanceof ArrayBuffer || (typeof SharedArrayBuffer !== 'undefined' && body instanceof SharedArrayBuffer)) return '[binary data]';
+  return JSON.stringify(body);
+}
+
 // ── Snapshot emission ─────────────────────────────────────────
-// Emits a [k6-perf][snapshot-event] JSON line to stdout for any 4xx/5xx response
-// when captureSnapshotOnFailure is enabled. The Node.js reporting pipeline reads
-// these events to write per-request failure snapshots to the results directory.
 
 function emitSnapshotEvent(
   method: string,
@@ -163,7 +247,7 @@ function emitSnapshotEvent(
       method,
       url: resolvedUrl,
       headers: cfg.includeRequestHeaders ? options?.headers : undefined,
-      body: cfg.includeRequestBody && options?.body != null ? String(options.body) : undefined,
+      body: cfg.includeRequestBody ? serializeBodyForLog(options?.body) : undefined,
     },
     response: {
       status: res.status,
@@ -179,23 +263,16 @@ function emitSnapshotEvent(
 /**
  * Execute an HTTP request in a framework-aware way and return the native k6 Response.
  *
- * 1. Resolves relative paths against the effective base URL.
- * 2. Strips auto-computed headers (Content-Length, Transfer-Encoding, Host).
- * 3. Builds k6 params (headers, cookies, tags, redirects) from options.
- * 4. Executes the appropriate http.* call.
- * 5. Emits [k6-perf][snapshot-event] for 4xx/5xx when captureSnapshotOnFailure is enabled.
- * 6. When K6_PERF_DEBUG is set, calls logExchange() for replay logging.
- * 7. Returns the native k6 Response for use with check() and correlation extraction.
+ * Accepts every body type, HTTP method, and param that k6 supports natively.
+ * See RequestOptions for the full set of supported options.
  */
 export function request(
-  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
+  method: HttpMethod,
   pathOrUrl: string,
   options?: RequestOptions,
 ): any {
   const resolvedUrl = resolvePath(pathOrUrl, options?.service);
 
-  // Auto-register the URL origin so clearCookies() can clear cookies for it
-  // without requiring an explicit registerBaseUrl() call in the script.
   if (resolvedUrl) {
     try {
       const origin = new URL(resolvedUrl).origin + '/';
@@ -221,11 +298,21 @@ export function request(
     },
   };
 
-  if (cleanHeaders && Object.keys(cleanHeaders).length > 0) {
-    k6Params.headers = cleanHeaders;
-  }
+  if (cleanHeaders && Object.keys(cleanHeaders).length > 0) k6Params.headers = cleanHeaders;
+  if (options?.timeout !== undefined) k6Params.timeout = options.timeout;
+  if (options?.auth !== undefined) k6Params.auth = options.auth;
+  if (options?.responseType !== undefined) k6Params.responseType = options.responseType;
+  if (options?.jar !== undefined) k6Params.jar = options.jar;
+  if (options?.compression !== undefined) k6Params.compression = options.compression;
+  if (options?.throw !== undefined) k6Params.throw = options.throw;
+  if (options?.http2 !== undefined) k6Params.http2 = options.http2;
+  if (options?.responseCallback !== undefined) k6Params.responseCallback = options.responseCallback;
 
-  const body = options?.body ?? null;
+  // Newer @types/k6 narrows RequestBody to Record<string, FormValue> for objects,
+  // which rejects Record<string, unknown>. Cast to any to satisfy both old and new
+  // type definitions while preserving full runtime support for all body types.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const body = (options?.body ?? null) as any;
   let res: any;
 
   switch (method) {
@@ -242,17 +329,20 @@ export function request(
       res = http.patch(resolvedUrl, body, k6Params);
       break;
     case 'DELETE':
-      res = http.del(resolvedUrl, null, k6Params);
+      res = http.del(resolvedUrl, body, k6Params);
+      break;
+    case 'HEAD':
+      res = http.head(resolvedUrl, k6Params);
+      break;
+    case 'OPTIONS':
+      res = http.options(resolvedUrl, body, k6Params);
       break;
     default:
       res = http.request(method, resolvedUrl, body, k6Params);
   }
 
-  // Snapshot fires regardless of debug mode — it's a failure capture, not a debug trace.
   emitSnapshotEvent(method, resolvedUrl, options, res);
 
-  // Apply error behavior for 4xx/5xx responses. Snapshot is already emitted above so
-  // the failure is always recorded before we potentially throw or abort.
   if (res && res.status >= 400) {
     applyErrorBehaviorForStatus(method, resolvedUrl, res.status);
   }
@@ -265,11 +355,15 @@ export function request(
         recordingStartedAt,
         method,
         url: resolvedUrl,
-        body: body as string | null,
+        body: body instanceof ArrayBuffer || (typeof SharedArrayBuffer !== 'undefined' && body instanceof SharedArrayBuffer)
+          ? '[binary data]'
+          : body,
         params: {
-          headers: options?.headers, // original headers for replay fidelity
+          headers: options?.headers,
+          cookies: options?.cookies,
           tags: k6Params.tags as Record<string, string>,
         },
+        variables: options?.variables,
       },
       res,
     );
