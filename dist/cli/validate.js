@@ -44,7 +44,7 @@ const ConfigurationManager_1 = require("../config/ConfigurationManager");
 const GatekeeperValidator_1 = require("../config/GatekeeperValidator");
 const TestPlanLoader_1 = require("../scenario/TestPlanLoader");
 function runValidate(opts) {
-    const { planPath, dataRoot = 'scrum-suites', envFilePath, verbose = false, } = opts;
+    const { planPath, dataRoot = 'scrum_suites', envFilePath, verbose = false, } = opts;
     console.log('\n  Running pre-flight validation...\n');
     // 1. Load test plan
     let plan;
@@ -58,7 +58,7 @@ function runValidate(opts) {
     }
     // 2. Resolve env config path
     const envConfigPath = opts.envConfigPath ?? path.join('config', 'environments', `${plan.environment}.json`);
-    const runtimeSettingsPath = opts.runtimeSettingsPath ?? path.join('config', 'runtime-settings', 'default.json');
+    const runtimeSettingsPath = opts.runtimeSettingsPath ?? path.join('config', 'runtime_settings', 'default.json');
     // 3. Merge configs
     let resolvedConfig;
     try {

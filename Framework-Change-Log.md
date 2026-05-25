@@ -33,19 +33,19 @@ The HAR generation flow was improved so it is closer to real framework usage and
 
 Updated source files:
 
-- [core-engine/src/cli/generate.ts](d:/repos/K6-PerfFramework/core-engine/src/cli/generate.ts)
-- [core-engine/src/recording/HARParser.ts](d:/repos/K6-PerfFramework/core-engine/src/recording/HARParser.ts)
-- [core-engine/src/recording/DomainFilter.ts](d:/repos/K6-PerfFramework/core-engine/src/recording/DomainFilter.ts)
-- [core-engine/src/recording/ScriptGenerator.ts](d:/repos/K6-PerfFramework/core-engine/src/recording/ScriptGenerator.ts)
-- [core-engine/src/debug/ExchangeLog.ts](d:/repos/K6-PerfFramework/core-engine/src/debug/ExchangeLog.ts)
+- [core_engine/src/cli/generate.ts](d:/repos/K6-PerfFramework/core_engine/src/cli/generate.ts)
+- [core_engine/src/recording/HARParser.ts](d:/repos/K6-PerfFramework/core_engine/src/recording/HARParser.ts)
+- [core_engine/src/recording/DomainFilter.ts](d:/repos/K6-PerfFramework/core_engine/src/recording/DomainFilter.ts)
+- [core_engine/src/recording/ScriptGenerator.ts](d:/repos/K6-PerfFramework/core_engine/src/recording/ScriptGenerator.ts)
+- [core_engine/src/debug/ExchangeLog.ts](d:/repos/K6-PerfFramework/core_engine/src/debug/ExchangeLog.ts)
 
 Backups created before changing the generator flow:
 
-- [core-engine/src/cli/generate.backup.ts](d:/repos/K6-PerfFramework/core-engine/src/cli/generate.backup.ts)
-- [core-engine/src/recording/HARParser.backup.ts](d:/repos/K6-PerfFramework/core-engine/src/recording/HARParser.backup.ts)
-- [core-engine/src/recording/DomainFilter.backup.ts](d:/repos/K6-PerfFramework/core-engine/src/recording/DomainFilter.backup.ts)
-- [core-engine/src/recording/ScriptGenerator.backup.ts](d:/repos/K6-PerfFramework/core-engine/src/recording/ScriptGenerator.backup.ts)
-- [core-engine/src/types/HARContracts.backup.ts](d:/repos/K6-PerfFramework/core-engine/src/types/HARContracts.backup.ts)
+- [core_engine/src/cli/generate.backup.ts](d:/repos/K6-PerfFramework/core_engine/src/cli/generate.backup.ts)
+- [core_engine/src/recording/HARParser.backup.ts](d:/repos/K6-PerfFramework/core_engine/src/recording/HARParser.backup.ts)
+- [core_engine/src/recording/DomainFilter.backup.ts](d:/repos/K6-PerfFramework/core_engine/src/recording/DomainFilter.backup.ts)
+- [core_engine/src/recording/ScriptGenerator.backup.ts](d:/repos/K6-PerfFramework/core_engine/src/recording/ScriptGenerator.backup.ts)
+- [core_engine/src/types/HARContracts.backup.ts](d:/repos/K6-PerfFramework/core_engine/src/types/HARContracts.backup.ts)
 
 Key outcomes:
 
@@ -75,12 +75,12 @@ Generated scripts need runtime-safe JavaScript helpers that k6 can load directly
 
 Added helper files:
 
-- [core-engine/src/utils/transaction.js](d:/repos/K6-PerfFramework/core-engine/src/utils/transaction.js)
-- [core-engine/src/utils/replayLogger.js](d:/repos/K6-PerfFramework/core-engine/src/utils/replayLogger.js)
+- [core_engine/src/utils/transaction.js](d:/repos/K6-PerfFramework/core_engine/src/utils/transaction.js)
+- [core_engine/src/utils/replayLogger.js](d:/repos/K6-PerfFramework/core_engine/src/utils/replayLogger.js)
 
 Related exported module update:
 
-- [core-engine/src/index.ts](d:/repos/K6-PerfFramework/core-engine/src/index.ts)
+- [core_engine/src/index.ts](d:/repos/K6-PerfFramework/core_engine/src/index.ts)
 
 Key outcomes:
 
@@ -94,8 +94,8 @@ The diff flow was strengthened so the report is more useful for both machine com
 
 Updated source files:
 
-- [core-engine/src/debug/DiffChecker.ts](d:/repos/K6-PerfFramework/core-engine/src/debug/DiffChecker.ts)
-- [core-engine/src/debug/HTMLDiffReporter.ts](d:/repos/K6-PerfFramework/core-engine/src/debug/HTMLDiffReporter.ts)
+- [core_engine/src/debug/DiffChecker.ts](d:/repos/K6-PerfFramework/core_engine/src/debug/DiffChecker.ts)
+- [core_engine/src/debug/HTMLDiffReporter.ts](d:/repos/K6-PerfFramework/core_engine/src/debug/HTMLDiffReporter.ts)
 
 Key outcomes:
 
@@ -119,10 +119,10 @@ The framework now has a first-class CLI debug command instead of relying only on
 
 Updated source files:
 
-- [core-engine/src/cli/run.ts](d:/repos/K6-PerfFramework/core-engine/src/cli/run.ts)
-- [core-engine/src/debug/ReplayRunner.ts](d:/repos/K6-PerfFramework/core-engine/src/debug/ReplayRunner.ts)
-- [core-engine/src/execution/PipelineRunner.ts](d:/repos/K6-PerfFramework/core-engine/src/execution/PipelineRunner.ts)
-- [scrum-suites/sample-team/run-debug.ts](d:/repos/K6-PerfFramework/scrum-suites/sample-team/run-debug.ts)
+- [core_engine/src/cli/run.ts](d:/repos/K6-PerfFramework/core_engine/src/cli/run.ts)
+- [core_engine/src/debug/ReplayRunner.ts](d:/repos/K6-PerfFramework/core_engine/src/debug/ReplayRunner.ts)
+- [core_engine/src/execution/PipelineRunner.ts](d:/repos/K6-PerfFramework/core_engine/src/execution/PipelineRunner.ts)
+- [scrum_suites/sample_team/run-debug.ts](d:/repos/K6-PerfFramework/scrum_suites/sample_team/run-debug.ts)
 
 Key outcomes:
 
@@ -139,11 +139,11 @@ The framework now supports debug execution settings in the test plan itself.
 
 Updated source files:
 
-- [core-engine/src/types/TestPlanSchema.ts](d:/repos/K6-PerfFramework/core-engine/src/types/TestPlanSchema.ts)
-- [core-engine/src/config/SchemaValidator.ts](d:/repos/K6-PerfFramework/core-engine/src/config/SchemaValidator.ts)
-- [core-engine/src/config/GatekeeperValidator.ts](d:/repos/K6-PerfFramework/core-engine/src/config/GatekeeperValidator.ts)
-- [core-engine/src/cli/run.ts](d:/repos/K6-PerfFramework/core-engine/src/cli/run.ts)
-- [core-engine/src/debug/ReplayRunner.ts](d:/repos/K6-PerfFramework/core-engine/src/debug/ReplayRunner.ts)
+- [core_engine/src/types/TestPlanSchema.ts](d:/repos/K6-PerfFramework/core_engine/src/types/TestPlanSchema.ts)
+- [core_engine/src/config/SchemaValidator.ts](d:/repos/K6-PerfFramework/core_engine/src/config/SchemaValidator.ts)
+- [core_engine/src/config/GatekeeperValidator.ts](d:/repos/K6-PerfFramework/core_engine/src/config/GatekeeperValidator.ts)
+- [core_engine/src/cli/run.ts](d:/repos/K6-PerfFramework/core_engine/src/cli/run.ts)
+- [core_engine/src/debug/ReplayRunner.ts](d:/repos/K6-PerfFramework/core_engine/src/debug/ReplayRunner.ts)
 
 Key outcomes:
 
@@ -163,13 +163,13 @@ The project scaffold now includes a debug-aware template in addition to the norm
 
 Updated source file:
 
-- [core-engine/src/cli/init.ts](d:/repos/K6-PerfFramework/core-engine/src/cli/init.ts)
+- [core_engine/src/cli/init.ts](d:/repos/K6-PerfFramework/core_engine/src/cli/init.ts)
 
 Key outcomes:
 
-- `init` still creates the standard `config/test-plans/load-test.json`
-- `init` now also creates `config/test-plans/debug-test.json`
-- `init` now creates a sample recording log at `scrum-suites/sample-team/recordings/browse-journey.recording-log.json`
+- `init` still creates the standard `config/test_plans/load-test.json`
+- `init` now also creates `config/test_plans/debug-test.json`
+- `init` now creates a sample recording log at `scrum_suites/sample_team/recordings/browse-journey.recording-log.json`
 - The scaffolded next steps now mention the debug test plan as the starting point for replay-diff execution
 
 ## Change Set 8: Recording Log Auto-Resolution And Iteration-Aware Debug Report
@@ -178,23 +178,23 @@ The debug replay flow has been strengthened so it can automatically resolve reco
 
 Updated source files:
 
-- [core-engine/src/debug/RecordingLogResolver.ts](d:/repos/K6-PerfFramework/core-engine/src/debug/RecordingLogResolver.ts)
-- [core-engine/src/cli/generate.ts](d:/repos/K6-PerfFramework/core-engine/src/cli/generate.ts)
-- [core-engine/src/config/GatekeeperValidator.ts](d:/repos/K6-PerfFramework/core-engine/src/config/GatekeeperValidator.ts)
-- [core-engine/src/config/SchemaValidator.ts](d:/repos/K6-PerfFramework/core-engine/src/config/SchemaValidator.ts)
-- [core-engine/src/types/TestPlanSchema.ts](d:/repos/K6-PerfFramework/core-engine/src/types/TestPlanSchema.ts)
-- [core-engine/src/debug/ReplayRunner.ts](d:/repos/K6-PerfFramework/core-engine/src/debug/ReplayRunner.ts)
-- [core-engine/src/debug/DiffChecker.ts](d:/repos/K6-PerfFramework/core-engine/src/debug/DiffChecker.ts)
-- [core-engine/src/debug/HTMLDiffReporter.ts](d:/repos/K6-PerfFramework/core-engine/src/debug/HTMLDiffReporter.ts)
-- [core-engine/src/utils/replayLogger.js](d:/repos/K6-PerfFramework/core-engine/src/utils/replayLogger.js)
-- [core-engine/src/recording/ScriptGenerator.ts](d:/repos/K6-PerfFramework/core-engine/src/recording/ScriptGenerator.ts)
-- [core-engine/src/index.ts](d:/repos/K6-PerfFramework/core-engine/src/index.ts)
-- [core-engine/src/cli/run.ts](d:/repos/K6-PerfFramework/core-engine/src/cli/run.ts)
+- [core_engine/src/debug/RecordingLogResolver.ts](d:/repos/K6-PerfFramework/core_engine/src/debug/RecordingLogResolver.ts)
+- [core_engine/src/cli/generate.ts](d:/repos/K6-PerfFramework/core_engine/src/cli/generate.ts)
+- [core_engine/src/config/GatekeeperValidator.ts](d:/repos/K6-PerfFramework/core_engine/src/config/GatekeeperValidator.ts)
+- [core_engine/src/config/SchemaValidator.ts](d:/repos/K6-PerfFramework/core_engine/src/config/SchemaValidator.ts)
+- [core_engine/src/types/TestPlanSchema.ts](d:/repos/K6-PerfFramework/core_engine/src/types/TestPlanSchema.ts)
+- [core_engine/src/debug/ReplayRunner.ts](d:/repos/K6-PerfFramework/core_engine/src/debug/ReplayRunner.ts)
+- [core_engine/src/debug/DiffChecker.ts](d:/repos/K6-PerfFramework/core_engine/src/debug/DiffChecker.ts)
+- [core_engine/src/debug/HTMLDiffReporter.ts](d:/repos/K6-PerfFramework/core_engine/src/debug/HTMLDiffReporter.ts)
+- [core_engine/src/utils/replayLogger.js](d:/repos/K6-PerfFramework/core_engine/src/utils/replayLogger.js)
+- [core_engine/src/recording/ScriptGenerator.ts](d:/repos/K6-PerfFramework/core_engine/src/recording/ScriptGenerator.ts)
+- [core_engine/src/index.ts](d:/repos/K6-PerfFramework/core_engine/src/index.ts)
+- [core_engine/src/cli/run.ts](d:/repos/K6-PerfFramework/core_engine/src/cli/run.ts)
 - [Debug-Automation-Status.md](d:/repos/K6-PerfFramework/Debug-Automation-Status.md)
 
 Key outcomes:
 
-- HAR generation now maintains a suite-local recording registry at `scrum-suites/<team>/recordings/.recording-index.json`
+- HAR generation now maintains a suite-local recording registry at `scrum_suites/<team>/recordings/.recording-index.json`
 - Debug mode can auto-resolve recording logs using:
   - explicit `recordingLogPath`
   - suite-local registry entry
@@ -237,8 +237,8 @@ Recommended test plan shape:
   "user_journeys": [
     {
       "name": "login",
-      "scriptPath": "scrum-suites/sample-team/tests/generated-sample-review.js",
-      "recordingLogPath": "scrum-suites/sample-team/recordings/generated-sample-review.recording-log.json"
+      "scriptPath": "scrum_suites/sample_team/tests/generated-sample-review.js",
+      "recordingLogPath": "scrum_suites/sample_team/recordings/generated-sample-review.recording-log.json"
     }
   ]
 }
@@ -253,8 +253,8 @@ Build and typecheck were used repeatedly during this change cycle:
 
 Manual and sample validation artifacts created during the process include:
 
-- [scrum-suites/sample-team/tests/generated-sample-review.js](d:/repos/K6-PerfFramework/scrum-suites/sample-team/tests/generated-sample-review.js)
-- [scrum-suites/sample-team/recordings/generated-sample-review.recording-log.json](d:/repos/K6-PerfFramework/scrum-suites/sample-team/recordings/generated-sample-review.recording-log.json)
+- [scrum_suites/sample_team/tests/generated-sample-review.js](d:/repos/K6-PerfFramework/scrum_suites/sample_team/tests/generated-sample-review.js)
+- [scrum_suites/sample_team/recordings/generated-sample-review.recording-log.json](d:/repos/K6-PerfFramework/scrum_suites/sample_team/recordings/generated-sample-review.recording-log.json)
 - [browse.replay-log.json](d:/repos/K6-PerfFramework/results/debug/Sample_Debug_Test/Run_2026-03-31T04-06-37-056Z/browse.replay-log.json)
 - [browse.diff.html](d:/repos/K6-PerfFramework/results/debug/Sample_Debug_Test/Run_2026-03-31T04-06-37-056Z/browse.diff.html)
 - [browse.diff.html](d:/repos/K6-PerfFramework/results/debug/Sample_Debug_Test/Run_2026-03-31T04-53-50-700Z/browse.diff.html)

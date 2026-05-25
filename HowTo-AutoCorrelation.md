@@ -36,7 +36,7 @@ There are three phases:
 Create or update `correlation-rules.json` in your team's suite folder:
 
 ```
-scrum-suites/<your-team>/correlation-rules.json
+scrum_suites/<your-team>/correlation-rules.json
 ```
 
 ### Rule structure
@@ -122,7 +122,7 @@ Use any tool that exports a HAR file. Common options:
 
 Save the file to your team's recordings folder:
 ```
-scrum-suites/<your-team>/recordings/my-flow.har
+scrum_suites/<your-team>/recordings/my-flow.har
 ```
 
 ### Step 2: Name your transactions in the HAR
@@ -143,12 +143,12 @@ If they are auto-named (e.g. `page_1`, `page_2`), rename them inside the HAR JSO
 ### Step 3: Run the CLI generator
 
 ```bash
-npm run cli -- generate <team-name> <script-name> --har scrum-suites/<team>/recordings/my-flow.har
+npm run cli -- generate <team-name> <script-name> --har scrum_suites/<team>/recordings/my-flow.har
 ```
 
 **Example:**
 ```bash
-npm run cli -- generate sample-team login-flow --har scrum-suites/sample-team/recordings/sample-login-flow.har
+npm run cli -- generate sample_team login-flow --har scrum_suites/sample_team/recordings/sample-login-flow.har
 ```
 
 The CLI will:
@@ -158,7 +158,7 @@ The CLI will:
 4. Group remaining requests by `pageref` into transaction groups.
 5. Generate a ready-to-run k6 script at:
    ```
-   scrum-suites/<team>/tests/<script-name>.js
+   scrum_suites/<team>/tests/<script-name>.js
    ```
 
 ### Step 4: Review the generated script
@@ -211,7 +211,7 @@ import { initTransactions, startTransaction, endTransaction } from '../../../dis
 ### Step 2: Initialize the engine before `export default`
 
 ```javascript
-const rules = RuleProcessor.loadRules('scrum-suites/<team>/correlation-rules.json');
+const rules = RuleProcessor.loadRules('scrum_suites/<team>/correlation-rules.json');
 const engine = new CorrelationEngine(rules);
 
 initTransactions(['T01_Login', 'T02_Dashboard', 'T03_Checkout']);
@@ -276,7 +276,7 @@ group('T02_Dashboard', function () {
 
 ```bash
 # From the framework root directory
-k6 run scrum-suites/<team>/tests/<script-name>.js
+k6 run scrum_suites/<team>/tests/<script-name>.js
 ```
 
 **With environment overrides:**
@@ -284,7 +284,7 @@ k6 run scrum-suites/<team>/tests/<script-name>.js
 k6 run --env BASE_URL=https://staging.example.com \
         --vus 10 \
         --duration 5m \
-        scrum-suites/sample-team/tests/correlation-journey.js
+        scrum_suites/sample_team/tests/correlation-journey.js
 ```
 
 ### What to look for in the output
@@ -313,9 +313,9 @@ A `[Correlation] Critical fallback triggered` log followed by a test error means
 
 | File | Purpose |
 |:-----|:--------|
-| `scrum-suites/sample-team/recordings/sample-login-flow.har` | Realistic 3-transaction HAR with login, dashboard, checkout |
-| `scrum-suites/sample-team/correlation-rules.json` | Rules for csrfToken, bearerToken, sessionId, orderId |
-| `scrum-suites/sample-team/tests/correlation-journey.js` | Fully annotated test that demonstrates all 4 correlation patterns |
+| `scrum_suites/sample_team/recordings/sample-login-flow.har` | Realistic 3-transaction HAR with login, dashboard, checkout |
+| `scrum_suites/sample_team/correlation-rules.json` | Rules for csrfToken, bearerToken, sessionId, orderId |
+| `scrum_suites/sample_team/tests/correlation-journey.js` | Fully annotated test that demonstrates all 4 correlation patterns |
 
 ### Correlation patterns covered in the sample test
 
@@ -339,5 +339,5 @@ A `[Correlation] Critical fallback triggered` log followed by a test error means
 | Token missing from second VU iteration | Tokens were extracted only once at init | Call `engine.process()` inside `export default function()`, not at module level |
 
 
-npm run cli -- generate sample-team login-flow \
-    --har scrum-suites/sample-team/recordings/sample-login-flow.har
+npm run cli -- generate sample_team login-flow \
+    --har scrum_suites/sample_team/recordings/sample-login-flow.har

@@ -2,7 +2,7 @@
 
 This document provides a line-by-line breakdown of how a static request recorded inside a HAR file transforms into a **dynamic, fully-correlated k6 request execution**.
 
-We will use the specific example from `scrum-suites/sample-team/tests/correlation-journey.js`:
+We will use the specific example from `scrum_suites/sample_team/tests/correlation-journey.js`:
 ```javascript
 const csrfToken = engine.get('csrfToken') || 'MISSING_CSRF';
 ```

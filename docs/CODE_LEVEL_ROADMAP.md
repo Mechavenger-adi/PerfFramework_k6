@@ -23,7 +23,7 @@ Before touching code, understand what this framework **is**:
 
 ```
 K6-PerfFramework/
-├── core-engine/src/     ← Framework internals (DO NOT EDIT as a test author)
+├── core_engine/src/     ← Framework internals (DO NOT EDIT as a test author)
 │   ├── cli/             ← CLI commands (init, run, generate, validate, debug)
 │   ├── config/          ← Configuration merging & validation
 │   ├── scenario/        ← Test Plan → k6 scenarios translation
@@ -40,10 +40,10 @@ K6-PerfFramework/
 │   └── types/           ← TypeScript interfaces & contracts
 ├── config/              ← User-facing configs
 │   ├── environments/    ← dev.json, staging.json (base URLs)
-│   ├── test-plans/      ← load-test.json, debug-test.json
-│   ├── runtime-settings/← default.json (think time, pacing, error behavior)
+│   ├── test_plans/      ← load-test.json, debug-test.json
+│   ├── runtime_settings/← default.json (think time, pacing, error behavior)
 │   └── correlation-rules/← Token extraction rules
-├── scrum-suites/        ← Team-owned test scripts
+├── scrum_suites/        ← Team-owned test scripts
 │   └── <team>/
 │       ├── tests/       ← .js journey scripts
 │       ├── data/        ← .csv test data files
@@ -58,7 +58,7 @@ K6-PerfFramework/
 > **Goal:** Understand the *data shapes* before reading any logic.
 
 ### 1A. Test Plan Schema
-📄 [TestPlanSchema.ts](file:///d:/repos/K6-PerfFramework/core-engine/src/types/TestPlanSchema.ts)
+📄 [TestPlanSchema.ts](file:///d:/repos/K6-PerfFramework/core_engine/src/types/TestPlanSchema.ts)
 
 This is the **single most important type file**. Every JSON test plan maps to the `TestPlan` interface.
 
@@ -71,7 +71,7 @@ This is the **single most important type file**. Every JSON test plan maps to th
 | `DebugSettings` | Debug replay config | `enabled`, `mode`, `iterations`, `autoResolveRecordingLog` |
 
 ### 1B. Config Contracts
-📄 [ConfigContracts.ts](file:///d:/repos/K6-PerfFramework/core-engine/src/types/ConfigContracts.ts)
+📄 [ConfigContracts.ts](file:///d:/repos/K6-PerfFramework/core_engine/src/types/ConfigContracts.ts)
 
 | Interface | Purpose |
 |---|---|
@@ -81,7 +81,7 @@ This is the **single most important type file**. Every JSON test plan maps to th
 | `FRAMEWORK_DEFAULTS` | Hardcoded fallback values when no config file is provided |
 
 ### 1C. Reporting Contracts
-📄 `core-engine/src/types/ReportingContracts.ts`
+📄 `core_engine/src/types/ReportingContracts.ts`
 
 Defines `ReportBundle`, `TransactionMetricsFile`, `CISummary` — the shapes of every output artifact.
 
@@ -92,7 +92,7 @@ Defines `ReportBundle`, `TransactionMetricsFile`, `CISummary` — the shapes of 
 > **Goal:** Trace a `npm run cli -- run --plan ...` command from entry to k6 launch.
 
 ### 2A. Entry Point
-📄 [run.ts](file:///d:/repos/K6-PerfFramework/core-engine/src/cli/run.ts) (838 lines — the main orchestrator)
+📄 [run.ts](file:///d:/repos/K6-PerfFramework/core_engine/src/cli/run.ts) (838 lines — the main orchestrator)
 
 This file registers all CLI commands using [Commander.js](https://github.com/tj/commander.js).
 
@@ -137,22 +137,22 @@ Step 8: finalizeRunArtifacts()         → Parse k6 output → HTML report
 > **Goal:** Understand the config precedence chain.
 
 ### 3A. ConfigurationManager
-📄 [ConfigurationManager.ts](file:///d:/repos/K6-PerfFramework/core-engine/src/config/ConfigurationManager.ts) (155 lines)
+📄 [ConfigurationManager.ts](file:///d:/repos/K6-PerfFramework/core_engine/src/config/ConfigurationManager.ts) (155 lines)
 
 Merge order (lowest → highest precedence):
 ```
-FRAMEWORK_DEFAULTS → environment JSON → runtime-settings JSON → CLI overrides → .env secrets
+FRAMEWORK_DEFAULTS → environment JSON → runtime_settings JSON → CLI overrides → .env secrets
 ```
 
 Key method: `resolve()` at line 32. It:
 1. Starts with `structuredClone(FRAMEWORK_DEFAULTS)`
 2. Loads environment config (`config/environments/dev.json`)
-3. Deep-merges runtime settings (`config/runtime-settings/default.json`)
+3. Deep-merges runtime settings (`config/runtime_settings/default.json`)
 4. Applies CLI overrides (`--debug` flag, etc.)
 5. Loads `.env` secrets via `EnvResolver`
 
 ### 3B. GatekeeperValidator
-📄 [GatekeeperValidator.ts](file:///d:/repos/K6-PerfFramework/core-engine/src/config/GatekeeperValidator.ts) (242 lines)
+📄 [GatekeeperValidator.ts](file:///d:/repos/K6-PerfFramework/core_engine/src/config/GatekeeperValidator.ts) (242 lines)
 
 Pre-flight checks run **before k6 is invoked**. It validates:
 1. Environment has `baseUrl` and `name`
@@ -170,7 +170,7 @@ Pre-flight checks run **before k6 is invoked**. It validates:
 > **Goal:** Understand how a JSON test plan becomes k6-native scenarios.
 
 ### 4A. WorkloadModels
-📄 [WorkloadModels.ts](file:///d:/repos/K6-PerfFramework/core-engine/src/scenario/WorkloadModels.ts) (118 lines)
+📄 [WorkloadModels.ts](file:///d:/repos/K6-PerfFramework/core_engine/src/scenario/WorkloadModels.ts) (118 lines)
 
 Pure factory functions that create `GlobalLoadProfile` objects:
 
@@ -183,7 +183,7 @@ Pure factory functions that create `GlobalLoadProfile` objects:
 | `buildIterationProfile()` | Fixed | N VUs × M iterations |
 
 ### 4B. ScenarioBuilder
-📄 [ScenarioBuilder.ts](file:///d:/repos/K6-PerfFramework/core-engine/src/scenario/ScenarioBuilder.ts) (353 lines)
+📄 [ScenarioBuilder.ts](file:///d:/repos/K6-PerfFramework/core_engine/src/scenario/ScenarioBuilder.ts) (353 lines)
 
 The `build()` method dispatches to:
 - `buildParallel()` — All journeys run concurrently (most common)
@@ -199,7 +199,7 @@ This creates the `K6_PERF_PHASES` environment variable that tells the lifecycle 
 
 > **Goal:** Understand how the framework launches the k6 binary.
 
-📄 [PipelineRunner.ts](file:///d:/repos/K6-PerfFramework/core-engine/src/execution/PipelineRunner.ts) (259 lines)
+📄 [PipelineRunner.ts](file:///d:/repos/K6-PerfFramework/core_engine/src/execution/PipelineRunner.ts) (259 lines)
 
 | Method | When Used |
 |---|---|
@@ -220,7 +220,7 @@ What happens inside `execute()`:
 > **Goal:** This is the most complex and most important piece. Understand how `initPhase → actionPhase → endPhase` actually works inside a running k6 VU.
 
 ### 6A. Transaction Helpers
-📄 [transaction.ts](file:///d:/repos/K6-PerfFramework/core-engine/src/utils/transaction.ts) (57 lines)
+📄 [transaction.ts](file:///d:/repos/K6-PerfFramework/core_engine/src/utils/transaction.ts) (57 lines)
 
 Three functions — the LoadRunner equivalent:
 
@@ -231,7 +231,7 @@ endTransaction('Login')                ← Calculates duration, adds to k6 Trend
 ```
 
 ### 6B. Lifecycle Bridge
-📄 [lifecycle.ts](file:///d:/repos/K6-PerfFramework/core-engine/src/utils/lifecycle.ts) (318 lines)
+📄 [lifecycle.ts](file:///d:/repos/K6-PerfFramework/core_engine/src/utils/lifecycle.ts) (318 lines)
 
 **This is the most intellectually dense file in the framework.** Read it carefully.
 
@@ -257,7 +257,7 @@ Last iteration or ramp-down detected: → endPhase() (once per VU)
 Uses `Math.floor()` instead of `Math.ceil()` because k6 removes VUs slightly before our check runs. Floor ensures endPhase fires in time.
 
 ### 6C. How a Journey Script Uses the Lifecycle
-📄 [buyanimal_1_framework_lifecycle.js](file:///d:/repos/K6-PerfFramework/scrum-suites/jpet-team/tests/buyanimal_1_framework_lifecycle.js) (real example)
+📄 [buyanimal_1_framework_lifecycle.js](file:///d:/repos/K6-PerfFramework/scrum_suites/jpet_team/tests/buyanimal_1_framework_lifecycle.js) (real example)
 
 Pattern every script follows:
 ```javascript
@@ -281,12 +281,12 @@ export default function() {
 ## Phase 7: Data, Assertions & Correlation (1 hour)
 
 ### 7A. Data Layer
-📄 [DataFactory.ts](file:///d:/repos/K6-PerfFramework/core-engine/src/data/DataFactory.ts) — Loads CSV/JSON on the Node.js side
+📄 [DataFactory.ts](file:///d:/repos/K6-PerfFramework/core_engine/src/data/DataFactory.ts) — Loads CSV/JSON on the Node.js side
 📄 `DataPoolManager.ts` — Manages row allocation across VUs
 📄 `DataValidator.ts` — Validates CSV columns exist before k6 runs
 
 ### 7B. Assertions / SLA
-📄 [ThresholdManager.ts](file:///d:/repos/K6-PerfFramework/core-engine/src/assertions/ThresholdManager.ts) (99 lines)
+📄 [ThresholdManager.ts](file:///d:/repos/K6-PerfFramework/core_engine/src/assertions/ThresholdManager.ts) (99 lines)
 
 Converts test plan SLAs into k6-native `thresholds`:
 ```
@@ -295,7 +295,7 @@ journey_slas.login: { p90: 2000 }  →  thresholds: { 'http_req_duration{scenari
 ```
 
 ### 7C. Correlation Engine
-📄 [CorrelationEngine.ts](file:///d:/repos/K6-PerfFramework/core-engine/src/correlation/CorrelationEngine.ts) (58 lines)
+📄 [CorrelationEngine.ts](file:///d:/repos/K6-PerfFramework/core_engine/src/correlation/CorrelationEngine.ts) (58 lines)
 
 Simple store-based engine:
 1. `process(response)` — Runs all rules against the response, extracts values via `ExtractorRegistry`
@@ -308,7 +308,7 @@ Simple store-based engine:
 
 > **Goal:** Understand the HAR → script pipeline.
 
-📄 [HARParser.ts](file:///d:/repos/K6-PerfFramework/core-engine/src/recording/HARParser.ts) — Reads `.har`, sorts by time, filters domains, strips headers
+📄 [HARParser.ts](file:///d:/repos/K6-PerfFramework/core_engine/src/recording/HARParser.ts) — Reads `.har`, sorts by time, filters domains, strips headers
 📄 `TransactionGrouper.ts` — Groups requests by `pageref` into logical transactions
 📄 `ScriptGenerator.ts` — Outputs the final `.js` file with `initTransactions()`, `startTransaction()`, `logExchange()`, etc.
 
@@ -320,7 +320,7 @@ Pipeline: `HAR file → HARParser.parse() → TransactionGrouper.group() → Scr
 
 > **Goal:** Understand how the framework compares recorded vs replayed traffic.
 
-📄 [ReplayRunner.ts](file:///d:/repos/K6-PerfFramework/core-engine/src/debug/ReplayRunner.ts) (452 lines)
+📄 [ReplayRunner.ts](file:///d:/repos/K6-PerfFramework/core_engine/src/debug/ReplayRunner.ts) (452 lines)
 
 The `runDebug()` method:
 1. Spawns k6 with `captureOutput: true` and `per-vu-iterations` executor
@@ -354,15 +354,15 @@ All combined into ReportBundle
 RunReportGenerator.generate()      → RunReport.html (single-file dashboard with Chart.js)
 ```
 
-📄 [RunReportGenerator.ts](file:///d:/repos/K6-PerfFramework/core-engine/src/reporting/RunReportGenerator.ts) — Generates a self-contained HTML file with embedded CSS, JS, and Chart.js. The report has tabs: Summary, Graphs, Transactions, Errors, Warnings, Snapshots, System.
+📄 [RunReportGenerator.ts](file:///d:/repos/K6-PerfFramework/core_engine/src/reporting/RunReportGenerator.ts) — Generates a self-contained HTML file with embedded CSS, JS, and Chart.js. The report has tabs: Summary, Graphs, Transactions, Errors, Warnings, Snapshots, System.
 
 ---
 
 ## Phase 11: The Barrel Export (15 min)
 
-📄 [index.ts](file:///d:/repos/K6-PerfFramework/core-engine/src/index.ts)
+📄 [index.ts](file:///d:/repos/K6-PerfFramework/core_engine/src/index.ts)
 
-This is the public API surface. Every class/type the framework exposes is re-exported here. Teams import from `@k6-perf/core-engine`. Read this file to see what's "public" vs "internal."
+This is the public API surface. Every class/type the framework exposes is re-exported here. Teams import from `@k6-perf/core_engine`. Read this file to see what's "public" vs "internal."
 
 ---
 

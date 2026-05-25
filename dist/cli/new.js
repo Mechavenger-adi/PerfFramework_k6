@@ -49,8 +49,8 @@ function runNewWizard() {
     console.log('\n============================================');
     console.log('|     K6-PerfFramework Config Wizard       |');
     console.log('============================================\n');
-    rl.question('What would you like to create? (1: test-plan, 2: runtime-settings): ', (typeChoice) => {
-        const typeStr = typeChoice.trim() === '2' ? 'runtime-settings' : 'test-plans';
+    rl.question('What would you like to create? (1: test-plan, 2: runtime_settings): ', (typeChoice) => {
+        const typeStr = typeChoice.trim() === '2' ? 'runtime_settings' : 'test_plans';
         const templatesDir = path.resolve(process.cwd(), `templates/${typeStr}`);
         if (!fs.existsSync(templatesDir)) {
             console.log(`\n[FAIL] No templates found in ${templatesDir}\n`);

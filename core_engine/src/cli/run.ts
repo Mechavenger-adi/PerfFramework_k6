@@ -1,0 +1,1426 @@
+/**
+ * run.ts
+ * Phase 1 – Main CLI entry point.
+ * Orchestrates the full framework pipeline: load -> validate -> build -> execute.
+ */
+
+import { Command } from 'commander';
+import * as fs from 'fs';
+import * as path from 'path';
+import { ConfigurationManager } from '../config/ConfigurationManager';
+import { GatekeeperValidator } from '../config/GatekeeperValidator';
+import { RuntimeConfigManager } from '../config/RuntimeConfigManager';
+import { RecordingLogResolver } from '../debug/RecordingLogResolver';
+import { ReplayRunner } from '../debug/ReplayRunner';
+import { HostMonitor, HostSnapshot } from '../execution/HostMonitor';
+import { ParallelExecutionManager } from '../execution/ParallelExecutionManager';
+import { PipelineRunner } from '../execution/PipelineRunner';
+import { ScenarioBuilder } from '../scenario/ScenarioBuilder';
+import { ArtifactWriter } from '../reporting/ArtifactWriter';
+import { EventArtifactBuilder } from '../reporting/EventArtifactBuilder';
+import { RunReportGenerator } from '../reporting/RunReportGenerator';
+import { RunSummaryBuilder } from '../reporting/RunSummaryBuilder';
+import { TimeseriesArtifactBuilder } from '../reporting/TimeseriesArtifactBuilder';
+import { TransactionMetricsBuilder } from '../reporting/TransactionMetricsBuilder';
+import { ScenarioRuntimeMetadata } from '../scenario/ScenarioBuilder';
+import { TestPlanLoader } from '../scenario/TestPlanLoader';
+import { ResolvedConfig } from '../types/ConfigContracts';
+import { ReportBundle } from '../types/ReportingContracts';
+import { TestPlan, UserJourney } from '../types/TestPlanSchema';
+import { Logger } from '../utils/logger';
+import { ProgressBar } from '../utils/ProgressBar';
+import { runConvert } from './convert';
+import { runGenerate } from './generate';
+import { runGenerateByos } from './generate-byos';
+import { runInit } from './init';
+import { runValidate } from './validate';
+import { listTemplates, showTemplate } from './templates';
+import { listFeatures } from './features';
+import { inspectConfig } from './config-inspect';
+import { runNewWizard } from './new';
+import { generateDocs } from './docs';
+
+const program = new Command();
+
+program
+  .name('k6-framework')
+  .description('k6 Performance Framework CLI – Phase 1 Foundation')
+  .version('1.0.0');
+
+// ---------------------------------------------
+// INIT command
+// ---------------------------------------------
+
+program
+  .command('init')
+  .description('Scaffold a new k6 performance project in the current directory')
+  .option('-d, --dir <path>', 'Target directory to scaffold into', process.cwd())
+  .action((opts) => {
+    runInit(opts.dir);
+  });
+
+// ---------------------------------------------
+// NEW command
+// ---------------------------------------------
+
+program
+  .command('new')
+  .description('Interactive wizard to create a new test plan or runtime settings from templates')
+  .action(() => {
+    runNewWizard();
+  });
+
+// ---------------------------------------------
+// DOCS command
+// ---------------------------------------------
+
+program
+  .command('docs')
+  .description('Auto-generate Markdown reference documentation from JSON schemas')
+  .action(() => {
+    generateDocs();
+  });
+
+// ---------------------------------------------
+// GENERATE BYOS command
+// ---------------------------------------------
+
+program
+  .command('generate-byos <team> <script-name>')
+  .description('Scaffold a BYOS (Bring Your Own Script) template for pasting raw k6 scripts')
+  .action((team, scriptName) => {
+    runGenerateByos(team, scriptName);
+  });
+
+// ---------------------------------------------
+// CONVERT command
+// ---------------------------------------------
+
+program
+  .command('convert <input-script> <team> <script-name>')
+  .description('Convert a conventional k6 script to a framework-compatible script with logExchange and transaction wrappers')
+  .option('--in-place', 'Overwrite the input file instead of writing to scrum_suites/<team>/tests/')
+  .action(async (inputScript, team, scriptName, opts) => {
+    await runConvert(inputScript, team, scriptName, { inPlace: opts.inPlace });
+  });
+
+// ---------------------------------------------
+// GENERATE command
+// ---------------------------------------------
+
+program
+  .command('generate <team> <script-name>')
+  .description('Generate a k6 script from a HAR recording')
+  .requiredOption('--har <path>', 'Path to the .har file')
+  .action(async (team, scriptName, opts) => {
+    await runGenerate(opts.har, team, scriptName);
+  });
+
+// ---------------------------------------------
+// VALIDATE command
+// ---------------------------------------------
+
+
+program
+  .command('validate')
+  .description('Validate configs and test plan before execution')
+  .requiredOption('--plan <path>', 'Path to the test plan JSON file')
+  .option('--env-config <path>', 'Path to the environment config JSON file (auto-resolved if omitted)')
+  .option('--runtime <path>', 'Path to the runtime_settings JSON file', 'config/runtime_settings/default.json')
+  .option('--data-root <path>', 'Root directory for data files', 'scrum_suites')
+  .option('--env-file <path>', 'Path to .env file', '.env')
+  .option('--verbose', 'Print verbose validation output including completeness score')
+  .action((opts) => {
+    const passed = runValidate({
+      planPath: opts.plan,
+      envConfigPath: opts.envConfig,
+      runtimeSettingsPath: opts.runtime,
+      dataRoot: opts.dataRoot,
+      envFilePath: opts.envFile,
+      verbose: opts.verbose,
+    });
+
+    if (!passed) process.exit(1);
+  });
+
+// ---------------------------------------------
+// TEMPLATES command
+// ---------------------------------------------
+
+const templatesCmd = program
+  .command('templates')
+  .description('Discover and view built-in config templates');
+
+templatesCmd
+  .command('list')
+  .description('List all available templates')
+  .option('--type <type>', 'Type of templates (test_plans | runtime_settings)', 'test_plans')
+  .action((opts) => {
+    if (opts.type !== 'test_plans' && opts.type !== 'runtime_settings') {
+      console.error('Invalid type. Must be test_plans or runtime_settings.');
+      process.exit(1);
+    }
+    listTemplates(opts.type);
+  });
+
+templatesCmd
+  .command('show <name>')
+  .description('Show the content of a specific template')
+  .option('--type <type>', 'Type of template (test_plans | runtime_settings)', 'test_plans')
+  .action((name, opts) => {
+    if (opts.type !== 'test_plans' && opts.type !== 'runtime_settings') {
+      console.error('Invalid type. Must be test_plans or runtime_settings.');
+      process.exit(1);
+    }
+    showTemplate(opts.type, name);
+  });
+
+// ---------------------------------------------
+// FEATURES command
+// ---------------------------------------------
+
+program
+  .command('features')
+  .description('Discover built-in framework capabilities')
+  .action(() => {
+    listFeatures();
+  });
+
+// ---------------------------------------------
+// CONFIG command
+// ---------------------------------------------
+
+const configCmd = program
+  .command('config')
+  .description('Configuration utilities');
+
+configCmd
+  .command('inspect')
+  .description('Inspect the final merged configuration resolution chain')
+  .requiredOption('--plan <path>', 'Path to the test plan JSON file')
+  .option('--env-config <path>', 'Path to the environment config JSON file')
+  .option('--runtime <path>', 'Path to the runtime_settings JSON file')
+  .option('--env-file <path>', 'Path to .env file')
+  .action((opts) => {
+    inspectConfig(opts.plan, opts.envConfig, opts.runtime, opts.envFile);
+  });
+
+// ---------------------------------------------
+// DEBUG command
+// ---------------------------------------------
+
+program
+  .command('debug')
+  .description('Run a script in single-iteration debug mode and generate an HTML diff report')
+  .requiredOption('--script <path>', 'Path to the generated journey script')
+  .option('--recording-log <path>', 'Path to the normalized recording-log JSON file')
+  .option('--out <path>', 'Path to the HTML diff report', path.join('results', 'debug-diff.html'))
+  .option('--replay-log <path>', 'Optional path to save the captured replay-log JSON file')
+  .allowUnknownOption()
+  .allowExcessArguments()
+  .action(async (opts, cmd) => {
+    Logger.header('k6 Performance Framework – DEBUG');
+    const passthroughArgs = filterPassthroughArgs(cmd.args as string[]);
+
+    try {
+      const resolvedRecordingLogPath = opts.recordingLog
+        ? opts.recordingLog
+        : resolveRecordingLogForStandaloneDebug(opts.script);
+      const result = await ReplayRunner.runDebug({
+        scriptPath: opts.script,
+        recordingLogPath: resolvedRecordingLogPath,
+        outHtmlPath: opts.out,
+        replayLogPath: opts.replayLog,
+        vus: 1,
+        iterations: 1,
+        extraK6Args: passthroughArgs,
+      });
+
+      Logger.pass(`Replay log saved: ${result.replayLogPath}`);
+      Logger.pass(`HTML diff report: ${result.htmlReportPath}`);
+      Logger.pass(`Diff steps compared: ${result.results.length}\n`);
+    } catch (err) {
+      Logger.fail(`Debug execution failed: ${(err as Error).message}\n`);
+      process.exit(1);
+    }
+  });
+
+// ---------------------------------------------
+// RUN command
+// ---------------------------------------------
+
+program
+  .command('run')
+  .description('Execute a test plan through k6')
+  .requiredOption('--plan <path>', 'Path to the test plan JSON file')
+  .option('--env-config <path>', 'Path to the environment config JSON (auto-resolved if omitted)')
+  .option('--runtime <path>', 'Path to the runtime_settings JSON file', 'config/runtime_settings/default.json')
+  .option('--env-file <path>', 'Path to .env file', '.env')
+  .option('--data-root <path>', 'Root directory for data files', 'scrum_suites')
+  .option('--debug', 'Enable debug mode (prints resolved config)')
+  .option('--out <k6-output>', 'k6 --out flag value (e.g. json=results.json)')
+  .allowUnknownOption()
+  .allowExcessArguments()
+  .action(async (opts, cmd) => {
+    const passthroughArgs = filterPassthroughArgs(cmd.args as string[]);
+    Logger.header('k6 Performance Framework – RUN');
+
+    // -- Step 1: Load test plan -----------------
+    let plan;
+    try {
+      const loader = new TestPlanLoader();
+      plan = loader.load(opts.plan);
+      Logger.pass(`Test Plan loaded: ${plan.name} (${plan.environment})`);
+    } catch (err) {
+      Logger.fail((err as Error).message);
+      process.exit(1);
+    }
+
+    // -- Step 2: Resolve configs ----------------
+    const envConfigPath =
+      opts.envConfig ?? path.join('config', 'environments', `${plan.environment}.json`);
+
+    let resolvedConfig;
+    try {
+      const configManager = new ConfigurationManager(opts.envFile);
+      resolvedConfig = configManager.resolve({
+        environmentConfigPath: envConfigPath,
+        runtimeSettingsPath: opts.runtime,
+        cliOverrides: {
+          ...(opts.debug !== undefined ? { debugMode: opts.debug as boolean } : {}),
+        },
+      });
+      Logger.pass(`Config resolved for environment: ${resolvedConfig.environment.name}`);
+    } catch (err) {
+      Logger.fail(`Config error: ${(err as Error).message}`);
+      process.exit(1);
+    }
+
+    // -- Step 3: Gatekeeper pre-flight ----------
+    const gatekeeper = new GatekeeperValidator();
+    const preflight = gatekeeper.validate(resolvedConfig, plan, opts.dataRoot);
+    gatekeeper.printResult(preflight);
+
+    if (!preflight.passed) {
+      Logger.fail('Pre-flight checks failed. Execution aborted.\n');
+      process.exit(1);
+    }
+
+    if (plan.debug?.enabled) {
+      await runPlanDebugMode(plan, resolvedConfig, passthroughArgs);
+      return;
+    }
+
+    // -- Step 4: Prepare run metadata and output paths ---------------
+    const { reportDir, safeReportDir, runId, runManifestPath } = prepareRunArtifacts(plan, resolvedConfig);
+    const scenarioRuntimeMetadata = buildScenarioRuntimeMetadata(plan, resolvedConfig, runId, safeReportDir);
+    const runtimeEnv = buildRunEnvironment(plan, resolvedConfig, runId, safeReportDir, runManifestPath);
+    writeRunManifest(runManifestPath, plan, resolvedConfig, scenarioRuntimeMetadata);
+
+    // -- Step 5: Build k6 options ---------------
+    let k6Options;
+    try {
+      k6Options = ParallelExecutionManager.resolve(plan, scenarioRuntimeMetadata);
+      const scenarioCount = Object.keys(k6Options.scenarios).length;
+      Logger.pass(`Scenarios built: ${scenarioCount} journey(s) -> ${Object.keys(k6Options.scenarios).join(', ')}\n`);
+    } catch (err) {
+      Logger.fail(`Scenario build error: ${(err as Error).message}`);
+      process.exit(1);
+    }
+
+    // -- Step 6: Execute via k6 -----------------
+    // k6 parallel scenarios use "exec" to point to named exported functions.
+    // Each journey script only exports a `default` function.
+    // Solution: Generate a temporary combined entry script that re-exports
+    // each journey's default function under its scenario exec name.
+
+    const entryScriptDir = getEntryScriptDirectory(plan.user_journeys);
+    fs.mkdirSync(entryScriptDir, { recursive: true });
+
+    let entryCode = '';
+    entryCode += `import { htmlReport } from "https://raw.githubusercontent.com/benc-uk/k6-reporter/main/dist/bundle.js";\n`;
+    entryCode += `import { textSummary } from "https://jslib.k6.io/k6-summary/0.0.1/index.js";\n`;
+    for (const journey of plan.user_journeys) {
+      const execName = journey.name.replace(/[^a-zA-Z0-9_]/g, '_');
+      const importPath = toImportSpecifier(entryScriptDir, journey.scriptPath);
+      entryCode += `export { default as ${execName} } from '${importPath}';\n`;
+    }
+    entryCode += `\nexport function handleSummary(data) {\n`;
+    entryCode += `  return {\n`;
+    entryCode += `    "${safeReportDir}/k6-reporter-summary.html": htmlReport(data),\n`;
+    entryCode += `    "${safeReportDir}/handleSummary.json": JSON.stringify(data),\n`;
+    entryCode += `    stdout: textSummary(data, { indent: " ", enableColors: true }),\n`;
+    entryCode += `  };\n`;
+    entryCode += `}\n`;
+
+    const entryScriptPath = path.join(
+      entryScriptDir,
+      `.k6-perf-entry-${runId.replace(/[^a-zA-Z0-9_]/g, '_')}.js`,
+    );
+    fs.writeFileSync(entryScriptPath, entryCode, 'utf-8');
+
+    // Robust cleanup handlers for the generated orchestration file
+    const cleanupEntryScript = () => {
+      try {
+        if (fs.existsSync(entryScriptPath)) {
+          fs.unlinkSync(entryScriptPath);
+        }
+      } catch {
+        // Silent best-effort fail
+      }
+    };
+    const forceExitHandler = () => {
+      cleanupEntryScript();
+      process.exit(130);
+    };
+
+    process.on('exit', cleanupEntryScript);
+    process.once('SIGINT', forceExitHandler);
+    process.once('SIGTERM', forceExitHandler);
+
+    const metricsStreamPath = path.join(reportDir, 'metrics-stream.json');
+    const safeMetricsStreamPath = metricsStreamPath.replace(/\\/g, '/');
+    const runLogPath = path.join(reportDir, 'k6-run.log');
+    const safeRunLogPath = runLogPath.replace(/\\/g, '/');
+
+    const extraArgs: string[] = [
+      '--summary-export', `${safeReportDir}/summary.json`,
+      '--out', `web-dashboard=export=${safeReportDir}/TestSummary.html`,
+      '--out', `json=${safeMetricsStreamPath}`,
+      // Mirror k6 log output (console.log, framework events) to a file for
+      // post-run snapshot parsing. Logs still appear in terminal via stderr;
+      // stdout stays uninherited so k6's animated progress bar renders correctly.
+      '--log-output', 'stderr',
+      '--log-output', `file=${safeRunLogPath}`,
+      // User-supplied k6 flags forwarded verbatim (e.g. --http-debug=full).
+      ...passthroughArgs,
+    ];
+
+    if (opts.out) {
+      extraArgs.push('--out', opts.out);
+    }
+
+    const influxUrl = resolvedConfig.secrets['K6_INFLUXDB_URL'];
+    if (influxUrl) {
+      extraArgs.push('--out', `influxdb=${influxUrl}`);
+    }
+
+    const hostSnapshots: HostSnapshot[] = [];
+    if (resolvedConfig.runtime.monitoring.enabled) {
+      hostSnapshots.push(await HostMonitor.captureSnapshot());
+    }
+    const hostSampler = HostMonitor.startPeriodicSampling(resolvedConfig.runtime.monitoring, hostSnapshots);
+
+    Logger.pass('Prepared reporting directories');
+    Logger.detail(`Run ID: ${runId}`);
+    Logger.detail(`Reports will be saved to: ${reportDir}`);
+    Logger.detail(`Run manifest: ${runManifestPath}`);
+    Logger.detail('Launching k6...\n');
+    let runResult;
+    const k6StartTime = new Date().toISOString();
+    const txnNamesForLive = runtimeEnv.K6_PERF_TRANSACTION_NAMES
+      ? (JSON.parse(runtimeEnv.K6_PERF_TRANSACTION_NAMES) as string[])
+      : [];
+    const liveRuntime = new RuntimeConfigManager(resolvedConfig.runtime);
+    const liveDisplay = txnNamesForLive.length > 0
+      ? startLiveTransactionDisplay(metricsStreamPath, txnNamesForLive, liveRuntime.getTransactionStats(), runLogPath)
+      : null;
+    try {
+      // No onLine → stdio is fully inherited → k6's live progress bar renders correctly.
+      // Snapshot events are captured via --log-output file=... and parsed post-run.
+      runResult = await PipelineRunner.executeAsync({
+        scriptPath: entryScriptPath,
+        k6Options,
+        extraK6Args: extraArgs,
+        env: runtimeEnv,
+        reportDir,
+        runId,
+        runManifestPath,
+      });
+    } finally {
+      if (liveDisplay) liveDisplay.stop();
+      // Parse and persist snapshots from the mirrored log file
+      parseAndFlushSnapshots(runLogPath, reportDir);
+      await hostSampler.stop();
+      if (resolvedConfig.runtime.monitoring.enabled) {
+        hostSnapshots.push(await HostMonitor.captureSnapshot());
+      }
+      cleanupEntryScript();
+      process.removeListener('exit', cleanupEntryScript);
+      process.removeListener('SIGINT', forceExitHandler);
+      process.removeListener('SIGTERM', forceExitHandler);
+    }
+    const k6EndTime = new Date().toISOString();
+
+    const generatedArtifacts = finalizeRunArtifacts({
+      runId,
+      reportDir,
+      plan,
+      resolvedConfig,
+      runStatus: runResult.status,
+      hostSnapshots,
+      k6StartTime,
+      k6EndTime,
+    });
+
+    Logger.pass('Unified report artifacts generated');
+    Logger.detail(`Unified HTML report: ${generatedArtifacts.runReportHtml}`);
+    Logger.detail(`Transaction metrics: ${generatedArtifacts.transactionMetricsJson}`);
+    Logger.detail(`CI summary: ${generatedArtifacts.ciSummaryJson}`);
+
+    if (generatedArtifacts.transactionMetrics) {
+      printTransactionTable(generatedArtifacts.transactionMetrics);
+    }
+
+    PipelineRunner.ensureSuccess(runResult);
+  });
+
+async function runPlanDebugMode(plan: TestPlan, resolvedConfig: ResolvedConfig, passthroughArgs: string[] = []): Promise<void> {
+  const debugSettings = plan.debug ?? { enabled: false };
+  const baseDir = debugSettings.reportDir
+    ? path.resolve(process.cwd(), debugSettings.reportDir)
+    : path.join(process.cwd(), 'results', 'debug');
+  const safePlanName = plan.name.replace(/[^a-zA-Z0-9_]/g, '_');
+  const timestamp = new Date().toISOString().replace(/[-:.]/g, '_');
+  const runDir = path.join(baseDir, safePlanName, `Run_${timestamp}`);
+
+  fs.mkdirSync(runDir, { recursive: true });
+
+  const journeyCount = plan.user_journeys.length;
+  Logger.pass(`Debug mode · ${journeyCount} journey(s) · ${debugSettings.vus ?? 1} VU(s) · ${debugSettings.iterations ?? 1} iteration(s) each`);
+  Logger.detail(`Output: ${runDir}\n`);
+
+  const failures: string[] = [];
+  const journeyProgress = new ProgressBar('Debug journeys', plan.user_journeys.length);
+
+  for (const journey of plan.user_journeys) {
+    try {
+      journeyProgress.update(journeyProgress.current, journey.name);
+      const result = await runJourneyDebug(plan, journey, runDir, resolvedConfig, passthroughArgs);
+      journeyProgress.done(`${journey.name} — ${result.results.length} steps`);
+      journeyProgress.tick();
+      Logger.detail(`  Report: ${path.basename(result.htmlReportPath)}`);
+    } catch (err) {
+      const message = `${journey.name}: ${(err as Error).message}`;
+      journeyProgress.fail(journey.name);
+      journeyProgress.tick();
+      failures.push(message);
+    }
+  }
+
+  if (failures.length > 0) {
+    Logger.fail('Debug run finished with errors:');
+    failures.forEach((failure) => Logger.bullet(failure, 'red'));
+    console.error('');
+    process.exit(1);
+  }
+}
+
+function runJourneyDebug(plan: TestPlan, journey: UserJourney, runDir: string, resolvedConfig: ResolvedConfig, passthroughArgs: string[] = []) {
+  const safeJourneyName = journey.name.replace(/[^a-zA-Z0-9_]/g, '_');
+  const outHtmlPath = path.join(runDir, `${safeJourneyName}.diff.html`);
+  const replayLogPath = path.join(runDir, `${safeJourneyName}.replay-log.json`);
+
+  const runtime = new RuntimeConfigManager(resolvedConfig.runtime);
+  return ReplayRunner.runDebug({
+    scriptPath: journey.scriptPath,
+    recordingLogPath: journey.recordingLogPath,
+    outHtmlPath,
+    replayLogPath,
+    vus: plan.debug?.vus ?? 1,
+    iterations: plan.debug?.iterations ?? 1,
+    noCookiesReset: plan.noCookiesReset,
+    teamEnvironments: resolvedConfig.environment.scrum_suites,
+    errorBehavior: runtime.getErrorBehavior(),
+    extraK6Args: passthroughArgs,
+  });
+}
+
+// Flags the framework always injects into the k6 command itself.
+// Passing them again via CLI passthrough would silently override framework
+// internals (--config discards all built scenarios; --summary-export loses
+// the post-run JSON that reporting depends on).
+const FRAMEWORK_OWNED_FLAGS = new Set(['--config', '--summary-export']);
+
+function filterPassthroughArgs(args: string[]): string[] {
+  const filtered: string[] = [];
+  let i = 0;
+  while (i < args.length) {
+    const arg = args[i];
+    const flagKey = arg.startsWith('--')
+      ? (arg.includes('=') ? arg.slice(0, arg.indexOf('=')) : arg)
+      : null;
+    if (flagKey && FRAMEWORK_OWNED_FLAGS.has(flagKey)) {
+      Logger.warn(`Ignoring passthrough flag '${arg}' — managed by the framework.`);
+      // Standalone form (--flag value or --flag =value): skip the next token too
+      if (!arg.includes('=') && i + 1 < args.length && !args[i + 1].startsWith('-')) {
+        i += 2;
+      } else {
+        i += 1;
+      }
+      continue;
+    }
+    // Merge "--flag =value" (space before =) into "--flag=value" so k6 doesn't
+    // interpret "=value" as a second positional script argument.
+    if (flagKey && !arg.includes('=') && i + 1 < args.length && args[i + 1].startsWith('=')) {
+      filtered.push(arg + args[i + 1]);
+      i += 2;
+      continue;
+    }
+    filtered.push(arg);
+    i++;
+  }
+  return filtered;
+}
+
+function resolveRecordingLogForStandaloneDebug(scriptPath: string): string | undefined {
+  const resolution = RecordingLogResolver.resolve(scriptPath);
+  if (resolution.status === 'ambiguous') {
+    throw new Error(
+      `Multiple recording logs matched this script in ${resolution.recordingsDir}. ` +
+      `Set --recording-log explicitly. Candidates: ${(resolution.candidates ?? []).join(', ')}`,
+    );
+  }
+
+  return resolution.resolvedPath;
+}
+
+function getEntryScriptDirectory(journeys: UserJourney[]): string {
+  const scriptDirs = Array.from(
+    new Set(journeys.map((journey) => path.dirname(path.resolve(process.cwd(), journey.scriptPath)))),
+  );
+
+  if (scriptDirs.length === 1) {
+    return scriptDirs[0];
+  }
+
+  return path.join(process.cwd(), '.k6-temp');
+}
+
+function toImportSpecifier(fromDir: string, targetPath: string): string {
+  const relativePath = path.relative(fromDir, path.resolve(process.cwd(), targetPath)).replace(/\\/g, '/');
+  return relativePath.startsWith('.') ? relativePath : `./${relativePath}`;
+}
+
+function prepareRunArtifacts(plan: TestPlan, resolvedConfig: ResolvedConfig): {
+  reportDir: string;
+  safeReportDir: string;
+  runId: string;
+  runManifestPath: string;
+} {
+  const baseDir = resolvedConfig.secrets['K6_RESULTS_BASE_DIR'] || 'results';
+  const safePlanName = plan.name.replace(/[^a-zA-Z0-9_]/g, '_');
+  const timestamp = new Date().toISOString().replace(/[-:.]/g, '_');
+  const runId = `Run_${timestamp}`;
+  const reportDir = path.join(process.cwd(), baseDir, safePlanName, runId);
+
+  fs.mkdirSync(reportDir, { recursive: true });
+
+  return {
+    reportDir,
+    safeReportDir: reportDir.replace(/\\/g, '/'),
+    runId,
+    runManifestPath: path.join(reportDir, 'run-manifest.json'),
+  };
+}
+
+function buildScenarioRuntimeMetadata(
+  plan: TestPlan,
+  resolvedConfig: ResolvedConfig,
+  runId: string,
+  safeReportDir: string,
+): ScenarioRuntimeMetadata {
+  const runtime = new RuntimeConfigManager(resolvedConfig.runtime);
+  const journeyTransactionNames = extractJourneyTransactionNames(plan);
+
+  return {
+    runId,
+    planName: plan.name,
+    environment: plan.environment,
+    executionMode: plan.execution_mode,
+    reportDir: safeReportDir,
+    generatedAt: new Date().toISOString(),
+    journeyTransactionNames,
+    runtime: {
+      errorBehavior: runtime.getErrorBehavior(),
+      thinkTime: {
+        mode: resolvedConfig.runtime.thinkTime.mode,
+        fixed: resolvedConfig.runtime.thinkTime.fixed,
+        min: resolvedConfig.runtime.thinkTime.min,
+        max: resolvedConfig.runtime.thinkTime.max,
+      },
+      pacingEnabled: runtime.isPacingEnabled(),
+      pacingSeconds: runtime.getPacingSeconds(),
+      reporting: {
+        transactionStats: runtime.getTransactionStats(),
+        includeTransactionTable: runtime.shouldIncludeTransactionTable(),
+        includeErrorTable: runtime.shouldIncludeErrorTable(),
+        timeseriesEnabled: runtime.isTimeseriesEnabled(),
+        timeseriesBucketSizeSeconds: runtime.getTimeseriesBucketSizeSeconds(),
+      },
+      errors: {
+        captureSnapshotOnFailure: runtime.shouldCaptureSnapshotOnFailure(),
+        maxSnapshotsPerRun: runtime.getMaxSnapshotsPerRun(),
+        includeRequestHeaders: runtime.shouldIncludeRequestHeadersInSnapshots(),
+        includeRequestBody: runtime.shouldIncludeRequestBodyInSnapshots(),
+        includeResponseHeaders: runtime.shouldIncludeResponseHeadersInSnapshots(),
+        includeResponseBody: runtime.shouldIncludeResponseBodyInSnapshots(),
+      },
+    },
+  };
+}
+
+function buildRunEnvironment(
+  plan: TestPlan,
+  resolvedConfig: ResolvedConfig,
+  runId: string,
+  safeReportDir: string,
+  runManifestPath: string,
+): Record<string, string> {
+  const transactionNames = collectUniqueTransactionNames(extractJourneyTransactionNames(plan));
+
+  return {
+    K6_PERF_RUN_ID: runId,
+    K6_PERF_PLAN_NAME: plan.name,
+    K6_PERF_ENVIRONMENT: plan.environment,
+    K6_PERF_EXECUTION_MODE: plan.execution_mode,
+    K6_PERF_REPORT_DIR: safeReportDir,
+    K6_PERF_RUN_MANIFEST_PATH: runManifestPath.replace(/\\/g, '/'),
+    K6_PERF_TEAM_ENVIRONMENTS: JSON.stringify(resolvedConfig.environment.scrum_suites || {}),
+    ...(transactionNames.length > 0
+      ? { K6_PERF_TRANSACTION_NAMES: JSON.stringify(transactionNames) }
+      : {}),
+  };
+}
+
+function extractJourneyTransactionNames(plan: TestPlan): Record<string, string[]> {
+  const journeyTransactionNames: Record<string, string[]> = {};
+
+  for (const journey of plan.user_journeys) {
+    const resolvedScriptPath = path.isAbsolute(journey.scriptPath)
+      ? journey.scriptPath
+      : path.resolve(journey.scriptPath);
+
+    if (!fs.existsSync(resolvedScriptPath)) {
+      continue;
+    }
+
+    const source = fs.readFileSync(resolvedScriptPath, 'utf-8');
+    const names = extractTransactionNamesFromSource(source);
+    if (names.length > 0) {
+      journeyTransactionNames[journey.name] = names;
+    }
+  }
+
+  return journeyTransactionNames;
+}
+
+function collectUniqueTransactionNames(journeyTransactionNames: Record<string, string[]>): string[] {
+  const unique = new Set<string>();
+
+  for (const names of Object.values(journeyTransactionNames)) {
+    for (const name of names) {
+      unique.add(name);
+    }
+  }
+
+  return [...unique];
+}
+
+function extractTransactionNamesFromSource(source: string): string[] {
+  const matches = new Set<string>();
+  const patterns = [
+    /transaction\(\s*(['"`])([^'"`]+)\1\s*,/g,
+    /startTransaction\(\s*(['"`])([^'"`]+)\1\s*\)/g,
+  ];
+
+  for (const pattern of patterns) {
+    let match: RegExpExecArray | null;
+    while ((match = pattern.exec(source)) !== null) {
+      const name = match[2]?.trim();
+      if (name) {
+        matches.add(name);
+      }
+    }
+  }
+
+  return [...matches];
+}
+
+function writeRunManifest(
+  runManifestPath: string,
+  plan: TestPlan,
+  resolvedConfig: ResolvedConfig,
+  scenarioMetadata: ScenarioRuntimeMetadata,
+): void {
+  const reportDir = path.dirname(runManifestPath).replace(/\\/g, '/');
+  const manifest = {
+    runId: scenarioMetadata.runId,
+    generatedAt: scenarioMetadata.generatedAt,
+    plan: {
+      name: plan.name,
+      environment: plan.environment,
+      executionMode: plan.execution_mode,
+      journeys: plan.user_journeys.map((journey) => ({
+        name: journey.name,
+        scriptPath: journey.scriptPath,
+        weight: journey.weight,
+      })),
+    },
+    runtime: scenarioMetadata.runtime,
+    artifacts: {
+      reportDir,
+      summaryJson: `${reportDir}/summary.json`,
+      testDetailsHtml: `${reportDir}/TestDetails.html`,
+      testSummaryHtml: `${reportDir}/TestSummary.html`,
+      runReportHtml: `${reportDir}/RunReport.html`,
+      transactionMetricsJson: `${reportDir}/transaction-metrics.json`,
+      errorsNdjson: `${reportDir}/errors.ndjson`,
+      warningsNdjson: `${reportDir}/warnings.ndjson`,
+      ciSummaryJson: `${reportDir}/ci-summary.json`,
+      timeseriesJson: `${reportDir}/timeseries.json`,
+      systemMetricsJson: `${reportDir}/system-metrics.json`,
+      runManifest: runManifestPath.replace(/\\/g, '/'),
+    },
+    environment: {
+      name: resolvedConfig.environment.name,
+      scrum_suites: resolvedConfig.environment.scrum_suites,
+    },
+  };
+
+  fs.writeFileSync(runManifestPath, JSON.stringify(manifest, null, 2), 'utf-8');
+}
+
+function finalizeRunArtifacts(options: {
+  runId: string;
+  reportDir: string;
+  plan: TestPlan;
+  resolvedConfig: ResolvedConfig;
+  runStatus: number;
+  hostSnapshots: HostSnapshot[];
+  k6StartTime?: string;
+  k6EndTime?: string;
+}): {
+  runReportHtml: string;
+  transactionMetricsJson: string;
+  errorsNdjson: string;
+  warningsNdjson: string;
+  ciSummaryJson: string;
+  timeseriesJson: string;
+  systemMetricsJson: string;
+  transactionMetrics?: import('../types/ReportingContracts').TransactionMetricsFile;
+} {
+  const summaryPath = path.join(options.reportDir, 'summary.json');
+  const handleSummaryPath = path.join(options.reportDir, 'handleSummary.json');
+  const transactionMetricsPath = path.join(options.reportDir, 'transaction-metrics.json');
+  const errorsPath = path.join(options.reportDir, 'errors.ndjson');
+  const warningsPath = path.join(options.reportDir, 'warnings.ndjson');
+  const ciSummaryPath = path.join(options.reportDir, 'ci-summary.json');
+  const timeseriesPath = path.join(options.reportDir, 'timeseries.json');
+  const systemMetricsPath = path.join(options.reportDir, 'system-metrics.json');
+  const runReportPath = path.join(options.reportDir, 'RunReport.html');
+
+  if (!fs.existsSync(summaryPath) && !fs.existsSync(handleSummaryPath)) {
+    Logger.warn(`summary.json not found at ${summaryPath}. Unified report generation skipped for this run.`);
+    return {
+      runReportHtml: runReportPath,
+      transactionMetricsJson: transactionMetricsPath,
+      errorsNdjson: errorsPath,
+      warningsNdjson: warningsPath,
+      ciSummaryJson: ciSummaryPath,
+      timeseriesJson: timeseriesPath,
+      systemMetricsJson: systemMetricsPath,
+      transactionMetrics: undefined,
+    };
+  }
+
+  // Prefer handleSummary.json (richer format with Trend metric counts and array-based groups)
+  // over --summary-export's flat format
+  const primarySummaryPath = fs.existsSync(handleSummaryPath) ? handleSummaryPath : summaryPath;
+  const summaryData = JSON.parse(fs.readFileSync(primarySummaryPath, 'utf-8')) as {
+    metrics?: Record<string, {
+      type?: string;
+      values?: Record<string, number>;
+      thresholds?: Record<string, { ok?: boolean }>;
+    }>;
+    root_group?: {
+      name?: string;
+      groups?: Array<{
+        name?: string;
+        groups?: unknown[];
+        checks?: Array<{ passes?: number; fails?: number }>;
+      }>;
+      checks?: Array<{ passes?: number; fails?: number }>;
+    };
+  };
+  const runtime = new RuntimeConfigManager(options.resolvedConfig.runtime);
+  const journeyName = options.plan.user_journeys.length === 1 ? options.plan.user_journeys[0].name : 'all';
+  const transactionMetrics = TransactionMetricsBuilder.build({
+    runId: options.runId,
+    stats: runtime.getTransactionStats(),
+    journeyName,
+    summaryData: summaryData as any,
+  });
+  const eventArtifacts = EventArtifactBuilder.build({
+    runId: options.runId,
+    planName: options.plan.name,
+    environment: options.plan.environment,
+    journeyName,
+    errorBehavior: runtime.getErrorBehavior(),
+    runStatus: options.runStatus,
+    summaryData: summaryData as any,
+  });
+  const monitoringWarnings = HostMonitor.buildWarnings(
+    options.runId,
+    options.resolvedConfig.runtime.monitoring,
+    options.hostSnapshots,
+  );
+  eventArtifacts.warnings.push(...monitoringWarnings);
+  const ciSummary = RunSummaryBuilder.buildCiSummary({
+    runId: options.runId,
+    planName: options.plan.name,
+    environment: options.plan.environment,
+    executionStatus: options.runStatus,
+    summaryData: summaryData as any,
+    transactions: transactionMetrics,
+  });
+  ciSummary.errorCount = eventArtifacts.errors.length;
+  ciSummary.warningCount = eventArtifacts.warnings.length;
+  const startTime = options.k6StartTime ?? new Date().toISOString();
+  const endTime = options.k6EndTime ?? new Date().toISOString();
+  const reportAgents = buildReportAgents(eventArtifacts);
+  const timeseries = TimeseriesArtifactBuilder.build({
+    bucketSizeSeconds: runtime.getTimeseriesBucketSizeSeconds(),
+    startTime,
+    endTime,
+    summaryData: summaryData as any,
+    transactions: transactionMetrics,
+    errors: eventArtifacts.errors,
+    warnings: eventArtifacts.warnings,
+    agents: reportAgents,
+    systemSnapshots: options.hostSnapshots,
+  });
+
+  ArtifactWriter.writeJson(transactionMetricsPath, transactionMetrics);
+  ArtifactWriter.writeNdjson(errorsPath, eventArtifacts.errors as unknown as Array<Record<string, unknown>>);
+  ArtifactWriter.writeNdjson(warningsPath, eventArtifacts.warnings as unknown as Array<Record<string, unknown>>);
+  ArtifactWriter.writeJson(ciSummaryPath, ciSummary);
+  ArtifactWriter.writeJson(timeseriesPath, timeseries);
+  ArtifactWriter.writeJson(systemMetricsPath, {
+    snapshots: options.hostSnapshots,
+  });
+
+  const snapshotsFile = path.join(options.reportDir, 'snapshots.json');
+  let snapshotFiles: Array<Record<string, unknown>> = [];
+  if (fs.existsSync(snapshotsFile)) {
+    try {
+      snapshotFiles = JSON.parse(fs.readFileSync(snapshotsFile, 'utf-8')) as Array<Record<string, unknown>>;
+    } catch { /* skip malformed */ }
+  }
+
+  const reportBundle: ReportBundle = {
+    meta: {
+      runId: options.runId,
+      plan: options.plan.name,
+      environment: options.plan.environment,
+      startTime,
+      endTime,
+      status: ciSummary.status,
+      bucketSizeSeconds: runtime.getTimeseriesBucketSizeSeconds(),
+    },
+    config: {
+      transactionStats: runtime.getTransactionStats(),
+      defaultTopTransactions: 5,
+      timeseriesEnabled: runtime.isTimeseriesEnabled(),
+    },
+    summary: {
+      rawSummaryPath: summaryPath.replace(/\\/g, '/'),
+      ciSummary,
+    },
+    transactions: transactionMetrics,
+    timeseries,
+    errors: eventArtifacts.errors as unknown as Array<Record<string, unknown>>,
+    warnings: eventArtifacts.warnings as unknown as Array<Record<string, unknown>>,
+    snapshots: snapshotFiles,
+    system: {
+      agents: reportAgents,
+      snapshots: options.hostSnapshots,
+    },
+  };
+
+  fs.writeFileSync(runReportPath, RunReportGenerator.generate(reportBundle), 'utf-8');
+
+  return {
+    runReportHtml: runReportPath,
+    transactionMetricsJson: transactionMetricsPath,
+    errorsNdjson: errorsPath,
+    warningsNdjson: warningsPath,
+    ciSummaryJson: ciSummaryPath,
+    timeseriesJson: timeseriesPath,
+    systemMetricsJson: systemMetricsPath,
+    transactionMetrics,
+  };
+}
+
+function buildReportAgents(eventArtifacts: {
+  errors: Array<{ agent?: ReportBundle['system']['agents'][number] }>;
+  warnings: Array<{ agent?: ReportBundle['system']['agents'][number] }>;
+}): ReportBundle['system']['agents'] {
+  const firstAgent = eventArtifacts.errors[0]?.agent ?? eventArtifacts.warnings[0]?.agent;
+  return firstAgent ? [firstAgent] : [];
+}
+
+/**
+ * Print a LoadRunner-style transaction metrics table to the console.
+ */
+function printTransactionTable(metrics: import('../types/ReportingContracts').TransactionMetricsFile): void {
+  const rows = metrics.transactions;
+  if (!rows.length) return;
+
+  // Columns: always show these base columns, then the configured stats (minus duplicates)
+  const baseColumns = ['transaction', 'count', 'pass', 'fail', 'errorPct'];
+  const statColumns = metrics.stats.filter((s) => !['count', 'pass', 'fail', 'error %', 'error%', 'errorpct'].includes(s.toLowerCase()));
+  const allColumns = [...baseColumns, ...statColumns];
+
+  // Compute column widths
+  const headerLabels: Record<string, string> = {
+    transaction: 'Transaction',
+    count: 'Count',
+    pass: 'Pass',
+    fail: 'Fail',
+    errorPct: 'Err%',
+    avg: 'Avg(ms)',
+    min: 'Min(ms)',
+    max: 'Max(ms)',
+  };
+  // Add p(N) labels
+  for (const col of statColumns) {
+    if (!headerLabels[col]) {
+      headerLabels[col] = col;
+    }
+  }
+
+  const colWidths = allColumns.map((col) => {
+    const header = headerLabels[col] ?? col;
+    let max = header.length;
+    for (const row of rows) {
+      const val = formatCell(row[col], col);
+      if (val.length > max) max = val.length;
+    }
+    return Math.min(max, 48); // cap column width
+  });
+
+  const c = {
+    dim: process.stdout.isTTY !== false && !process.env.NO_COLOR ? '\x1b[2m' : '',
+    reset: process.stdout.isTTY !== false && !process.env.NO_COLOR ? '\x1b[0m' : '',
+    cyan: process.stdout.isTTY !== false && !process.env.NO_COLOR ? '\x1b[36m' : '',
+    bold: process.stdout.isTTY !== false && !process.env.NO_COLOR ? '\x1b[1m' : '',
+    red: process.stdout.isTTY !== false && !process.env.NO_COLOR ? '\x1b[31m' : '',
+    green: process.stdout.isTTY !== false && !process.env.NO_COLOR ? '\x1b[32m' : '',
+    yellow: process.stdout.isTTY !== false && !process.env.NO_COLOR ? '\x1b[33m' : '',
+  };
+
+  // Header
+  console.log('');
+  console.log(`${c.bold}${c.cyan}  Transaction Metrics Matrix${c.reset}`);
+  const sep = colWidths.map((w) => '─'.repeat(w + 2)).join('┬');
+  console.log(`  ${c.dim}┌${sep}┐${c.reset}`);
+
+  const headerRow = allColumns.map((col, i) => {
+    const label = headerLabels[col] ?? col;
+    return col === 'transaction' ? ` ${label.padEnd(colWidths[i])} ` : ` ${label.padStart(colWidths[i])} `;
+  }).join(`${c.dim}│${c.reset}`);
+  console.log(`  ${c.dim}│${c.reset}${c.bold}${headerRow}${c.reset}${c.dim}│${c.reset}`);
+
+  const headerSep = colWidths.map((w) => '─'.repeat(w + 2)).join('┼');
+  console.log(`  ${c.dim}├${headerSep}┤${c.reset}`);
+
+  // Rows
+  for (const row of rows) {
+    const cells = allColumns.map((col, i) => {
+      const val = formatCell(row[col], col);
+      const truncated = val.length > colWidths[i] ? val.slice(0, colWidths[i] - 1) + '…' : val;
+
+      if (col === 'transaction') {
+        return ` ${truncated.padEnd(colWidths[i])} `;
+      }
+
+      // Color coding for errorPct and fail columns
+      let color = '';
+      if (col === 'errorPct' || col === 'fail') {
+        const numVal = typeof row[col] === 'number' ? row[col] as number : 0;
+        if (numVal > 0) color = c.red;
+      }
+      if (col === 'pass') {
+        const numVal = typeof row[col] === 'number' ? row[col] as number : 0;
+        if (numVal > 0) color = c.green;
+      }
+
+      return ` ${color}${truncated.padStart(colWidths[i])}${color ? c.reset : ''} `;
+    }).join(`${c.dim}│${c.reset}`);
+
+    console.log(`  ${c.dim}│${c.reset}${cells}${c.dim}│${c.reset}`);
+  }
+
+  const bottomSep = colWidths.map((w) => '─'.repeat(w + 2)).join('┴');
+  console.log(`  ${c.dim}└${bottomSep}┘${c.reset}`);
+  console.log('');
+}
+
+function formatCell(value: unknown, column: string): string {
+  if (value == null || value === '') return '-';
+  if (typeof value === 'number') {
+    if (column === 'errorPct') return value.toFixed(1) + '%';
+    if (column === 'count' || column === 'pass' || column === 'fail') return value.toString();
+    // Timing values in ms
+    return Number.isInteger(value) ? value.toString() : value.toFixed(1);
+  }
+  return String(value);
+}
+
+// ---------------------------------------------
+// Live transaction display (reads --out json stream)
+// ---------------------------------------------
+
+const LIVE_TXN_INTERVAL_MS = 5_000;
+
+interface LiveTxnStats {
+  count: number;
+  total: number;
+  min: number;
+  max: number;
+  values: number[];
+  wMean: number;
+  wM2: number;
+  checkPasses: Map<string, number>; // checkName → cumulative pass count
+  checkFails:  Map<string, number>; // checkName → cumulative fail count
+}
+
+function pct(values: number[], p: number): string {
+  if (!values.length) return '-';
+  const sorted = [...values].sort((a, b) => a - b);
+  return String(Math.round(sorted[Math.max(0, Math.ceil(p * sorted.length) - 1)]));
+}
+
+function startLiveTransactionDisplay(
+  metricsStreamPath: string,
+  transactionNames: string[],
+  transactionStats: string[],
+  _logPath: string,
+): { stop: () => void } {
+  const normToDisplay = new Map<string, string>();
+  for (const name of transactionNames) {
+    normToDisplay.set(name, name);
+    normToDisplay.set(name.replace(/[^a-zA-Z0-9]+/g, '_'), name);
+  }
+
+  const stats = new Map<string, LiveTxnStats>();
+  let metricsOffset = 0;
+  const isTTY = process.stdout.isTTY === true;
+  const useColor = isTTY && !process.env.NO_COLOR;
+
+  // Reserve the bottom of the terminal for the live table; confine k6's
+  // output (banner + animated progress bar) to the top region via an ANSI
+  // scroll region. The two never overlap. Falls back to scrollback printing
+  // when stdout is not a TTY or the terminal is too short to fit both areas.
+  const termRows = process.stdout.rows || 40;
+  // title + top border + header row + header separator + N data rows + bottom border
+  const tableRows = transactionNames.length + 5;
+  // k6 needs at least ~12 rows for its banner + progress bar to remain readable
+  const useFixedTable = isTTY && termRows >= tableRows + 12;
+  const tableTop = useFixedTable ? termRows - tableRows + 1 : 0;
+  let scrollRegionSet = false;
+
+  function tick(): void {
+    try {
+      // ── Read new metric data points ──────────────────────────
+      if (fs.existsSync(metricsStreamPath)) {
+        const metricsSize = fs.statSync(metricsStreamPath).size;
+        if (metricsSize > metricsOffset) {
+          const fd = fs.openSync(metricsStreamPath, 'r');
+          let buf: Buffer;
+          try {
+            buf = Buffer.alloc(metricsSize - metricsOffset);
+            fs.readSync(fd, buf, 0, buf.length, metricsOffset);
+            metricsOffset = metricsSize;
+          } finally {
+            fs.closeSync(fd);
+          }
+          for (const line of buf.toString('utf-8').split('\n')) {
+            if (!line.trim()) continue;
+            try {
+              type StreamEntry = { type?: string; metric?: string; data?: { value?: number; tags?: Record<string, string> } };
+              const entry = JSON.parse(line) as StreamEntry;
+              if (entry.type !== 'Point' || typeof entry.metric !== 'string') continue;
+
+              // ── checks metric → pass/fail counts (mirrors TransactionMetricsBuilder) ──
+              if (entry.metric === 'checks') {
+                const tags = entry.data?.tags;
+                if (!tags?.group || typeof entry.data?.value !== 'number') continue;
+                // group is "::outer::txnName" — last non-empty segment is the transaction
+                const lastName = tags.group.split('::').filter(Boolean).at(-1) ?? '';
+                const checkDisplay = normToDisplay.get(lastName)
+                  ?? normToDisplay.get(lastName.replace(/[^a-zA-Z0-9]+/g, '_'));
+                if (!checkDisplay) continue;
+                const cs: LiveTxnStats = stats.get(checkDisplay) ?? {
+                  count: 0, total: 0, min: Infinity, max: -Infinity,
+                  values: [], wMean: 0, wM2: 0,
+                  checkPasses: new Map(), checkFails: new Map(),
+                };
+                const checkName = tags.check ?? 'check';
+                if (entry.data.value === 1) {
+                  cs.checkPasses.set(checkName, (cs.checkPasses.get(checkName) ?? 0) + 1);
+                } else {
+                  cs.checkFails.set(checkName, (cs.checkFails.get(checkName) ?? 0) + 1);
+                }
+                stats.set(checkDisplay, cs);
+                continue;
+              }
+
+              // ── transaction timing metric → count + timing stats ──
+              const displayName = normToDisplay.get(entry.metric);
+              if (!displayName || typeof entry.data?.value !== 'number') continue;
+              const v = entry.data.value;
+              const s: LiveTxnStats = stats.get(displayName) ?? {
+                count: 0, total: 0, min: Infinity, max: -Infinity,
+                values: [], wMean: 0, wM2: 0,
+                checkPasses: new Map(), checkFails: new Map(),
+              };
+              s.count++;
+              s.total += v;
+              s.min = Math.min(s.min, v);
+              s.max = Math.max(s.max, v);
+              const delta = v - s.wMean;
+              s.wMean += delta / s.count;
+              s.wM2 += delta * (v - s.wMean);
+              s.values.push(v);
+              if (s.values.length > 100_000) s.values = s.values.slice(-50_000);
+              stats.set(displayName, s);
+            } catch { /* skip malformed */ }
+          }
+        }
+      }
+
+      if (stats.size === 0) return;
+
+      if (useFixedTable) {
+        // First render: install a scroll region that confines k6's banner +
+        // progress bar to the rows above the table. Anything k6 prints from
+        // here on stays inside rows 1..(tableTop - 1) — our table area is
+        // never overwritten. Done lazily on first tick so k6 has time to draw
+        // its banner before we modify terminal state.
+        if (!scrollRegionSet) {
+          process.stdout.write(`\x1b[1;${tableTop - 1}r`);
+          // Place cursor at the bottom of the scroll region so k6's progress
+          // bar continues redrawing inside it.
+          process.stdout.write(`\x1b[${tableTop - 1};1H`);
+          scrollRegionSet = true;
+        }
+        renderFixedTable(stats, transactionStats, useColor, tableTop, termRows);
+      } else {
+        renderScrollbackTable(stats, transactionStats, useColor);
+      }
+    } catch { /* file not ready yet */ }
+  }
+
+  const timer = setInterval(tick, LIVE_TXN_INTERVAL_MS);
+  timer.unref();
+
+  return {
+    stop: () => {
+      clearInterval(timer);
+      if (stats.size === 0) {
+        if (scrollRegionSet) {
+          // Reset scroll region and park cursor below the table area
+          process.stdout.write(`\x1b[r\x1b[${termRows};1H\n`);
+        }
+        return;
+      }
+      if (useFixedTable && scrollRegionSet) {
+        renderFixedTable(stats, transactionStats, useColor, tableTop, termRows);
+        // Reset full-screen scroll region, then move cursor below the table so
+        // anything that prints after (transaction summary, etc.) appears below.
+        process.stdout.write(`\x1b[r\x1b[${termRows};1H\n`);
+      } else {
+        renderScrollbackTable(stats, transactionStats, useColor);
+      }
+    },
+  };
+}
+
+/**
+ * Build the rendered table as a list of strings (one per row). Pure helper
+ * shared by both fixed-position and scrollback renderers.
+ */
+function buildLiveTableLines(
+  stats: Map<string, LiveTxnStats>,
+  transactionStats: string[],
+  useColor: boolean,
+): string[] {
+  // Per-transaction iterations where AT LEAST ONE check failed. Used as a
+  // lower bound on the failed-iteration count — more defensible than the old
+  // `count - min(passes)` formula, which silently reported 0 fails when the
+  // checkPasses map was empty but checkFails had entries.
+  const failedIterations = (s: LiveTxnStats): number => {
+    if (s.checkFails.size === 0) return 0;
+    let maxFails = 0;
+    for (const f of s.checkFails.values()) if (f > maxFails) maxFails = f;
+    return Math.min(maxFails, s.count);
+  };
+
+  type ColDef = { header: string; width: number; val: (name: string, s: LiveTxnStats) => string };
+  const ALL_COLS: Record<string, ColDef> = {
+    count:   { header: 'Count',   width: 7,  val: (_n, s) => String(s.count) },
+    pass:    { header: 'Pass',    width: 7,  val: (_n, s) => {
+      // No check data at all → assume the transaction passed (it completed)
+      if (s.checkPasses.size === 0 && s.checkFails.size === 0) return String(s.count);
+      return String(Math.max(0, s.count - failedIterations(s)));
+    } },
+    fail:    { header: 'Fail',    width: 6,  val: (_n, s) => String(failedIterations(s)) },
+    avg:     { header: 'Avg(ms)', width: 8,  val: (_n, s) => s.count > 0 ? String(Math.round(s.total / s.count)) : '-' },
+    min:     { header: 'Min(ms)', width: 8,  val: (_n, s) => s.count > 0 ? String(Math.round(s.min)) : '-' },
+    max:     { header: 'Max(ms)', width: 8,  val: (_n, s) => s.count > 0 ? String(Math.round(s.max)) : '-' },
+    'p(90)': { header: 'p90(ms)', width: 8,  val: (_n, s) => pct(s.values, 0.90) },
+    'p(97)': { header: 'p97(ms)', width: 8,  val: (_n, s) => pct(s.values, 0.97) },
+    std:     { header: 'Std(ms)', width: 8,  val: (_n, s) => s.count < 2 ? '-' : String(Math.round(Math.sqrt(s.wM2 / s.count))) },
+  };
+
+  const activeCols = transactionStats.filter((k) => ALL_COLS[k]).map((k) => ({ key: k, ...ALL_COLS[k] }));
+  if (!activeCols.length) return [];
+
+  const rows = [...stats.entries()].sort(([a], [b]) => a.localeCompare(b));
+  if (!rows.length) return [];
+
+  const c = {
+    dim:   useColor ? '\x1b[2m'  : '',
+    reset: useColor ? '\x1b[0m'  : '',
+    cyan:  useColor ? '\x1b[36m' : '',
+    bold:  useColor ? '\x1b[1m'  : '',
+  };
+
+  const txnW = Math.min(48, Math.max(11, ...rows.map(([n]) => n.length)));
+  const widths = [txnW, ...activeCols.map((col) => col.width)];
+  const headers = ['Transaction', ...activeCols.map((col) => col.header)];
+
+  const lines: string[] = [];
+  const now = new Date().toLocaleTimeString();
+  lines.push(`${c.bold}${c.cyan}  Live Metrics  ${c.dim}[updated ${now}]${c.reset}`);
+  lines.push(`  ${c.dim}┌${widths.map((w) => '─'.repeat(w + 2)).join('┬')}┐${c.reset}`);
+
+  const hRow = headers.map((h, i) =>
+    i === 0 ? ` ${h.padEnd(widths[i])} ` : ` ${h.padStart(widths[i])} `,
+  ).join(`${c.dim}│${c.reset}`);
+  lines.push(`  ${c.dim}│${c.reset}${c.bold}${hRow}${c.reset}${c.dim}│${c.reset}`);
+  lines.push(`  ${c.dim}├${widths.map((w) => '─'.repeat(w + 2)).join('┼')}┤${c.reset}`);
+
+  for (const [name, s] of rows) {
+    const label = name.length > txnW ? name.slice(0, txnW - 1) + '…' : name;
+    const cells = [
+      ` ${label.padEnd(txnW)} `,
+      ...activeCols.map((col) => ` ${col.val(name, s).padStart(col.width)} `),
+    ].join(`${c.dim}│${c.reset}`);
+    lines.push(`  ${c.dim}│${c.reset}${cells}${c.dim}│${c.reset}`);
+  }
+
+  lines.push(`  ${c.dim}└${widths.map((w) => '─'.repeat(w + 2)).join('┴')}┘${c.reset}`);
+  return lines;
+}
+
+/**
+ * Fixed-position rendering: the table lives at rows `tableTop..termRows`,
+ * frozen below k6's scroll region. Save cursor → clear table area → draw
+ * table → restore cursor, so k6's progress bar continues animating above
+ * without ever touching our table area.
+ */
+function renderFixedTable(
+  stats: Map<string, LiveTxnStats>,
+  transactionStats: string[],
+  useColor: boolean,
+  tableTop: number,
+  termRows: number,
+): void {
+  const lines = buildLiveTableLines(stats, transactionStats, useColor);
+  if (lines.length === 0) return;
+
+  let out = '\x1b7'; // save cursor (k6's position in its scroll region)
+  // Clear the table area first (in case previous render was longer)
+  for (let row = tableTop; row <= termRows; row++) {
+    out += `\x1b[${row};1H\x1b[2K`;
+  }
+  // Draw the table starting at tableTop
+  out += `\x1b[${tableTop};1H` + lines.join('\n');
+  out += '\x1b8'; // restore cursor → k6 keeps animating where it left off
+  process.stdout.write(out);
+}
+
+/**
+ * Fallback for non-TTY stdout or terminals too short for fixed positioning:
+ * just append the latest snapshot as scrollback.
+ */
+function renderScrollbackTable(
+  stats: Map<string, LiveTxnStats>,
+  transactionStats: string[],
+  useColor: boolean,
+): void {
+  const lines = buildLiveTableLines(stats, transactionStats, useColor);
+  if (lines.length === 0) return;
+  process.stdout.write('\n' + lines.join('\n') + '\n');
+}
+
+// ---------------------------------------------
+// Snapshot event parser (reads k6 log file post-run)
+// ---------------------------------------------
+
+const SNAPSHOT_EVENT_PREFIX = '[k6-perf][snapshot-event] ';
+
+/**
+ * Reads the mirrored k6 log file, extracts snapshot events emitted during the
+ * run, and writes a consolidated snapshots.json to the report directory.
+ */
+function parseAndFlushSnapshots(runLogPath: string, reportDir: string): void {
+  if (!fs.existsSync(runLogPath)) return;
+  const snapshots: Array<Record<string, unknown>> = [];
+  try {
+    const content = fs.readFileSync(runLogPath, 'utf-8');
+    for (const line of content.split('\n')) {
+      const payload = extractSnapshotPayload(line);
+      if (!payload) continue;
+      try {
+        snapshots.push(JSON.parse(payload) as Record<string, unknown>);
+      } catch { /* skip malformed */ }
+    }
+  } catch { /* log file unreadable */ }
+
+  if (snapshots.length === 0) return;
+  try {
+    fs.writeFileSync(
+      path.join(reportDir, 'snapshots.json'),
+      JSON.stringify(snapshots, null, 2),
+      'utf-8',
+    );
+  } catch { /* ignore */ }
+}
+
+function extractSnapshotPayload(line: string): string | null {
+  // k6 logfmt format: level=info msg="[k6-perf][snapshot-event] {...}" source=console
+  const consoleMatch = line.match(/msg="((?:\\.|[^"])*)"\s+source=console/);
+  if (consoleMatch) {
+    let rawMessage: string;
+    try {
+      rawMessage = JSON.parse(`"${consoleMatch[1]}"`) as string;
+    } catch {
+      rawMessage = consoleMatch[1].replace(/\\"/g, '"');
+    }
+    const idx = rawMessage.indexOf(SNAPSHOT_EVENT_PREFIX);
+    if (idx !== -1) return rawMessage.slice(idx + SNAPSHOT_EVENT_PREFIX.length).trim();
+    return null;
+  }
+  const idx = line.indexOf(SNAPSHOT_EVENT_PREFIX);
+  return idx !== -1 ? line.slice(idx + SNAPSHOT_EVENT_PREFIX.length).trim() : null;
+}
+
+// ---------------------------------------------
+// Parse
+// ---------------------------------------------
+
+program.parse(process.argv);

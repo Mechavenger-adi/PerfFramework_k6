@@ -116,7 +116,7 @@ program
 program
     .command('convert <input-script> <team> <script-name>')
     .description('Convert a conventional k6 script to a framework-compatible script with logExchange and transaction wrappers')
-    .option('--in-place', 'Overwrite the input file instead of writing to scrum-suites/<team>/tests/')
+    .option('--in-place', 'Overwrite the input file instead of writing to scrum_suites/<team>/tests/')
     .action(async (inputScript, team, scriptName, opts) => {
     await (0, convert_1.runConvert)(inputScript, team, scriptName, { inPlace: opts.inPlace });
 });
@@ -138,8 +138,8 @@ program
     .description('Validate configs and test plan before execution')
     .requiredOption('--plan <path>', 'Path to the test plan JSON file')
     .option('--env-config <path>', 'Path to the environment config JSON file (auto-resolved if omitted)')
-    .option('--runtime <path>', 'Path to the runtime-settings JSON file', 'config/runtime-settings/default.json')
-    .option('--data-root <path>', 'Root directory for data files', 'scrum-suites')
+    .option('--runtime <path>', 'Path to the runtime_settings JSON file', 'config/runtime_settings/default.json')
+    .option('--data-root <path>', 'Root directory for data files', 'scrum_suites')
     .option('--env-file <path>', 'Path to .env file', '.env')
     .option('--verbose', 'Print verbose validation output including completeness score')
     .action((opts) => {
@@ -163,10 +163,10 @@ const templatesCmd = program
 templatesCmd
     .command('list')
     .description('List all available templates')
-    .option('--type <type>', 'Type of templates (test-plans | runtime-settings)', 'test-plans')
+    .option('--type <type>', 'Type of templates (test_plans | runtime_settings)', 'test_plans')
     .action((opts) => {
-    if (opts.type !== 'test-plans' && opts.type !== 'runtime-settings') {
-        console.error('Invalid type. Must be test-plans or runtime-settings.');
+    if (opts.type !== 'test_plans' && opts.type !== 'runtime_settings') {
+        console.error('Invalid type. Must be test_plans or runtime_settings.');
         process.exit(1);
     }
     (0, templates_1.listTemplates)(opts.type);
@@ -174,10 +174,10 @@ templatesCmd
 templatesCmd
     .command('show <name>')
     .description('Show the content of a specific template')
-    .option('--type <type>', 'Type of template (test-plans | runtime-settings)', 'test-plans')
+    .option('--type <type>', 'Type of template (test_plans | runtime_settings)', 'test_plans')
     .action((name, opts) => {
-    if (opts.type !== 'test-plans' && opts.type !== 'runtime-settings') {
-        console.error('Invalid type. Must be test-plans or runtime-settings.');
+    if (opts.type !== 'test_plans' && opts.type !== 'runtime_settings') {
+        console.error('Invalid type. Must be test_plans or runtime_settings.');
         process.exit(1);
     }
     (0, templates_1.showTemplate)(opts.type, name);
@@ -202,7 +202,7 @@ configCmd
     .description('Inspect the final merged configuration resolution chain')
     .requiredOption('--plan <path>', 'Path to the test plan JSON file')
     .option('--env-config <path>', 'Path to the environment config JSON file')
-    .option('--runtime <path>', 'Path to the runtime-settings JSON file')
+    .option('--runtime <path>', 'Path to the runtime_settings JSON file')
     .option('--env-file <path>', 'Path to .env file')
     .action((opts) => {
     (0, config_inspect_1.inspectConfig)(opts.plan, opts.envConfig, opts.runtime, opts.envFile);
@@ -252,9 +252,9 @@ program
     .description('Execute a test plan through k6')
     .requiredOption('--plan <path>', 'Path to the test plan JSON file')
     .option('--env-config <path>', 'Path to the environment config JSON (auto-resolved if omitted)')
-    .option('--runtime <path>', 'Path to the runtime-settings JSON file', 'config/runtime-settings/default.json')
+    .option('--runtime <path>', 'Path to the runtime_settings JSON file', 'config/runtime_settings/default.json')
     .option('--env-file <path>', 'Path to .env file', '.env')
-    .option('--data-root <path>', 'Root directory for data files', 'scrum-suites')
+    .option('--data-root <path>', 'Root directory for data files', 'scrum_suites')
     .option('--debug', 'Enable debug mode (prints resolved config)')
     .option('--out <k6-output>', 'k6 --out flag value (e.g. json=results.json)')
     .allowUnknownOption()

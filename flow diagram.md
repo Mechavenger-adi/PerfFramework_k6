@@ -24,8 +24,8 @@ AI assistants should use this file together with `AGENT-CONTEXT.md` as a token-s
 
 1. `flow diagram.md`
 2. `AGENT-CONTEXT.md`
-3. `config/test-plans/*.json`
-4. `core-engine/src/cli/run.ts`
+3. `config/test_plans/*.json`
+4. `core_engine/src/cli/run.ts`
 5. The specific connected modules for the task at hand
 
 ## Authoritative Structural Map
@@ -42,11 +42,11 @@ flowchart LR
 
   subgraph Inputs["Inputs And Suite Assets"]
     direction TB
-    PLAN["config/test-plans/*.json"]
+    PLAN["config/test_plans/*.json"]
     ENV["config/environments/*.json"]
-    RUNTIMECFG["config/runtime-settings/*.json"]
+    RUNTIMECFG["config/runtime_settings/*.json"]
     ENVFILE[".env / secrets"]
-    SUITES["scrum-suites/<team>/"]
+    SUITES["scrum_suites/<team>/"]
     TESTS["tests/*.js"]
     SUITEDATA["data files (.csv, .json)"]
     RECORDINGS["recordings (.har, .recording-log.json)"]
@@ -260,8 +260,8 @@ flowchart LR
 ### 1. Top-Level Orientation
 
 - `flow diagram.md` and `AGENT-CONTEXT.md` are the two orientation files AI models should read first.
-- Test execution starts from `config/test-plans/*.json`, environment files, runtime settings, and optional `.env` secrets.
-- Team-owned suites live under `scrum-suites/<team>/` and provide the actual tests, data files, recordings, and correlation rules.
+- Test execution starts from `config/test_plans/*.json`, environment files, runtime settings, and optional `.env` secrets.
+- Team-owned suites live under `scrum_suites/<team>/` and provide the actual tests, data files, recordings, and correlation rules.
 
 ### 2. CLI Entry Points
 
@@ -326,7 +326,7 @@ flowchart LR
 
 ### 7. Runtime And Journey Script Flow
 
-- Journey scripts in `scrum-suites/<team>/tests` are the k6-facing runtime entrypoints.
+- Journey scripts in `scrum_suites/<team>/tests` are the k6-facing runtime entrypoints.
 - They rely on runtime helpers such as:
   - `lifecycle.ts`
   - `transaction.ts`

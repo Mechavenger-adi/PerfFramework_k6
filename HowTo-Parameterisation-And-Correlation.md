@@ -12,20 +12,20 @@ Parameterisation replaces hardcoded values (usernames, product IDs, search terms
 
 | Component | File | Role |
 |:----------|:-----|:-----|
-| **DataFactory** | `core-engine/src/data/DataFactory.ts` | Loads CSV/JSON files into `DataRow[]` arrays |
-| **DataPoolManager** | `core-engine/src/data/DataPoolManager.ts` | Assigns rows to VUs with overflow strategies |
-| **DataValidator** | `core-engine/src/data/DataValidator.ts` | Pre-flight validation (missing columns, row count vs VU demand) |
-| **DynamicValueFactory** | `core-engine/src/data/DynamicValueFactory.ts` | Random/generated values (UUID, timestamp, email, phone) |
+| **DataFactory** | `core_engine/src/data/DataFactory.ts` | Loads CSV/JSON files into `DataRow[]` arrays |
+| **DataPoolManager** | `core_engine/src/data/DataPoolManager.ts` | Assigns rows to VUs with overflow strategies |
+| **DataValidator** | `core_engine/src/data/DataValidator.ts` | Pre-flight validation (missing columns, row count vs VU demand) |
+| **DynamicValueFactory** | `core_engine/src/data/DynamicValueFactory.ts` | Random/generated values (UUID, timestamp, email, phone) |
 
 ### 1.2 Data File Conventions
 
 | Convention | Rule | Example |
 |:-----------|:-----|:--------|
-| **Location** | `scrum-suites/<team>/data/` | `scrum-suites/jpet-team/data/` |
+| **Location** | `scrum_suites/<team>/data/` | `scrum_suites/jpet_team/data/` |
 | **Prefix** | Parameterised columns use `p_` prefix | `p_username`, `p_password`, `p_email` |
 | **Format** | CSV (first row = header) or JSON array of objects | See below |
 
-**CSV example** (`scrum-suites/my-team/data/p_users.csv`):
+**CSV example** (`scrum_suites/my_team/data/p_users.csv`):
 ```csv
 p_username,p_password,p_email
 testuser001,P@ssw0rd1,testuser001@perf-test.local
@@ -33,7 +33,7 @@ testuser002,P@ssw0rd2,testuser002@perf-test.local
 testuser003,P@ssw0rd3,testuser003@perf-test.local
 ```
 
-**JSON example** (`scrum-suites/my-team/data/p_products.json`):
+**JSON example** (`scrum_suites/my_team/data/p_products.json`):
 ```json
 [
   { "p_productId": "PROD-001", "p_name": "Widget A", "p_price": 29.99 },
@@ -146,7 +146,7 @@ const row = users[idx];
 The `DataValidator` runs during `GatekeeperValidator.validate()` before test execution:
 
 ```bash
-npm run cli -- validate --plan config/test-plans/my-plan.json
+npm run cli -- validate --plan config/test_plans/my-plan.json
 ```
 
 Checks performed:
@@ -161,8 +161,8 @@ Checks performed:
 import http from 'k6/http';
 import { check, sleep, group } from 'k6';
 import { SharedArray } from 'k6/data';
-import { initTransactions, startTransaction, endTransaction } from '../../../core-engine/src/utils/transaction.js';
-import { logExchange } from '../../../core-engine/src/utils/replayLogger.js';
+import { initTransactions, startTransaction, endTransaction } from '../../../core_engine/src/utils/transaction.js';
+import { logExchange } from '../../../core_engine/src/utils/replayLogger.js';
 
 const users = new SharedArray('users', function () {
   return JSON.parse(open('./data/p_users.json'));
@@ -217,14 +217,14 @@ Correlation captures dynamic server-generated values (CSRF tokens, session IDs, 
 
 | Component | File | Role |
 |:----------|:-----|:-----|
-| **CorrelationEngine** | `core-engine/src/correlation/CorrelationEngine.ts` | Central store — calls extractors per rule, stores results |
-| **ExtractorRegistry** | `core-engine/src/correlation/ExtractorRegistry.ts` | Pluggable extractors: `regex`, `jsonpath`, `header` |
-| **RuleProcessor** | `core-engine/src/correlation/RuleProcessor.ts` | Loads rule JSON files into typed `CorrelationRule[]` |
-| **FallbackHandler** | `core-engine/src/correlation/FallbackHandler.ts` | Handles extraction failures per rule's fallback strategy |
+| **CorrelationEngine** | `core_engine/src/correlation/CorrelationEngine.ts` | Central store — calls extractors per rule, stores results |
+| **ExtractorRegistry** | `core_engine/src/correlation/ExtractorRegistry.ts` | Pluggable extractors: `regex`, `jsonpath`, `header` |
+| **RuleProcessor** | `core_engine/src/correlation/RuleProcessor.ts` | Loads rule JSON files into typed `CorrelationRule[]` |
+| **FallbackHandler** | `core_engine/src/correlation/FallbackHandler.ts` | Handles extraction failures per rule's fallback strategy |
 
 ### 2.2 Correlation Rule Schema
 
-Rules are defined per team in `scrum-suites/<team>/correlation-rules.json`:
+Rules are defined per team in `scrum_suites/<team>/correlation-rules.json`:
 
 ```json
 [
@@ -299,7 +299,7 @@ Rules are defined per team in `scrum-suites/<team>/correlation-rules.json`:
 ```javascript
 import { CorrelationEngine, RuleProcessor } from '../../../dist/index.js';
 
-const rules = RuleProcessor.loadRules('scrum-suites/my-team/correlation-rules.json');
+const rules = RuleProcessor.loadRules('scrum_suites/my_team/correlation-rules.json');
 const engine = new CorrelationEngine(rules);
 ```
 
@@ -342,7 +342,7 @@ http.post('https://api.example.com/checkout',
 
 ### 2.7 Full Correlated Script Example
 
-See the reference implementation at `scrum-suites/sample-team/tests/correlation-journey.js` which demonstrates:
+See the reference implementation at `scrum_suites/sample_team/tests/correlation-journey.js` which demonstrates:
 
 - CSRF token extraction via `jsonpath`
 - Bearer JWT extraction via `jsonpath`
@@ -359,14 +359,14 @@ import http from 'k6/http';
 import { check, sleep, group } from 'k6';
 import { SharedArray } from 'k6/data';
 import { CorrelationEngine, RuleProcessor } from '../../../dist/index.js';
-import { initTransactions, startTransaction, endTransaction } from '../../../core-engine/src/utils/transaction.js';
-import { logExchange } from '../../../core-engine/src/utils/replayLogger.js';
+import { initTransactions, startTransaction, endTransaction } from '../../../core_engine/src/utils/transaction.js';
+import { logExchange } from '../../../core_engine/src/utils/replayLogger.js';
 
 const users = new SharedArray('users', function () {
   return JSON.parse(open('./data/p_users.json'));
 });
 
-const rules = RuleProcessor.loadRules('scrum-suites/my-team/correlation-rules.json');
+const rules = RuleProcessor.loadRules('scrum_suites/my_team/correlation-rules.json');
 const engine = new CorrelationEngine(rules);
 
 initTransactions(['t01_login', 't02_add_to_cart']);
@@ -445,7 +445,7 @@ export default function () {
 The `variableEvents` array in request definition objects tracks parameterised/correlated substitutions for the debug diff report. Use `createVariableEvent()` from `replayLogger.js`:
 
 ```javascript
-import { logExchange, createVariableEvent } from '../../../core-engine/src/utils/replayLogger.js';
+import { logExchange, createVariableEvent } from '../../../core_engine/src/utils/replayLogger.js';
 
 const csrfToken = engine.get('csrfToken');
 
@@ -489,7 +489,7 @@ This metadata appears in the HTML diff report under the "Variable Events" panel,
 
 | # | Improvement | Detail |
 |:--|:-----------|:-------|
-| 11 | **`validate` command for correlation rules** | `npm run cli -- validate --rules scrum-suites/my-team/correlation-rules.json` — check schema, detect duplicate names, warn about missing `isCritical` on auth tokens. |
+| 11 | **`validate` command for correlation rules** | `npm run cli -- validate --rules scrum_suites/my_team/correlation-rules.json` — check schema, detect duplicate names, warn about missing `isCritical` on auth tokens. |
 | 12 | **Correlation dry-run** | `npm run cli -- correlate --script <path> --rules <path> --dry-run` — run the script once and print a table showing which rules matched, what was extracted, and what failed. |
 | 13 | **Data file scaffolding** | `npm run cli -- init-data <team> --columns p_username,p_password,p_email --rows 10` — generates a CSV with placeholder data using `DynamicValueFactory`. |
 | 14 | **Converter auto-parameterisation detection** | When running `convert`, scan request bodies for patterns that look like credentials, emails, and IDs. Flag them in output with `// TODO: parameterise` comments pointing to recommended `p_` column names. |
@@ -526,7 +526,7 @@ Phase   What                                        Effort
 ## Quick Reference — Data File Locations
 
 ```
-scrum-suites/
+scrum_suites/
   <team>/
     data/
       p_users.csv              # User credentials

@@ -72,8 +72,8 @@ async function runConvert(inputPath, teamName, scriptName, options) {
         logger_1.Logger.pass(`Converted in-place: ${absoluteInput}`);
         return;
     }
-    // Write to scrum-suites/<team>/tests/<name>.js
-    const suiteDir = path.join(process.cwd(), 'scrum-suites', teamName);
+    // Write to scrum_suites/<team>/tests/<name>.js
+    const suiteDir = path.join(process.cwd(), 'scrum_suites', teamName);
     const targetDir = path.join(suiteDir, 'tests');
     if (!fs.existsSync(targetDir)) {
         fs.mkdirSync(targetDir, { recursive: true });

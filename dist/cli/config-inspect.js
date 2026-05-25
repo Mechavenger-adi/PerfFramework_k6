@@ -47,7 +47,7 @@ function inspectConfig(planPath, envConfigPath, runtimeSettingsPath, envFilePath
         const loader = new TestPlanLoader_1.TestPlanLoader();
         const plan = loader.load(planPath);
         const envPath = envConfigPath ?? path.join('config', 'environments', `${plan.environment}.json`);
-        const runtimePath = runtimeSettingsPath ?? path.join('config', 'runtime-settings', 'default.json');
+        const runtimePath = runtimeSettingsPath ?? path.join('config', 'runtime_settings', 'default.json');
         const configManager = new ConfigurationManager_1.ConfigurationManager(envFilePath);
         // Note: resolve() internally calls printResolvedConfig if debugMode is true.
         // To explicitly inspect, we can just resolve and print it.

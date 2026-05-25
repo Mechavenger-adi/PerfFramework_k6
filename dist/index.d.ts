@@ -3,7 +3,7 @@
  * Phase 1 – Core Engine barrel export.
  * Teams import from this single entry point.
  *
- * Usage: import { ConfigurationManager, ScenarioBuilder, ... } from '@k6-perf/core-engine'
+ * Usage: import { ConfigurationManager, ScenarioBuilder, ... } from '@k6-perf/core_engine'
  */
 export * from './types/ConfigContracts';
 export * from './types/EventContracts';
@@ -42,7 +42,14 @@ export { SnapshotRuntime } from './runtime/SnapshotRuntime';
 export { TimeseriesRuntime } from './runtime/TimeseriesRuntime';
 export { Logger } from './utils/logger';
 export { PathResolver } from './utils/PathResolver';
-export { endTransaction, getCurrentTransaction, initTransactions, startTransaction, transaction } from './utils/transaction';
+export { endTransaction, getCurrentTransaction, initTransactions, isVuTerminated, k6Check, startTransaction, transaction } from './utils/transaction';
+export { request } from './utils/request';
+export type { CookieValue, HttpMethod, RequestBody, RequestOptions } from './utils/request';
+export { createJourneyLifecycleStore, getTransactionGate, runJourneyLifecycle, thinktime } from './utils/lifecycle';
+export type { JourneyLifecycleStore, PhaseFns, TransactionGate } from './utils/lifecycle';
+export { logReplayExchange, logExchange, trackCorrelation, trackDataRow, trackParameter } from './utils/replayLogger';
+export { clearCookies, deleteCookie, getEnvContext, registerBaseUrl, registerFrameworkEnvironmentUrls, resolveFrameworkUrl, resolvePath } from './utils/session';
+export type { TeamEnvironmentOverride } from './utils/session';
 export { DomainFilter } from './recording/DomainFilter';
 export { HARParser } from './recording/HARParser';
 export { ScriptGenerator } from './recording/ScriptGenerator';

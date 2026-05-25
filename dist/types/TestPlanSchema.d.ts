@@ -54,7 +54,7 @@ export interface UserJourney {
      * - true (default): cookies persist across iterations for this journey.
      * - false: cookies are cleared at the start of each iteration.
      * Note: k6 noCookiesReset is global; per-journey control requires using
-     * clearCookies() from core-engine/src/utils/session.js in initPhase/actionPhase.
+     * clearCookies() from core_engine/src/utils/session.js in initPhase/actionPhase.
      */
     noCookiesReset?: boolean;
 }

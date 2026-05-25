@@ -8,7 +8,7 @@ As a mentor or a new developer, you should understand that this framework is spl
 
 ## 1. The Config Layer (Node.js Orchestration)
 
-**Location:** `core-engine/src/config/`
+**Location:** `core_engine/src/config/`
 **Purpose:** Collects all configurations, merges them, and validates that everything is safe to run.
 
 ### `ConfigurationManager.ts`
@@ -30,7 +30,7 @@ As a mentor or a new developer, you should understand that this framework is spl
 
 ## 2. The Scenario & Execution Layer (Node.js Orchestration)
 
-**Location:** `core-engine/src/scenario/` & `core-engine/src/execution/`
+**Location:** `core_engine/src/scenario/` & `core_engine/src/execution/`
 **Purpose:** Maps human-readable test plans into raw k6 commands and launches the process.
 
 ### `ScenarioBuilder.ts` & `WorkloadModels.ts`
@@ -48,7 +48,7 @@ As a mentor or a new developer, you should understand that this framework is spl
 
 ## 3. The Runtime Utilities (k6 Runtime Code)
 
-**Location:** `core-engine/src/utils/`
+**Location:** `core_engine/src/utils/`
 **Purpose:** These are the TypeScript files imported *directly into your test scripts*. They run thousands of times per second inside the k6 executing engine.
 
 ### `lifecycle.ts`
@@ -96,7 +96,7 @@ As a mentor or a new developer, you should understand that this framework is spl
 
 ## 4. The Data & Correlation Layer (Node.js & k6 Runtime)
 
-**Location:** `core-engine/src/data/` & `core-engine/src/correlation/`
+**Location:** `core_engine/src/data/` & `core_engine/src/correlation/`
 
 ### `DataPoolManager.ts`
 *   **Purpose:** Ensures different Virtual Users (VUs) don't grab the exact same username/password from your `userdetails.csv` file at the exact same time. It slices the data based on a formula using `__VU` and `__ITER`.
@@ -115,7 +115,7 @@ As a mentor or a new developer, you should understand that this framework is spl
 
 ## 5. The Debug & Reporting Layer (Node.js Orchestration)
 
-**Location:** `core-engine/src/debug/` & `core-engine/src/reporting/`
+**Location:** `core_engine/src/debug/` & `core_engine/src/reporting/`
 **Purpose:** What happens after k6 finishes executing. This layer aggregates data into human UI dashboards and Jenkins-friendly outputs.
 
 ### `ReplayRunner.ts` & `DiffChecker.ts` (Debug Layer)

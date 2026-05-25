@@ -4,7 +4,7 @@
     "module": "commonjs",
     "lib": ["ES2020"],
     "outDir": "./dist",
-    "rootDir": "./core-engine/src",
+    "rootDir": "./core_engine/src",
     "strict": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
@@ -16,9 +16,9 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "paths": {
-      "@core/*": ["./core-engine/src/*"]
+      "@core/*": ["./core_engine/src/*"]
     }
   },
-  "include": ["core-engine/src/**/*"],
-  "exclude": ["node_modules", "dist", "scrum-suites"]
+  "include": ["core_engine/src/**/*"],
+  "exclude": ["node_modules", "dist", "scrum_suites"]
 }

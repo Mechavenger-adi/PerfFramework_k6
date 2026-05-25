@@ -4,7 +4,7 @@
  * Phase 1 – Core Engine barrel export.
  * Teams import from this single entry point.
  *
- * Usage: import { ConfigurationManager, ScenarioBuilder, ... } from '@k6-perf/core-engine'
+ * Usage: import { ConfigurationManager, ScenarioBuilder, ... } from '@k6-perf/core_engine'
  */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
@@ -21,8 +21,8 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
     for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ExchangeLogBuilder = exports.DiffChecker = exports.RuleProcessor = exports.FallbackHandler = exports.ExtractorRegistry = exports.CorrelationEngine = exports.ThresholdManager = exports.SLARegistry = exports.JourneyAssertionResolver = exports.TransactionGrouper = exports.ScriptGenerator = exports.HARParser = exports.DomainFilter = exports.transaction = exports.startTransaction = exports.initTransactions = exports.getCurrentTransaction = exports.endTransaction = exports.PathResolver = exports.Logger = exports.TimeseriesRuntime = exports.SnapshotRuntime = exports.MetricsRuntime = exports.LifecycleRuntime = exports.ErrorRuntime = exports.DynamicValueFactory = exports.DataValidator = exports.DataPoolManager = exports.DataFactory = exports.PipelineRunner = exports.ParallelExecutionManager = exports.JourneyAllocator = exports.HostMonitor = exports.TestPlanLoader = exports.ScenarioBuilder = exports.ExecutorFactory = exports.toK6ExecutorConfig = exports.buildExternallyControlledProfile = exports.buildRampingArrivalRateProfile = exports.buildConstantArrivalRateProfile = exports.buildIterationProfile = exports.buildSpikeProfile = exports.buildSoakProfile = exports.buildStressProfile = exports.buildLoadProfile = exports.SchemaValidator = exports.RuntimeConfigManager = exports.GatekeeperValidator = exports.EnvResolver = exports.ConfigurationManager = void 0;
-exports.TransactionMetricsBuilder = exports.TimeseriesArtifactBuilder = exports.RunSummaryBuilder = exports.RunReportGenerator = exports.EventArtifactBuilder = exports.ArtifactWriter = exports.ResultTransformer = exports.GrafanaReporter = exports.CustomUploader = exports.AzureReporter = exports.ReplayRunner = exports.RecordingLogResolver = exports.HTMLDiffReporter = void 0;
+exports.clearCookies = exports.trackParameter = exports.trackDataRow = exports.trackCorrelation = exports.logExchange = exports.logReplayExchange = exports.thinktime = exports.runJourneyLifecycle = exports.getTransactionGate = exports.createJourneyLifecycleStore = exports.request = exports.transaction = exports.startTransaction = exports.k6Check = exports.isVuTerminated = exports.initTransactions = exports.getCurrentTransaction = exports.endTransaction = exports.PathResolver = exports.Logger = exports.TimeseriesRuntime = exports.SnapshotRuntime = exports.MetricsRuntime = exports.LifecycleRuntime = exports.ErrorRuntime = exports.DynamicValueFactory = exports.DataValidator = exports.DataPoolManager = exports.DataFactory = exports.PipelineRunner = exports.ParallelExecutionManager = exports.JourneyAllocator = exports.HostMonitor = exports.TestPlanLoader = exports.ScenarioBuilder = exports.ExecutorFactory = exports.toK6ExecutorConfig = exports.buildExternallyControlledProfile = exports.buildRampingArrivalRateProfile = exports.buildConstantArrivalRateProfile = exports.buildIterationProfile = exports.buildSpikeProfile = exports.buildSoakProfile = exports.buildStressProfile = exports.buildLoadProfile = exports.SchemaValidator = exports.RuntimeConfigManager = exports.GatekeeperValidator = exports.EnvResolver = exports.ConfigurationManager = void 0;
+exports.TransactionMetricsBuilder = exports.TimeseriesArtifactBuilder = exports.RunSummaryBuilder = exports.RunReportGenerator = exports.EventArtifactBuilder = exports.ArtifactWriter = exports.ResultTransformer = exports.GrafanaReporter = exports.CustomUploader = exports.AzureReporter = exports.ReplayRunner = exports.RecordingLogResolver = exports.HTMLDiffReporter = exports.ExchangeLogBuilder = exports.DiffChecker = exports.RuleProcessor = exports.FallbackHandler = exports.ExtractorRegistry = exports.CorrelationEngine = exports.ThresholdManager = exports.SLARegistry = exports.JourneyAssertionResolver = exports.TransactionGrouper = exports.ScriptGenerator = exports.HARParser = exports.DomainFilter = exports.resolvePath = exports.resolveFrameworkUrl = exports.registerFrameworkEnvironmentUrls = exports.registerBaseUrl = exports.getEnvContext = exports.deleteCookie = void 0;
 // -- Types / Contracts ------------------------
 __exportStar(require("./types/ConfigContracts"), exports);
 __exportStar(require("./types/EventContracts"), exports);
@@ -94,8 +94,31 @@ var transaction_1 = require("./utils/transaction");
 Object.defineProperty(exports, "endTransaction", { enumerable: true, get: function () { return transaction_1.endTransaction; } });
 Object.defineProperty(exports, "getCurrentTransaction", { enumerable: true, get: function () { return transaction_1.getCurrentTransaction; } });
 Object.defineProperty(exports, "initTransactions", { enumerable: true, get: function () { return transaction_1.initTransactions; } });
+Object.defineProperty(exports, "isVuTerminated", { enumerable: true, get: function () { return transaction_1.isVuTerminated; } });
+Object.defineProperty(exports, "k6Check", { enumerable: true, get: function () { return transaction_1.k6Check; } });
 Object.defineProperty(exports, "startTransaction", { enumerable: true, get: function () { return transaction_1.startTransaction; } });
 Object.defineProperty(exports, "transaction", { enumerable: true, get: function () { return transaction_1.transaction; } });
+var request_1 = require("./utils/request");
+Object.defineProperty(exports, "request", { enumerable: true, get: function () { return request_1.request; } });
+var lifecycle_1 = require("./utils/lifecycle");
+Object.defineProperty(exports, "createJourneyLifecycleStore", { enumerable: true, get: function () { return lifecycle_1.createJourneyLifecycleStore; } });
+Object.defineProperty(exports, "getTransactionGate", { enumerable: true, get: function () { return lifecycle_1.getTransactionGate; } });
+Object.defineProperty(exports, "runJourneyLifecycle", { enumerable: true, get: function () { return lifecycle_1.runJourneyLifecycle; } });
+Object.defineProperty(exports, "thinktime", { enumerable: true, get: function () { return lifecycle_1.thinktime; } });
+var replayLogger_1 = require("./utils/replayLogger");
+Object.defineProperty(exports, "logReplayExchange", { enumerable: true, get: function () { return replayLogger_1.logReplayExchange; } });
+Object.defineProperty(exports, "logExchange", { enumerable: true, get: function () { return replayLogger_1.logExchange; } });
+Object.defineProperty(exports, "trackCorrelation", { enumerable: true, get: function () { return replayLogger_1.trackCorrelation; } });
+Object.defineProperty(exports, "trackDataRow", { enumerable: true, get: function () { return replayLogger_1.trackDataRow; } });
+Object.defineProperty(exports, "trackParameter", { enumerable: true, get: function () { return replayLogger_1.trackParameter; } });
+var session_1 = require("./utils/session");
+Object.defineProperty(exports, "clearCookies", { enumerable: true, get: function () { return session_1.clearCookies; } });
+Object.defineProperty(exports, "deleteCookie", { enumerable: true, get: function () { return session_1.deleteCookie; } });
+Object.defineProperty(exports, "getEnvContext", { enumerable: true, get: function () { return session_1.getEnvContext; } });
+Object.defineProperty(exports, "registerBaseUrl", { enumerable: true, get: function () { return session_1.registerBaseUrl; } });
+Object.defineProperty(exports, "registerFrameworkEnvironmentUrls", { enumerable: true, get: function () { return session_1.registerFrameworkEnvironmentUrls; } });
+Object.defineProperty(exports, "resolveFrameworkUrl", { enumerable: true, get: function () { return session_1.resolveFrameworkUrl; } });
+Object.defineProperty(exports, "resolvePath", { enumerable: true, get: function () { return session_1.resolvePath; } });
 // -- Recording Layer ----------------------------
 var DomainFilter_1 = require("./recording/DomainFilter");
 Object.defineProperty(exports, "DomainFilter", { enumerable: true, get: function () { return DomainFilter_1.DomainFilter; } });

@@ -64,7 +64,7 @@ The framework should reduce boilerplate without hiding request intent. HTTP call
 ```text
 /k6-perf-framework
 │
-├── /core-engine
+├── /core_engine
 │   ├── /src
 │   │   ├── /api-clients
 │   │   ├── /config
@@ -84,7 +84,7 @@ The framework should reduce boilerplate without hiding request intent. HTTP call
 │   ├── index.ts
 │   └── tsconfig.json
 │
-├── /scrum-suites
+├── /scrum_suites
 │   ├── /scrum-team-payments
 │   │   ├── /tests
 │   │   ├── /data
@@ -97,8 +97,8 @@ The framework should reduce boilerplate without hiding request intent. HTTP call
 │
 ├── /config
 │   ├── environments
-│   ├── test-plans
-│   ├── runtime-settings
+│   ├── test_plans
+│   ├── runtime_settings
 │   └── correlation-rules
 │
 ├── .env
@@ -114,7 +114,7 @@ The framework should reduce boilerplate without hiding request intent. HTTP call
 
 ### Folder
 ```text
-/core-engine/src/config
+/core_engine/src/config
 ```
 
 ### Components
@@ -145,7 +145,7 @@ The framework should reduce boilerplate without hiding request intent. HTTP call
 
 ### Folder
 ```text
-/core-engine/src/scenario
+/core_engine/src/scenario
 ```
 
 ### Components
@@ -176,7 +176,7 @@ ScenarioBuilder.stressTest({
 
 ### Folder
 ```text
-/core-engine/src/execution
+/core_engine/src/execution
 ```
 
 ### Components
@@ -254,7 +254,7 @@ Parallel execution existed conceptually through k6 scenarios, but it was not pre
 
 ### Folder
 ```text
-/core-engine/src/data
+/core_engine/src/data
 ```
 
 ### Components
@@ -289,7 +289,7 @@ Parallel execution existed conceptually through k6 scenarios, but it was not pre
 
 ### Folder
 ```text
-/core-engine/src/correlation
+/core_engine/src/correlation
 ```
 
 ### Components
@@ -322,7 +322,7 @@ Parallel execution existed conceptually through k6 scenarios, but it was not pre
 
 ### Folder
 ```text
-/core-engine/src/recording
+/core_engine/src/recording
 ```
 
 ### Components
@@ -334,8 +334,8 @@ Parallel execution existed conceptually through k6 scenarios, but it was not pre
 
 ### CLI companions
 ```text
-/core-engine/src/cli/generate.ts
-/core-engine/src/cli/convert.ts
+/core_engine/src/cli/generate.ts
+/core_engine/src/cli/convert.ts
 ```
 
 ### Responsibilities
@@ -368,7 +368,7 @@ Parallel execution existed conceptually through k6 scenarios, but it was not pre
 
 ### Folder
 ```text
-/core-engine/src/debug
+/core_engine/src/debug
 ```
 
 ### Components
@@ -396,7 +396,7 @@ This module is one of the strongest differentiators of the framework.
 
 ### Folder
 ```text
-/core-engine/src/assertions
+/core_engine/src/assertions
 ```
 
 ### Components
@@ -424,7 +424,7 @@ SLARegistry.register("checkout", {
 
 ### Folder
 ```text
-/core-engine/src/reporters
+/core_engine/src/reporters
 ```
 
 ### Components
@@ -449,7 +449,7 @@ A Node-based uploader such as `upload-results.js` can remain part of the project
 
 ### Folder
 ```text
-/core-engine/src/ai
+/core_engine/src/ai
 ```
 
 ### Components
@@ -472,7 +472,7 @@ AI features must remain optional. The framework must still function fully withou
 
 ### Folder
 ```text
-/core-engine/src/cli
+/core_engine/src/cli
 ```
 
 ### Components
@@ -492,15 +492,15 @@ AI features must remain optional. The framework must still function fully withou
 ```bash
 k6-framework init
 k6-framework validate
-k6-framework generate-byos my-team script-name
+k6-framework generate-byos my_team script-name
 k6-framework generate --har ./recordings/checkout.har
-k6-framework run --plan ./config/test-plans/load-test.json
+k6-framework run --plan ./config/test_plans/load-test.json
 ```
 
 ### Bring Your Own Scripts (BYOS)
 To support users migrating from standalone k6 or Grafana Studio, the CLI allows templating custom scripts:
 - Users run `k6-framework generate-byos <team> <script-name>`
-- A template is generated inside `scrum-suites/<team>/tests/` with the required framework skeleton
+- A template is generated inside `scrum_suites/<team>/tests/` with the required framework skeleton
 - Users paste their raw k6 code into the template, enabling them to bypass standard HAR generation while still using framework global settings, assertions, and logging.
 
 Without this CLI layer, adoption cost rises and the framework becomes harder to standardize.
@@ -510,7 +510,7 @@ Without this CLI layer, adoption cost rises and the framework becomes harder to 
 ## 5. Runtime Behavior
 
 ## 5.1 Runtime Settings
-A `runtime-settings.json` should define:
+A `runtime_settings.json` should define:
 - global think time
 - random think time range
 - pacing
@@ -866,7 +866,7 @@ These are the main weaknesses and risks that were identified and should be treat
 #### RuntimeConfigManager
 
 **Approach:**
-- Load `runtime-settings.json` and expose typed accessors for think time, pacing, iteration behavior, HTTP timeouts, error behavior, and k6 options.
+- Load `runtime_settings.json` and expose typed accessors for think time, pacing, iteration behavior, HTTP timeouts, error behavior, and k6 options.
 - Merge runtime settings into the resolved config via `ConfigurationManager`.
 - Expose helpers that test scripts call at runtime: `applyThinkTime()`, `applyPacing()`, `getTimeout()`.
 

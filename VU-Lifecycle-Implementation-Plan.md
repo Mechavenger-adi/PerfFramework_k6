@@ -120,8 +120,8 @@ Computed by `ScenarioBuilder` and injected into the k6 scenario's `env` block:
 import http from 'k6/http';
 import { check, sleep, group } from 'k6';
 import exec from 'k6/execution';
-import { initTransactions, startTransaction, endTransaction } from '../../../core-engine/src/utils/transaction.js';
-import { logExchange } from '../../../core-engine/src/utils/replayLogger.js';
+import { initTransactions, startTransaction, endTransaction } from '../../../core_engine/src/utils/transaction.js';
+import { logExchange } from '../../../core_engine/src/utils/replayLogger.js';
 
 const __PHASES = JSON.parse(__ENV.K6_PERF_PHASES || '{}');
 let _lastEndMs = 0;
@@ -383,8 +383,8 @@ VUs
 
 ### Step 8: Update sample test plans
 
-- Add lifecycle example to `config/test-plans/load-test.json`
-- Optionally create a `config/test-plans/spike-test.json` example
+- Add lifecycle example to `config/test_plans/load-test.json`
+- Optionally create a `config/test_plans/spike-test.json` example
 
 ---
 
@@ -614,13 +614,13 @@ export default function () {
 
 | File | Change Type | Scope |
 |------|-------------|-------|
-| `core-engine/src/types/TestPlanSchema.ts` | Add interface + property | `LifecycleConfig`, `UserJourney.lifecycle` |
-| `core-engine/src/config/SchemaValidator.ts` | Add validation rules | `lifecycle` field schema |
-| `core-engine/src/config/GatekeeperValidator.ts` | Add cross-validation | Iteration count, buffer vs ramp-down, overlap |
-| `core-engine/src/scenario/ScenarioBuilder.ts` | New method + env injection | `computePhases()`, `K6_PERF_PHASES` env var |
-| `core-engine/src/recording/ScriptGenerator.ts` | Lifecycle-aware code generation | Conditional wrapping of init/action/end groups |
-| `core-engine/src/recording/ScriptConverter.ts` | Optional lifecycle parameter | Same wrapping for converted scripts |
-| `config/test-plans/load-test.json` | Add lifecycle example | Sample config |
+| `core_engine/src/types/TestPlanSchema.ts` | Add interface + property | `LifecycleConfig`, `UserJourney.lifecycle` |
+| `core_engine/src/config/SchemaValidator.ts` | Add validation rules | `lifecycle` field schema |
+| `core_engine/src/config/GatekeeperValidator.ts` | Add cross-validation | Iteration count, buffer vs ramp-down, overlap |
+| `core_engine/src/scenario/ScenarioBuilder.ts` | New method + env injection | `computePhases()`, `K6_PERF_PHASES` env var |
+| `core_engine/src/recording/ScriptGenerator.ts` | Lifecycle-aware code generation | Conditional wrapping of init/action/end groups |
+| `core_engine/src/recording/ScriptConverter.ts` | Optional lifecycle parameter | Same wrapping for converted scripts |
+| `config/test_plans/load-test.json` | Add lifecycle example | Sample config |
 
 **No changes to:** `ReplayRunner.ts`, `HTMLDiffReporter.ts`, `PipelineRunner.ts`, `transaction.ts`, `ThresholdManager.ts`, `SLARegistry.ts`, `ExecutorFactory.ts`, `WorkloadModels.ts`, `JourneyAllocator.ts`, `ParallelExecutionManager.ts`
 

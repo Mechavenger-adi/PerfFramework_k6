@@ -16,14 +16,14 @@
     *   **Your Script:** The Recipe.
 
 ## Slide 3: Folder Structure (Where you live)
-*   **Visual Idea:** Callouts pointing to `scrum-suites/` and `config/`.
+*   **Visual Idea:** Callouts pointing to `scrum_suites/` and `config/`.
 *   **Talking Points:** 
-    *   **`core-engine/`:** Do not touch (Engine internals).
-    *   **`scrum-suites/your-team/`:** Your home base!
+    *   **`core_engine/`:** Do not touch (Engine internals).
+    *   **`scrum_suites/your-team/`:** Your home base!
         *   `tests/` -> Your `.js` definitions.
         *   `data/` -> Your `.csv` test users.
     *   **`config/`:** Changing behavior without changing code.
-        *   `test-plans/load-test.json` -> Toggling load spikes and mixing scripts.
+        *   `test_plans/load-test.json` -> Toggling load spikes and mixing scripts.
 
 ## Slide 4: Writing a Script (The Three Phases)
 *   **Visual:** Code snippet showing `initPhase`, `actionPhase`, `endPhase`.
@@ -37,7 +37,7 @@
 ## Slide 5: The Command Line (Running tests)
 *   **Visual Idea:** Screenshot of terminal running the command.
 *   **Talking Points:** 
-    *   Command: `npm run cli -- run --plan config/test-plans/load-test.json`
+    *   Command: `npm run cli -- run --plan config/test_plans/load-test.json`
     *   **What happens?** Progress bars show validation -> The test executes silently -> The report is built.
 
 ## Slide 6: Reading the Report 
@@ -62,17 +62,17 @@ npm run cli -- init
 Explain: "This creates the basic folder structure and journey template automatically. No need to write from scratch."
 
 **Step 2: Take a peek at the generated script**
-Open `scrum-suites/sample-team/tests/browse-journey.js`
+Open `scrum_suites/sample_team/tests/browse-journey.js`
 Say: "Notice the three phases. The framework has already wired up `initPhase`, `actionPhase`, and `endPhase` for us. It also automatically wired up `startTransaction`."
 
 **Step 3: Show the Test Plan**
-Open `config/test-plans/debug-test.json`
+Open `config/test_plans/debug-test.json`
 Say: "This is a pre-configured debug test plan. It only spins up 1 Virtual User for 5 iterations. Perfect for making sure the script compiles."
 
 **Step 4: Execute the Run**
 Run the following:
 ```bash
-npm run cli -- run --plan config/test-plans/debug-test.json
+npm run cli -- run --plan config/test_plans/debug-test.json
 ```
 Say: "The engine is validating everything. Now it's passing it to k6. Bam. HTML Report generated."
 
@@ -82,6 +82,6 @@ Say: "Without having to configure Grafana or parse JSON, we have a complete brea
 
 ---
 ## Must-Know Points for your Team (Takeaways)
-1. **Always run `npm run build`** if you touch anything in `/core-engine`.
+1. **Always run `npm run build`** if you touch anything in `/core_engine`.
 2. **Never hardcode URLs in your script.** Use the environment manager (`config/environments/dev.json`).
 3. **If K6 exits with Code `99`, your SLA failed.** Your test didn't crash, the website was just too slow!

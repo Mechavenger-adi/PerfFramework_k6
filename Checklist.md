@@ -167,7 +167,7 @@
 | # | Item | Status | Notes |
 |---|---|---|---|
 | 4.7 | Dual ESM + CJS npm package build | ⬜ | `tsup` or similar bundler |
-| 4.8 | Published `@k6-perf/core-engine` package | ⬜ | Teams `npm install` the core engine |
+| 4.8 | Published `@k6-perf/core_engine` package | ⬜ | Teams `npm install` the core engine |
 
 ---
 

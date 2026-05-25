@@ -45,14 +45,14 @@ function runInit(projectDir = process.cwd()) {
     console.log(`\n Initializing k6 Performance Framework project at: ${projectDir}\n`);
     const dirs = [
         'config/environments',
-        'config/test-plans',
-        'config/runtime-settings',
+        'config/test_plans',
+        'config/runtime_settings',
         'config/schemas',
         'config/correlation-rules',
-        'scrum-suites/sample-team/tests',
-        'scrum-suites/sample-team/data',
-        'scrum-suites/sample-team/recordings',
-        'scrum-suites/sample-team/results',
+        'scrum_suites/sample_team/tests',
+        'scrum_suites/sample_team/data',
+        'scrum_suites/sample_team/recordings',
+        'scrum_suites/sample_team/results',
         'results',
     ];
     // Create folders
@@ -73,20 +73,20 @@ function runInit(projectDir = process.cwd()) {
             tenantId: 'tenant-001',
         },
         teamOverrides: {
-            'sample-team': {
-                baseUrl: 'https://sample-team.dev.your-company.com',
+            'sample_team': {
+                baseUrl: 'https://sample_team.dev.your-company.com',
                 serviceUrls: {
-                    auth: 'https://auth.sample-team.dev.your-company.com',
+                    auth: 'https://auth.sample_team.dev.your-company.com',
                 },
                 custom: {
-                    tenantId: 'sample-team-dev',
+                    tenantId: 'sample_team-dev',
                 },
             },
         },
     }, null, 2), 'config/environments/dev.json');
     // -- Sample: runtime settings -----------------
-    writeIfNotExists(path.join(projectDir, 'config/runtime-settings/default.json'), JSON.stringify({
-        $schema: '../schemas/runtime-settings.schema.json',
+    writeIfNotExists(path.join(projectDir, 'config/runtime_settings/default.json'), JSON.stringify({
+        $schema: '../schemas/runtime_settings.schema.json',
         thinkTime: { ignoreThinkTime: false, globalOverride: true, mode: 'fixed', fixed: 1 },
         pacing: { enabled: false },
         http: { timeoutSeconds: 60, maxRedirects: 10, throwOnError: false },
@@ -115,9 +115,9 @@ function runInit(projectDir = process.cwd()) {
             sampleIntervalSeconds: 10,
         },
         debugMode: false,
-    }, null, 2), 'config/runtime-settings/default.json');
+    }, null, 2), 'config/runtime_settings/default.json');
     // -- Sample: test plan -------------------------
-    writeIfNotExists(path.join(projectDir, 'config/test-plans/load-test.json'), JSON.stringify({
+    writeIfNotExists(path.join(projectDir, 'config/test_plans/load-test.json'), JSON.stringify({
         $schema: '../schemas/test-plan.schema.json',
         name: 'Sample Load Test',
         environment: 'dev',
@@ -134,12 +134,12 @@ function runInit(projectDir = process.cwd()) {
         user_journeys: [
             {
                 name: 'browse',
-                scriptPath: 'scrum-suites/sample-team/tests/browse-journey.js',
+                scriptPath: 'scrum_suites/sample_team/tests/browse-journey.js',
                 weight: 70,
             },
             {
                 name: 'checkout',
-                scriptPath: 'scrum-suites/sample-team/tests/checkout-journey.js',
+                scriptPath: 'scrum_suites/sample_team/tests/checkout-journey.js',
                 weight: 30,
             },
         ],
@@ -147,9 +147,9 @@ function runInit(projectDir = process.cwd()) {
             p95: 3000,
             errorRate: 1,
         },
-    }, null, 2), 'config/test-plans/load-test.json');
+    }, null, 2), 'config/test_plans/load-test.json');
     // -- Sample: debug test plan -------------------
-    writeIfNotExists(path.join(projectDir, 'config/test-plans/debug-test.json'), JSON.stringify({
+    writeIfNotExists(path.join(projectDir, 'config/test_plans/debug-test.json'), JSON.stringify({
         $schema: '../schemas/test-plan.schema.json',
         name: 'Sample Debug Test',
         environment: 'dev',
@@ -170,11 +170,11 @@ function runInit(projectDir = process.cwd()) {
         user_journeys: [
             {
                 name: 'browse',
-                scriptPath: 'scrum-suites/sample-team/tests/browse-journey.js',
-                recordingLogPath: 'scrum-suites/sample-team/recordings/browse-journey.recording-log.json',
+                scriptPath: 'scrum_suites/sample_team/tests/browse-journey.js',
+                recordingLogPath: 'scrum_suites/sample_team/recordings/browse-journey.recording-log.json',
             },
         ],
-    }, null, 2), 'config/test-plans/debug-test.json');
+    }, null, 2), 'config/test_plans/debug-test.json');
     // -- Sample: .env template --------------------
     writeIfNotExists(path.join(projectDir, '.env.template'), `# Copy this file to .env and fill in your values
 # NEVER commit .env to source control
@@ -184,13 +184,13 @@ K6_API_KEY=your-api-key-here
 K6_DEBUG=false
 `, '.env.template');
     // -- Sample: CSV data file --------------------
-    writeIfNotExists(path.join(projectDir, 'scrum-suites/sample-team/data/p_users.csv'), `p_username,p_password,p_email
+    writeIfNotExists(path.join(projectDir, 'scrum_suites/sample_team/data/p_users.csv'), `p_username,p_password,p_email
 testuser001,P@ssw0rd1,testuser001@perf-test.local
 testuser002,P@ssw0rd2,testuser002@perf-test.local
 testuser003,P@ssw0rd3,testuser003@perf-test.local
-`, 'scrum-suites/sample-team/data/p_users.csv');
+`, 'scrum_suites/sample_team/data/p_users.csv');
     // -- Sample: recording log ---------------------
-    writeIfNotExists(path.join(projectDir, 'scrum-suites/sample-team/recordings/browse-journey.recording-log.json'), JSON.stringify([
+    writeIfNotExists(path.join(projectDir, 'scrum_suites/sample_team/recordings/browse-journey.recording-log.json'), JSON.stringify([
         {
             harEntryId: 'sample_req_1',
             transaction: 'Homepage',
@@ -215,15 +215,15 @@ testuser003,P@ssw0rd3,testuser003@perf-test.local
                 body: '<html></html>',
             },
         },
-    ], null, 2), 'scrum-suites/sample-team/recordings/browse-journey.recording-log.json');
+    ], null, 2), 'scrum_suites/sample_team/recordings/browse-journey.recording-log.json');
     // -- Sample: browse journey script -------------
-    writeIfNotExists(path.join(projectDir, 'scrum-suites/sample-team/tests/browse-journey.js'), `import { check } from 'k6';
+    writeIfNotExists(path.join(projectDir, 'scrum_suites/sample_team/tests/browse-journey.js'), `import { check } from 'k6';
 import { transaction } from '../../../dist/utils/transaction.js';
 import { request } from '../../../dist/utils/request.js';
 import { createJourneyLifecycleStore, runJourneyLifecycle, thinktime } from '../../../dist/utils/lifecycle.js';
 import { clearCookies, getEnvContext } from '../../../dist/utils/session.js';
 
-const env = getEnvContext('sample-team', { baseUrl: 'https://your-dev-environment.com/' });
+const env = getEnvContext('sample_team', { baseUrl: 'https://your-dev-environment.com/' });
 const __journeyLifecycleStore = createJourneyLifecycleStore();
 
 export function initPhase(ctx) {
@@ -252,15 +252,15 @@ export function endPhase(ctx) {
 export default function () {
   runJourneyLifecycle(__journeyLifecycleStore, { initPhase, actionPhase, endPhase });
 }
-`, 'scrum-suites/sample-team/tests/browse-journey.js');
+`, 'scrum_suites/sample_team/tests/browse-journey.js');
     // -- Sample: checkout journey script -----------
-    writeIfNotExists(path.join(projectDir, 'scrum-suites/sample-team/tests/checkout-journey.js'), `import { check } from 'k6';
+    writeIfNotExists(path.join(projectDir, 'scrum_suites/sample_team/tests/checkout-journey.js'), `import { check } from 'k6';
 import { transaction } from '../../../dist/utils/transaction.js';
 import { request } from '../../../dist/utils/request.js';
 import { createJourneyLifecycleStore, runJourneyLifecycle, thinktime } from '../../../dist/utils/lifecycle.js';
 import { clearCookies, getEnvContext } from '../../../dist/utils/session.js';
 
-const env = getEnvContext('sample-team', { baseUrl: 'https://your-dev-environment.com/' });
+const env = getEnvContext('sample_team', { baseUrl: 'https://your-dev-environment.com/' });
 const __journeyLifecycleStore = createJourneyLifecycleStore();
 
 export function initPhase(ctx) {
@@ -307,15 +307,15 @@ export function endPhase(ctx) {
 export default function () {
   runJourneyLifecycle(__journeyLifecycleStore, { initPhase, actionPhase, endPhase });
 }
-`, 'scrum-suites/sample-team/tests/checkout-journey.js');
+`, 'scrum_suites/sample_team/tests/checkout-journey.js');
     console.log(`\n[PASS]  Project scaffolded successfully!\n`);
     console.log('Next steps:');
     console.log('  1. Copy .env.template -> .env and fill in your values');
     console.log('  2. Update config/environments/dev.json with your base URL');
-    console.log('  3. Update scripts in scrum-suites/sample-team/tests/');
-    console.log('  4. Run: npx tsx core-engine/src/cli/run.ts validate --plan config/test-plans/load-test.json');
-    console.log('  5. Run: npx tsx core-engine/src/cli/run.ts run --plan config/test-plans/load-test.json');
-    console.log('  6. For replay debugging, start from: config/test-plans/debug-test.json\n');
+    console.log('  3. Update scripts in scrum_suites/sample_team/tests/');
+    console.log('  4. Run: npx tsx core_engine/src/cli/run.ts validate --plan config/test_plans/load-test.json');
+    console.log('  5. Run: npx tsx core_engine/src/cli/run.ts run --plan config/test_plans/load-test.json');
+    console.log('  6. For replay debugging, start from: config/test_plans/debug-test.json\n');
 }
 function writeIfNotExists(filePath, content, label) {
     if (!fs.existsSync(filePath)) {

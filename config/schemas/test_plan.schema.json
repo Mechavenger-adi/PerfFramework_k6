@@ -1,0 +1,257 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "k6-perf/test-plan",
+  "title": "K6-PerfFramework Test Plan",
+  "description": "Defines a complete performance test: which journeys to run, how many VUs, what load profile, SLA thresholds, and execution mode. This is the primary input that drives scenario orchestration.",
+  "type": "object",
+  "required": ["name", "environment", "execution_mode", "global_load_profile", "user_journeys"],
+  "additionalProperties": true,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "JSON Schema reference for editor IntelliSense (ignored at runtime)."
+    },
+    "_meta": {
+      "type": "object",
+      "description": "Template metadata (ignored at runtime).",
+      "additionalProperties": true
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Human-readable name for this test plan. Used in report titles, result folder names, and CI summary output. Example: 'Checkout Flow - Peak Load Test'."
+    },
+    "environment": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Target environment name. Must match a config file in config/environments/<name>.json. The framework auto-resolves the environment config and injects baseUrl, serviceUrls, and secrets. Examples: dev, staging, uat, prod."
+    },
+    "execution_mode": {
+      "type": "string",
+      "enum": ["parallel", "sequential", "hybrid"],
+      "description": "How user journeys are orchestrated:\n• parallel — All journeys run concurrently, VUs distributed by weight.\n• sequential — Journeys run one after another using startTime offsets.\n• hybrid — Mix parallel and sequential groups (requires hybrid_groups).\nMost common: 'parallel' for load tests, 'sequential' for workflow chains."
+    },
+    "global_load_profile": {
+      "type": "object",
+      "description": "Default load profile applied to all journeys unless overridden per-journey. Defines the k6 executor type, VU count, stages, and duration.",
+      "required": ["executor"],
+      "properties": {
+        "executor": {
+          "type": "string",
+          "enum": [
+            "ramping-vus",
+            "constant-vus",
+            "ramping-arrival-rate",
+            "constant-arrival-rate",
+            "shared-iterations",
+            "per-vu-iterations"
+          ],
+          "description": "k6 executor type:\n• ramping-vus — Ramp VUs up/down through stages (most common for load tests).\n• constant-vus — Fixed VU count for a set duration.\n• ramping-arrival-rate — Control request rate, not VU count.\n• constant-arrival-rate — Fixed requests/second.\n• shared-iterations — Fixed total iterations across all VUs (good for data-driven tests).\n• per-vu-iterations — Each VU runs a fixed number of iterations."
+        },
+        "startVUs": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Starting VU count for ramping executors. Usually 0 for a clean ramp-up. Only used with 'ramping-vus' executor.",
+          "default": 0
+        },
+        "stages": {
+          "type": "array",
+          "description": "Ramp stages for 'ramping-vus' executor. Each stage defines a duration and a target VU count. Classic load test pattern: ramp-up → steady state → ramp-down.",
+          "items": {
+            "type": "object",
+            "required": ["duration", "target"],
+            "properties": {
+              "duration": {
+                "type": "string",
+                "description": "Stage duration as a k6 duration string. Examples: '30s', '2m', '1h30m'."
+              },
+              "target": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Target VU count at the end of this stage. k6 linearly ramps from the previous stage's target to this value."
+              }
+            }
+          }
+        },
+        "vus": {
+          "type": "number",
+          "minimum": 1,
+          "description": "Fixed VU count for 'constant-vus', 'shared-iterations', or 'per-vu-iterations' executors."
+        },
+        "duration": {
+          "type": "string",
+          "description": "Test duration for 'constant-vus' or arrival-rate executors. k6 duration string. Examples: '5m', '1h', '30s'."
+        },
+        "iterations": {
+          "type": "number",
+          "minimum": 1,
+          "description": "Total iterations for 'shared-iterations' or per-VU iterations for 'per-vu-iterations'. For shared-iterations: all VUs share this pool. For per-vu-iterations: each VU runs this many."
+        }
+      }
+    },
+    "user_journeys": {
+      "type": "array",
+      "minItems": 1,
+      "description": "List of user journey scripts to include in this test. Each journey maps to a k6 scenario. At least one journey is required.",
+      "items": {
+        "type": "object",
+        "required": ["name", "scriptPath"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique journey name. Used as the k6 scenario key, report labels, and SLA references. Must be unique across all journeys in this plan. Use descriptive names like 'checkout_flow' or 'browse_catalog'."
+          },
+          "scriptPath": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Path to the journey script file. Can be relative to the project root or absolute. The framework auto-resolves paths by searching scrum_suites/ if the direct path doesn't exist. Example: 'buyanimal_1_framework_lifecycle.js'."
+          },
+          "recordingLogPath": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Path to the normalized recording log JSON for debug replay comparison. Only needed when debug.enabled=true. Auto-resolved from the suite's recordings/ folder if omitted."
+          },
+          "weight": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "VU distribution weight as a percentage (0–100) for parallel execution mode. All journey weights should sum to 100. Example: Two journeys with weight 70 and 30 = 70% of VUs run journey 1, 30% run journey 2."
+          },
+          "vus": {
+            "type": "number",
+            "minimum": 1,
+            "description": "Explicit VU count override for this journey. Takes priority over weight-based distribution. Use when you need a specific number of VUs regardless of global profile."
+          },
+          "loadProfile": {
+            "$ref": "#/properties/global_load_profile",
+            "description": "Per-journey load profile override. When specified, this journey uses its own executor/stages/duration instead of the global_load_profile."
+          },
+          "tags": {
+            "type": "object",
+            "additionalProperties": { "type": "string" },
+            "description": "Custom tags attached to all metrics from this journey. Useful for filtering in Grafana/InfluxDB. Example: { \"team\": \"checkout\", \"priority\": \"critical\" }."
+          },
+          "noCookiesReset": {
+            "type": "boolean",
+            "description": "Per-journey cookie persistence override.\n• true (default) — Cookies persist across iterations (like a real browser session).\n• false — Cookies are cleared at the start of each iteration (isolated sessions).\nNote: Uses clearCookies() from session.js in the lifecycle."
+          }
+        }
+      }
+    },
+    "hybrid_groups": {
+      "type": "array",
+      "description": "Required when execution_mode='hybrid'. Defines groups of journeys that run in parallel or sequential sub-groups. Allows mixing execution patterns within a single test plan.",
+      "items": {
+        "type": "object",
+        "required": ["mode", "journeys"],
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": ["parallel", "sequential"],
+            "description": "How journeys in this group are executed relative to each other."
+          },
+          "journeys": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 },
+            "description": "Journey names (must match names in user_journeys array)."
+          }
+        }
+      }
+    },
+    "global_sla": {
+      "type": "object",
+      "description": "Global SLA (Service Level Agreement) thresholds applied to all journeys. These become k6 thresholds on http_req_duration. If any SLA is breached, the test reports a threshold failure.",
+      "properties": {
+        "errorRate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Maximum allowed error rate in percent (0–100). Example: 5 = test fails if more than 5% of requests error."
+        },
+        "avgResponseTime": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Maximum allowed average response time in milliseconds."
+        },
+        "p50": { "type": "number", "minimum": 0, "description": "P50 (median) response time threshold in milliseconds." },
+        "p75": { "type": "number", "minimum": 0, "description": "P75 response time threshold in milliseconds." },
+        "p90": { "type": "number", "minimum": 0, "description": "P90 response time threshold in milliseconds." },
+        "p95": { "type": "number", "minimum": 0, "description": "P95 response time threshold in milliseconds. Industry standard for SLAs." },
+        "p99": { "type": "number", "minimum": 0, "description": "P99 response time threshold in milliseconds. Captures tail latency." }
+      },
+      "additionalProperties": {
+        "type": "number",
+        "description": "Custom percentile threshold in milliseconds. Key must match pattern p<N> (e.g., p97, p99.9)."
+      }
+    },
+    "journey_slas": {
+      "type": "object",
+      "description": "Per-journey SLA overrides keyed by journey name. These apply to the journey's scenario-level http_req_duration metric. Override global_sla for specific journeys that have different performance requirements.",
+      "additionalProperties": {
+        "$ref": "#/properties/global_sla"
+      }
+    },
+    "transaction_slas": {
+      "type": "object",
+      "description": "Per-transaction SLA overrides keyed by transaction name (e.g., 'tx01_launch'). These apply directly to the transaction's Trend metric. Use for critical transactions that need tighter thresholds than the journey average.",
+      "additionalProperties": {
+        "$ref": "#/properties/global_sla"
+      }
+    },
+    "max_total_vus": {
+      "type": "number",
+      "minimum": 1,
+      "description": "Safety ceiling for total VU count across all journeys. The gatekeeper pre-flight check blocks execution if the calculated VUs exceed this limit. Use as a guardrail to prevent accidental overload."
+    },
+    "debug": {
+      "type": "object",
+      "description": "Debug replay execution settings. When enabled, journeys run in single-VU mode and produce HTML diff reports comparing recorded vs. live HTTP exchanges. Use for validating script correctness before running full load.",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "When true, switches from normal load execution to debug replay mode. Journeys run with minimal VUs/iterations and produce diff reports."
+        },
+        "mode": {
+          "type": "string",
+          "enum": ["diff"],
+          "description": "Debug mode type. Currently only 'diff' (HAR recording vs. live replay comparison) is supported.",
+          "default": "diff"
+        },
+        "autoResolveRecordingLog": {
+          "type": "boolean",
+          "description": "Automatically find the recording log from the journey's suite recordings/ folder. Set false to require explicit recordingLogPath per journey.",
+          "default": true
+        },
+        "vus": {
+          "type": "number",
+          "minimum": 1,
+          "description": "VU count for debug replay. Usually 1.",
+          "default": 1
+        },
+        "iterations": {
+          "type": "number",
+          "minimum": 1,
+          "description": "Iteration count for debug replay. Usually 1–2.",
+          "default": 1
+        },
+        "reportDir": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Directory for debug replay output (HTML diff reports, replay logs). Defaults to results/debug/.",
+          "default": "results/debug"
+        },
+        "failOnMissingRecordingLog": {
+          "type": "boolean",
+          "description": "When true, validation fails if any journey lacks a recordingLogPath. When false (default), a warning is issued and the journey runs without diff comparison.",
+          "default": false
+        }
+      }
+    },
+    "noCookiesReset": {
+      "type": "boolean",
+      "description": "Global cookie persistence setting.\n• true (default) — Cookies persist across VU iterations (browser-like behavior).\n• false — Cookie jar is cleared after each iteration.\nCan be overridden per-journey via journey.noCookiesReset.",
+      "default": true
+    }
+  }
+}

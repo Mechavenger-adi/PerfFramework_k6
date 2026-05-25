@@ -74,7 +74,7 @@ async function runGenerate(harPath, teamName, outName) {
     }
     const scriptContent = ScriptGenerator_1.ScriptGenerator.generate(groups, lifecycleSelection, teamName);
     const recordingLog = ExchangeLog_1.ExchangeLogBuilder.fromGroups(groups);
-    const suiteDir = path.join(process.cwd(), 'scrum-suites', teamName);
+    const suiteDir = path.join(process.cwd(), 'scrum_suites', teamName);
     const targetDir = path.join(suiteDir, 'tests');
     const recordingDir = path.join(suiteDir, 'recordings');
     if (!fs.existsSync(targetDir)) {

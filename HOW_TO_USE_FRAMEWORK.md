@@ -21,7 +21,7 @@ The framework is designed around several key operational layers:
 
 ## 2. CLI Commands
 
-The framework includes a CLI entrypoint (internally aliased as `k6-framework` or executed via `core-engine/src/cli/run.ts`) that orchestrates the entire workflow. 
+The framework includes a CLI entrypoint (internally aliased as `k6-framework` or executed via `core_engine/src/cli/run.ts`) that orchestrates the entire workflow. 
 
 Available commands include:
 
@@ -41,7 +41,7 @@ Configuration follows a strict merge order utilizing the `ConfigurationManager.t
 1. **`.env` variables**: Secrets and tokens.
 2. **CLI arguments**: Flags directly passed during run commands.
 3. **Suite-level / Test Plan**: Specific test-plan SLAs and journey behavior (e.g., `load-test.json`).
-4. **Runtime settings**: General `runtime-settings/default.json` controlling things like random think-time padding, error overrides, and pacing.
+4. **Runtime settings**: General `runtime_settings/default.json` controlling things like random think-time padding, error overrides, and pacing.
 5. **Environment Config**: Environment-specific settings (e.g., `environments/dev.json`), usually pointing to specific base URLs.
 6. **Framework defaults**: Built-in fallback values.
 
@@ -82,7 +82,7 @@ For humans, prefer:
 
 To run a test, you typically need to create or utilize three main components: a Test Plan, Correlation Rules (optional but recommended), and the actual Test Journey script.
 
-### A. Test Plan (`config/test-plans/load-test.json`)
+### A. Test Plan (`config/test_plans/load-test.json`)
 
 The Test Plan JSON dictates *how* the tests will run (the workload model). It splits test load by weights across journeys without you needing to do the math to allocate VUs mechanically.
 
@@ -103,12 +103,12 @@ The Test Plan JSON dictates *how* the tests will run (the workload model). It sp
   "user_journeys": [
     { 
       "name": "browse_crocodiles", 
-      "scriptPath": "scrum-suites/sample-team/tests/browse-journey.js", 
+      "scriptPath": "scrum_suites/sample_team/tests/browse-journey.js", 
       "weight": 50 
     },
     { 
       "name": "checkout_crocodiles", 
-      "scriptPath": "scrum-suites/sample-team/tests/checkout-journey.js", 
+      "scriptPath": "scrum_suites/sample_team/tests/checkout-journey.js", 
       "weight": 50 
     }
   ],
@@ -119,7 +119,7 @@ The Test Plan JSON dictates *how* the tests will run (the workload model). It sp
 }
 ```
 
-### B. Correlation Rules (`scrum-suites/<team>/correlation-rules.json`)
+### B. Correlation Rules (`scrum_suites/<team>/correlation-rules.json`)
 
 Instead of burying token extractions heavily in JavaScript, you define rules in JSON files. The `CorrelationEngine` automatically intercepts responses, snags tokens based on these rules, and provides fallback behavior if it fails.
 
@@ -143,15 +143,15 @@ Instead of burying token extractions heavily in JavaScript, you define rules in 
 ]
 ```
 
-### C. Typical Test Journey (`scrum-suites/<team>/tests/browse-journey.js`)
+### C. Typical Test Journey (`scrum_suites/<team>/tests/browse-journey.js`)
 
 At its core, a journey is still a standard k6 script. The main difference now is that the framework expects the business flow to be split into `initPhase(ctx)`, `actionPhase(ctx)`, and `endPhase(ctx)`. The framework lifecycle helper then decides when each phase runs per VU for supported executors.
 
 ```javascript
 import http from 'k6/http';
 import { check, sleep, group } from 'k6';
-import { initTransactions, startTransaction, endTransaction } from '../../../core-engine/src/utils/transaction.js';
-import { createJourneyLifecycleStore, runJourneyLifecycle } from '../../../core-engine/src/utils/lifecycle.js';
+import { initTransactions, startTransaction, endTransaction } from '../../../core_engine/src/utils/transaction.js';
+import { createJourneyLifecycleStore, runJourneyLifecycle } from '../../../core_engine/src/utils/lifecycle.js';
 
 initTransactions(['Login', 'Browse', 'Logout']);
 const lifecycleStore = createJourneyLifecycleStore();
@@ -195,11 +195,11 @@ export default function () {
 
 ## 6. Getting Started Checklist
 
-1. **Initialize your team's suite**: Run the `init` command or manually create your folder in `scrum-suites/<your-team>`.
+1. **Initialize your team's suite**: Run the `init` command or manually create your folder in `scrum_suites/<your-team>`.
 2. **Generate baseline scripts**: Drop a `.har` file in your `recordings/` folder and run `generate <team> <script-name> --har <path>`. The generator will ask which domains to keep, whether to include static assets, and which grouped transactions belong in init/end. OR use `generate-byos` to create a blank phase-based template.
 3. **Refine the Script**: Review the generated replay metadata logs and request tags, then adjust assertions, data, and correlation as needed.
 4. **Extract dynamic values**: Add correlation definitions to your `correlation-rules.json`.
-5. **Construct a Test Plan**: Create a new `.json` plan in `config/test-plans` targeting your new scripts.
+5. **Construct a Test Plan**: Create a new `.json` plan in `config/test_plans` targeting your new scripts.
 6. **Validate & Run**: Run the `validate` command to ensure everything is correct, then execute the `run` command to kick off the load test.
 
 ---
@@ -221,7 +221,7 @@ Using the framework's CLI generator:
 # General format: k6-framework generate <team-name> <script-name> --har <path-to-har>
 
 # Example using the main CLI entrypoint locally:
-npx tsx core-engine/src/cli/run.ts generate sample-team login-test --har scrum-suites/sample-team/recordings/sample-login-flow.har
+npx tsx core_engine/src/cli/run.ts generate sample_team login-test --har scrum_suites/sample_team/recordings/sample-login-flow.har
 ```
 
 **Interactive prompts you will see:**
@@ -234,7 +234,7 @@ npx tsx core-engine/src/cli/run.ts generate sample-team login-test --har scrum-s
 - attaches k6 request tags like `har_entry_id`, `transaction`, and `recording_started_at`
 - uses framework transaction helpers instead of hand-written `Trend` timing blocks
 - also writes a normalized recording log JSON file next to your HAR assets for later replay-to-recording matching
-- updates a suite-local recording registry in `scrum-suites/<team>/recordings/.recording-index.json` so debug mode can auto-resolve the recording log later
+- updates a suite-local recording registry in `scrum_suites/<team>/recordings/.recording-index.json` so debug mode can auto-resolve the recording log later
 
 ---
 
@@ -250,7 +250,7 @@ The `CorrelationEngine` processes custom rules on the fly and extracts dynamic v
 **Script Example:**
 ```javascript
 import http from 'k6/http';
-import { CorrelationEngine } from '../../../core-engine/src/correlation/CorrelationEngine.js';
+import { CorrelationEngine } from '../../../core_engine/src/correlation/CorrelationEngine.js';
 
 // Load or define your correlation rules
 const rules = [
@@ -309,7 +309,7 @@ If a script is failing or dynamic values aren't correlating properly, the framew
   "user_journeys": [
     {
       "name": "login",
-      "scriptPath": "scrum-suites/sample-team/tests/generated-sample-review.js"
+      "scriptPath": "scrum_suites/sample_team/tests/generated-sample-review.js"
     }
   ]
 }
@@ -329,13 +329,13 @@ If a script is failing or dynamic values aren't correlating properly, the framew
 
 **Example programmatic lifecycle:**
 ```typescript
-import { ReplayRunner } from '../../../core-engine/src/debug/ReplayRunner.js';
-import { DiffChecker } from '../../../core-engine/src/debug/DiffChecker.js';
+import { ReplayRunner } from '../../../core_engine/src/debug/ReplayRunner.js';
+import { DiffChecker } from '../../../core_engine/src/debug/DiffChecker.js';
 
 // Step 1: Execute the script in diagnostic debug mode
 ReplayRunner.runDebug({
-    scriptPath: './scrum-suites/sample-team/tests/browse-journey.js',
-    originalHarPath: './scrum-suites/sample-team/recordings/sample-login-flow.har',
+    scriptPath: './scrum_suites/sample_team/tests/browse-journey.js',
+    originalHarPath: './scrum_suites/sample_team/recordings/sample-login-flow.har',
     outHtmlPath: './results/debug-diff.html'
 });
 

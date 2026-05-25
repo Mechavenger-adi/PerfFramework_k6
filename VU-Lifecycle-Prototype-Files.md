@@ -4,21 +4,21 @@ Original framework files were left untouched.
 
 ## Backups
 
-- `core-engine/src/types/TestPlanSchema.ts.bak-2026-04-05`
-- `core-engine/src/config/SchemaValidator.ts.bak-2026-04-05`
-- `core-engine/src/config/GatekeeperValidator.ts.bak-2026-04-05`
-- `core-engine/src/scenario/ScenarioBuilder.ts.bak-2026-04-05`
-- `core-engine/src/recording/ScriptGenerator.ts.bak-2026-04-05`
-- `core-engine/src/recording/ScriptConverter.ts.bak-2026-04-05`
+- `core_engine/src/types/TestPlanSchema.ts.bak-2026-04-05`
+- `core_engine/src/config/SchemaValidator.ts.bak-2026-04-05`
+- `core_engine/src/config/GatekeeperValidator.ts.bak-2026-04-05`
+- `core_engine/src/scenario/ScenarioBuilder.ts.bak-2026-04-05`
+- `core_engine/src/recording/ScriptGenerator.ts.bak-2026-04-05`
+- `core_engine/src/recording/ScriptConverter.ts.bak-2026-04-05`
 
 ## Working Copies
 
-- `core-engine/src/types/TestPlanSchema.lifecycle-prototype.ts`
-- `core-engine/src/config/SchemaValidator.lifecycle-prototype.ts`
-- `core-engine/src/config/GatekeeperValidator.lifecycle-prototype.ts`
-- `core-engine/src/scenario/ScenarioBuilder.lifecycle-prototype.ts`
-- `core-engine/src/recording/ScriptGenerator.lifecycle-prototype.ts`
-- `core-engine/src/recording/ScriptConverter.lifecycle-prototype.ts`
+- `core_engine/src/types/TestPlanSchema.lifecycle-prototype.ts`
+- `core_engine/src/config/SchemaValidator.lifecycle-prototype.ts`
+- `core_engine/src/config/GatekeeperValidator.lifecycle-prototype.ts`
+- `core_engine/src/scenario/ScenarioBuilder.lifecycle-prototype.ts`
+- `core_engine/src/recording/ScriptGenerator.lifecycle-prototype.ts`
+- `core_engine/src/recording/ScriptConverter.lifecycle-prototype.ts`
 
 ## What The Prototype Covers
 

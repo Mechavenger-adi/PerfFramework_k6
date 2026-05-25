@@ -53,7 +53,7 @@ function listTemplates(type) {
         console.log(`\nNo templates found in ${templatesDir}\n`);
         return;
     }
-    console.log(`\nAvailable ${type === 'test-plans' ? 'Test Plan' : 'Runtime Settings'} Templates:\n`);
+    console.log(`\nAvailable ${type === 'test_plans' ? 'Test Plan' : 'Runtime Settings'} Templates:\n`);
     for (const file of files) {
         const absPath = path.join(templatesDir, file);
         try {

@@ -91,7 +91,7 @@ class ConfigurationManager {
     }
     loadRuntimeSettings(filePath) {
         if (!fs.existsSync(filePath)) {
-            console.warn(`[ConfigurationManager] No runtime-settings file found at '${filePath}'. Using framework defaults.`);
+            console.warn(`[ConfigurationManager] No runtime_settings file found at '${filePath}'. Using framework defaults.`);
             return {};
         }
         const raw = this.readJsonFile(filePath, 'Runtime Settings');

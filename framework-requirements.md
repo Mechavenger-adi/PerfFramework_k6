@@ -67,7 +67,7 @@ To design and build a reusable, maintainable, and portable performance testing f
 
 #### 3.2.2. Runtime Settings
 - **Requirement:** Allow users to easily configure test behavior via a central file.
-- **Implementation:** A `runtime-settings.json` file will provide toggleable options for:
+- **Implementation:** A `runtime_settings.json` file will provide toggleable options for:
     - **Think Time:** Configure globally (fixed or random range).
     - **Pacing:** Control the time between iterations.
     - **Iteration Logic:** Start the next iteration upon completion of the last, or after a fixed delay.

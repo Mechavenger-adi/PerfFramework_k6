@@ -58,7 +58,7 @@ class ScriptConverter {
     static convertFile(filePath, teamName, lifecycle) {
         const source = fs.readFileSync(filePath, 'utf-8');
         if (!teamName) {
-            const match = filePath.match(/[\\/]scrum-suites[\\/]([^\\/]+)[\\/]/);
+            const match = filePath.match(/[\\/]scrum_suites[\\/]([^\\/]+)[\\/]/);
             teamName = match ? match[1] : 'unknown_team';
         }
         return this.convert(source, teamName, lifecycle);
@@ -364,7 +364,7 @@ class ScriptConverter {
                     }
                     const checkMatch = nextLine.match(/^(\s*)check\s*\(\s*(\w+)\s*,/);
                     if (checkMatch) {
-                        const newCheck = nextLine.replace(new RegExp(`check\\s*\\(\\s*${checkMatch[2]}\\s*,`), `check(${resName},`);
+                        const newCheck = nextLine.replace(new RegExp(`check\\s*\\(\\s*${checkMatch[2]}\\s*,`), `k6Check(${resName},`);
                         result.push(newCheck);
                         i++;
                     }
@@ -423,7 +423,7 @@ class ScriptConverter {
     static buildImportBlock(source, _hasTransactionImport, _hasLogReplayExchange) {
         const lines = [];
         lines.push(`import { sleep } from 'k6';`);
-        lines.push(`import { transaction, check } from '../../../dist/utils/transaction.js';`);
+        lines.push(`import { transaction, k6Check } from '../../../dist/utils/transaction.js';`);
         lines.push(`import { request } from '../../../dist/utils/request.js';`);
         // trackCorrelation / trackParameter / trackDataRow still needed for correlation/data tracking
         lines.push(`import { trackCorrelation, trackParameter, trackDataRow } from '../../../dist/utils/replayLogger.js';`);

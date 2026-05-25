@@ -9,7 +9,7 @@ exports.getCurrentTransaction = getCurrentTransaction;
 exports.startTransaction = startTransaction;
 exports.endTransaction = endTransaction;
 exports.transaction = transaction;
-exports.check = check;
+exports.k6Check = k6Check;
 // @ts-ignore
 const k6_1 = require("k6");
 // @ts-ignore - K6 runtime module
@@ -184,7 +184,7 @@ function transaction(name, fn) {
  *
  * Drop-in replacement for k6's check() — same signature, same metric output.
  */
-function check(val, sets) {
+function k6Check(val, sets) {
     const passed = (0, k6_1.check)(val, sets);
     if (!passed) {
         const behavior = getRuntimeErrorBehavior();

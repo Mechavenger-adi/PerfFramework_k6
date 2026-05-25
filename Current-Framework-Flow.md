@@ -16,7 +16,7 @@ flowchart TD
     CLI --> RUN[run]
     CLI --> DBG[debug utilities]
 
-    INIT --> INIT_SCAFFOLD[Scaffold config, scrum-suites, sample files]
+    INIT --> INIT_SCAFFOLD[Scaffold config, scrum_suites, sample files]
 
     GEN --> HAR_READ[HARParser.readEntries]
     HAR_READ --> DOMAIN_SUMMARY[DomainFilter.summarize]
@@ -99,8 +99,8 @@ flowchart TD
     GROUP --> GEN_SCRIPT[ScriptGenerator.generate]
     GROUP --> GEN_REC_LOG[ExchangeLogBuilder.fromGroups]
 
-    GEN_SCRIPT --> SCRIPT_FILE[scrum-suites/team/tests/generated-script.js]
-    GEN_REC_LOG --> REC_FILE[scrum-suites/team/recordings/generated-script.recording-log.json]
+    GEN_SCRIPT --> SCRIPT_FILE[scrum_suites/team/tests/generated-script.js]
+    GEN_REC_LOG --> REC_FILE[scrum_suites/team/recordings/generated-script.recording-log.json]
 ```
 
 ## 4. Run Command Flow

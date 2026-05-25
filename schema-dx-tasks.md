@@ -8,12 +8,12 @@
 
 > Uses `$schema` property in each JSON file — works in **any** JSON Schema-aware editor (VS Code, JetBrains, Sublime LSP, Neovim LSP, Eclipse, etc.)
 
-- [x] **1.1** Create `config/schemas/runtime-settings.schema.json` — full schema with descriptions, defaults, enums
+- [x] **1.1** Create `config/schemas/runtime_settings.schema.json` — full schema with descriptions, defaults, enums
 - [x] **1.2** Create `config/schemas/test-plan.schema.json` — covers all plan fields including SLAs, debug, hybrid
 - [x] **1.3** Create `config/schemas/environment.schema.json` — environment config schema
-- [x] **1.4** Add `$schema` to `config/runtime-settings/default.json`
-- [x] **1.5** Add `$schema` to `config/test-plans/load-test.json`
-- [x] **1.6** Add `$schema` to `config/test-plans/webui-load-test.json`
+- [x] **1.4** Add `$schema` to `config/runtime_settings/default.json`
+- [x] **1.5** Add `$schema` to `config/test_plans/load-test.json`
+- [x] **1.6** Add `$schema` to `config/test_plans/webui-load-test.json`
 - [x] **1.7** Add `$schema` to `config/environments/dev.json`
 - [x] **1.8** Update `SchemaValidator.ts` to load schemas from `.schema.json` files instead of inline objects
 - [x] **1.9** Update `init.ts` scaffold to include `$schema` in generated configs
@@ -28,8 +28,8 @@
 
 ## Phase 3: Template Library (P2)
 
-- [ ] **3.1** Create `config/templates/test-plans/` with 6–8 starter templates
-- [ ] **3.2** Create `config/templates/runtime-settings/` with 4 presets
+- [ ] **3.1** Create `config/templates/test_plans/` with 6–8 starter templates
+- [ ] **3.2** Create `config/templates/runtime_settings/` with 4 presets
 - [ ] **3.3** Add `_meta` block to templates for discoverability
 - [ ] **3.4** Add CLI `templates list` and `templates show <name>` commands
 - [ ] **3.5** Strip `_meta` and `$schema` during config load (so they don't break validation)

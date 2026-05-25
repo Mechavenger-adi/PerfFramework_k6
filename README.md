@@ -5,7 +5,7 @@ A TypeScript-powered performance testing framework on top of Grafana k6. The fra
 ## What This Framework Provides
 
 - Declarative test plans for parallel, sequential, and hybrid journey execution.
-- Team-owned test suites under `scrum-suites/<team>/`.
+- Team-owned test suites under `scrum_suites/<team>/`.
 - HAR-to-k6 script generation with transaction grouping and replay metadata.
 - BYOS support for wrapping existing k6 scripts in the framework lifecycle.
 - Environment, runtime, SLA, and secret configuration resolution.
@@ -17,14 +17,14 @@ A TypeScript-powered performance testing framework on top of Grafana k6. The fra
 
 ```text
 K6-PerfFramework/
-  core-engine/                 Framework TypeScript source
+  core_engine/                 Framework TypeScript source
   dist/                        Compiled JavaScript output
   config/
     environments/              Environment configs such as dev.json
-    runtime-settings/          Runtime behavior such as think time and reporting
+    runtime_settings/          Runtime behavior such as think time and reporting
     schemas/                   JSON schemas for validation
-    test-plans/                Runnable test plans
-  scrum-suites/
+    test_plans/                Runnable test plans
+  scrum_suites/
     <team>/
       tests/                   k6 journey scripts
       recordings/              HAR files and normalized recording logs
@@ -112,7 +112,7 @@ npm run build
 npm run typecheck
 
 # Validate a test plan
-npm run validate -- --plan config/test-plans/load-test.json
+npm run validate -- --plan config/test_plans/load-test.json
 
 # Run the default load test plan shortcut
 npm run loadtest
@@ -121,7 +121,7 @@ npm run loadtest
 npm run debug
 
 # Run any test plan
-npm run cli -- run --plan config/test-plans/load-test.json
+npm run cli -- run --plan config/test_plans/load-test.json
 ```
 
 ## Configuration Files
@@ -144,21 +144,21 @@ Example: `config/environments/dev.json`
 }
 ```
 
-Use `scrum_suites` keys that match the team folder under `scrum-suites/`.
+Use `scrum_suites` keys that match the team folder under `scrum_suites/`.
 
 ### Runtime Settings
 
-Runtime settings live in `config/runtime-settings/default.json`. They control think time, pacing, HTTP behavior, error behavior, reporting, snapshots, monitoring, and debug verbosity.
+Runtime settings live in `config/runtime_settings/default.json`. They control think time, pacing, HTTP behavior, error behavior, reporting, snapshots, monitoring, and debug verbosity.
 
 Use a custom runtime file with:
 
 ```bash
-npm run cli -- run --plan config/test-plans/load-test.json --runtime config/runtime-settings/default.json
+npm run cli -- run --plan config/test_plans/load-test.json --runtime config/runtime_settings/default.json
 ```
 
 ### Test Plan
 
-Test plans live in `config/test-plans/`. A plan selects the environment, workload model, journeys, and SLA rules.
+Test plans live in `config/test_plans/`. A plan selects the environment, workload model, journeys, and SLA rules.
 
 Example:
 
@@ -192,7 +192,7 @@ Example:
 }
 ```
 
-When a journey script path is just a file name, the framework resolves it from the matching scrum-suite test folder. Fully qualified relative paths such as `scrum-suites/Jpet_new/tests/buyanimal_raw_19thmay.js` are also supported.
+When a journey script path is just a file name, the framework resolves it from the matching scrum-suite test folder. Fully qualified relative paths such as `scrum_suites/Jpet_new/tests/buyanimal_raw_19thmay.js` are also supported.
 
 ## Creating a New Suite or Script
 
@@ -227,7 +227,7 @@ npm run cli -- generate-byos Jpet_new buyanimal
 This creates a script under:
 
 ```text
-scrum-suites/Jpet_new/tests/
+scrum_suites/Jpet_new/tests/
 ```
 
 ### Convert an Existing k6 Script
@@ -247,13 +247,13 @@ npm run cli -- convert path/to/input-script.js Jpet_new converted-script --in-pl
 Place a browser HAR file under your suite recordings folder, for example:
 
 ```text
-scrum-suites/Jpet_new/recordings/buyanimal.har
+scrum_suites/Jpet_new/recordings/buyanimal.har
 ```
 
 Generate the script:
 
 ```bash
-npm run generate -- Jpet_new buyanimal --har scrum-suites/Jpet_new/recordings/buyanimal.har
+npm run generate -- Jpet_new buyanimal --har scrum_suites/Jpet_new/recordings/buyanimal.har
 ```
 
 The generator prompts for domain selection and whether static assets should be included. It writes the generated k6 script and a normalized recording log for debug comparisons.
@@ -264,27 +264,27 @@ Recommended flow:
 
 ```bash
 npm run build
-npm run validate -- --plan config/test-plans/load-test.json --verbose
-npm run cli -- run --plan config/test-plans/load-test.json
+npm run validate -- --plan config/test_plans/load-test.json --verbose
+npm run cli -- run --plan config/test_plans/load-test.json
 ```
 
 Optional run flags:
 
 ```bash
 # Use explicit environment config
-npm run cli -- run --plan config/test-plans/load-test.json --env-config config/environments/dev.json
+npm run cli -- run --plan config/test_plans/load-test.json --env-config config/environments/dev.json
 
 # Use explicit runtime settings
-npm run cli -- run --plan config/test-plans/load-test.json --runtime config/runtime-settings/default.json
+npm run cli -- run --plan config/test_plans/load-test.json --runtime config/runtime_settings/default.json
 
 # Use a custom .env path
-npm run cli -- run --plan config/test-plans/load-test.json --env-file .env
+npm run cli -- run --plan config/test_plans/load-test.json --env-file .env
 
 # Pass an additional k6 output
-npm run cli -- run --plan config/test-plans/load-test.json --out json=results/raw-k6-output.json
+npm run cli -- run --plan config/test_plans/load-test.json --out json=results/raw-k6-output.json
 
 # Print resolved config/debug information
-npm run cli -- run --plan config/test-plans/load-test.json --debug
+npm run cli -- run --plan config/test_plans/load-test.json --debug
 ```
 
 ## Debug Replay Mode
@@ -300,21 +300,21 @@ npm run debug
 Or run a debug-enabled plan:
 
 ```bash
-npm run cli -- run --plan config/test-plans/debug-test.json
+npm run cli -- run --plan config/test_plans/debug-test.json
 ```
 
 Standalone debug for one script:
 
 ```bash
-npm run cli -- debug --script scrum-suites/Jpet_new/tests/buyanimal_raw_19thmay.js
+npm run cli -- debug --script scrum_suites/Jpet_new/tests/buyanimal_raw_19thmay.js
 ```
 
 With an explicit recording log and output path:
 
 ```bash
 npm run cli -- debug ^
-  --script scrum-suites/Jpet_new/tests/buyanimal_raw_19thmay.js ^
-  --recording-log scrum-suites/Jpet_new/recordings/buyanimal_raw_19thmay.recording-log.json ^
+  --script scrum_suites/Jpet_new/tests/buyanimal_raw_19thmay.js ^
+  --recording-log scrum_suites/Jpet_new/recordings/buyanimal_raw_19thmay.recording-log.json ^
   --out results/debug-diff.html
 ```
 
@@ -357,22 +357,22 @@ results/debug/<safe-test-plan-name>/Run_<timestamp>/
 npm run cli -- features
 
 # List test-plan templates
-npm run cli -- templates list --type test-plans
+npm run cli -- templates list --type test_plans
 
 # Show a test-plan template
-npm run cli -- templates show smoke --type test-plans
+npm run cli -- templates show smoke --type test_plans
 
 # List runtime-setting templates
-npm run cli -- templates list --type runtime-settings
+npm run cli -- templates list --type runtime_settings
 
 # Show a runtime-setting template
-npm run cli -- templates show local-debug --type runtime-settings
+npm run cli -- templates show local-debug --type runtime_settings
 
 # Regenerate schema documentation
 npm run cli -- docs
 
 # Inspect final merged configuration
-npm run cli -- config inspect --plan config/test-plans/load-test.json
+npm run cli -- config inspect --plan config/test_plans/load-test.json
 ```
 
 ## Authoring Journey Scripts
@@ -382,8 +382,8 @@ Generated and BYOS scripts use a phase-based shape:
 ```javascript
 import http from 'k6/http';
 import { check, group } from 'k6';
-import { initTransactions, startTransaction, endTransaction } from '../../../core-engine/src/utils/transaction.js';
-import { createJourneyLifecycleStore, runJourneyLifecycle } from '../../../core-engine/src/utils/lifecycle.js';
+import { initTransactions, startTransaction, endTransaction } from '../../../core_engine/src/utils/transaction.js';
+import { createJourneyLifecycleStore, runJourneyLifecycle } from '../../../core_engine/src/utils/lifecycle.js';
 
 initTransactions(['Launch']);
 const lifecycleStore = createJourneyLifecycleStore();

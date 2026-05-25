@@ -2,13 +2,13 @@
   "$schema": "../schemas/environment.schema.json",
   "name": "dev",
   "scrum_suites": {
-    "sample-team": {
-      "baseUrl": "https://sample-team.dev.your-company.com",
+    "sample_team": {
+      "baseUrl": "https://sample_team.dev.your-company.com",
       "serviceUrls": {
-        "auth": "https://auth.sample-team.dev.your-company.com"
+        "auth": "https://auth.sample_team.dev.your-company.com"
       },
       "custom": {
-        "tenantId": "sample-team-dev"
+        "tenantId": "sample_team-dev"
       }
     },
     "jpet_new": {

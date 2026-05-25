@@ -7,7 +7,7 @@ This document is designed for engineers seeking to understand the exact mathemat
 ## 1. Engine Orchestration & Load Distribution
 
 ### The Orchestration Pipeline (`cli/run.ts`)
-When `npm run cli -- run --plan config/test-plans/load-test.json` is invoked, the execution strictly follows this synchronously awaited pipeline:
+When `npm run cli -- run --plan config/test_plans/load-test.json` is invoked, the execution strictly follows this synchronously awaited pipeline:
 
 1.  **TestPlanLoader:** Validates the underlying JSON schema strictly using `ajv` (`SchemaValidator.ts`).
 2.  **ConfigurationMerge:** `ConfigurationManager.replace()` deep-merges objects in this order (highest priority overwrites): `.env variables` -> `CLI Overrides` -> `Suite/Plan Config` -> `Runtime JSON (e.g. default.json)` -> `Environment JSON (dev.json)` -> `FRAMEWORK_DEFAULTS`. 
@@ -125,7 +125,7 @@ K6 operates on strict thresholds block formatting. Human-friendly JSON configura
 
 ## 7. The Core Engine (`run.ts`) Line-by-Line Execution Flow
 
-The absolute heartbeat of the orchestration is `core-engine/src/cli/run.ts`. Below is a reverse-engineered simplification of the main `run()` method, broken down line-by-line:
+The absolute heartbeat of the orchestration is `core_engine/src/cli/run.ts`. Below is a reverse-engineered simplification of the main `run()` method, broken down line-by-line:
 
 ```typescript
 // 1. Loading the Test Plan
@@ -166,7 +166,7 @@ monitor.start();
 ```typescript
 // 6. Pipeline Execution
 const runResult = PipelineRunner.run({
-    script: 'core-engine/src/index.ts', // or direct wrapper script
+    script: 'core_engine/src/index.ts', // or direct wrapper script
     options: k6Options,
 });
 ```

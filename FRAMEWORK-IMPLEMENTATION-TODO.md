@@ -41,7 +41,7 @@ This checklist tracks the agreed lifecycle, reporting, observability, and CI/CD 
 - Added schema validation for new runtime sections
 - Added runtime config accessors for reporting, snapshots, timeseries, monitoring, and pacing
 - Added `EventContracts.ts` and `ReportingContracts.ts`
-- Updated scaffolded default runtime settings in `core-engine/src/cli/init.ts`
+- Updated scaffolded default runtime settings in `core_engine/src/cli/init.ts`
 
 ## Task 2: Shared Runtime Foundation
 
@@ -60,7 +60,7 @@ This checklist tracks the agreed lifecycle, reporting, observability, and CI/CD 
 - Task 1
 
 **Expected outputs**
-- new runtime helper files under `core-engine/src/runtime/`
+- new runtime helper files under `core_engine/src/runtime/`
 - hidden lifecycle wrapper skeleton
 - structured error/warning event creation
 - transaction metric helper
@@ -72,14 +72,14 @@ This checklist tracks the agreed lifecycle, reporting, observability, and CI/CD 
 - Added `MetricsRuntime.ts`
 - Added `SnapshotRuntime.ts`
 - Added `TimeseriesRuntime.ts`
-- Exported new runtime helpers from `core-engine/src/index.ts`
+- Exported new runtime helpers from `core_engine/src/index.ts`
 - Pacing direction agreed: expose pacing helper similar to think time and apply pacing after the last transaction in `actionPhase(ctx)`
 
 **Next**
 - Integrate these helpers into execution flow without breaking current behavior
 
 **Lifecycle bridge update (overhauled 2026-04-09)**
-- Shared k6-side lifecycle helper in `core-engine/src/utils/lifecycle.js`
+- Shared k6-side lifecycle helper in `core_engine/src/utils/lifecycle.js`
 - Generated and converted scripts call the shared lifecycle helper instead of invoking `actionPhase(ctx)` directly
 - Helper uses **instantaneous VU target interpolation** — at any elapsed time `t`, linearly interpolates between stage boundaries to compute the exact target VU count, then compares `vuId > target` to trigger endPhase
 - Helper supports:
@@ -143,7 +143,7 @@ This checklist tracks the agreed lifecycle, reporting, observability, and CI/CD 
 - stable simple author-facing scripts
 
 **Delivered so far**
-- Added shared CLI lifecycle prompt in `core-engine/src/cli/LifecyclePrompt.ts`
+- Added shared CLI lifecycle prompt in `core_engine/src/cli/LifecyclePrompt.ts`
 - `generate` now prompts for init/end groups with a skip path
 - `convert` now prompts for init/end groups with a skip path when running interactively
 - `ScriptGenerator` now emits:
@@ -189,7 +189,7 @@ This checklist tracks the agreed lifecycle, reporting, observability, and CI/CD 
 - Added `noCookiesReset?: boolean` to `TestPlan` and `UserJourney` interfaces in `TestPlanSchema.ts`
 - `ParallelExecutionManager.resolve()` now uses `noCookiesReset: plan.noCookiesReset !== false` (default true)
 - `ReplayRunner` debug path respects `noCookiesReset` from plan config
-- Created `core-engine/src/utils/session.js` with URL registry pattern:
+- Created `core_engine/src/utils/session.js` with URL registry pattern:
   - `registerBaseUrl(url)` — tracks base URLs for the VU
   - `clearCookies(...urls)` — clears jar for given URLs or all registered URLs if no args
   - `deleteCookie(url, name)` — removes specific cookie
@@ -221,7 +221,7 @@ This checklist tracks the agreed lifecycle, reporting, observability, and CI/CD 
 - CI-friendly outputs available after run
 
 **Delivered so far**
-- Added `core-engine/src/reporting/ArtifactWriter.ts`
+- Added `core_engine/src/reporting/ArtifactWriter.ts`
 - Added end-of-run artifact finalization in `run.ts`
 - Local/non-debug load runs now generate:
   - `transaction-metrics.json`
@@ -259,12 +259,12 @@ This checklist tracks the agreed lifecycle, reporting, observability, and CI/CD 
 - summary/gate logic can use transaction data
 
 **Delivered so far**
-- Added `core-engine/src/reporting/TransactionMetricsBuilder.ts`
+- Added `core_engine/src/reporting/TransactionMetricsBuilder.ts`
 - Transaction matrix now derives:
   - duration stats from k6 summary trend metrics
   - pass/fail counts from grouped check results in `summary.json`
 - Supports configurable visible stats such as `count`, `pass`, `fail`, `avg`, `min`, `max`, `p(90)`, `p(95)`, `p(99)`
-- Added `core-engine/src/reporting/RunSummaryBuilder.ts` so CI summary can consume transaction matrix output
+- Added `core_engine/src/reporting/RunSummaryBuilder.ts` so CI summary can consume transaction matrix output
 
 ## Task 7: Error, Warning, And Snapshot Flow
 
@@ -291,7 +291,7 @@ This checklist tracks the agreed lifecycle, reporting, observability, and CI/CD 
 - errorBehavior enforced by shared runtime
 
 **Delivered so far**
-- Added `core-engine/src/reporting/EventArtifactBuilder.ts`
+- Added `core_engine/src/reporting/EventArtifactBuilder.ts`
 - `errors.ndjson` now contains structured error rows derived from:
   - failed k6 checks grouped by transaction
   - non-zero k6 process exit code
@@ -330,7 +330,7 @@ This checklist tracks the agreed lifecycle, reporting, observability, and CI/CD 
 - system metrics available for reports
 
 **Delivered so far**
-- Added `core-engine/src/execution/HostMonitor.ts`
+- Added `core_engine/src/execution/HostMonitor.ts`
 - Local run path now captures host snapshots during execution plus final boundary snapshots when monitoring is enabled
 - High CPU / high memory warnings are now emitted into `warnings.ndjson`
 - Added `system-metrics.json`
@@ -365,7 +365,7 @@ This checklist tracks the agreed lifecycle, reporting, observability, and CI/CD 
 - no split report dependency
 
 **Delivered so far**
-- Added `core-engine/src/reporting/RunReportGenerator.ts`
+- Added `core_engine/src/reporting/RunReportGenerator.ts`
 - `RunReport.html` is now generated for local/non-debug load runs
 - Current baseline tabs:
   - Summary
@@ -403,7 +403,7 @@ This checklist tracks the agreed lifecycle, reporting, observability, and CI/CD 
 - attached table recalculates per selected time window
 
 **Delivered so far**
-- Added `core-engine/src/reporting/TimeseriesArtifactBuilder.ts`
+- Added `core_engine/src/reporting/TimeseriesArtifactBuilder.ts`
 - `timeseries.json` now contains:
   - overview series
   - per-transaction series
@@ -474,8 +474,8 @@ This checklist tracks the agreed lifecycle, reporting, observability, and CI/CD 
 - examples aligned with final architecture
 
 **Delivered so far**
-- Updated `core-engine/src/cli/init.ts` sample journey templates to the phase-based script shape
-- Updated `core-engine/src/cli/generate-byos.ts` to scaffold phase-based BYOS scripts
+- Updated `core_engine/src/cli/init.ts` sample journey templates to the phase-based script shape
+- Updated `core_engine/src/cli/generate-byos.ts` to scaffold phase-based BYOS scripts
 - Updated `HOW_TO_USE_FRAMEWORK.md` with:
   - phase-based script examples
   - run artifact overview
@@ -490,14 +490,14 @@ This checklist tracks the agreed lifecycle, reporting, observability, and CI/CD 
 - `externally-controlled` — added from scratch
 
 **Files changed:** TestPlanSchema.ts, ExecutorFactory.ts, WorkloadModels.ts, ScenarioBuilder.ts, SchemaValidator.ts, index.ts
-**Templates added:** `config/test-plans/templates/` — one per executor type
+**Templates added:** `config/test_plans/templates/` — one per executor type
 
 ## Completed: ScriptConverter Modernization (2026-05-20)
 
 **ScriptConverter aligned with ScriptGenerator conventions:**
 - Import block now includes `clearCookies`/`registerBaseUrl` from session.js, `trackDataRow` from replayLogger.js
-- `applyPhaseContract()` strips stale `variableEvents: []` fields, fixes `dist/` → `core-engine/src/` import paths
-- Import path consistency: all imports now use `../../../core-engine/src/utils/` paths
+- `applyPhaseContract()` strips stale `variableEvents: []` fields, fixes `dist/` → `core_engine/src/` import paths
+- Import path consistency: all imports now use `../../../core_engine/src/utils/` paths
 - Duplicate import prevention for lifecycle.js and session.js when preserving source imports
 
 ## Verification Checklist

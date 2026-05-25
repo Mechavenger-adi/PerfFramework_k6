@@ -46,7 +46,7 @@ This checklist tracks the agreed lifecycle, reporting, observability, and CI/CD 
 - Task 1
 
 **Expected outputs**
-- new runtime helper files under `core-engine/src/runtime/`
+- new runtime helper files under `core_engine/src/runtime/`
 - hidden lifecycle wrapper skeleton
 - structured error/warning event creation
 - transaction metric helper

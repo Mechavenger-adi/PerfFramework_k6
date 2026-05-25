@@ -7,7 +7,7 @@ class ScriptGenerator {
      * Output uses the transaction() wrapper and request() helper from the framework utils.
      */
     static generate(groups, lifecycle, teamName) {
-        let script = `import { transaction, check } from '../../../dist/utils/transaction.js';\n`;
+        let script = `import { transaction, k6Check } from '../../../dist/utils/transaction.js';\n`;
         script += `import { request } from '../../../dist/utils/request.js';\n`;
         script += `import { createJourneyLifecycleStore, runJourneyLifecycle, thinktime } from '../../../dist/utils/lifecycle.js';\n`;
         script += `import { logReplayExchange, trackCorrelation, trackParameter } from '../../../dist/utils/replayLogger.js';\n`;
@@ -72,7 +72,7 @@ class ScriptGenerator {
                 script += `        recordingStartedAt: ${JSON.stringify(req.startedDateTime)},\n`;
                 script += `      },\n`;
                 script += `    });\n`;
-                script += `    check(${responseName}, {\n`;
+                script += `    k6Check(${responseName}, {\n`;
                 script += `      ${JSON.stringify(`${groupItem.name} - status is ${req.status}`)}: (r) => r.status === ${req.status},\n`;
                 script += `    });\n`;
                 if (reqIndex < groupItem.entries.length - 1) {

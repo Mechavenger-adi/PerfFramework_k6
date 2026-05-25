@@ -10,8 +10,8 @@ Your framework has **three config surfaces** that need discoverability:
 
 | Config | File | Current Pain |
 |--------|------|-------------|
-| **Test Plan** | `config/test-plans/*.json` | Users don't know about SLAs, debug settings, hybrid mode, cookie control |
-| **Runtime Settings** | `config/runtime-settings/*.json` | 8 top-level sections, ~30 fields — overwhelming |
+| **Test Plan** | `config/test_plans/*.json` | Users don't know about SLAs, debug settings, hybrid mode, cookie control |
+| **Runtime Settings** | `config/runtime_settings/*.json` | 8 top-level sections, ~30 fields — overwhelming |
 | **Environment** | `config/environments/*.json` | Simplest, but `serviceUrls` and `custom` are undiscovered |
 
 The core insight: **you already have the schemas** in `SchemaValidator.ts` (AJV inline schemas) and the TypeScript types in `ConfigContracts.ts` + `TestPlanSchema.ts`. The problem is that these schemas are **trapped inside code** and never reach the user's editor.
@@ -24,12 +24,12 @@ The core insight: **you already have the schemas** in `SchemaValidator.ts` (AJV 
 
 You already have `RUNTIME_SETTINGS_SCHEMA` and `TEST_PLAN_SCHEMA` as JS objects in `SchemaValidator.ts`. Extract them as standalone `.json` files with `description` fields added.
 
-**Create:** `config/schemas/runtime-settings.schema.json`
+**Create:** `config/schemas/runtime_settings.schema.json`
 
 ```json
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://k6-perf.dev/schemas/runtime-settings.json",
+  "$id": "https://k6-perf.dev/schemas/runtime_settings.json",
   "title": "K6-PerfFramework Runtime Settings",
   "description": "Controls think time, pacing, HTTP behavior, error handling, reporting, monitoring, and debug mode for all test executions.",
   "type": "object",
@@ -87,7 +87,7 @@ Add a `$schema` reference to every config JSON:
 
 ```json
 {
-  "$schema": "../schemas/runtime-settings.schema.json",
+  "$schema": "../schemas/runtime_settings.schema.json",
   "thinkTime": { "mode": "fixed", "fixed": 1 }
 }
 ```
@@ -102,11 +102,11 @@ Add a `.vscode/settings.json` to the repo so schemas apply even without `$schema
 {
   "json.schemas": [
     {
-      "fileMatch": ["config/runtime-settings/*.json"],
-      "url": "./config/schemas/runtime-settings.schema.json"
+      "fileMatch": ["config/runtime_settings/*.json"],
+      "url": "./config/schemas/runtime_settings.schema.json"
     },
     {
-      "fileMatch": ["config/test-plans/*.json"],
+      "fileMatch": ["config/test_plans/*.json"],
       "url": "./config/schemas/test-plan.schema.json"
     },
     {
@@ -182,7 +182,7 @@ Config completeness: 62% (5/8 sections configured)
 
 ```
 config/templates/
-├── test-plans/
+├── test_plans/
 │   ├── smoke-test.json              # 1 VU, 1 iteration — sanity check
 │   ├── baseline-load.json           # 10 VUs, 2 min — establish baseline
 │   ├── ramp-load.json               # 0→50→0 VUs ramping
@@ -192,7 +192,7 @@ config/templates/
 │   ├── debug-replay.json            # Single VU diff replay
 │   ├── ci-pipeline.json             # Fast, SLA-gated, CI-friendly
 │   └── multi-journey-weighted.json  # 3+ journeys with weight distribution
-├── runtime-settings/
+├── runtime_settings/
 │   ├── aggressive.json              # Fast, no think time, throw on error
 │   ├── realistic.json               # Random think time, pacing enabled
 │   ├── debug-verbose.json           # All captures on, debug mode
@@ -238,7 +238,7 @@ Each template should include a `_meta` block (stripped at load time):
 ### 3.3 CLI Template Command
 
 ```bash
-npm run cli -- new --template spike-test --team my-team
+npm run cli -- new --template spike-test --team my_team
 npm run cli -- templates list                    # Show all templates
 npm run cli -- templates show spike-test         # Print template with docs
 ```
@@ -270,8 +270,8 @@ Enhance `init` or add a `new` command with `inquirer`-style prompts:
 ? Enable debug replay mode? No
 ? Enable host monitoring? No
 
-✔ Created: config/test-plans/my-load-test.json
-✔ Created: config/runtime-settings/my-load-test-runtime.json
+✔ Created: config/test_plans/my-load-test.json
+✔ Created: config/runtime_settings/my-load-test-runtime.json
 ```
 
 ### 4.2 Progressive Disclosure
@@ -305,7 +305,7 @@ Build a script that reads each `.schema.json` and generates markdown docs:
 npm run cli -- docs generate
 ```
 
-Output: `docs/generated/runtime-settings-reference.md`
+Output: `docs/generated/runtime_settings-reference.md`
 
 ```markdown
 ## Runtime Settings Reference
@@ -364,13 +364,13 @@ Switch config files from `.json` to `.jsonc` (JSON with Comments). VS Code suppo
 Add a `config inspect` CLI command:
 
 ```bash
-npm run cli -- config inspect --plan config/test-plans/load-test.json
+npm run cli -- config inspect --plan config/test_plans/load-test.json
 ```
 
 ```
 Configuration Resolution Chain:
   Layer 1: FRAMEWORK_DEFAULTS (built-in)
-  Layer 2: config/runtime-settings/default.json (12 overrides)
+  Layer 2: config/runtime_settings/default.json (12 overrides)
   Layer 3: config/environments/dev.json
   Layer 4: .env (2 secrets loaded)
   Layer 5: CLI flags (--debug)

@@ -1,0 +1,30 @@
+{
+  "$schema": "../../schemas/test-plan.schema.json",
+  "_meta": {
+    "title": "Stress Test",
+    "description": "Gradually pushes load beyond expected limits to see how the system handles heavy stress and identify bottlenecks."
+  },
+  "name": "Stress Test",
+  "environment": "dev",
+  "execution_mode": "parallel",
+  "global_load_profile": {
+    "executor": "ramping-vus",
+    "startVUs": 0,
+    "stages": [
+      { "duration": "2m", "target": 100 },
+      { "duration": "5m", "target": 100 },
+      { "duration": "2m", "target": 200 },
+      { "duration": "5m", "target": 200 },
+      { "duration": "2m", "target": 300 },
+      { "duration": "5m", "target": 300 },
+      { "duration": "5m", "target": 0 }
+    ]
+  },
+  "user_journeys": [
+    {
+      "name": "example_journey",
+      "scriptPath": "scrum_suites/sample_team/tests/example.js",
+      "weight": 100
+    }
+  ]
+}

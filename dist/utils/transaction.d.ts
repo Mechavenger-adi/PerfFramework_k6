@@ -44,4 +44,4 @@ export declare function transaction(name: string, fn: () => void): void;
  *
  * Drop-in replacement for k6's check() — same signature, same metric output.
  */
-export declare function check(val: any, sets: Record<string, (v: any) => boolean>): boolean;
+export declare function k6Check(val: any, sets: Record<string, (v: any) => boolean>): boolean;

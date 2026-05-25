@@ -27,7 +27,7 @@ Enterprise-grade k6 performance testing framework with:
 - **Dynamic SLA and threshold support** across global, journey, and transaction scopes with arbitrary percentile keys
 - **Session and cookie control** including `noCookiesReset`, `session.js`, and auto-cookie-clear behavior in generated/converted scripts
 - **Host monitoring and periodic sampling** for normal runs with system metrics surfaced in artifacts and the unified report
-- **Multi-team suite support** via `scrum-suites/` team folders containing tests, data, recordings, and correlation assets
+- **Multi-team suite support** via `scrum_suites/` team folders containing tests, data, recordings, and correlation assets
 - **LoadRunner-style transactions** using k6 Trend metrics and console transaction summaries after load runs
 
 ---
@@ -36,13 +36,13 @@ Enterprise-grade k6 performance testing framework with:
 
 | Item | Value |
 |------|-------|
-| **Package** | `@k6-perf/core-engine` v1.0.0 |
+| **Package** | `@k6-perf/core_engine` v1.0.0 |
 | **Runtime** | Node.js 22+, npm 11+, k6 (latest) |
 | **Language** | TypeScript (ES2020, commonjs) |
 | **Build** | `tsc` → `dist/` |
 | **Dev Runner** | `tsx` for CLI execution |
 | **Key deps** | commander, ajv, ajv-formats, dotenv, yargs |
-| **Entry** | `core-engine/src/index.ts` (barrel export) |
+| **Entry** | `core_engine/src/index.ts` (barrel export) |
 | **CLI bin** | `k6-framework` → `dist/cli/run.js` |
 
 ### CLI Commands
@@ -59,9 +59,9 @@ npm run cli -- debug --script <path>           # Debug replay
 ### Run Command Options
 - `--plan <path>` (required) - Test plan JSON file for normal execution
 - `--env-config <path>` - Environment config JSON (auto-resolved from `plan.environment` if omitted)
-- `--runtime <path>` - Runtime settings JSON (default: `config/runtime-settings/default.json`)
+- `--runtime <path>` - Runtime settings JSON (default: `config/runtime_settings/default.json`)
 - `--env-file <path>` - `.env` file path (default: `.env`)
-- `--data-root <path>` - Root directory used by validation/data discovery (default: `scrum-suites`)
+- `--data-root <path>` - Root directory used by validation/data discovery (default: `scrum_suites`)
 - `--debug` - Print resolved configuration and other debug-oriented execution detail during `run`
 - `--out <k6-output>` - Additional k6 `--out` sink (for example `json=results.json`)
 
@@ -84,11 +84,11 @@ K6-PerfFramework/
 |- .tmp-init-check/                    # Init-scaffold verification snapshot
 |- config/
 |  |- environments/                    # Environment JSON files
-|  |- runtime-settings/                # Runtime, reporting, error, monitoring defaults
-|  |- test-plans/                      # debug-test.json, load-test.json, webui-load-test.json
+|  |- runtime_settings/                # Runtime, reporting, error, monitoring defaults
+|  |- test_plans/                      # debug-test.json, load-test.json, webui-load-test.json
 |  |  `- templates/                    # Executor templates: ramping-vus, constant-vus, shared-iterations, per-vu-iterations, constant-arrival-rate, ramping-arrival-rate, externally-controlled
 |  `- correlation-rules/               # Reserved global rules folder
-|- core-engine/
+|- core_engine/
 |  |- DOCS_METHODS.md                  # API reference
 |  `- src/
 |     |- index.ts                      # Barrel export
@@ -107,12 +107,12 @@ K6-PerfFramework/
 |     |- utils/                        # Logger, progress, path, transaction, replay/session/lifecycle TS helpers
 |     `- types/                        # Config, test-plan, event, reporting, HAR contracts
 |- dist/                               # Transpiled JS output
-|- scrum-suites/
-|  |- sample-team/                     # Sample journeys, data, recordings, rules
-|  |- jpet-team/                       # JPetStore journeys, CSV data, HAR/recording logs
-|  |- my-team/                         # Team-specific journeys
+|- scrum_suites/
+|  |- sample_team/                     # Sample journeys, data, recordings, rules
+|  |- jpet_team/                       # JPetStore journeys, CSV data, HAR/recording logs
+|  |- my_team/                         # Team-specific journeys
 |  |- testpro/                         # Conversion/check scripts
-|  |- webui-team/                      # Web UI journeys and guide
+|  |- webui_team/                      # Web UI journeys and guide
 |  `- results/                         # Suite-level outputs
 |- results/                            # Generated run/debug outputs
 |- node_modules/                       # Installed dependencies
@@ -127,13 +127,13 @@ K6-PerfFramework/
 ├── AGENT-CONTEXT.md                   # THIS FILE — read first!
 ├── config/
 │   ├── environments/dev.json          # baseUrl: https://test-api.k6.io
-│   ├── runtime-settings/default.json  # thinkTime, pacing, http, errorBehavior
-│   ├── test-plans/
+│   ├── runtime_settings/default.json  # thinkTime, pacing, http, errorBehavior
+│   ├── test_plans/
 │   │   ├── debug-test.json            # 1 VU, 1 iter, debug diff mode
 │   │   ├── load-test.json             # ramping-vus 5 peak, 2 journeys 50/50
 │   │   └── webui-load-test.json       # ramping-vus 10 peak, 2 journeys 60/40
-│   └── correlation-rules/             # (empty — rules live per-team in scrum-suites)
-├── core-engine/
+│   └── correlation-rules/             # (empty — rules live per-team in scrum_suites)
+├── core_engine/
 │   ├── DOCS_METHODS.md                # Full API method reference
 │   └── src/
 │       ├── index.ts                   # Barrel export (all public APIs)
@@ -149,11 +149,11 @@ K6-PerfFramework/
 │       ├── reporters/                 # ResultTransformer, GrafanaReporter, AzureReporter, CustomUploader
 │       ├── utils/                     # Logger, ProgressBar, PathResolver, transaction.ts, replayLogger.ts, session.ts, lifecycle.ts
 │       └── types/                     # ConfigContracts, TestPlanSchema, HARContracts
-├── scrum-suites/                      # Team test suites
-│   ├── sample-team/                   # 6 test scripts, CSV data, correlation rules, recording logs
-│   ├── jpet-team/                     # 2 scripts, HAR recordings, recording-index
-│   ├── my-team/                       # 2 journey files
-│   ├── webui-team/                    # 2 scripts + HowTo guide
+├── scrum_suites/                      # Team test suites
+│   ├── sample_team/                   # 6 test scripts, CSV data, correlation rules, recording logs
+│   ├── jpet_team/                     # 2 scripts, HAR recordings, recording-index
+│   ├── my_team/                       # 2 journey files
+│   ├── webui_team/                    # 2 scripts + HowTo guide
 │   └── results/                       # Test run outputs (timestamped folders)
 ├── results/                           # Debug HTML diff reports
 └── *.md                               # 14 documentation files (see DOCUMENTATION section)
@@ -189,11 +189,11 @@ flowchart LR
 
   subgraph Inputs["Inputs And Suite Assets"]
     direction TB
-    PLAN["config/test-plans/*.json"]
+    PLAN["config/test_plans/*.json"]
     ENV["config/environments/*.json"]
-    RUNTIMECFG["config/runtime-settings/*.json"]
+    RUNTIMECFG["config/runtime_settings/*.json"]
     ENVFILE[".env / secrets"]
-    SUITES["scrum-suites/<team>/"]
+    SUITES["scrum_suites/<team>/"]
     TESTS["tests/*.js"]
     SUITEDATA["data files (.csv, .json)"]
     RECORDINGS["recordings (.har, .recording-log.json)"]
@@ -402,11 +402,11 @@ flowchart LR
 
 **Reading order for AI assistants:**
 1. `AGENT-CONTEXT.md`
-2. `config/test-plans/*.json` for active execution shape
-3. `core-engine/src/cli/run.ts` for top-level orchestration
-4. `core-engine/src/config/`, `scenario/`, `execution/` for runtime flow
-5. `core-engine/src/debug/`, `recording/`, `reporting/` for specialized paths
-6. `scrum-suites/<team>/tests`, `data`, `recordings` for suite-specific behavior
+2. `config/test_plans/*.json` for active execution shape
+3. `core_engine/src/cli/run.ts` for top-level orchestration
+4. `core_engine/src/config/`, `scenario/`, `execution/` for runtime flow
+5. `core_engine/src/debug/`, `recording/`, `reporting/` for specialized paths
+6. `scrum_suites/<team>/tests`, `data`, `recordings` for suite-specific behavior
 
 ---
 
@@ -415,7 +415,7 @@ flowchart LR
 **Current architecture note (2026-04-13):** Treat the layer descriptions below as the live source of truth. The codebase now has distinct `runtime/` and `reporting/` layers in addition to `reporters/`, and normal run flow is:
 `CLI run.ts -> ConfigurationManager/Gatekeeper -> ScenarioBuilder/ThresholdManager -> ParallelExecutionManager/PipelineRunner -> reporting artifact builders`.
 
-### 1. CONFIG LAYER (`core-engine/src/config/`)
+### 1. CONFIG LAYER (`core_engine/src/config/`)
 
 | File | Class | Purpose |
 |------|-------|---------|
@@ -427,7 +427,7 @@ flowchart LR
 
 **Config merge order:** FRAMEWORK_DEFAULTS → environment JSON → runtime JSON → suite config → CLI overrides → .env secrets
 
-### 2. SCENARIO LAYER (`core-engine/src/scenario/`)
+### 2. SCENARIO LAYER (`core_engine/src/scenario/`)
 
 **Current layer note:** This layer now does more than executor translation. It injects `K6_PERF_RUNTIME_METADATA`, `K6_PERF_SCENARIO_METADATA`, and `K6_PERF_PHASES` into scenario env, and `computePhaseEnvelope()` now includes explicit `shared-iterations` metadata for lifecycle-aware iteration flows. `ScenarioRuntimeMetadata.runtime.thinkTime` now carries the full think-time config (`mode`, `fixed`, `min`, `max`) so k6-side `getFrameworkThinkTime()` can compute correct sleep durations.
 
@@ -438,7 +438,7 @@ flowchart LR
 | TestPlanLoader.ts | `TestPlanLoader` | `load(planPath)` → reads JSON, validates schema via SchemaValidator, returns typed TestPlan |
 | ScenarioBuilder.ts | `ScenarioBuilder` | `build(plan)` → K6ScenariosMap. Routes to `buildParallel()`, `buildSequential()` (startTime offsets), `buildHybrid()` (mixed groups). Helpers: `sanitizeExecName()`, `estimateTotalDurationSeconds()`, `parseDurationToSeconds()`. `ScenarioRuntimeMetadata` interface carries `runtime.thinkTime: { mode, fixed?, min?, max? }` (replaced flat `thinkTimeMode` string) |
 
-### 3. EXECUTION LAYER (`core-engine/src/execution/`)
+### 3. EXECUTION LAYER (`core_engine/src/execution/`)
 
 **Current layer note:** Normal load runs use `PipelineRunner.executeAsync()`, while debug replay still uses sync `execute()` with captured output. `HostMonitor.ts` also belongs to this layer and provides start/end snapshots plus periodic CPU/memory sampling for run artifacts and the unified report.
 
@@ -448,7 +448,7 @@ flowchart LR
 | ParallelExecutionManager.ts | `ParallelExecutionManager` | `resolve(plan)` → K6Options (scenarios + thresholds). `extractMaxVUs()` → peak VU from load profile. `scaleProfileToVUs()` → proportional scaling preserving stage ratios |
 | PipelineRunner.ts | `PipelineRunner` | `run(options)` → spawns k6 with `stdio: 'inherit'`, exits with k6 status. `execute(options)` → writes temp JSON, spawns k6 via `spawnSync`, captures stdout/stderr to files, returns PipelineRunResult. `ensureSuccess()`, `printCapturedOutput()`. Execution details (`Logger.info`) suppressed when `captureOutput: true` (debug mode — progress phases provide status instead) |
 
-### 4. DATA LAYER (`core-engine/src/data/`)
+### 4. DATA LAYER (`core_engine/src/data/`)
 
 | File | Class | Purpose |
 |------|-------|---------|
@@ -457,7 +457,7 @@ flowchart LR
 | DataValidator.ts | `DataValidator` | `validateCSV(path, requiredCols?, minRows?)`, `validateJSON(path, requiredKeys?, minRows?)`. Returns `DataValidationResult { valid, file, rowCount, errors[], warnings[] }`. `printResult()` for console output |
 | DynamicValueFactory.ts | `DynamicValueFactory` | Static pure functions: `timestamp(format?)`, `uuid()`, `randomInt(min,max)`, `randomString(length)`, `randomEmail(prefix?,domain?)`, `randomPhone(pattern?)`, `pickRandom(items)`, `epochMs()`, `epochSecs()` |
 
-### 5. CORRELATION LAYER (`core-engine/src/correlation/`)
+### 5. CORRELATION LAYER (`core_engine/src/correlation/`)
 
 | File | Class | Purpose |
 |------|-------|---------|
@@ -471,7 +471,7 @@ flowchart LR
 {"name": "csrfToken", "source": "body", "extractor": "jsonpath", "pattern": "csrfToken", "fallback": "fail", "isCritical": true}
 ```
 
-### 6. RECORDING LAYER (`core-engine/src/recording/`)
+### 6. RECORDING LAYER (`core_engine/src/recording/`)
 
 | File | Class | Purpose |
 |------|-------|---------|
@@ -479,9 +479,9 @@ flowchart LR
 | DomainFilter.ts | `DomainFilter` | `summarize(entries)` → `DomainStat[] { host, count }` sorted by count desc. `filter(entries, allowedDomains)` → substring match filtering with removal logging |
 | ScriptGenerator.ts | `ScriptGenerator` | `generate(groups)` → full k6 script string with: k6 imports, framework helpers (initTransactions/startTransaction/endTransaction), logReplayExchange calls, status checks. Supports GET/POST/PUT/PATCH/DELETE. Tags each request with transaction + harEntryId + recordingStartedAt |
 | TransactionGrouper.ts | `TransactionGrouper` | `group(entries)` → `TransactionGroup[] { name, entries[] }`. Groups by `pageref`, fallback names `Group_1`, `Group_2`, etc. Sanitizes names (non-alphanumeric → underscore) |
-| ScriptConverter.ts | `ScriptConverter` | `convert(source)` / `convertFile(filePath)` → transforms conventional k6 scripts to framework format. Handles Pattern A (Studio/Trend-based) and Pattern B (semi-framework). Adds `logExchange()`, request definition objects with `cookies:{}`, `redirects:0`, proper `tags`, `initTransactions/startTransaction/endTransaction`. Uses dual counters: `requestCounter` (per-group, for variable names) and `globalRequestId` (sequential across all groups, for `id`/`har_entry_id`). Preserves original `// har_entry: req_N` IDs when present. Skips `let params;`/`let url;`/`let resp;` (inlined) but preserves `let match;`/`let regex;` (used for correlation extraction). Pre-scans for `getUniqueItem(FILES["xxx"])` patterns and injects `trackDataRow()` / `trackParameter()` calls (routed to initPhase prelude by lifecycle partitioner). Rewrites `correlation_vars["key"] = expr;` → `correlation_vars["key"] = trackCorrelation("key", expr, "body");`. `applyPhaseContract()` normalizes stale patterns: strips `variableEvents:[]`, fixes `dist/` → `core-engine/src/` import paths. Imports aligned with ScriptGenerator: `clearCookies`/`registerBaseUrl` from session.js, `trackDataRow` from replayLogger.js. Idempotent. |
+| ScriptConverter.ts | `ScriptConverter` | `convert(source)` / `convertFile(filePath)` → transforms conventional k6 scripts to framework format. Handles Pattern A (Studio/Trend-based) and Pattern B (semi-framework). Adds `logExchange()`, request definition objects with `cookies:{}`, `redirects:0`, proper `tags`, `initTransactions/startTransaction/endTransaction`. Uses dual counters: `requestCounter` (per-group, for variable names) and `globalRequestId` (sequential across all groups, for `id`/`har_entry_id`). Preserves original `// har_entry: req_N` IDs when present. Skips `let params;`/`let url;`/`let resp;` (inlined) but preserves `let match;`/`let regex;` (used for correlation extraction). Pre-scans for `getUniqueItem(FILES["xxx"])` patterns and injects `trackDataRow()` / `trackParameter()` calls (routed to initPhase prelude by lifecycle partitioner). Rewrites `correlation_vars["key"] = expr;` → `correlation_vars["key"] = trackCorrelation("key", expr, "body");`. `applyPhaseContract()` normalizes stale patterns: strips `variableEvents:[]`, fixes `dist/` → `core_engine/src/` import paths. Imports aligned with ScriptGenerator: `clearCookies`/`registerBaseUrl` from session.js, `trackDataRow` from replayLogger.js. Idempotent. |
 
-### 7. DEBUG LAYER (`core-engine/src/debug/`)
+### 7. DEBUG LAYER (`core_engine/src/debug/`)
 
 | File | Class | Purpose |
 |------|-------|---------|
@@ -493,7 +493,7 @@ flowchart LR
 
 **Debug workflow:** k6 script runs → console outputs `[k6-perf][replay-log]` JSON per request → ReplayRunner captures → DiffChecker compares recording vs replay → HTMLDiffReporter generates interactive report
 
-### 8. ASSERTIONS LAYER (`core-engine/src/assertions/`)
+### 8. ASSERTIONS LAYER (`core_engine/src/assertions/`)
 
 | File | Class | Purpose |
 |------|-------|---------|
@@ -501,7 +501,7 @@ flowchart LR
 | ThresholdManager.ts | `ThresholdManager` | `apply(plan)` → translates global + per-journey SLAs to k6-native thresholds. Transaction names used directly as Trend metric keys. Scenario metrics: `http_req_duration{scenario:X}` for p90/p95/avg, `http_req_failed{scenario:X}` for errorRate. Returns `Record<string, string[]>` |
 | JourneyAssertionResolver.ts | `JourneyAssertionResolver` | `printReport(metrics)` → evaluates k6 end-of-test summary, prints pass/fail for check rates and SLA breaches |
 
-### 9. RUNTIME LAYER (`core-engine/src/runtime/`)
+### 9. RUNTIME LAYER (`core_engine/src/runtime/`)
 
 | File | Export | Purpose |
 |------|--------|---------|
@@ -511,7 +511,7 @@ flowchart LR
 | SnapshotRuntime.ts | `SnapshotRuntime` | Runtime snapshot helpers used for failure/system artifact capture |
 | TimeseriesRuntime.ts | `TimeseriesRuntime` | Runtime-side timeseries helpers feeding persisted timeseries artifacts |
 
-### 10. REPORTING LAYER (`core-engine/src/reporting/`)
+### 10. REPORTING LAYER (`core_engine/src/reporting/`)
 
 | File | Class | Purpose |
 |------|-------|---------|
@@ -522,7 +522,7 @@ flowchart LR
 | RunReportGenerator.ts | `RunReportGenerator` | Builds the unified `RunReport.html` artifact and its tabs/sections |
 | TimeseriesArtifactBuilder.ts | `TimeseriesArtifactBuilder` | Builds persisted `timeseries.json` data for graphs, events, and system-series support |
 
-### 11. REPORTERS LAYER (`core-engine/src/reporters/`)
+### 11. REPORTERS LAYER (`core_engine/src/reporters/`)
 
 | File | Class | Purpose |
 |------|-------|---------|
@@ -533,19 +533,19 @@ flowchart LR
 
 > **Note:** Reporters are currently placeholder/stub implementations — they log actions but don't actually push data.
 
-### 12. UTILS LAYER (`core-engine/src/utils/`)
+### 12. UTILS LAYER (`core_engine/src/utils/`)
 
 | File | Export | Purpose |
 |------|--------|---------|
 | logger.ts | `Logger` | `info()`, `warn()`, `error()`, `debug()`. Format: `[k6-perf] [LEVEL] [timestamp] message`. Routes: error→console.error, warn→console.warn, rest→console.log. Optional context metadata as JSON. Status methods: `pass()` (green), `fail()` (red), `warning()` (yellow), `detail()` (dim `>` prefix), `header()` (cyan box), `bullet()` (colored bullet). Exports `ansi` object. Respects `NO_COLOR` env var and non-TTY. |
 | ProgressBar.ts | `ProgressBar`, `createSpinner` | Phase-based terminal progress logger compatible with blocking `spawnSync`. `start()` prints `▸ label...`, `done(msg?)` prints `✔ msg (elapsed)`, `fail(msg?)` prints `✖ msg (elapsed)`. `update(current, label?)` prints `▸ [n/total] label...` for multi-step progress. `createSpinner(label)` factory for single blocking operations. |
-| PathResolver.ts | `PathResolver` | `resolve(targetPath, searchRoot='scrum-suites')` → resolves exact path first, then recursively searches scrum-suites for filename match. Eliminates hardcoded paths in test plans |
+| PathResolver.ts | `PathResolver` | `resolve(targetPath, searchRoot='scrum_suites')` → resolves exact path first, then recursively searches scrum_suites for filename match. Eliminates hardcoded paths in test plans |
 | transaction.ts | `initTransactions`, `startTransaction`, `endTransaction` | LoadRunner-style timing. Creates Trend metrics using the transaction name directly (e.g., `new Trend('Homepage')`) in k6 init context. Records start timestamp → calculates duration → adds to Trend |
 | replayLogger.ts | `logReplayExchange`, `logExchange`, `trackCorrelation`, `trackParameter`, `trackDataRow`, `createVariableEvent` | k6-side logging. Outputs `[k6-perf][replay-log]` JSON with: harEntryId, transaction, iteration, VU, request/response details, headers, cookies, body. `trackCorrelation(name, value, source)` / `trackParameter(name, value, source)` register variables in `_variableRegistry`. `trackDataRow(sourceName, rowObject)` bulk-registers all CSV columns as parameters. `logExchange` auto-detects variable usage by scanning request URL/body/headers for registered values (via `detectVariableEvents()`). Body values stringified defensively (`typeof body === 'object' ? JSON.stringify(body) : String(body)`). **Binary body detection:** `binaryBodyPlaceholder(url, responseHeaders)` checks Content-Type (image/audio/video/font + common binary MIME types) and URL extension (.png/.ttf/.woff2/etc.) — replaces body with `[binary: content-type]` placeholder to prevent JSON serialization failures. Cookie extraction: `extractJarCookies(url)` uses `http.cookieJar().cookiesForURL()` for auto-managed cookies, `extractK6ResponseCookies(resCookies)` for k6's parsed `res.cookies` object. Tracks per-iteration state and request sequencing |
 | session.ts | `registerBaseUrl`, `clearCookies`, `deleteCookie` | k6-side cookie management utilities. **URL registry pattern:** `_registeredUrls` Set tracks all known base URLs. `registerBaseUrl(url)` adds a URL to the registry (called automatically by generated/converted scripts at module init). `clearCookies(...urls)` clears the VU's cookie jar — with no arguments, clears all registered URLs; with arguments, clears only the given URLs. `deleteCookie(url, name)` removes a specific named cookie. Used by framework to support per-journey cookie control when `noCookiesReset` is true globally but individual journeys need session resets. |
 | lifecycle.ts | `createJourneyLifecycleStore`, `runJourneyLifecycle`, `getFrameworkThinkTime` | k6-side lifecycle orchestration. Manages `initPhase`, `actionPhase`, `endPhase` execution, pacing, and error behavior. `getFrameworkThinkTime()` reads the thinkTime config from `K6_PERF_RUNTIME_METADATA` env var and returns the appropriate sleep duration in seconds — supports `fixed` (default 1s) and `random` (random in [min, max], defaults 0.5–3s) modes. Used by generated/converted scripts via `sleep(getFrameworkThinkTime())` between transaction groups. |
 
-### 13. TYPES (`core-engine/src/types/`)
+### 13. TYPES (`core_engine/src/types/`)
 
 | File | Key Exports |
 |------|-------------|
@@ -575,7 +575,7 @@ flowchart LR
 ```typescript
 {
   name: string;
-  scriptPath: string;               // resolved via PathResolver (recursive scrum-suites search)
+  scriptPath: string;               // resolved via PathResolver (recursive scrum_suites search)
   weight?: number;                  // for parallel VU distribution
   vus?: number;                     // explicit VU override
   load_profile?: GlobalLoadProfile; // journey-specific profile
@@ -638,7 +638,7 @@ flowchart LR
 
 ## SCRUM-SUITES (Team Test Content)
 
-### sample-team (Reference/Demo)
+### sample_team (Reference/Demo)
 - **Scripts (6):** browse-journey.js, checkout-journey.js, correlation-journey.js, generated-from-har.js, generated-sample-review.js, login-journey.js
 - **Data:** data/p_users.csv (3 users: testuser001-003 with `p_username`, `p_password`, `p_email` columns)
 - **Correlation rules:** correlation-rules.json → csrfToken, bearerToken (critical), sessionId (skip), orderId (default)
@@ -646,7 +646,7 @@ flowchart LR
 - **run-debug.ts:** Standalone debug replay runner (accepts script, recording-log, output path)
 - **Target APIs:** https://test-api.k6.io (crocodile API), https://test.k6.io (web UI), httpbin.org (correlation demo)
 
-### jpet-team (Real Site Recording)
+### jpet_team (Real Site Recording)
 - **Scripts (5):** jpet-login-test.js, jpetstore.aspectran.com_buydog.js (~539 lines each, HAR-generated with replay metadata), buyanimal_new.js (converted from k6 Studio buy_animals.js via ScriptConverter — 20 requests across 9 groups, CSV parameterization + 2 correlation extractions), buyanimal_raw.js (HAR-generated via `generate` command — 29 requests across 9 transactions, full buy-a-dog flow including static assets like .gif images), buyanimal_1_framework_lifecycle.js (framework lifecycle script with initPhase/actionPhase/endPhase — login in init, buy flow in action, logout in end, CSV parameterization + correlation + `cookies: {}` params)
 - **Transactions:** t01_launch, t02_login, search_animal, select_product, add_to_cart, increase_quantity_to_2_and_proceed_to_checkout, click_continue, click_confirm, logout
 - **Data files:** Data/userdetails.csv (p_username, p_password), Data/pet.csv (p_pet)
@@ -654,13 +654,13 @@ flowchart LR
 - **Recording logs:** 2 JSON logs + .recording-index.json (maps scripts ↔ recordings ↔ source HARs)
 - **Target:** jpetstore.aspectran.com | **Credentials:** j2ee/j2ee
 
-### webui-team (k6 Public Test Site)
+### webui_team (k6 Public Test Site)
 - **Scripts (2):** homepage-journey.js (HomePage/News/Contacts/Pi transactions), login-journey.js (Login/Submit/Messages/Form/Logout)
 - **HowTo guide:** HowTo-WebUI-Test.md (comprehensive setup + execution guide)
 - **Target:** https://test.k6.io | **Credentials:** admin/123
 - **Load plan:** webui-load-test.json (10 peak VUs, 60% homepage / 40% login, SLA: p95<2000ms, errorRate<10%)
 
-### my-team (Minimal)
+### my_team (Minimal)
 - **Scripts (2):** homepage-journey.js, login-journey.js
 
 ---
@@ -701,10 +701,10 @@ For each journey in test plan:
 - **Transaction metric naming:** Transaction name used directly as k6 Trend metric name (e.g., `Homepage`, `Login`) — no prefix
 - **Replay log marker:** `[k6-perf][replay-log]` in k6 console output (JSON per request)
 - **Recording index:** `.recording-index.json` in each team's recordings/ dir
-- **Script resolution:** PathResolver searches `scrum-suites/` recursively if direct path fails
+- **Script resolution:** PathResolver searches `scrum_suites/` recursively if direct path fails
 - **Config auto-resolution:** Environment config from `config/environments/{plan.environment}.json`
 - **Cookie management:** `noCookiesReset: true` (default) persists cookies across k6 VU iterations (like LoadRunner). Per-journey cookie control via `session.ts` utilities (`clearCookies()`, `deleteCookie()`). Generated/converted scripts auto-import `registerBaseUrl` and call `clearCookies()` in `initPhase`.
-- **Team folder structure:** `scrum-suites/{team}/tests/`, `scrum-suites/{team}/recordings/`, `scrum-suites/{team}/data/`, `scrum-suites/{team}/results/`
+- **Team folder structure:** `scrum_suites/{team}/tests/`, `scrum_suites/{team}/recordings/`, `scrum_suites/{team}/data/`, `scrum_suites/{team}/results/`
 
 ---
 
@@ -717,7 +717,7 @@ For each journey in test plan:
 
 **Current behavior note:** `baseUrl` is loaded into resolved environment config, injected into k6 runtime via `K6_PERF_BASE_URL`, and consumed by generated/converted scripts through `resolveFrameworkUrl()`. Optional `teamOverrides` let multiple teams share the same environment name while targeting different URLs.
 
-### config/runtime-settings/default.json
+### config/runtime_settings/default.json
 ```json
 {
   "thinkTime": { "mode": "fixed", "fixed": 1 },
@@ -728,7 +728,7 @@ For each journey in test plan:
 }
 ```
 
-### config/test-plans/debug-test.json (CURRENTLY USED FOR DEBUG REPLAY)
+### config/test_plans/debug-test.json (CURRENTLY USED FOR DEBUG REPLAY)
 ```json
 {
   "name": "Sample Debug Test",
@@ -741,13 +741,13 @@ For each journey in test plan:
 }
 ```
 
-### config/test-plans/load-test.json
+### config/test_plans/load-test.json
 - noCookiesReset: true
 - ramping-vus: 0→5 (10s), steady 5 (30s), 5→0 (10s)
 - Journeys: browse_crocodiles (50%), checkout_crocodiles (50%)
 - SLA: p95 < 3000ms, errorRate < 40%
 
-### config/test-plans/webui-load-test.json
+### config/test_plans/webui-load-test.json
 - noCookiesReset: true
 - ramping-vus: 0→10 (15s), steady 10 (1m), 10→0 (15s)
 - Journeys: buyanimal_1_framework_lifecycle (100%)
@@ -772,7 +772,7 @@ For each journey in test plan:
 | Prerequisites.md | Node 22+, npm 11+, k6 installation (platform-specific) |
 | Framework-Change-Log.md | 8 major change sets tracked |
 | Framework-Audit-Checklist.md | Gap analysis: AI features + packaging incomplete |
-| core-engine/DOCS_METHODS.md | Full API method reference by file |
+| core_engine/DOCS_METHODS.md | Full API method reference by file |
 
 ---
 
@@ -793,7 +793,7 @@ For each journey in test plan:
 - Full end-to-end packaging incomplete (no npm publish workflow)
 - Some runtime enforcement gaps
 - Reporters are stub/placeholder implementations (log actions, don't actually HTTP push)
-- `config/correlation-rules/` directory is empty (rules are per-team in scrum-suites/{team}/)
+- `config/correlation-rules/` directory is empty (rules are per-team in scrum_suites/{team}/)
 - No unit tests or integration tests in the repo
 
 ---
@@ -801,9 +801,9 @@ For each journey in test plan:
 ## LAST SUCCESSFUL COMMAND
 
 ```bash
-npm run cli -- run --plan config/test-plans/debug-test.json
+npm run cli -- run --plan config/test_plans/debug-test.json
 # Exit Code: 0
-# Ran debug-test with buyanimal_raw.js (HAR-generated script, jpet-team)
+# Ran debug-test with buyanimal_raw.js (HAR-generated script, jpet_team)
 # Clean phase-based terminal output:
 #   ▸ buyanimal_raw...
 #   ▸ Executing k6 debug run...
@@ -830,12 +830,12 @@ npm run cli -- run --plan config/test-plans/debug-test.json
 
 ### 2026-03-31 — Initial Context Created
 - **What:** Created AGENT-CONTEXT.md with full codebase analysis
-- **Scope:** All 11 core-engine layers, all config files, all scrum-suite teams, all documentation
+- **Scope:** All 11 core_engine layers, all config files, all scrum-suite teams, all documentation
 - **Status:** Framework at 81% completion (Phase 1-3 done, Phase 4 not started)
 - **Active work:** debug-test.json open in editor, last run was successful debug test against jpetstore
 
 ### 2026-03-31 — HTML Diff Report Body Visibility & Redirect-Awareness Fix
-- **What:** Modified `core-engine/src/debug/HTMLDiffReporter.ts` and `core-engine/src/debug/DiffChecker.ts`
+- **What:** Modified `core_engine/src/debug/HTMLDiffReporter.ts` and `core_engine/src/debug/DiffChecker.ts`
 - **Why:** Request bodies were hidden inside collapsed `<details>` elements; response body mismatches caused by k6 following redirects (recording captures 302 with empty body, k6 captures final 200 with full HTML body)
 - **HTMLDiffReporter.ts changes:**
   - `renderSnapshot()`: Added request body and response body preview rows (truncated, max 200 chars) for POST/PUT/PATCH/DELETE methods
@@ -849,12 +849,12 @@ npm run cli -- run --plan config/test-plans/debug-test.json
 - **Result:** Overall match score improved from 79% → 83% for the jpetstore buydog test. 4 redirect warnings correctly shown for POST requests that returned 302 in recording.
 
 ### 2026-03-31 — Remove Duplicate Body Display in HTML Report
-- **What:** Modified `core-engine/src/debug/HTMLDiffReporter.ts`
+- **What:** Modified `core_engine/src/debug/HTMLDiffReporter.ts`
 - **Why:** Body preview rows added to `renderSnapshot()` caused request/response body to appear twice — once in the snapshot table and once in the collapsible section below.
 - **Fix:** Removed `reqBodyPreview` and `resBodyPreview` rows from `renderSnapshot()`. Bodies now appear only in the collapsible `<details>` sections (auto-expanded for POST/PUT/PATCH/DELETE).
 
 ### 2026-03-31 — Compact Debug Logging & Env-Gated Replay Logs
-- **What:** Modified `core-engine/src/utils/replayLogger.ts`, `core-engine/src/recording/ScriptGenerator.ts`, `core-engine/src/debug/ReplayRunner.ts`
+- **What:** Modified `core_engine/src/utils/replayLogger.ts`, `core_engine/src/recording/ScriptGenerator.ts`, `core_engine/src/debug/ReplayRunner.ts`
 - **Why:** Generated scripts were bloated with ~20 lines of `console.log` + `logReplayExchange` boilerplate per request. Also, replay logging ran unconditionally during load tests (unnecessary I/O overhead).
 - **replayLogger.ts:** Added `logExchange(req, res)` compact wrapper — checks `__ENV.K6_PERF_DEBUG` env var, extracts metadata from request definition object, delegates to `logReplayExchange`. Original `logReplayExchange` still exported (backward compatible, always logs).
 - **ScriptGenerator.ts:** Changed import from `logReplayExchange` to `logExchange`. Replaced ~20 lines of per-request logging boilerplate with single `logExchange(request_N, res_N)` call. Removed inline `console.log('[k6-perf][replay]...')` lines.
@@ -863,7 +863,7 @@ npm run cli -- run --plan config/test-plans/debug-test.json
 - **Note:** Future error handling can use separate functions (e.g. `logError`) not gated behind `K6_PERF_DEBUG`.
 
 ### 2026-03-31 — Color-Coded Terminal Logger
-- **What:** Modified `core-engine/src/utils/logger.ts`, `core-engine/src/cli/run.ts`, `core-engine/src/config/GatekeeperValidator.ts`
+- **What:** Modified `core_engine/src/utils/logger.ts`, `core_engine/src/cli/run.ts`, `core_engine/src/config/GatekeeperValidator.ts`
 - **Why:** Terminal output was plain uncolored text — hard to scan for pass/fail status in long runs.
 - **logger.ts:** Added ANSI color support (zero dependencies). New public methods: `Logger.pass()` (green), `Logger.fail()` (red), `Logger.warning()` (yellow), `Logger.detail()` (dim `>` prefix), `Logger.header()` (cyan box), `Logger.bullet()` (colored bullet point). Core `info/warn/error/debug` methods now color-coded by level. Respects `NO_COLOR` env var and non-TTY environments. Exports `ansi` object for direct ANSI access.
 - **run.ts:** Replaced all raw `console.log('[PASS]...')` and `console.error('[FAIL]...')` calls with `Logger.pass()`, `Logger.fail()`, `Logger.detail()`, `Logger.header()`. Added `Logger` import.
@@ -871,7 +871,7 @@ npm run cli -- run --plan config/test-plans/debug-test.json
 - **Color scheme:** INFO=cyan, WARN=yellow, ERROR=red, DEBUG=magenta, PASS=bold green, FAIL=bold red, headers=bold cyan, details=dim.
 
 ### 2026-03-31 — HTML Diff Report: Modern UI Overhaul + Search + Interactive Navigation
-- **What:** Major rewrite of `core-engine/src/debug/HTMLDiffReporter.ts` (CSS, HTML structure, JavaScript)
+- **What:** Major rewrite of `core_engine/src/debug/HTMLDiffReporter.ts` (CSS, HTML structure, JavaScript)
 - **Why:** Report needed modern look, search functionality, sticky navigation, and interactive linking between summary tables and detail sections.
 - **Visual redesign:**
   - Switched from serif (Georgia) to system sans-serif font stack (`-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto`)
@@ -906,26 +906,26 @@ npm run cli -- run --plan config/test-plans/debug-test.json
   - Enhanced shadow on sticky bar when scrolled past 80px
 
 ### 2026-03-31 — Wired Up `failOnMissingRecordingLog` Flag
-- **What:** Modified `core-engine/src/config/GatekeeperValidator.ts`
-- **Why:** The `failOnMissingRecordingLog` flag in runtime-settings was defined but never enforced — missing recording logs always silently passed pre-flight.
+- **What:** Modified `core_engine/src/config/GatekeeperValidator.ts`
+- **Why:** The `failOnMissingRecordingLog` flag in runtime_settings was defined but never enforced — missing recording logs always silently passed pre-flight.
 - **Fix:** `GatekeeperValidator.validate()` now reads `failOnMissingRecordingLog` from resolved config. When `true` and a journey's recording-log file is missing, pre-flight **fails** (blocks execution). When `false` or omitted, a **warning** is emitted but execution continues (framework generates replay-only report with "No data" on the recorded side).
-- **Config location:** `config/runtime-settings/default.json` → `debug.failOnMissingRecordingLog`
+- **Config location:** `config/runtime_settings/default.json` → `debug.failOnMissingRecordingLog`
 
 ### 2026-03-31 — Disabled Debug in Load-Test Plan for BYOS Scripts
-- **What:** Modified `config/test-plans/load-test.json`
+- **What:** Modified `config/test_plans/load-test.json`
 - **Why:** `browse-journey.js` and `checkout-journey.js` are BYOS scripts without `logExchange()` calls. Running them with `debug.enabled: true` causes k6 failures because the replay pipeline expects `[k6-perf][replay-log]` output.
 - **Fix:** Set `"debug": { "enabled": false }` in `load-test.json`. BYOS scripts need framework conversion (via `convert` command) before debug mode works.
 
 ### 2026-03-31 — Script Converter CLI Command
-- **What:** Created `core-engine/src/recording/ScriptConverter.ts`, `core-engine/src/cli/convert.ts`; Modified `core-engine/src/cli/run.ts`, `package.json`
+- **What:** Created `core_engine/src/recording/ScriptConverter.ts`, `core_engine/src/cli/convert.ts`; Modified `core_engine/src/cli/run.ts`, `package.json`
 - **Why:** Users with conventional k6 scripts (from Grafana k6 Studio, HAR exports, or hand-written) needed a way to convert them to framework-compatible scripts with `logExchange()` debug support.
 - **New files:**
-  - `core-engine/src/recording/ScriptConverter.ts` — Main converter class. Parses k6 scripts and transforms HTTP calls into framework-compatible request definition objects with `logExchange()` calls. Handles two major input patterns:
+  - `core_engine/src/recording/ScriptConverter.ts` — Main converter class. Parses k6 scripts and transforms HTTP calls into framework-compatible request definition objects with `logExchange()` calls. Handles two major input patterns:
     - **Pattern A "Studio":** Scripts with `Trend` imports, manual `Date.now()` timing, `group()` blocks → removes Trend boilerplate, adds `initTransactions/startTransaction/endTransaction`, wraps HTTP calls with request defs + `logExchange`
     - **Pattern B "Semi-framework":** Scripts already using transaction helpers but lacking `logExchange` → adds `logExchange` import, wraps HTTP calls with request defs, preserves existing transaction wrappers
-  - `core-engine/src/cli/convert.ts` — CLI handler for `convert` command
+  - `core_engine/src/cli/convert.ts` — CLI handler for `convert` command
 - **CLI usage:** `npm run cli -- convert <input-script> <team> <script-name> [--in-place]`
-  - Without `--in-place`: Writes to `scrum-suites/<team>/tests/<script-name>.js`
+  - Without `--in-place`: Writes to `scrum_suites/<team>/tests/<script-name>.js`
   - With `--in-place`: Overwrites the input file
 - **package.json:** Added `"convert"` script shortcut
 - **run.ts:** Registered `convert` command between `generate-byos` and `generate`
@@ -939,7 +939,7 @@ npm run cli -- run --plan config/test-plans/debug-test.json
 - **Tested against:** `generated-from-har.js` (Pattern A), `browse-journey.js` (Pattern B), `checkout-journey.js` (Pattern B with POST+variable body), `homepage-journey.js` (Pattern B with multi-check), idempotency test (re-convert = no-op)
 
 ### 2026-03-31 — Fix Converter ID Sequencing Bug
-- **What:** Modified `core-engine/src/recording/ScriptConverter.ts`
+- **What:** Modified `core_engine/src/recording/ScriptConverter.ts`
 - **Why:** `id` and `har_entry_id` in converted scripts were resetting to `req_1` at each `group()` boundary instead of being globally sequential. Root cause: single `requestCounter` variable served dual purpose (variable naming + ID generation) and was reset to 0 at each group start.
 - **Fix:** Introduced dual-counter architecture:
   - `requestCounter` — per-group, resets at each group start (for `request_N`/`res_N` variable names scoped inside `group()` callbacks)
@@ -949,13 +949,13 @@ npm run cli -- run --plan config/test-plans/debug-test.json
 - **Tested:** `generated-from-har.js` → preserved original IDs (req_0, req_1, req_3, req_4, req_5, req_6); `checkout-journey.js` → globally sequential (req_1, req_2, req_3 across 3 groups)
 
 ### 2026-04-02 — HARParser: Guard Against Missing Response Objects
-- **What:** Modified `core-engine/src/recording/HARParser.ts`
+- **What:** Modified `core_engine/src/recording/HARParser.ts`
 - **Why:** HAR files can contain entries where `e.response` is `undefined`/`null` — happens with cancelled requests, failed prefetch/speculation, DNS failures, aborted navigations, or incomplete proxy captures. This caused `TypeError: Cannot read properties of undefined (reading 'status')` at line 68 during `generate` command.
 - **Fix:** Added `.filter((e: any) => e.request && e.response)` before `.map()` in `readEntries()`. Entries missing either `request` or `response` are silently skipped — they have no usable HTTP data for script generation anyway.
 - **Impact:** `generate` command now handles malformed/incomplete HAR files gracefully. No functional change for valid HAR entries.
 
 ### 2026-04-02 — HTML Report: Grid Overflow Fix, Body Formatting, Decoded/Raw Toggle
-- **What:** Modified `core-engine/src/debug/HTMLDiffReporter.ts` (CSS + HTML rendering + JavaScript toggle)
+- **What:** Modified `core_engine/src/debug/HTMLDiffReporter.ts` (CSS + HTML rendering + JavaScript toggle)
 - **Why:** Three usability issues — (1) long URLs broke side-by-side CSS grid layout, (2) URL-encoded form bodies were unreadable walls of `key=value&...` text, (3) percent-encoded characters in URLs and headers were hard to read.
 - **Grid overflow fix:**
   - Added `min-width: 0` to `.grid > *` and `.body-grid > *` (prevents grid children from overflowing)
@@ -976,7 +976,7 @@ npm run cli -- run --plan config/test-plans/debug-test.json
   - JavaScript: checkbox toggles `raw-mode` class on `.shell` element
 
 ### 2026-04-02 — HTMLDiffReporter: Defensive String Coercion (value.replace fix)
-- **What:** Modified `core-engine/src/debug/HTMLDiffReporter.ts` — `escapeHtml()`, `sanitizeId()`, `decodeText()`
+- **What:** Modified `core_engine/src/debug/HTMLDiffReporter.ts` — `escapeHtml()`, `sanitizeId()`, `decodeText()`
 - **Why:** `value.replace is not a function` error during debug replay of k6 Studio converted scripts. Root cause: `ReplayRunner.parseReplayEntry()` does `JSON.parse(jsonPayload) as TaggedExchangeLogEntry` — a TypeScript type assertion with no runtime validation. Non-string values (numbers, null) from parsed JSON flow through `DiffChecker` → `DiffResult` → `HTMLDiffReporter` and crash in `.replace()` calls.
 - **Fix:** All three methods now coerce input with `String(value ?? '')` before any `.replace()` or `decodeURIComponent()` call. This handles numbers, null, undefined, and other non-string types gracefully.
 - **Methods changed:**
@@ -986,18 +986,18 @@ npm run cli -- run --plan config/test-plans/debug-test.json
 - **Impact:** Debug replay reports now generate successfully for converted k6 Studio scripts even when JSON fields contain unexpected non-string types.
 
 ### 2026-04-02 — replayLogger.ts: Body Stringification Fix (body.trim crash)
-- **What:** Modified `core-engine/src/utils/replayLogger.ts` — `logReplayExchange()` body field
+- **What:** Modified `core_engine/src/utils/replayLogger.ts` — `logReplayExchange()` body field
 - **Why:** POST bodies using `JSON.parse(...)` in k6 scripts produce JS objects. When `logReplayExchange` logged `requestInfo.body`, the object survived through the JSON pipeline. `DiffChecker.toReplayProjection` sets `postData: { text: entry.request.body }` where `text` was an object (not string). `HTMLDiffReporter.formatBody()` calls `body.trim()` on that object → `body.trim is not a function` crash.
 - **Fix:** In `logReplayExchange()`, body is now stringified: `typeof requestInfo.body === 'object' ? JSON.stringify(requestInfo.body) : String(requestInfo.body)`. Bodies are always strings in the replay log.
 
 ### 2026-04-02 — ScriptConverter: Fix let Declaration Stripping (match/regex crash)
-- **What:** Modified `core-engine/src/recording/ScriptConverter.ts` — `let` skip regex
+- **What:** Modified `core_engine/src/recording/ScriptConverter.ts` — `let` skip regex
 - **Why:** Converter regex `/(params|url|resp|match|regex)/` stripped `let match;` and `let regex;` declarations, but these variables are still used for correlation extraction (`regex = new RegExp(...)`, `match = res.body.match(regex)`). k6 ES modules run in strict mode — assigning to undeclared variables throws `ReferenceError`, crashing the script after the first correlation point (req_6 of 20). User confirmed: site works fine in k6 Studio.
 - **Fix:** Changed skip regex from `/(params|url|resp|match|regex)/` to `/(params|url|resp)/`. Comment updated to explain why `match` and `regex` are preserved.
 - **Impact:** Scripts with correlation extraction now run all requests to completion instead of crashing at the first regex match.
 
 ### 2026-04-02 — ReplayRunner: k6 Error Extraction for HTML Report
-- **What:** Modified `core-engine/src/debug/ReplayRunner.ts` — new `extractK6Errors()` method
+- **What:** Modified `core_engine/src/debug/ReplayRunner.ts` — new `extractK6Errors()` method
 - **Why:** k6 runtime errors (ReferenceError, TypeError, etc.) were only visible in stderr, not surfaced to the HTML diff report. Users had to manually inspect k6 output to diagnose script failures.
 - **Changes:**
   - New `extractK6Errors()` static method: parses k6 stdout/stderr for error patterns (`level=error msg="..."` logfmt and `ERRO[xxxx]` plain). Reads from both text and file paths. Deduplicates via Set.
@@ -1005,7 +1005,7 @@ npm run cli -- run --plan config/test-plans/debug-test.json
   - Passes `{ k6Errors }` to `HTMLDiffReporter.generateReport()` as report options.
 
 ### 2026-04-02 — HTMLDiffReporter: k6 Error Panel in Report
-- **What:** Modified `core-engine/src/debug/HTMLDiffReporter.ts` — new `ReportOptions` interface, error panel CSS + HTML
+- **What:** Modified `core_engine/src/debug/HTMLDiffReporter.ts` — new `ReportOptions` interface, error panel CSS + HTML
 - **Why:** k6 runtime errors needed to be visible in the HTML diff report for easy debugging.
 - **Changes:**
   - New `ReportOptions` interface: `{ k6Errors?: string[] }`
@@ -1015,7 +1015,7 @@ npm run cli -- run --plan config/test-plans/debug-test.json
   - Error messages HTML-escaped via `escapeHtml()`
 
 ### 2026-04-02 — replayLogger.ts: Runtime Variable Tracking (trackCorrelation/trackParameter)
-- **What:** Modified `core-engine/src/utils/replayLogger.ts`
+- **What:** Modified `core_engine/src/utils/replayLogger.ts`
 - **Why:** The HTML diff report showed "No request variables were captured" and "No parameterization or correlation variables were captured" because there was no mechanism to register variables at runtime and auto-detect their usage across requests.
 - **Changes:**
   - New `_variableRegistry` object stores `{ name, type, value, source }` for each tracked variable
@@ -1026,7 +1026,7 @@ npm run cli -- run --plan config/test-plans/debug-test.json
   - `logExchange()` compact wrapper passes body to `logReplayExchange` which handles the detection
 
 ### 2026-04-02 — ScriptConverter: trackCorrelation Rewrite + trackParameter Injection
-- **What:** Modified `core-engine/src/recording/ScriptConverter.ts`
+- **What:** Modified `core_engine/src/recording/ScriptConverter.ts`
 - **Why:** (1) Correlation variable assignments needed to call `trackCorrelation()` so the variable registry gets populated. (2) Parameterised CSV values (`getUniqueItem(FILES["xxx"])["p_yyy"]`) needed `trackParameter()` calls so the HTML report shows parameter usage.
 - **Changes:**
   - **Correlation rewrite:** `correlation_vars["key"] = expr;` → `correlation_vars["key"] = trackCorrelation("key", expr, "body");`
@@ -1035,7 +1035,7 @@ npm run cli -- run --plan config/test-plans/debug-test.json
   - **Import:** Already imports `trackCorrelation, trackParameter` from replayLogger.ts
 
 ### 2026-04-02 — buyanimal_new.js: Manual Fixes for Converted Script
-- **What:** Modified `scrum-suites/jpet-team/tests/buyanimal_new.js`
+- **What:** Modified `scrum_suites/jpet_team/tests/buyanimal_new.js`
 - **Why:** The previously converted script was missing variable declarations and parameter tracking calls.
 - **Changes:**
   - Added back `let match;` and `let regex;` declarations after `const correlation_vars = {};` (were stripped by old converter regex)
@@ -1043,7 +1043,7 @@ npm run cli -- run --plan config/test-plans/debug-test.json
 - **Verified:** Full debug run → 20 steps captured, 3 parameter variables + 2 correlation variables tracked, HTML report fully populated
 
 ### 2026-04-03 — HTML Report: UI Improvements (Labels, Section Order, Sticky, Section Search)
-- **What:** Modified `core-engine/src/debug/HTMLDiffReporter.ts` — CSS, HTML rendering, JavaScript
+- **What:** Modified `core_engine/src/debug/HTMLDiffReporter.ts` — CSS, HTML rendering, JavaScript
 - **Why:** Four UI improvements requested: rename label, reorder sections, sticky request title, per-section search.
 - **Changes:**
   1. **"Avg Score" → "Avg Match Score"** — Updated in 3 places: iteration stats, All Iterations Summary table, Transaction Timing Summary table
@@ -1052,7 +1052,7 @@ npm run cli -- run --plan config/test-plans/debug-test.json
   4. **Per-section search** — Added search icon button (🔍) on each Recorded/Replayed pane header. Search bar with text input, match count badge, prev/next/close buttons. Scroll sync toggle per section. Full JS: `openSectionSearch()`, `ssDoSearch()`, `ssGoTo()`, `ssHighlight()`, `ssClearHighlights()`, scroll sync event binding
 
 ### 2026-04-03 — HTML Report: Scroll Sync Moved to Section Level, Sticky Fix
-- **What:** Modified `core-engine/src/debug/HTMLDiffReporter.ts` — CSS + HTML structure + JavaScript
+- **What:** Modified `core_engine/src/debug/HTMLDiffReporter.ts` — CSS + HTML structure + JavaScript
 - **Why:** (1) Scroll sync toggle was per-pane (inside each Recorded/Replayed search bar) but should be per-section. (2) Request title not actually sticking because `overflow: hidden` creates a scroll container that breaks `position: sticky`.
 - **Changes:**
   - **Scroll sync:** Toggle moved from per-pane search bars to section-level `<summary>` element with class `scroll-sync-check`. JS rewritten: `ssIsSyncEnabled(pane)` queries section-level checkbox. Scroll events bound globally per `body-section` on all `pre` elements. `.ss-sync-group` styled with `display: inline-flex; margin-left: auto` (pushed to far right of summary via flex)
@@ -1060,7 +1060,7 @@ npm run cli -- run --plan config/test-plans/debug-test.json
   - **Search icon styling:** Replaced emoji 🔍 with inline SVG magnifying glass (`<circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/>`). Button restyled: 26×26px bordered pill, rounded corners, surface background, accent color on hover with box-shadow. Moved to far right of sub-section header via flex `.pane-header` layout
 
 ### 2026-04-03 — Terminal Progress Bar (ProgressBar.ts)
-- **What:** Created `core-engine/src/utils/ProgressBar.ts`; Modified `core-engine/src/debug/ReplayRunner.ts`, `core-engine/src/cli/run.ts`
+- **What:** Created `core_engine/src/utils/ProgressBar.ts`; Modified `core_engine/src/debug/ReplayRunner.ts`, `core_engine/src/cli/run.ts`
 - **Why:** User wanted visual progress feedback in the terminal during debug execution and report generation.
 - **Design decision:** Originally implemented as animated spinner + bar (`▰▱` gradient style), but `PipelineRunner.execute()` uses `spawnSync` which blocks the Node.js event loop — `setInterval`-based animation never fires. Redesigned as a **phase-based logger** that prints start/done lines instead of animating.
 - **ProgressBar.ts:** `ProgressBar` class with `start()` (`▸ label...`), `done(msg?)` (`✔ msg (elapsed)`), `fail(msg?)` (`✖ msg (elapsed)`), `update(current, label?)` (`▸ [n/total] label...`), `tick()`. `createSpinner(label)` factory for single blocking operations. Uses stderr output, respects `NO_COLOR`.
@@ -1069,16 +1069,16 @@ npm run cli -- run --plan config/test-plans/debug-test.json
 - **PipelineRunner.ts:** `Logger.info` execution details suppressed when `captureOutput: true` (debug mode — progress phases provide status instead).
 
 ### 2026-04-03 — Binary Content Detection for Static Resources
-- **What:** Modified `core-engine/src/utils/replayLogger.ts`, `core-engine/src/debug/ExchangeLog.ts`, `core-engine/src/debug/ReplayRunner.ts`
+- **What:** Modified `core_engine/src/utils/replayLogger.ts`, `core_engine/src/debug/ExchangeLog.ts`, `core_engine/src/debug/ReplayRunner.ts`
 - **Why:** Static resources (.png, .ttf, .gif, etc.) caused JSON parse errors in debug mode. Response bodies for binary content were serialized via `JSON.stringify()` producing broken/enormous log lines.
 - **Three-layer fix:**
   1. **replayLogger.ts (source):** New `binaryBodyPlaceholder(url, responseHeaders)` function. Checks: (a) response `Content-Type` header against `BINARY_CONTENT_RE` (`image/*`, `audio/*`, `video/*`, `font/*`) and `BINARY_MIME_TYPES` set (`application/octet-stream`, `application/zip`, `application/pdf`, various font types), (b) URL extension against `STATIC_EXT_RE` (.png, .jpg, .gif, .svg, .ico, .webp, .woff2, .ttf, .otf, .eot, .mp3, .mp4, .zip, .pdf, etc.). Replaces body with `[binary: content-type]` or `[binary: static asset]` placeholder **before** `JSON.stringify()`.
   2. **ExchangeLog.ts (recording side):** New `isBinaryContent(mimeType?, url?)` static method with same regex/set patterns. `normalizeBody()` now takes optional `mimeType` and `url` params — returns placeholder for binary content. `fromHAREntry()` passes `entry.mimeType` and `entry.url` to `normalizeBody()`.
   3. **ReplayRunner.ts (recording log file side):** New `STATIC_EXT_RE` regex. `normalizeRecordingEntry()` checks URL against regex — replaces response body with `[binary: static asset]` for pre-existing recording-log JSON files loaded from disk.
-- **jpet-team test:** `buyanimal_raw.js` has 4 image requests (logo-topbar.gif, splash.gif, banner_dogs.gif + cdn-cgi requests). These now log `[binary: image/gif]` instead of raw binary data, eliminating parse errors.
+- **jpet_team test:** `buyanimal_raw.js` has 4 image requests (logo-topbar.gif, splash.gif, banner_dogs.gif + cdn-cgi requests). These now log `[binary: image/gif]` instead of raw binary data, eliminating parse errors.
 
 ### 2026-04-03 — Terminal Log Cleanup (Readability)
-- **What:** Modified `core-engine/src/debug/ReplayRunner.ts`, `core-engine/src/execution/PipelineRunner.ts`, `core-engine/src/cli/run.ts`
+- **What:** Modified `core_engine/src/debug/ReplayRunner.ts`, `core_engine/src/execution/PipelineRunner.ts`, `core_engine/src/cli/run.ts`
 - **Why:** Verbose `[k6-perf] [INFO] [timestamp]` lines from `Logger.info()` interleaved with clean `▸`/`✔` progress lines, making terminal output hard to scan.
 - **ReplayRunner.ts:** `Logger.info("[ReplayRunner] Starting debug replay...")` → `Logger.detail("Script  : ...")` / `Logger.detail("Recording: ...")`. Removed `Logger.info` "saved to" lines (redundant — run.ts already shows report path). `Logger.warn` for missing recording → `Logger.detail`.
 - **PipelineRunner.ts:** `Logger.info` execution details (script path, options file, journeys) now only print when `captureOutput` is false (normal run mode). Debug mode progress phases already provide this info.
@@ -1101,26 +1101,26 @@ npm run cli -- run --plan config/test-plans/debug-test.json
   ```
 
 ### 2026-04-03 — debug-test.json: Switched to buyanimal_raw.js
-- **What:** Modified `config/test-plans/debug-test.json`
+- **What:** Modified `config/test_plans/debug-test.json`
 - **Why:** Switched active debug test from converted `buyanimal_new.js` (20 requests) to HAR-generated `buyanimal_raw.js` (29 requests, full jpetstore buy-a-dog flow including static assets) for more comprehensive testing.
 - **Journey:** `buyanimal_raw`, scriptPath `buyanimal_raw.js`, recording `buyanimal_raw.recording-log.json`
 
 ### 2026-04-05 — Performance Metrics Section in Debug Report
-- **What:** Modified `core-engine/src/debug/ReplayRunner.ts`, `core-engine/src/debug/HTMLDiffReporter.ts`
+- **What:** Modified `core_engine/src/debug/ReplayRunner.ts`, `core_engine/src/debug/HTMLDiffReporter.ts`
 - **Why:** User wanted k6 performance metrics (checks, HTTP timings, transaction durations) rendered in the debug report.
 - **Changes:**
   - **ReplayRunner.ts:** New `K6Metrics` interface (exported) with `checks[]`, `transactions[]`, `http[]`, `httpSummary`, `execution`, `network` fields. New `extractK6Metrics()` private static method parses k6 stdout sections for all metric tables. Passes `{ k6Errors, k6Metrics }` to HTMLDiffReporter. VU clamping: forces VUs=1 in debug mode with terminal warning if user configured higher.
   - **HTMLDiffReporter.ts:** New `renderMetricsSection()` method generates Performance Metrics section. CSS grid layout: Execution Summary (full-width KV tiles) → Checks + HTTP Metrics (side-by-side tables) → Transaction Timings (full-width table). `parseMetricNum()` helper extracts numeric values for `data-val` sort attributes. `ReportOptions` updated: `{ k6Errors?: string[], k6Metrics?: K6Metrics }`. Report title changed to "Replay Insights".
 
 ### 2026-04-05 — Global Table Styling & Sortable Column Headers
-- **What:** Modified `core-engine/src/debug/HTMLDiffReporter.ts` — CSS, HTML, JavaScript
+- **What:** Modified `core_engine/src/debug/HTMLDiffReporter.ts` — CSS, HTML, JavaScript
 - **Why:** User requested improved table appearance and column sorting across all report tables.
 - **Changes:**
   - **Table CSS (global):** `border-collapse: separate` with `border-spacing: 0`, gradient header backgrounds (`#f0f4ff` → `#e8eef9`), 2px bottom header border (`#4a7adb`), rounded corners on first/last header cells, zebra striping (`.table-row:nth-child(even)` or `tr:nth-child(even)`), blue hover (`#eef3ff`), smooth transitions, `font-variant-numeric: tabular-nums`
   - **Sortable headers:** `th.sortable` CSS with `cursor: pointer`, `::after` pseudo-element showing ⇅ (neutral) / ▲ (asc) / ▼ (desc). Text selection allowed (no `user-select: none`). JavaScript click handler on `table.m-sortable th.sortable` toggles ascending/descending, sorts by `data-val` attribute (numeric) or text content (string)
 
 ### 2026-04-05 — Transaction Naming: Remove `txn_` Prefix
-- **What:** Modified `core-engine/src/utils/transaction.ts`, `core-engine/src/assertions/SLARegistry.ts`, `core-engine/src/assertions/ThresholdManager.ts`, `core-engine/src/cli/generate-byos.ts`, `core-engine/src/cli/init.ts`
+- **What:** Modified `core_engine/src/utils/transaction.ts`, `core_engine/src/assertions/SLARegistry.ts`, `core_engine/src/assertions/ThresholdManager.ts`, `core_engine/src/cli/generate-byos.ts`, `core_engine/src/cli/init.ts`
 - **Why:** Transaction naming standardized to use name directly (e.g., `Homepage`) instead of `txn_Homepage` prefix.
 - **Changes:**
   - **transaction.ts:** JSDoc updated — removed "Automatically prefixes with `txn_`", now says "Uses the transaction name directly"
@@ -1236,26 +1236,26 @@ npm run cli -- run --plan config/test-plans/debug-test.json
 ### 2026-04-06 - Task 1 Implemented / Task 2 Scaffolded (Non-Breaking Foundation)
 - **What:** Started real framework implementation from the agreed checklist, focusing on Task 1 and Task 2 scaffolding while keeping current execution behavior intact.
 - **Existing files modified:**
-  - `core-engine/src/types/ConfigContracts.ts`
-  - `core-engine/src/config/SchemaValidator.ts`
-  - `core-engine/src/config/RuntimeConfigManager.ts`
-  - `core-engine/src/cli/init.ts`
-  - `core-engine/src/index.ts`
+  - `core_engine/src/types/ConfigContracts.ts`
+  - `core_engine/src/config/SchemaValidator.ts`
+  - `core_engine/src/config/RuntimeConfigManager.ts`
+  - `core_engine/src/cli/init.ts`
+  - `core_engine/src/index.ts`
   - `FRAMEWORK-IMPLEMENTATION-TODO.md`
 - **New files created:**
-  - `core-engine/src/types/EventContracts.ts`
-  - `core-engine/src/types/ReportingContracts.ts`
-  - `core-engine/src/runtime/LifecycleRuntime.ts`
-  - `core-engine/src/runtime/ErrorRuntime.ts`
-  - `core-engine/src/runtime/MetricsRuntime.ts`
-  - `core-engine/src/runtime/SnapshotRuntime.ts`
-  - `core-engine/src/runtime/TimeseriesRuntime.ts`
+  - `core_engine/src/types/EventContracts.ts`
+  - `core_engine/src/types/ReportingContracts.ts`
+  - `core_engine/src/runtime/LifecycleRuntime.ts`
+  - `core_engine/src/runtime/ErrorRuntime.ts`
+  - `core_engine/src/runtime/MetricsRuntime.ts`
+  - `core_engine/src/runtime/SnapshotRuntime.ts`
+  - `core_engine/src/runtime/TimeseriesRuntime.ts`
 - **Task 1 delivered:**
   - Added runtime/reporting/error/monitoring/timeseries config contracts.
   - Extended `errorBehavior` to `continue`, `stop_iteration`, `stop_vu`, `abort_test`.
   - Added schema validation for new runtime sections.
   - Added runtime config accessors for reporting, monitoring, timeseries, and snapshots.
-  - Updated project scaffold default runtime-settings template to include the new sections.
+  - Updated project scaffold default runtime_settings template to include the new sections.
 - **Task 2 delivered so far:**
   - Added non-breaking shared runtime scaffolds for lifecycle, structured errors, transaction metrics, snapshots, and bucketed timeseries.
   - Exported the new runtime helpers from the main barrel file.
@@ -1272,10 +1272,10 @@ npm run cli -- run --plan config/test-plans/debug-test.json
 ### 2026-04-06 - Task 3 Implemented: Scenario Metadata And Run Orchestration Wiring
 - **What:** Implemented the first non-breaking execution wiring step for the new lifecycle/reporting architecture.
 - **Existing files modified:**
-  - `core-engine/src/scenario/ScenarioBuilder.ts`
-  - `core-engine/src/execution/ParallelExecutionManager.ts`
-  - `core-engine/src/cli/run.ts`
-  - `core-engine/src/execution/PipelineRunner.ts`
+  - `core_engine/src/scenario/ScenarioBuilder.ts`
+  - `core_engine/src/execution/ParallelExecutionManager.ts`
+  - `core_engine/src/cli/run.ts`
+  - `core_engine/src/execution/PipelineRunner.ts`
   - `FRAMEWORK-IMPLEMENTATION-TODO.md`
 - **ScenarioBuilder changes:**
   - Added optional `ScenarioRuntimeMetadata`.
@@ -1316,15 +1316,15 @@ npm run cli -- run --plan config/test-plans/debug-test.json
 ### 2026-04-06 - Baseline Reporting Pipeline Implemented For Local Load Runs
 - **What:** Added the first working reporting pipeline on top of existing `summary.json` output so local/non-debug load runs now generate the new unified report artifacts without breaking the old ones.
 - **Existing files modified:**
-  - `core-engine/src/cli/run.ts`
-  - `core-engine/src/index.ts`
+  - `core_engine/src/cli/run.ts`
+  - `core_engine/src/index.ts`
   - `FRAMEWORK-IMPLEMENTATION-TODO.md`
   - `AGENT-CONTEXT.md`
 - **New files created:**
-  - `core-engine/src/reporting/ArtifactWriter.ts`
-  - `core-engine/src/reporting/TransactionMetricsBuilder.ts`
-  - `core-engine/src/reporting/RunSummaryBuilder.ts`
-  - `core-engine/src/reporting/RunReportGenerator.ts`
+  - `core_engine/src/reporting/ArtifactWriter.ts`
+  - `core_engine/src/reporting/TransactionMetricsBuilder.ts`
+  - `core_engine/src/reporting/RunSummaryBuilder.ts`
+  - `core_engine/src/reporting/RunReportGenerator.ts`
 - **Local run artifact behavior now:**
   - Every normal local load run continues to generate:
     - `summary.json`
@@ -1367,12 +1367,12 @@ npm run cli -- run --plan config/test-plans/debug-test.json
 ### 2026-04-06 - Baseline Structured Error And Warning Artifacts Implemented
 - **What:** Upgraded the reporting finalization path so the new error and warning artifacts now contain real derived events for local runs, instead of empty placeholders.
 - **Existing files modified:**
-  - `core-engine/src/cli/run.ts`
-  - `core-engine/src/index.ts`
+  - `core_engine/src/cli/run.ts`
+  - `core_engine/src/index.ts`
   - `FRAMEWORK-IMPLEMENTATION-TODO.md`
   - `AGENT-CONTEXT.md`
 - **New file created:**
-  - `core-engine/src/reporting/EventArtifactBuilder.ts`
+  - `core_engine/src/reporting/EventArtifactBuilder.ts`
 - **What the new builder does:**
   - Derives structured `ErrorEvent` rows from failed k6 checks found in `summary.json`, grouped by transaction.
   - Derives a framework execution error event when the k6 process exits non-zero.
@@ -1398,13 +1398,13 @@ npm run cli -- run --plan config/test-plans/debug-test.json
 ### 2026-04-06 - Baseline Timeseries Artifact And Graph Filter Path Implemented
 - **What:** Added the first working `timeseries.json` generation path and connected the unified HTML report to real timeseries data for local runs.
 - **Existing files modified:**
-  - `core-engine/src/cli/run.ts`
-  - `core-engine/src/reporting/RunReportGenerator.ts`
-  - `core-engine/src/index.ts`
+  - `core_engine/src/cli/run.ts`
+  - `core_engine/src/reporting/RunReportGenerator.ts`
+  - `core_engine/src/index.ts`
   - `FRAMEWORK-IMPLEMENTATION-TODO.md`
   - `AGENT-CONTEXT.md`
 - **New file created:**
-  - `core-engine/src/reporting/TimeseriesArtifactBuilder.ts`
+  - `core_engine/src/reporting/TimeseriesArtifactBuilder.ts`
 - **Artifact behavior now:**
   - `timeseries.json` is no longer an empty placeholder.
   - It now contains:
@@ -1432,15 +1432,15 @@ npm run cli -- run --plan config/test-plans/debug-test.json
 ### 2026-04-06 - Baseline Phase-Based Generator / Converter UX Implemented
 - **What:** Moved the generator and converter toward the agreed simple author-facing script contract while preserving current execution compatibility.
 - **Existing files modified:**
-  - `core-engine/src/recording/ScriptGenerator.ts`
-  - `core-engine/src/recording/ScriptConverter.ts`
-  - `core-engine/src/cli/generate.ts`
-  - `core-engine/src/cli/convert.ts`
-  - `core-engine/src/cli/run.ts`
+  - `core_engine/src/recording/ScriptGenerator.ts`
+  - `core_engine/src/recording/ScriptConverter.ts`
+  - `core_engine/src/cli/generate.ts`
+  - `core_engine/src/cli/convert.ts`
+  - `core_engine/src/cli/run.ts`
   - `FRAMEWORK-IMPLEMENTATION-TODO.md`
   - `AGENT-CONTEXT.md`
 - **New file created:**
-  - `core-engine/src/cli/LifecyclePrompt.ts`
+  - `core_engine/src/cli/LifecyclePrompt.ts`
 - **CLI behavior now:**
   - `generate` prompts users to choose init and end groups/transactions after HAR grouping.
   - `convert` prompts users to choose init and end groups/transactions when run interactively.
@@ -1471,13 +1471,13 @@ npm run cli -- run --plan config/test-plans/debug-test.json
 ### 2026-04-06 - Shared Lifecycle Helper Bridge Implemented For Supported Executors
 - **What:** Connected the new phase-based script contract to a shared k6-side lifecycle helper so `initPhase` and `endPhase` can begin executing for supported executors instead of existing only as authoring structure.
 - **Existing files modified:**
-  - `core-engine/src/scenario/ScenarioBuilder.ts`
-  - `core-engine/src/recording/ScriptGenerator.ts`
-  - `core-engine/src/recording/ScriptConverter.ts`
+  - `core_engine/src/scenario/ScenarioBuilder.ts`
+  - `core_engine/src/recording/ScriptGenerator.ts`
+  - `core_engine/src/recording/ScriptConverter.ts`
   - `FRAMEWORK-IMPLEMENTATION-TODO.md`
   - `AGENT-CONTEXT.md`
 - **New file created:**
-  - `core-engine/src/utils/lifecycle.ts`
+  - `core_engine/src/utils/lifecycle.ts`
 - **What the helper does:**
   - creates a per-script module-scope lifecycle store (`ctx` + run state)
   - runs `initPhase(ctx)` once per VU lifecycle
@@ -1518,13 +1518,13 @@ npm run cli -- run --plan config/test-plans/debug-test.json
 ### 2026-04-06 - Baseline Host Monitoring And System Reporting Implemented
 - **What:** Added a safe baseline host monitoring layer and surfaced the results into the new artifacts and unified report.
 - **Existing files modified:**
-  - `core-engine/src/cli/run.ts`
-  - `core-engine/src/reporting/RunReportGenerator.ts`
-  - `core-engine/src/index.ts`
+  - `core_engine/src/cli/run.ts`
+  - `core_engine/src/reporting/RunReportGenerator.ts`
+  - `core_engine/src/index.ts`
   - `FRAMEWORK-IMPLEMENTATION-TODO.md`
   - `AGENT-CONTEXT.md`
 - **New file created:**
-  - `core-engine/src/execution/HostMonitor.ts`
+  - `core_engine/src/execution/HostMonitor.ts`
 - **Behavior now:**
   - When `runtime.monitoring.enabled` is true, the framework captures host snapshots before and after the run.
   - Each snapshot currently records:
@@ -1542,10 +1542,10 @@ npm run cli -- run --plan config/test-plans/debug-test.json
 ### 2026-04-06 - Host Monitoring Upgraded To Periodic Sampling During Normal Runs
 - **What:** Deepened the monitoring path so normal load runs can now collect host snapshots periodically while k6 is executing, without changing the existing sync debug flow.
 - **Existing files modified:**
-  - `core-engine/src/execution/PipelineRunner.ts`
-  - `core-engine/src/execution/HostMonitor.ts`
-  - `core-engine/src/cli/run.ts`
-  - `core-engine/src/reporting/TimeseriesArtifactBuilder.ts`
+  - `core_engine/src/execution/PipelineRunner.ts`
+  - `core_engine/src/execution/HostMonitor.ts`
+  - `core_engine/src/cli/run.ts`
+  - `core_engine/src/reporting/TimeseriesArtifactBuilder.ts`
   - `FRAMEWORK-IMPLEMENTATION-TODO.md`
   - `AGENT-CONTEXT.md`
 - **Behavior now:**
@@ -1565,8 +1565,8 @@ npm run cli -- run --plan config/test-plans/debug-test.json
 ### 2026-04-06 - Scaffolds And Usage Guide Aligned With Phase-Based Model
 - **What:** Updated the framework scaffolds and primary usage guide so new users now see the simple phase-based authoring model by default.
 - **Existing files modified:**
-  - `core-engine/src/cli/init.ts`
-  - `core-engine/src/cli/generate-byos.ts`
+  - `core_engine/src/cli/init.ts`
+  - `core_engine/src/cli/generate-byos.ts`
   - `HOW_TO_USE_FRAMEWORK.md`
   - `FRAMEWORK-IMPLEMENTATION-TODO.md`
   - `AGENT-CONTEXT.md`
@@ -1606,32 +1606,32 @@ npm run cli -- run --plan config/test-plans/debug-test.json
 ### 2026-04-06 - Runtime Settings Backward Compatibility Fix
 - **What:** Relaxed runtime schema validation so older runtime JSON files remain valid while still supporting the newer `reporting`, `errors`, and `monitoring` sections.
 - **Files updated:**
-  - `core-engine/src/config/SchemaValidator.ts`
-  - `config/runtime-settings/default.json`
+  - `core_engine/src/config/SchemaValidator.ts`
+  - `config/runtime_settings/default.json`
   - `dist/config/SchemaValidator.js`
-- **Why:** Existing commands like `npm run cli -- run --plan config/test-plans/webui-load-test.json` were failing before execution because older runtime files lacked the newly introduced optional sections.
-- **Verification outcome:** Config validation now gets past the runtime-settings stage. The next visible blocker in `webui-load-test.json` is a missing journey script path (`buyanimal_1.framework-lifecycle-journey.js`), which is separate from runtime schema validation.
+- **Why:** Existing commands like `npm run cli -- run --plan config/test_plans/webui-load-test.json` were failing before execution because older runtime files lacked the newly introduced optional sections.
+- **Verification outcome:** Config validation now gets past the runtime_settings stage. The next visible blocker in `webui-load-test.json` is a missing journey script path (`buyanimal_1.framework-lifecycle-journey.js`), which is separate from runtime schema validation.
 
 ### 2026-04-06 - RuntimeConfigManager Reporting Fallback Fix
 - **What:** Hardened `RuntimeConfigManager` so reporting/error/monitoring accessors fall back to `FRAMEWORK_DEFAULTS` when merged runtime config is partial or stale.
 - **Files updated:**
-  - `core-engine/src/config/RuntimeConfigManager.ts`
+  - `core_engine/src/config/RuntimeConfigManager.ts`
   - `dist/config/RuntimeConfigManager.js`
-- **Why:** `tsx core-engine/src/cli/run.ts run --plan config/test-plans/webui-load-test.json` was crashing in `getTransactionStats()` with `transactionStats is not iterable`.
+- **Why:** `tsx core_engine/src/cli/run.ts run --plan config/test_plans/webui-load-test.json` was crashing in `getTransactionStats()` with `transactionStats is not iterable`.
 - **Verification outcome:** The crash is resolved; the run now proceeds into k6 execution. Remaining failures observed are run-environment/network related (blocked outbound access to `jpetstore.aspectran.com`) and report-path polish, not runtime-config accessor crashes.
 
 ### 2026-04-08 - Cookie Persistence Fix: noCookiesReset (Root Cause of 302 Errors)
 - **What:** Identified and fixed the root cause of HTTP 302 redirect errors on order endpoints (newOrderForm, newOrder, submitOrder, viewOrder) in iterations 2+ of the jpetstore buy flow.
 - **Root cause:** k6's default behavior (`noCookiesReset: false`) clears the VU's cookie jar after each iteration. This wiped the JSESSIONID between iterations, causing unauthenticated requests. LoadRunner preserves cookies across iterations by default.
 - **Files modified:**
-  - `core-engine/src/execution/ParallelExecutionManager.ts` — both `resolve()` return paths now use `noCookiesReset: plan.noCookiesReset !== false` (default true)
-  - `core-engine/src/debug/ReplayRunner.ts` — `DebugReplayOptions` interface gained `noCookiesReset?: boolean`; k6Options uses `options.noCookiesReset !== false`
-  - `core-engine/src/cli/run.ts` — `runJourneyDebug()` passes `plan.noCookiesReset` to ReplayRunner
-  - `core-engine/src/types/TestPlanSchema.ts` — Added `noCookiesReset?: boolean` to both `TestPlan` and `UserJourney` interfaces
+  - `core_engine/src/execution/ParallelExecutionManager.ts` — both `resolve()` return paths now use `noCookiesReset: plan.noCookiesReset !== false` (default true)
+  - `core_engine/src/debug/ReplayRunner.ts` — `DebugReplayOptions` interface gained `noCookiesReset?: boolean`; k6Options uses `options.noCookiesReset !== false`
+  - `core_engine/src/cli/run.ts` — `runJourneyDebug()` passes `plan.noCookiesReset` to ReplayRunner
+  - `core_engine/src/types/TestPlanSchema.ts` — Added `noCookiesReset?: boolean` to both `TestPlan` and `UserJourney` interfaces
 - **Verification:** Debug test (1 VU, 5 iterations) confirmed all 49 requests pass across all iterations with no 302 errors.
 
 ### 2026-04-08 - session.js: Cookie Management Utilities
-- **What:** Created `core-engine/src/utils/session.js` — k6-side cookie management utilities.
+- **What:** Created `core_engine/src/utils/session.js` — k6-side cookie management utilities.
 - **Design:** URL registry pattern. `_registeredUrls` Set tracks base URLs. `registerBaseUrl(url)` adds to registry. `clearCookies(...urls)` clears jar for given URLs or all registered URLs if none given. `deleteCookie(url, name)` removes specific cookie.
 - **Purpose:** Enables per-journey cookie control when `noCookiesReset: true` globally but individual journeys need session resets in their initPhase.
 
@@ -1649,7 +1649,7 @@ npm run cli -- run --plan config/test-plans/debug-test.json
   - Added `clearCookies()` as first line of `initPhase` in `renderPhaseFunction`
 
 ### 2026-05-13 - Transaction Counter Metrics
-- **What:** Updated `core-engine/src/utils/transaction.ts` so each transaction initializes a k6 Counter named `<transaction>_count` alongside its Trend.
+- **What:** Updated `core_engine/src/utils/transaction.ts` so each transaction initializes a k6 Counter named `<transaction>_count` alongside its Trend.
 - **Behavior:** `startTransaction(name)` increments `<name>_count` on every call, while `endTransaction(name)` still records duration to the Trend metric.
 - **Reporting effect:** `TransactionMetricsBuilder` uses `<transaction>_count` as the authoritative transaction count when present. `pass` remains the minimum successful check count inside the transaction, and `fail` is computed as `count - pass`.
 
@@ -1661,9 +1661,9 @@ npm run cli -- run --plan config/test-plans/debug-test.json
 ### 2026-04-08 - Test Plan JSON Files Updated
 - **What:** Added `noCookiesReset: true` to all three test plan JSON files.
 - **Files modified:**
-  - `config/test-plans/webui-load-test.json` — added `noCookiesReset: true`
-  - `config/test-plans/debug-test.json` — added `noCookiesReset: true`
-  - `config/test-plans/load-test.json` — added `noCookiesReset: true`
+  - `config/test_plans/webui-load-test.json` — added `noCookiesReset: true`
+  - `config/test_plans/debug-test.json` — added `noCookiesReset: true`
+  - `config/test_plans/load-test.json` — added `noCookiesReset: true`
 - **Note:** `debug-test.json` points to `buyanimal_1_framework_lifecycle.js` (framework lifecycle script) with 5 iterations. `webui-load-test.json` also uses this script for load testing.
 
 ### 2026-04-08 — Fix p(99) Percentile Not Showing in Results
@@ -1671,17 +1671,17 @@ npm run cli -- run --plan config/test-plans/debug-test.json
   1. **`ConfigurationManager.deepMerge()` array handling bug:** Arrays are typeof `object` in JS, so `deepMerge()` treated them as plain objects, spreading indices as keys (`{0: 'count', 1: 'pass', ...}`). The result lost its Array prototype, so `Array.isArray()` returned false in `RuntimeConfigManager.getTransactionStats()`, which then fell back to FRAMEWORK_DEFAULTS (which has `p(95)` not `p(99)`).
   2. **k6 `--config` JSON doesn't reliably apply `summaryTrendStats`:** Initial fix placed `summaryTrendStats` in the k6Options JSON config file passed via `--config`. k6 ignored it. Switched to the `--summary-trend-stats` CLI flag which has higher precedence.
 - **Files modified:**
-  - `core-engine/src/config/ConfigurationManager.ts` — Added `Array.isArray(source)` check to `deepMerge()` so arrays are replaced wholesale instead of being deep-merged as objects
-  - `core-engine/src/cli/run.ts` — Changed from setting `k6Options.summaryTrendStats` (JSON config) to passing `--summary-trend-stats` as a CLI flag via `extraArgs`. Extracts extra percentiles from `transactionStats` config, builds comma-separated stat list including k6 defaults + extras.
+  - `core_engine/src/config/ConfigurationManager.ts` — Added `Array.isArray(source)` check to `deepMerge()` so arrays are replaced wholesale instead of being deep-merged as objects
+  - `core_engine/src/cli/run.ts` — Changed from setting `k6Options.summaryTrendStats` (JSON config) to passing `--summary-trend-stats` as a CLI flag via `extraArgs`. Extracts extra percentiles from `transactionStats` config, builds comma-separated stat list including k6 defaults + extras.
 - **Verified:** `p(99)` now appears in terminal output, `handleSummary.json`, `transaction-metrics.json`, and `RunReport.html`
 
 ### 2026-04-08 — Dynamic SLA System (Replaces Hardcoded Percentiles)
 - **Problem:** `SLADefinition` hardcoded `p90`/`p95`/`p99` fields — adding any new percentile (p75, p99.9, etc.) required code changes in the type, ThresholdManager, and run.ts. Also `journey_slas` in TestPlan was defined but never consumed (dead config). No `transaction_slas` support existed.
 - **Files modified:**
-  - `core-engine/src/types/TestPlanSchema.ts` — `SLADefinition` now uses index signature `[key: string]: number | undefined` with regex-matched percentile keys (any `pNN` or `pNN.N` pattern). Added `transaction_slas?: Record<string, SLADefinition>` to `TestPlan`.
-  - `core-engine/src/assertions/ThresholdManager.ts` — Fully rewritten. `apply()` now dynamically iterates SLA keys matching `/^p(\d+(?:\.\d+)?)$/` instead of hardcoding p90/p95/p99. Consumes all three SLA tiers: `global_sla` → `http_req_duration`, `journey_slas` → `http_req_duration{scenario:name}` + `http_req_failed{scenario:name}`, `transaction_slas` → Trend metric by name. New `collectPercentiles(plan)` method returns all percentile values from all SLA definitions.
-  - `core-engine/src/cli/run.ts` — `summaryTrendStats` now collects percentiles from BOTH `transactionStats` config AND `ThresholdManager.collectPercentiles(plan)`, ensuring k6 computes any percentile referenced in SLAs.
-  - `config/test-plans/webui-load-test.json` — Added example `journey_slas` and `transaction_slas` sections.
+  - `core_engine/src/types/TestPlanSchema.ts` — `SLADefinition` now uses index signature `[key: string]: number | undefined` with regex-matched percentile keys (any `pNN` or `pNN.N` pattern). Added `transaction_slas?: Record<string, SLADefinition>` to `TestPlan`.
+  - `core_engine/src/assertions/ThresholdManager.ts` — Fully rewritten. `apply()` now dynamically iterates SLA keys matching `/^p(\d+(?:\.\d+)?)$/` instead of hardcoding p90/p95/p99. Consumes all three SLA tiers: `global_sla` → `http_req_duration`, `journey_slas` → `http_req_duration{scenario:name}` + `http_req_failed{scenario:name}`, `transaction_slas` → Trend metric by name. New `collectPercentiles(plan)` method returns all percentile values from all SLA definitions.
+  - `core_engine/src/cli/run.ts` — `summaryTrendStats` now collects percentiles from BOTH `transactionStats` config AND `ThresholdManager.collectPercentiles(plan)`, ensuring k6 computes any percentile referenced in SLAs.
+  - `config/test_plans/webui-load-test.json` — Added example `journey_slas` and `transaction_slas` sections.
 - **SLA tiers (all config-driven, no code changes needed for new percentiles):**
   1. `global_sla` — applies to all HTTP requests globally
   2. `journey_slas` — per-scenario (keyed by journey name)  
@@ -1691,12 +1691,12 @@ npm run cli -- run --plan config/test-plans/debug-test.json
 ### 2026-04-10 - Load Run Entry Script Path Resolution Fix For Relative Data Files
 - **What:** Fixed normal `run` mode so generated k6 entry scripts are created in the shared journey script directory when all journeys use the same folder, instead of always under `.k6-temp`.
 - **Files modified:**
-  - `core-engine/src/cli/run.ts` — added shared script-directory selection for generated entry scripts, switched generated journey exports to relative import specifiers, and added best-effort cleanup for the temporary entry file after execution.
+  - `core_engine/src/cli/run.ts` — added shared script-directory selection for generated entry scripts, switched generated journey exports to relative import specifiers, and added best-effort cleanup for the temporary entry file after execution.
 - **Why:** Some journeys load CSV files with relative `k6/experimental/fs.open("../Data/...")` paths. Debug mode worked because it runs the journey script directly, but normal load runs failed because the framework-generated main entry script lived in `.k6-temp`, causing relative file paths to resolve against `.k6-temp` instead of the journey `tests/` folder.
 - **Result:** Single-folder load plans now resolve relative data files the same way as debug runs and avoid the absolute-import warning for those journeys.
 
 ### 2026-04-09 — Fix: Transaction Metrics Missing in Reports & Console
-- **What:** Modified `core-engine/src/execution/ParallelExecutionManager.ts`, `core-engine/src/cli/run.ts`
+- **What:** Modified `core_engine/src/execution/ParallelExecutionManager.ts`, `core_engine/src/cli/run.ts`
 - **Why:** Two issues: (1) Custom percentiles like `p(97)` configured in `reporting.transactionStats` were missing from `transaction-metrics.json` and HTML reports — k6 only computes percentiles listed in `summaryTrendStats` (default: `avg/min/med/max/p(90)/p(95)`), so unlisted percentiles were never calculated. (2) No console transaction metrics table was printed after load runs — users had to open JSON/HTML files to see results.
 - **ParallelExecutionManager.ts changes:**
   - Added `summaryTrendStats` to `K6Options` interface
@@ -1710,7 +1710,7 @@ npm run cli -- run --plan config/test-plans/debug-test.json
 - **Result:** `p(97)` values now populated in `transaction-metrics.json`, `handleSummary.json`, `ci-summary.json`, HTML report, and console output. Console table matches configured `transactionStats` columns.
 
 ### 2026-04-09 — Lifecycle Overhaul: Instantaneous VU Target Interpolation
-- **What:** Rewrote `core-engine/src/utils/lifecycle.js` `getEndSignal()` and extended `core-engine/src/scenario/ScenarioBuilder.ts` `computePhaseEnvelope()`
+- **What:** Rewrote `core_engine/src/utils/lifecycle.js` `getEndSignal()` and extended `core_engine/src/scenario/ScenarioBuilder.ts` `computePhaseEnvelope()`
 - **Why:** The previous endPhase detection scanned for a single ramp-down stage and only handled simple 3-stage profiles. This broke for spike (multiple ramp-down segments), step/staircase (VU count changes at multiple levels), and `constant-vus` / `shared-iterations` (returned `unsupported`, endPhase never ran).
 - **New approach — Instantaneous VU Target Interpolation:**
   - `getInstantaneousTargetVUs(phases)`: At any elapsed time `t`, linearly interpolates between stage boundaries to compute the exact fractional target VU count. Formula: `previousVUs + progress * (stageVUs - previousVUs)` where `progress = (t - stageStart) / (stageEnd - stageStart)`.
@@ -1733,7 +1733,7 @@ npm run cli -- run --plan config/test-plans/debug-test.json
 - **What:** Added a dedicated `STRUCTURAL FLOW MAP (TREE-SITTER CONTEXT)` section near the top of this file.
 - **Why:** The repo now has enough moving parts that a compact structural graph provides much faster orientation than prose alone. The map is intended to function like a Tree-sitter-aligned code structure snapshot that can be maintained incrementally as code changes.
 - **What it covers:**
-  - config inputs (`test-plans`, `environments`, `runtime-settings`)
+  - config inputs (`test_plans`, `environments`, `runtime_settings`)
   - CLI entrypoints
   - engine layers (`config`, `scenario`, `execution`, `data`, `correlation`, `recording`, `debug`, `assertions`, `reporting`, `utils/types`)
   - suite assets (`tests`, `data`, `recordings`, `correlation-rules`)
@@ -1743,9 +1743,9 @@ npm run cli -- run --plan config/test-plans/debug-test.json
 ### 2026-04-10 - Lifecycle Fix: endPhase Runs After Final Action In Iteration-Based Flows
 - **What:** Fixed lifecycle end detection for iteration-based execution and debug replay so `endPhase` runs once after the final action cycle instead of being skipped or firing too early.
 - **Files modified:**
-  - `core-engine/src/utils/lifecycle.js` - changed `per-vu-iterations` logic to trigger `endPhase` only after the last `actionPhase`, and added explicit `shared-iterations` handling so each VU can end cleanly after its assigned iterations.
-  - `core-engine/src/scenario/ScenarioBuilder.ts` - added explicit `shared-iterations` phase metadata instead of treating it as a synthetic ramp-down envelope.
-  - `core-engine/src/debug/ReplayRunner.ts` - debug replay now injects `K6_PERF_PHASES` for the `shared-iterations` debug scenario so lifecycle logic is active in debug mode too.
+  - `core_engine/src/utils/lifecycle.js` - changed `per-vu-iterations` logic to trigger `endPhase` only after the last `actionPhase`, and added explicit `shared-iterations` handling so each VU can end cleanly after its assigned iterations.
+  - `core_engine/src/scenario/ScenarioBuilder.ts` - added explicit `shared-iterations` phase metadata instead of treating it as a synthetic ramp-down envelope.
+  - `core_engine/src/debug/ReplayRunner.ts` - debug replay now injects `K6_PERF_PHASES` for the `shared-iterations` debug scenario so lifecycle logic is active in debug mode too.
 - **Expected behavior now:**
   - `per-vu-iterations` example with `vus=2`, `iterations=5`:
     - each VU runs `initPhase` once
@@ -1764,8 +1764,8 @@ npm run cli -- run --plan config/test-plans/debug-test.json
   - `CORE ENGINE ARCHITECTURE`
 - **Key updates made:**
   - documented phase-based lifecycle, artifact-first reporting, host monitoring, session/cookie control, and dynamic SLA support in the overview
-  - updated run/debug command options to match the current CLI in `core-engine/src/cli/run.ts`
-  - added a current repo tree snapshot including `.tmp-init-check`, `dist`, `reporting/`, `reporters/`, `runtime/`, and `scrum-suites/testpro`
+  - updated run/debug command options to match the current CLI in `core_engine/src/cli/run.ts`
+  - added a current repo tree snapshot including `.tmp-init-check`, `dist`, `reporting/`, `reporters/`, `runtime/`, and `scrum_suites/testpro`
   - added a newer structural flow map that includes the `runtime`, `reporting`, and `reporters` layers
   - updated architecture from 11 layers to 13 layers and documented the distinct runtime/reporting layers
 - **Note:** New “current snapshot/map” blocks should be treated as authoritative if older legacy text nearby disagrees.
@@ -1775,7 +1775,7 @@ npm run cli -- run --plan config/test-plans/debug-test.json
 - **Why:** The previous section still had multiple diagrams and mixed levels of abstraction. The new map is intended to let AI models traverse the framework structure quickly, save tokens, and open only the modules relevant to the current task.
 - **What the new map now shows:**
   - top-level orientation from `AGENT-CONTEXT.md` into overview/map/architecture
-  - config inputs (`test-plans`, `environments`, `runtime-settings`, `.env`)
+  - config inputs (`test_plans`, `environments`, `runtime_settings`, `.env`)
   - suite assets (`tests`, `data`, `recordings`, `correlation-rules`)
   - CLI entrypoints (`run`, `validate`, `debug`, `generate`, `convert`, `init`)
   - detailed layer-to-module relationships across `config`, `scenario`, `assertions`, `execution`, `runtime`, `data`, `recording`, `correlation`, `debug`, `reporting`, `reporters`, and `utils/types`
@@ -1784,12 +1784,12 @@ npm run cli -- run --plan config/test-plans/debug-test.json
 
 
 ### 2026-04-20 - Utils Layer TypeScript Migration
-- **What:** Converted transaction.js, session.js, replayLogger.js, and lifecycle.js to TypeScript (.ts) in core-engine/src/utils/
+- **What:** Converted transaction.js, session.js, replayLogger.js, and lifecycle.js to TypeScript (.ts) in core_engine/src/utils/
 - **Why:** To bring type-safety to the last remaining loose JS files in the core framework architecture.
 - **Impact:** All internal references point to dist/utils/*.js which is where tsc outputs the compiled CommonJS helpers for goja.
 
 ### 2026-05-07 — getFrameworkThinkTime Implementation & Duplicate Import Fix
-- **What:** Modified `core-engine/src/utils/lifecycle.ts`, `core-engine/src/recording/ScriptGenerator.ts`, `core-engine/src/scenario/ScenarioBuilder.ts`, `core-engine/src/cli/run.ts`, `scrum-suites/jpet-team/tests/buyanimal_1_framework_lifecycle.js`
+- **What:** Modified `core_engine/src/utils/lifecycle.ts`, `core_engine/src/recording/ScriptGenerator.ts`, `core_engine/src/scenario/ScenarioBuilder.ts`, `core_engine/src/cli/run.ts`, `scrum_suites/jpet_team/tests/buyanimal_1_framework_lifecycle.js`
 - **Why:** Two errors blocked test execution:
   1. `SyntaxError: duplicate bounded name createJourneyLifecycleStore` — duplicate lifecycle import lines in ScriptGenerator and test script
   2. `getFrameworkThinkTime is not defined` — function was referenced but never implemented
@@ -1804,15 +1804,15 @@ npm run cli -- run --plan config/test-plans/debug-test.json
 - **What:** Created `config/schemas/` with three JSON Schema files and wired them into all config files via `$schema` property.
 - **Why:** Users had no discoverability for config fields — no autocomplete, no hover descriptions, no validation hints. JSON Schema with `$schema` is editor-agnostic and works in VS Code, JetBrains (IntelliJ/WebStorm), Sublime Text (LSP), Neovim (LSP), Eclipse, and any JSON Schema-aware editor.
 - **New files:**
-  - `config/schemas/runtime-settings.schema.json` — 8 top-level sections, ~30 fields, all with rich descriptions and defaults
+  - `config/schemas/runtime_settings.schema.json` — 8 top-level sections, ~30 fields, all with rich descriptions and defaults
   - `config/schemas/test-plan.schema.json` — covers all plan fields including SLAs, debug, hybrid groups, per-journey overrides
   - `config/schemas/environment.schema.json` — environment config with serviceUrls and custom fields
 - **Modified files:**
-  - `config/runtime-settings/default.json` — added `$schema` reference
-  - `config/test-plans/load-test.json`, `webui-load-test.json` — added `$schema` references
+  - `config/runtime_settings/default.json` — added `$schema` reference
+  - `config/test_plans/load-test.json`, `webui-load-test.json` — added `$schema` references
   - `config/environments/dev.json` — added `$schema` reference
-  - `core-engine/src/config/SchemaValidator.ts` — loads external schema files with inline fallback, allows `$schema` property, enhanced enum error messages to show allowed values
-  - `core-engine/src/cli/init.ts` — scaffolds `config/schemas/` directory, adds `$schema` to generated configs, uses `getFrameworkThinkTime` in sample scripts
+  - `core_engine/src/config/SchemaValidator.ts` — loads external schema files with inline fallback, allows `$schema` property, enhanced enum error messages to show allowed values
+  - `core_engine/src/cli/init.ts` — scaffolds `config/schemas/` directory, adds `$schema` to generated configs, uses `getFrameworkThinkTime` in sample scripts
 - **Design decisions:**
   - `$schema` in each file (not `.vscode/settings.json`) for editor-agnosticism
   - External schema files as single source of truth; inline schemas kept as fallback
@@ -1827,8 +1827,8 @@ npm run cli -- run --plan config/test-plans/debug-test.json
   - Added `--verbose` flag to `validate.ts` & `run.ts` which computes and prints a "Config Completeness Score" indicating how many top-level sections were utilized vs left to defaults.
 - **Phase 3 (Template Library):**
   - Updated `*.schema.json` files and inline schemas to explicitly allow a `_meta` object (ignored at runtime) for storing template titles and descriptions.
-  - Created 6 test plan templates in `config/templates/test-plans/*.jsonc` (smoke, load, spike, soak, stress, breakpoint).
-  - Created 4 runtime setting templates in `config/templates/runtime-settings/*.jsonc` (ci-pipeline, local-debug, max-throughput, strict-sla).
+  - Created 6 test plan templates in `config/templates/test_plans/*.jsonc` (smoke, load, spike, soak, stress, breakpoint).
+  - Created 4 runtime setting templates in `config/templates/runtime_settings/*.jsonc` (ci-pipeline, local-debug, max-throughput, strict-sla).
   - Created new `templates.ts` CLI module with `list` and `show <name>` commands.
 - **Phase 4 (JSONC Support):**
   - Replaced native `JSON.parse` with `jsonc-parser.parse()` in `ConfigurationManager.ts` and `TestPlanLoader.ts`, natively supporting inline `//` and `/* */` comments in user config files.
@@ -1845,8 +1845,8 @@ npm run cli -- run --plan config/test-plans/debug-test.json
 - **Why:** To eliminate the problem of stale documentation. The schema is now the single source of truth for both runtime validation, editor tooling, *and* documentation.
 - **Implementation:** Added `docs.ts` to read `config/schemas/*.schema.json`, extract descriptions, required status, and enums, and output a formatted `docs/configuration-reference.md`.
 
-### 2026-05-13 — AI Context System (`/ai-context`) Created
-- **What:** Created a 25-file modular AI context system at `ai-context/` to replace monolithic AGENT-CONTEXT.md loading for AI agents.
+### 2026-05-13 — AI Context System (`/ai_context`) Created
+- **What:** Created a 25-file modular AI context system at `ai_context/` to replace monolithic AGENT-CONTEXT.md loading for AI agents.
 - **Why:** AGENT-CONTEXT.md is 1,841 lines / 140KB (~35K tokens). Most tasks only need 3-8K tokens of context. Modular files enable targeted loading with 80-90% token savings.
 - **Files created (25):**
   - `overview.md` — Entry point and routing table (always read first)
@@ -1875,11 +1875,11 @@ npm run cli -- run --plan config/test-plans/debug-test.json
   - `subsystem-boundaries.md` — Layer ownership rules
   - `risk-zones.md` — 10 hidden complexity areas (RZ1-RZ10)
 - **Design:** All content derived from actual repository analysis (code, change logs, graph.html, implementation history). Zero generic documentation. Each file is self-contained, concise, and scannable.
-- **Usage:** AI agents should read `ai-context/overview.md` first, then load only task-relevant files. AGENT-CONTEXT.md remains the canonical record but should NOT be the primary AI loading target.
+- **Usage:** AI agents should read `ai_context/overview.md` first, then load only task-relevant files. AGENT-CONTEXT.md remains the canonical record but should NOT be the primary AI loading target.
 
 ### 2026-05-14 - Environment Base URL Injection + Team Overrides
 - **What:** Wired environment `baseUrl` into generated, converted, and BYOS scripts and added optional team-specific environment overrides.
-- **Config model:** `EnvironmentConfig` now supports `teamOverrides` keyed by `scrum-suites/<team>` folder name. Each override can supply `baseUrl`, `serviceUrls`, and `custom`.
+- **Config model:** `EnvironmentConfig` now supports `teamOverrides` keyed by `scrum_suites/<team>` folder name. Each override can supply `baseUrl`, `serviceUrls`, and `custom`.
 - **Scenario wiring:** `ParallelExecutionManager.resolve()` now passes resolved environment config into `ScenarioBuilder`. `ScenarioBuilder` resolves the effective per-journey environment using the journey script path and injects `K6_PERF_BASE_URL`, `K6_PERF_SERVICE_URLS`, `K6_PERF_ENV_CUSTOM`, and `K6_PERF_TEAM`.
 - **k6 runtime helpers:** `session.ts` now exposes `registerFrameworkEnvironmentUrls()` and `resolveFrameworkUrl()`. Generated and converted scripts register runtime env URLs for cookie clearing, with recorded-origin fallbacks preserved for debug replay and older flows.
 - **Script behavior:** `ScriptGenerator.ts` emits relative primary-host request URLs resolved at runtime via `resolveFrameworkUrl(..., { fallbackBaseUrl })`. `ScriptConverter.ts` applies the same conversion when it can safely detect primary-host URL literals.
@@ -1896,7 +1896,7 @@ npm run cli -- run --plan config/test-plans/debug-test.json
   - `ScenarioBuilder.ts` — Added arrival-rate fields to `K6ScenarioDefinition`. Extended `ScenarioPhaseEnvelope` mode union. Implemented `computePhaseEnvelope()` for constant-arrival-rate (duration-based), ramping-arrival-rate (stage timeline), and externally-controlled (open-ended).
   - `SchemaValidator.ts` — Added `rate`, `timeUnit`, `preAllocatedVUs`, `maxVUs` properties. Added executor enum with all 7 types.
   - `index.ts` — Exported new builder functions.
-  - `config/test-plans/templates/` — Created 7 template JSON files, one per executor type.
+  - `config/test_plans/templates/` — Created 7 template JSON files, one per executor type.
 - **Executor field requirements (k6-native):**
   | Executor | Required | Optional |
   |----------|----------|----------|
@@ -1909,10 +1909,10 @@ npm run cli -- run --plan config/test-plans/debug-test.json
   | externally-controlled | maxVUs | vus, duration |
 
 ### 2026-05-20 - ScriptConverter Modernization — Aligned With ScriptGenerator Conventions
-- **What:** Updated `core-engine/src/recording/ScriptConverter.ts` to align its output with the current framework conventions used by ScriptGenerator.
+- **What:** Updated `core_engine/src/recording/ScriptConverter.ts` to align its output with the current framework conventions used by ScriptGenerator.
 - **Changes:**
-  - `buildImportBlock()` — Now imports `clearCookies`/`registerBaseUrl` from session.js, `trackDataRow` from replayLogger.js, `createJourneyLifecycleStore`/`runJourneyLifecycle` from lifecycle.js. Fixes stale `dist/` import paths to `core-engine/src/` paths. Skips re-adding lifecycle/session imports that are already handled.
-  - `applyPhaseContract()` — Now normalizes stale patterns before phase splitting: strips `variableEvents: []` fields from request definitions (auto-detected by replayLogger now), fixes `../dist/utils/` → `../core-engine/src/utils/` import paths. All internal references updated from `source` to `cleaned`.
+  - `buildImportBlock()` — Now imports `clearCookies`/`registerBaseUrl` from session.js, `trackDataRow` from replayLogger.js, `createJourneyLifecycleStore`/`runJourneyLifecycle` from lifecycle.js. Fixes stale `dist/` import paths to `core_engine/src/` paths. Skips re-adding lifecycle/session imports that are already handled.
+  - `applyPhaseContract()` — Now normalizes stale patterns before phase splitting: strips `variableEvents: []` fields from request definitions (auto-detected by replayLogger now), fixes `../dist/utils/` → `../core_engine/src/utils/` import paths. All internal references updated from `source` to `cleaned`.
   - Import preservation — Converter now detects and skips duplicate lifecycle.js and session.js imports when preserving source imports.
 - **Why:** ScriptConverter's output had diverged from ScriptGenerator's conventions: used `dist/` paths, didn't import session utilities, didn't clean up `variableEvents`, and didn't fix stale import paths in re-converted scripts.
 - **Verification:** `tsc --noEmit` passes. Converter output now matches ScriptGenerator patterns for imports, request definition shape, and lifecycle contract.

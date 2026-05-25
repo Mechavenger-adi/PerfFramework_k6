@@ -46,7 +46,7 @@
         },
         "required": ["baseUrl"]
       },
-      "description": "Team-specific environments keyed by the scrum-suites/<team> folder name. Example: { \"retail-ui\": { \"baseUrl\": \"https://retail-dev.example.com\" } }."
+      "description": "Team-specific environments keyed by the scrum_suites/<team> folder name. Example: { \"retail-ui\": { \"baseUrl\": \"https://retail-dev.example.com\" } }."
     }
   }
 }

@@ -1251,76 +1251,76 @@ Ensure responsibilities stay separated:
 
 ### Config and contracts
 
-- `core-engine/src/types/ConfigContracts.ts`
+- `core_engine/src/types/ConfigContracts.ts`
   - add reporting / errors / monitoring / timeseries config
   - extend `errorBehavior`
-- new `core-engine/src/types/EventContracts.ts`
+- new `core_engine/src/types/EventContracts.ts`
   - define `ErrorEvent`, `WarningEvent`, snapshot metadata contracts
-- new `core-engine/src/types/ReportingContracts.ts`
+- new `core_engine/src/types/ReportingContracts.ts`
   - define `TransactionMetricsFile`, `CiSummary`, `TimeSeriesFile`, report bundle contracts
 
 ### Validation and config access
 
-- `core-engine/src/config/SchemaValidator.ts`
+- `core_engine/src/config/SchemaValidator.ts`
   - validate new config sections
-- `core-engine/src/config/GatekeeperValidator.ts`
+- `core_engine/src/config/GatekeeperValidator.ts`
   - validate lifecycle/reporting/monitoring combinations
-- `core-engine/src/config/RuntimeConfigManager.ts`
+- `core_engine/src/config/RuntimeConfigManager.ts`
   - expose helper accessors for reporting, monitoring, timeseries, snapshots, error behavior
 
 ### Shared runtime layer
 
-- new `core-engine/src/runtime/LifecycleRuntime.ts`
+- new `core_engine/src/runtime/LifecycleRuntime.ts`
   - hidden `initPhase/actionPhase/endPhase` execution wrapper
-- new `core-engine/src/runtime/ErrorRuntime.ts`
+- new `core_engine/src/runtime/ErrorRuntime.ts`
   - structured error/warning handling + errorBehavior enforcement
-- new `core-engine/src/runtime/MetricsRuntime.ts`
+- new `core_engine/src/runtime/MetricsRuntime.ts`
   - transaction metrics collection
-- new `core-engine/src/runtime/SnapshotRuntime.ts`
+- new `core_engine/src/runtime/SnapshotRuntime.ts`
   - snapshot capture + limits
-- new `core-engine/src/runtime/TimeseriesRuntime.ts`
+- new `core_engine/src/runtime/TimeseriesRuntime.ts`
   - bucketed aggregate generation
 
 ### Generation and conversion
 
-- `core-engine/src/recording/ScriptGenerator.ts`
+- `core_engine/src/recording/ScriptGenerator.ts`
   - emit simple phase-based scripts
-- `core-engine/src/recording/ScriptConverter.ts`
+- `core_engine/src/recording/ScriptConverter.ts`
   - convert into simple phase-based scripts + `ctx` usage
-- `core-engine/src/cli/generate.ts`
+- `core_engine/src/cli/generate.ts`
   - prompt for init/end group selection with skip option
-- `core-engine/src/cli/convert.ts`
+- `core_engine/src/cli/convert.ts`
   - prompt for init/end group selection with skip option
 
 ### Scenario and execution
 
-- `core-engine/src/scenario/ScenarioBuilder.ts`
+- `core_engine/src/scenario/ScenarioBuilder.ts`
   - lifecycle env injection
-- `core-engine/src/cli/run.ts`
+- `core_engine/src/cli/run.ts`
   - wrapper wiring, run output orchestration, artifact publishing
-- `core-engine/src/execution/PipelineRunner.ts`
+- `core_engine/src/execution/PipelineRunner.ts`
   - artifact lifecycle integration
 
 ### Artifact persistence and reporting
 
-- new `core-engine/src/reporting/ArtifactWriter.ts`
+- new `core_engine/src/reporting/ArtifactWriter.ts`
   - write JSON/NDJSON artifacts
-- new `core-engine/src/reporting/TransactionMetricsBuilder.ts`
+- new `core_engine/src/reporting/TransactionMetricsBuilder.ts`
   - final transaction matrix generation
-- new `core-engine/src/reporting/RunSummaryBuilder.ts`
+- new `core_engine/src/reporting/RunSummaryBuilder.ts`
   - `ci-summary.json` and summary verdicts
-- new `core-engine/src/reporting/RunReportGenerator.ts`
+- new `core_engine/src/reporting/RunReportGenerator.ts`
   - unified `RunReport.html`
 
 ### Monitoring
 
-- new `core-engine/src/execution/HostMonitor.ts`
+- new `core_engine/src/execution/HostMonitor.ts`
   - CPU/memory sampling and warning events
 
 ### Docs and templates
 
-- `core-engine/src/cli/init.ts`
-- `core-engine/src/cli/generate-byos.ts`
+- `core_engine/src/cli/init.ts`
+- `core_engine/src/cli/generate-byos.ts`
 - framework docs / sample plans / guides
 
 ## Non-Regression Rule
@@ -1412,12 +1412,12 @@ v1 should **not** try to solve everything:
 
 ## Files Likely To Change In The Real Implementation
 
-- `core-engine/src/types/TestPlanSchema.ts`
-- `core-engine/src/config/SchemaValidator.ts`
-- `core-engine/src/config/GatekeeperValidator.ts`
-- `core-engine/src/scenario/ScenarioBuilder.ts`
-- `core-engine/src/recording/ScriptGenerator.ts`
-- `core-engine/src/recording/ScriptConverter.ts`
+- `core_engine/src/types/TestPlanSchema.ts`
+- `core_engine/src/config/SchemaValidator.ts`
+- `core_engine/src/config/GatekeeperValidator.ts`
+- `core_engine/src/scenario/ScenarioBuilder.ts`
+- `core_engine/src/recording/ScriptGenerator.ts`
+- `core_engine/src/recording/ScriptConverter.ts`
 - new shared lifecycle runtime helper file(s)
 - CLI/execution entry integration for wrapper generation/loading
 - docs / examples / sample plans
@@ -1466,7 +1466,7 @@ The framework defaults to `noCookiesReset: true` in k6 options, matching LoadRun
 For per-journey cookie control when the global setting persists cookies:
 
 ```javascript
-import { clearCookies, registerBaseUrl, deleteCookie } from '../../../core-engine/src/utils/session.js';
+import { clearCookies, registerBaseUrl, deleteCookie } from '../../../core_engine/src/utils/session.js';
 
 // Register base URLs (auto-called by generated/converted scripts)
 registerBaseUrl('https://myapp.example.com/');

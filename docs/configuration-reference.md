@@ -12,7 +12,7 @@ Defines target environment settings: base URL, optional service URLs, optional p
 | `baseUrl` | string | **Yes** | Primary base URL of the system under test. Exposed to scripts via `K6_PERF_BASE_URL` and used by framework URL helpers such as `resolveFrameworkUrl()`. Example: 'https://api.staging.example.com'. |
 | `serviceUrls` | object | No | Optional secondary base URLs keyed by service name. Use when your application has multiple backends (auth service, API gateway, CDN, etc.). Example: { "auth": "https://auth.example.com", "api": "https://api.example.com" }. |
 | `custom` | object | No | Any additional environment-specific key-value pairs. Accessible via resolvedConfig.environment.custom in the framework. Example: { "tenantId": "tenant-001", "region": "us-east-1", "featureFlags": true }. |
-| `teamOverrides` | object | No | Optional team-specific overrides keyed by the `scrum-suites/<team>` folder name. Use when multiple teams share an environment name like `dev` but target different hosts. |
+| `teamOverrides` | object | No | Optional team-specific overrides keyed by the `scrum_suites/<team>` folder name. Use when multiple teams share an environment name like `dev` but target different hosts. |
 
 ## K6-PerfFramework Runtime Settings
 

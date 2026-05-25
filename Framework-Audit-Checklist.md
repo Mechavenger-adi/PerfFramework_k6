@@ -36,11 +36,11 @@ Legend:
 ### 1. Framework Foundation
 
 - `[x]` Configuration-driven architecture is implemented
-  Evidence: `core-engine/src/config/ConfigurationManager.ts`, `core-engine/src/config/SchemaValidator.ts`
+  Evidence: `core_engine/src/config/ConfigurationManager.ts`, `core_engine/src/config/SchemaValidator.ts`
 - `[x]` Convention-based project structure is implemented
-  Evidence: `core-engine/src/cli/init.ts`
+  Evidence: `core_engine/src/cli/init.ts`
 - `[x]` CLI scaffolding for new projects is implemented and working
-  Evidence: `core-engine/src/cli/init.ts`
+  Evidence: `core_engine/src/cli/init.ts`
 - `[~]` Packaging as a portable npm package is partial
   Notes: package metadata and build output exist, but the built CLI is not fully runnable because of alias resolution in `PipelineRunner`
 - `[ ]` CI/CD-ready `npm test` style integration is not fully implemented
@@ -49,23 +49,23 @@ Legend:
 ### 2. Test Authoring and Script Generation
 
 - `[x]` HAR file parsing is implemented
-  Evidence: `core-engine/src/recording/HARParser.ts`
+  Evidence: `core_engine/src/recording/HARParser.ts`
 - `[x]` Transaction grouping by `pageref` is implemented
-  Evidence: `core-engine/src/recording/TransactionGrouper.ts`
+  Evidence: `core_engine/src/recording/TransactionGrouper.ts`
 - `[x]` Generated scripts use framework transaction helpers instead of manual Trend timing
-  Evidence: `core-engine/src/recording/ScriptGenerator.ts`, `core-engine/src/utils/transaction.ts`
+  Evidence: `core_engine/src/recording/ScriptGenerator.ts`, `core_engine/src/utils/transaction.ts`
 - `[x]` Generated scripts include HAR entry comments for traceability
-  Evidence: `core-engine/src/recording/ScriptGenerator.ts`
+  Evidence: `core_engine/src/recording/ScriptGenerator.ts`
 - `[x]` Generated scripts now include structured replay metadata logs and request tags
-  Evidence: `core-engine/src/recording/ScriptGenerator.ts`
+  Evidence: `core_engine/src/recording/ScriptGenerator.ts`
 - `[x]` HAR generation now emits a normalized recording log file keyed by `harEntryId`
-  Evidence: `core-engine/src/cli/generate.ts`, `core-engine/src/debug/ExchangeLog.ts`
+  Evidence: `core_engine/src/cli/generate.ts`, `core_engine/src/debug/ExchangeLog.ts`
 - `[~]` HAR-based script generation is working but not fully as required
   Notes: generation is now interactive for domains and static assets, but still does not prompt for think time
 - `[x]` Interactive CLI prompts for HAR generation are implemented
 - `[x]` User prompt to choose target domains is implemented
 - `[x]` Domain filtering is implemented as an interactive flow
-  Evidence: `core-engine/src/recording/DomainFilter.ts`, `core-engine/src/recording/HARParser.ts`, `core-engine/src/cli/generate.ts`
+  Evidence: `core_engine/src/recording/DomainFilter.ts`, `core_engine/src/recording/HARParser.ts`, `core_engine/src/cli/generate.ts`
 - `[x]` User prompt to include or exclude static assets is implemented
 - `[ ]` User prompt for default think time is missing
 - `[~]` Generated script structure does not follow `init`, `action`, `teardown`
@@ -87,9 +87,9 @@ Legend:
 ### 4. Parameterization and Data
 
 - `[x]` CSV data support is implemented and working
-  Evidence: `core-engine/src/data/DataFactory.ts`
+  Evidence: `core_engine/src/data/DataFactory.ts`
 - `[x]` JSON data support is implemented and working
-  Evidence: `core-engine/src/data/DataFactory.ts`
+  Evidence: `core_engine/src/data/DataFactory.ts`
 - `[ ]` Inline data array support is not implemented
 - `[x]` `p_` naming convention is reflected in samples and documentation
 - `[x]` Overflow strategy `terminate` is implemented
@@ -105,13 +105,13 @@ Legend:
 ### 5. Correlation
 
 - `[x]` Rule-based correlation engine exists
-  Evidence: `core-engine/src/correlation/CorrelationEngine.ts`
+  Evidence: `core_engine/src/correlation/CorrelationEngine.ts`
 - `[x]` Correlation rule loading from JSON exists
-  Evidence: `core-engine/src/correlation/RuleProcessor.ts`
+  Evidence: `core_engine/src/correlation/RuleProcessor.ts`
 - `[x]` Regex extractor exists
 - `[x]` Header extractor exists
 - `[~]` `jsonpath` extractor is only a simplified dot-notation implementation
-  Evidence: `core-engine/src/correlation/ExtractorRegistry.ts`
+  Evidence: `core_engine/src/correlation/ExtractorRegistry.ts`
 - `[~]` Correlation `source/scope` is only partially respected
   Notes: extractor choice matters, but full body/header scope behavior is not robustly modeled
 - `[x]` Fallback default value strategy exists
@@ -128,37 +128,37 @@ Legend:
 - `[ ]` Header manager utility is missing
 - `[ ]` Cookie manager utility is missing
 - `[~]` Reusable logging wrapper exists
-  Evidence: `core-engine/src/utils/logger.ts`
+  Evidence: `core_engine/src/utils/logger.ts`
 - `[~]` Automatic default 2xx validation is only partially satisfied
   Notes: sample/manual scripts use 2xx checks, generated HAR scripts use exact-status checks
 
 ### 7. Test Execution and Orchestration
 
 - `[x]` Central test plan model is implemented
-  Evidence: `core-engine/src/types/TestPlanSchema.ts`
+  Evidence: `core_engine/src/types/TestPlanSchema.ts`
 - `[x]` Parallel scenario construction is implemented
-  Evidence: `core-engine/src/scenario/ScenarioBuilder.ts`
+  Evidence: `core_engine/src/scenario/ScenarioBuilder.ts`
 - `[x]` Sequential scenario construction is implemented
 - `[x]` Hybrid scenario construction is implemented
 - `[x]` Global load profile support is implemented
 - `[x]` Per-journey load profile override support is implemented
 - `[x]` Weighted VU allocation is implemented
-  Evidence: `core-engine/src/execution/JourneyAllocator.ts`
+  Evidence: `core_engine/src/execution/JourneyAllocator.ts`
 - `[x]` Threshold injection from SLAs is implemented
-  Evidence: `core-engine/src/assertions/ThresholdManager.ts`
+  Evidence: `core_engine/src/assertions/ThresholdManager.ts`
 - `[~]` End-to-end run execution is blocked in the built CLI
   Notes: `dist/cli/run.js` imports `PipelineRunner`, which imports `@core/utils/logger` and fails under Node module resolution
 
 ### 8. Runtime Settings
 
 - `[x]` Runtime settings schema/model exists
-  Evidence: `core-engine/src/types/ConfigContracts.ts`
+  Evidence: `core_engine/src/types/ConfigContracts.ts`
 - `[x]` Think time config model exists
 - `[x]` Pacing config model exists
 - `[x]` HTTP timeout/maxRedirects config model exists
 - `[x]` Error behavior config model exists
 - `[x]` Typed runtime accessor class exists
-  Evidence: `core-engine/src/config/RuntimeConfigManager.ts`
+  Evidence: `core_engine/src/config/RuntimeConfigManager.ts`
 - `[~]` Think time is not wired into generated or framework-run execution consistently
 - `[~]` Pacing is modeled but not enforced in the runner/scripts
 - `[~]` Iteration logic modes are not fully implemented as described in requirements
@@ -171,11 +171,11 @@ Legend:
 - `[x]` Record and replay linkage is materially improved
   Notes: generated scripts now include `har_entry` comments, structured replay logs, request tags, and generated recording-log artifacts for cross-reference
 - `[x]` Replay runner class exists
-  Evidence: `core-engine/src/debug/ReplayRunner.ts`
+  Evidence: `core_engine/src/debug/ReplayRunner.ts`
 - `[x]` Diff comparison utility exists
-  Evidence: `core-engine/src/debug/DiffChecker.ts`
+  Evidence: `core_engine/src/debug/DiffChecker.ts`
 - `[x]` HTML diff report generator exists
-  Evidence: `core-engine/src/debug/HTMLDiffReporter.ts`
+  Evidence: `core_engine/src/debug/HTMLDiffReporter.ts`
 - `[~]` Replay debug utility is not working end-to-end
   Notes: it depends on `PipelineRunner`, which currently fails in built runtime
 - `[x]` HTML report now groups requests by transaction
@@ -187,7 +187,7 @@ Legend:
 ### 10. Reporting and Trend Analysis
 
 - `[x]` Result transformation utility exists
-  Evidence: `core-engine/src/reporters/ResultTransformer.ts`
+  Evidence: `core_engine/src/reporters/ResultTransformer.ts`
 - `[x]` Grafana reporter stub exists
 - `[x]` Azure reporter stub exists
 - `[x]` Custom uploader stub exists
@@ -226,7 +226,7 @@ These parts are present and behaved as expected during verification:
 
 ## Key Gaps and Defects
 
-- Main packaged CLI run flow is broken by unresolved import alias in `core-engine/src/execution/PipelineRunner.ts`
+- Main packaged CLI run flow is broken by unresolved import alias in `core_engine/src/execution/PipelineRunner.ts`
 - HAR generation still does not satisfy the full workflow because think-time prompting and `init/action/teardown` structure are not yet implemented
 - Runtime settings are modeled more than they are actually enforced
 - Correlation is only partially aligned with the requirement, especially JSONPath and skip behavior

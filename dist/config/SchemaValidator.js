@@ -247,7 +247,7 @@ class SchemaValidator {
         (0, ajv_formats_1.default)(this.ajv);
         // Prefer external schema files (rich descriptions for docs/tooling),
         // fall back to inline schemas if external files are unavailable.
-        const runtimeSchema = loadExternalSchema('runtime-settings.schema.json') ?? RUNTIME_SETTINGS_SCHEMA_INLINE;
+        const runtimeSchema = loadExternalSchema('runtime_settings.schema.json') ?? RUNTIME_SETTINGS_SCHEMA_INLINE;
         const planSchema = loadExternalSchema('test-plan.schema.json') ?? TEST_PLAN_SCHEMA_INLINE;
         this.validateRuntimeSettings = this.ajv.compile(runtimeSchema);
         this.validateTestPlan = this.ajv.compile(planSchema);
