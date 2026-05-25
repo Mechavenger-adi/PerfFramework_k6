@@ -16,7 +16,7 @@
       "minLength": 1,
       "description": "Logical environment name. Must match the filename (e.g., 'dev' for dev.json). Referenced by the test plan's 'environment' field. Common values: dev, staging, uat, preprod, prod."
     },
-    "scrum_suites": {
+    "testSuites": {
       "type": "object",
       "additionalProperties": {
         "type": "object",
@@ -46,7 +46,7 @@
         },
         "required": ["baseUrl"]
       },
-      "description": "Team-specific environments keyed by the scrum_suites/<team> folder name. Example: { \"retail-ui\": { \"baseUrl\": \"https://retail-dev.example.com\" } }."
+      "description": "Team-specific environments keyed by the testSuites/<team> folder name. Example: { \"retail-ui\": { \"baseUrl\": \"https://retail-dev.example.com\" } }."
     }
   }
 }

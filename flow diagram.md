@@ -46,7 +46,7 @@ flowchart LR
     ENV["config/environments/*.json"]
     RUNTIMECFG["config/runtime_settings/*.json"]
     ENVFILE[".env / secrets"]
-    SUITES["scrum_suites/<team>/"]
+    SUITES["testSuites/<team>/"]
     TESTS["tests/*.js"]
     SUITEDATA["data files (.csv, .json)"]
     RECORDINGS["recordings (.har, .recording-log.json)"]
@@ -261,7 +261,7 @@ flowchart LR
 
 - `flow diagram.md` and `AGENT-CONTEXT.md` are the two orientation files AI models should read first.
 - Test execution starts from `config/test_plans/*.json`, environment files, runtime settings, and optional `.env` secrets.
-- Team-owned suites live under `scrum_suites/<team>/` and provide the actual tests, data files, recordings, and correlation rules.
+- Team-owned suites live under `testSuites/<team>/` and provide the actual tests, data files, recordings, and correlation rules.
 
 ### 2. CLI Entry Points
 
@@ -326,7 +326,7 @@ flowchart LR
 
 ### 7. Runtime And Journey Script Flow
 
-- Journey scripts in `scrum_suites/<team>/tests` are the k6-facing runtime entrypoints.
+- Journey scripts in `testSuites/<team>/tests` are the k6-facing runtime entrypoints.
 - They rely on runtime helpers such as:
   - `lifecycle.ts`
   - `transaction.ts`

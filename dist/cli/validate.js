@@ -44,7 +44,7 @@ const ConfigurationManager_1 = require("../config/ConfigurationManager");
 const GatekeeperValidator_1 = require("../config/GatekeeperValidator");
 const TestPlanLoader_1 = require("../scenario/TestPlanLoader");
 function runValidate(opts) {
-    const { planPath, dataRoot = 'scrum_suites', envFilePath, verbose = false, } = opts;
+    const { planPath, dataRoot = 'testSuites', envFilePath, verbose = false, } = opts;
     console.log('\n  Running pre-flight validation...\n');
     // 1. Load test plan
     let plan;

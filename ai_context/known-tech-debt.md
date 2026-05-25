@@ -57,7 +57,7 @@
 ## TD9 — `config/correlation-rules/` Directory Empty
 
 **Severity:** Low
-**Description:** Global correlation rules directory exists but is empty. All rules live per-team in `scrum_suites/{team}/`.
+**Description:** Global correlation rules directory exists but is empty. All rules live per-team in `testSuites/{team}/`.
 **Impact:** No global correlation rule sharing across teams.
 
 ## TD10 — Dependent-Request Flow Control Missing

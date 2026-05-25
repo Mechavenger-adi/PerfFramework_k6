@@ -27,7 +27,7 @@ Enterprise-grade k6 performance testing framework with:
 - **Dynamic SLA and threshold support** across global, journey, and transaction scopes with arbitrary percentile keys
 - **Session and cookie control** including `noCookiesReset`, `session.js`, and auto-cookie-clear behavior in generated/converted scripts
 - **Host monitoring and periodic sampling** for normal runs with system metrics surfaced in artifacts and the unified report
-- **Multi-team suite support** via `scrum_suites/` team folders containing tests, data, recordings, and correlation assets
+- **Multi-team suite support** via `testSuites/` team folders containing tests, data, recordings, and correlation assets
 - **LoadRunner-style transactions** using k6 Trend metrics and console transaction summaries after load runs
 
 ---
@@ -61,7 +61,7 @@ npm run cli -- debug --script <path>           # Debug replay
 - `--env-config <path>` - Environment config JSON (auto-resolved from `plan.environment` if omitted)
 - `--runtime <path>` - Runtime settings JSON (default: `config/runtime_settings/default.json`)
 - `--env-file <path>` - `.env` file path (default: `.env`)
-- `--data-root <path>` - Root directory used by validation/data discovery (default: `scrum_suites`)
+- `--data-root <path>` - Root directory used by validation/data discovery (default: `testSuites`)
 - `--debug` - Print resolved configuration and other debug-oriented execution detail during `run`
 - `--out <k6-output>` - Additional k6 `--out` sink (for example `json=results.json`)
 
@@ -107,7 +107,7 @@ K6-PerfFramework/
 |     |- utils/                        # Logger, progress, path, transaction, replay/session/lifecycle TS helpers
 |     `- types/                        # Config, test-plan, event, reporting, HAR contracts
 |- dist/                               # Transpiled JS output
-|- scrum_suites/
+|- testSuites/
 |  |- sample_team/                     # Sample journeys, data, recordings, rules
 |  |- jpet_team/                       # JPetStore journeys, CSV data, HAR/recording logs
 |  |- my_team/                         # Team-specific journeys
@@ -132,7 +132,7 @@ K6-PerfFramework/
 │   │   ├── debug-test.json            # 1 VU, 1 iter, debug diff mode
 │   │   ├── load-test.json             # ramping-vus 5 peak, 2 journeys 50/50
 │   │   └── webui-load-test.json       # ramping-vus 10 peak, 2 journeys 60/40
-│   └── correlation-rules/             # (empty — rules live per-team in scrum_suites)
+│   └── correlation-rules/             # (empty — rules live per-team in testSuites)
 ├── core_engine/
 │   ├── DOCS_METHODS.md                # Full API method reference
 │   └── src/
@@ -149,7 +149,7 @@ K6-PerfFramework/
 │       ├── reporters/                 # ResultTransformer, GrafanaReporter, AzureReporter, CustomUploader
 │       ├── utils/                     # Logger, ProgressBar, PathResolver, transaction.ts, replayLogger.ts, session.ts, lifecycle.ts
 │       └── types/                     # ConfigContracts, TestPlanSchema, HARContracts
-├── scrum_suites/                      # Team test suites
+├── testSuites/                      # Team test suites
 │   ├── sample_team/                   # 6 test scripts, CSV data, correlation rules, recording logs
 │   ├── jpet_team/                     # 2 scripts, HAR recordings, recording-index
 │   ├── my_team/                       # 2 journey files
@@ -193,7 +193,7 @@ flowchart LR
     ENV["config/environments/*.json"]
     RUNTIMECFG["config/runtime_settings/*.json"]
     ENVFILE[".env / secrets"]
-    SUITES["scrum_suites/<team>/"]
+    SUITES["testSuites/<team>/"]
     TESTS["tests/*.js"]
     SUITEDATA["data files (.csv, .json)"]
     RECORDINGS["recordings (.har, .recording-log.json)"]
@@ -406,7 +406,7 @@ flowchart LR
 3. `core_engine/src/cli/run.ts` for top-level orchestration
 4. `core_engine/src/config/`, `scenario/`, `execution/` for runtime flow
 5. `core_engine/src/debug/`, `recording/`, `reporting/` for specialized paths
-6. `scrum_suites/<team>/tests`, `data`, `recordings` for suite-specific behavior
+6. `testSuites/<team>/tests`, `data`, `recordings` for suite-specific behavior
 
 ---
 
@@ -539,7 +539,7 @@ flowchart LR
 |------|--------|---------|
 | logger.ts | `Logger` | `info()`, `warn()`, `error()`, `debug()`. Format: `[k6-perf] [LEVEL] [timestamp] message`. Routes: error→console.error, warn→console.warn, rest→console.log. Optional context metadata as JSON. Status methods: `pass()` (green), `fail()` (red), `warning()` (yellow), `detail()` (dim `>` prefix), `header()` (cyan box), `bullet()` (colored bullet). Exports `ansi` object. Respects `NO_COLOR` env var and non-TTY. |
 | ProgressBar.ts | `ProgressBar`, `createSpinner` | Phase-based terminal progress logger compatible with blocking `spawnSync`. `start()` prints `▸ label...`, `done(msg?)` prints `✔ msg (elapsed)`, `fail(msg?)` prints `✖ msg (elapsed)`. `update(current, label?)` prints `▸ [n/total] label...` for multi-step progress. `createSpinner(label)` factory for single blocking operations. |
-| PathResolver.ts | `PathResolver` | `resolve(targetPath, searchRoot='scrum_suites')` → resolves exact path first, then recursively searches scrum_suites for filename match. Eliminates hardcoded paths in test plans |
+| PathResolver.ts | `PathResolver` | `resolve(targetPath, searchRoot='testSuites')` → resolves exact path first, then recursively searches testSuites for filename match. Eliminates hardcoded paths in test plans |
 | transaction.ts | `initTransactions`, `startTransaction`, `endTransaction` | LoadRunner-style timing. Creates Trend metrics using the transaction name directly (e.g., `new Trend('Homepage')`) in k6 init context. Records start timestamp → calculates duration → adds to Trend |
 | replayLogger.ts | `logReplayExchange`, `logExchange`, `trackCorrelation`, `trackParameter`, `trackDataRow`, `createVariableEvent` | k6-side logging. Outputs `[k6-perf][replay-log]` JSON with: harEntryId, transaction, iteration, VU, request/response details, headers, cookies, body. `trackCorrelation(name, value, source)` / `trackParameter(name, value, source)` register variables in `_variableRegistry`. `trackDataRow(sourceName, rowObject)` bulk-registers all CSV columns as parameters. `logExchange` auto-detects variable usage by scanning request URL/body/headers for registered values (via `detectVariableEvents()`). Body values stringified defensively (`typeof body === 'object' ? JSON.stringify(body) : String(body)`). **Binary body detection:** `binaryBodyPlaceholder(url, responseHeaders)` checks Content-Type (image/audio/video/font + common binary MIME types) and URL extension (.png/.ttf/.woff2/etc.) — replaces body with `[binary: content-type]` placeholder to prevent JSON serialization failures. Cookie extraction: `extractJarCookies(url)` uses `http.cookieJar().cookiesForURL()` for auto-managed cookies, `extractK6ResponseCookies(resCookies)` for k6's parsed `res.cookies` object. Tracks per-iteration state and request sequencing |
 | session.ts | `registerBaseUrl`, `clearCookies`, `deleteCookie` | k6-side cookie management utilities. **URL registry pattern:** `_registeredUrls` Set tracks all known base URLs. `registerBaseUrl(url)` adds a URL to the registry (called automatically by generated/converted scripts at module init). `clearCookies(...urls)` clears the VU's cookie jar — with no arguments, clears all registered URLs; with arguments, clears only the given URLs. `deleteCookie(url, name)` removes a specific named cookie. Used by framework to support per-journey cookie control when `noCookiesReset` is true globally but individual journeys need session resets. |
@@ -575,7 +575,7 @@ flowchart LR
 ```typescript
 {
   name: string;
-  scriptPath: string;               // resolved via PathResolver (recursive scrum_suites search)
+  scriptPath: string;               // resolved via PathResolver (recursive testSuites search)
   weight?: number;                  // for parallel VU distribution
   vus?: number;                     // explicit VU override
   load_profile?: GlobalLoadProfile; // journey-specific profile
@@ -701,10 +701,10 @@ For each journey in test plan:
 - **Transaction metric naming:** Transaction name used directly as k6 Trend metric name (e.g., `Homepage`, `Login`) — no prefix
 - **Replay log marker:** `[k6-perf][replay-log]` in k6 console output (JSON per request)
 - **Recording index:** `.recording-index.json` in each team's recordings/ dir
-- **Script resolution:** PathResolver searches `scrum_suites/` recursively if direct path fails
+- **Script resolution:** PathResolver searches `testSuites/` recursively if direct path fails
 - **Config auto-resolution:** Environment config from `config/environments/{plan.environment}.json`
 - **Cookie management:** `noCookiesReset: true` (default) persists cookies across k6 VU iterations (like LoadRunner). Per-journey cookie control via `session.ts` utilities (`clearCookies()`, `deleteCookie()`). Generated/converted scripts auto-import `registerBaseUrl` and call `clearCookies()` in `initPhase`.
-- **Team folder structure:** `scrum_suites/{team}/tests/`, `scrum_suites/{team}/recordings/`, `scrum_suites/{team}/data/`, `scrum_suites/{team}/results/`
+- **Team folder structure:** `testSuites/{team}/tests/`, `testSuites/{team}/recordings/`, `testSuites/{team}/data/`, `testSuites/{team}/results/`
 
 ---
 
@@ -793,7 +793,7 @@ For each journey in test plan:
 - Full end-to-end packaging incomplete (no npm publish workflow)
 - Some runtime enforcement gaps
 - Reporters are stub/placeholder implementations (log actions, don't actually HTTP push)
-- `config/correlation-rules/` directory is empty (rules are per-team in scrum_suites/{team}/)
+- `config/correlation-rules/` directory is empty (rules are per-team in testSuites/{team}/)
 - No unit tests or integration tests in the repo
 
 ---
@@ -925,7 +925,7 @@ npm run cli -- run --plan config/test_plans/debug-test.json
     - **Pattern B "Semi-framework":** Scripts already using transaction helpers but lacking `logExchange` → adds `logExchange` import, wraps HTTP calls with request defs, preserves existing transaction wrappers
   - `core_engine/src/cli/convert.ts` — CLI handler for `convert` command
 - **CLI usage:** `npm run cli -- convert <input-script> <team> <script-name> [--in-place]`
-  - Without `--in-place`: Writes to `scrum_suites/<team>/tests/<script-name>.js`
+  - Without `--in-place`: Writes to `testSuites/<team>/tests/<script-name>.js`
   - With `--in-place`: Overwrites the input file
 - **package.json:** Added `"convert"` script shortcut
 - **run.ts:** Registered `convert` command between `generate-byos` and `generate`
@@ -1035,7 +1035,7 @@ npm run cli -- run --plan config/test_plans/debug-test.json
   - **Import:** Already imports `trackCorrelation, trackParameter` from replayLogger.ts
 
 ### 2026-04-02 — buyanimal_new.js: Manual Fixes for Converted Script
-- **What:** Modified `scrum_suites/jpet_team/tests/buyanimal_new.js`
+- **What:** Modified `testSuites/jpet_team/tests/buyanimal_new.js`
 - **Why:** The previously converted script was missing variable declarations and parameter tracking calls.
 - **Changes:**
   - Added back `let match;` and `let regex;` declarations after `const correlation_vars = {};` (were stripped by old converter regex)
@@ -1765,7 +1765,7 @@ npm run cli -- run --plan config/test_plans/debug-test.json
 - **Key updates made:**
   - documented phase-based lifecycle, artifact-first reporting, host monitoring, session/cookie control, and dynamic SLA support in the overview
   - updated run/debug command options to match the current CLI in `core_engine/src/cli/run.ts`
-  - added a current repo tree snapshot including `.tmp-init-check`, `dist`, `reporting/`, `reporters/`, `runtime/`, and `scrum_suites/testpro`
+  - added a current repo tree snapshot including `.tmp-init-check`, `dist`, `reporting/`, `reporters/`, `runtime/`, and `testSuites/testpro`
   - added a newer structural flow map that includes the `runtime`, `reporting`, and `reporters` layers
   - updated architecture from 11 layers to 13 layers and documented the distinct runtime/reporting layers
 - **Note:** New “current snapshot/map” blocks should be treated as authoritative if older legacy text nearby disagrees.
@@ -1789,7 +1789,7 @@ npm run cli -- run --plan config/test_plans/debug-test.json
 - **Impact:** All internal references point to dist/utils/*.js which is where tsc outputs the compiled CommonJS helpers for goja.
 
 ### 2026-05-07 — getFrameworkThinkTime Implementation & Duplicate Import Fix
-- **What:** Modified `core_engine/src/utils/lifecycle.ts`, `core_engine/src/recording/ScriptGenerator.ts`, `core_engine/src/scenario/ScenarioBuilder.ts`, `core_engine/src/cli/run.ts`, `scrum_suites/jpet_team/tests/buyanimal_1_framework_lifecycle.js`
+- **What:** Modified `core_engine/src/utils/lifecycle.ts`, `core_engine/src/recording/ScriptGenerator.ts`, `core_engine/src/scenario/ScenarioBuilder.ts`, `core_engine/src/cli/run.ts`, `testSuites/jpet_team/tests/buyanimal_1_framework_lifecycle.js`
 - **Why:** Two errors blocked test execution:
   1. `SyntaxError: duplicate bounded name createJourneyLifecycleStore` — duplicate lifecycle import lines in ScriptGenerator and test script
   2. `getFrameworkThinkTime is not defined` — function was referenced but never implemented
@@ -1879,7 +1879,7 @@ npm run cli -- run --plan config/test_plans/debug-test.json
 
 ### 2026-05-14 - Environment Base URL Injection + Team Overrides
 - **What:** Wired environment `baseUrl` into generated, converted, and BYOS scripts and added optional team-specific environment overrides.
-- **Config model:** `EnvironmentConfig` now supports `teamOverrides` keyed by `scrum_suites/<team>` folder name. Each override can supply `baseUrl`, `serviceUrls`, and `custom`.
+- **Config model:** `EnvironmentConfig` now supports `teamOverrides` keyed by `testSuites/<team>` folder name. Each override can supply `baseUrl`, `serviceUrls`, and `custom`.
 - **Scenario wiring:** `ParallelExecutionManager.resolve()` now passes resolved environment config into `ScenarioBuilder`. `ScenarioBuilder` resolves the effective per-journey environment using the journey script path and injects `K6_PERF_BASE_URL`, `K6_PERF_SERVICE_URLS`, `K6_PERF_ENV_CUSTOM`, and `K6_PERF_TEAM`.
 - **k6 runtime helpers:** `session.ts` now exposes `registerFrameworkEnvironmentUrls()` and `resolveFrameworkUrl()`. Generated and converted scripts register runtime env URLs for cookie clearing, with recorded-origin fallbacks preserved for debug replay and older flows.
 - **Script behavior:** `ScriptGenerator.ts` emits relative primary-host request URLs resolved at runtime via `resolveFrameworkUrl(..., { fallbackBaseUrl })`. `ScriptConverter.ts` applies the same conversion when it can safely detect primary-host URL literals.

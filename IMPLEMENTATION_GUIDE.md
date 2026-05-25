@@ -7,7 +7,7 @@ Based on the `framework-requirements.md`, this guide outlines the exact, step-by
 ## Step 1: Framework Initialization & CI/CD Packaging
 **Covers Requirement:** 3.6 (Framework Architecture & Packaging)
 
-The framework is designed to abstract core logic away from project-specific domains. To start a new project or onboard a new team, you use the `init` CLI command. This creates the expected structure (`config/`, `scrum_suites/`, etc.).
+The framework is designed to abstract core logic away from project-specific domains. To start a new project or onboard a new team, you use the `init` CLI command. This creates the expected structure (`config/`, `testSuites/`, etc.).
 
 **Command:**
 ```bash
@@ -20,7 +20,7 @@ npx tsx core_engine/src/cli/init.ts
 ## Step 2: HAR-based Script Generation
 **Covers Requirements:** 3.1.1 (HAR Script Generation), 3.1.4 (Reusable Modules - Auto 2xx checks), 3.3.1 (Record & Replay Logging)
 
-Instead of manually writing k6 HTTP requests, record your browser session, save it as a `.har` file, and place it in `scrum_suites/<your-team>/recordings/`. The framework generator will:
+Instead of manually writing k6 HTTP requests, record your browser session, save it as a `.har` file, and place it in `testSuites/<your-team>/recordings/`. The framework generator will:
 * Filter URLs (strip third-party telemetry).
 * Group requests into transactions (based on `pageref`).
 * Auto-inject standard `sleep()` think-times.
@@ -30,7 +30,7 @@ Instead of manually writing k6 HTTP requests, record your browser session, save 
 **Command:**
 ```bash
 # Format: <cli> generate <har-path> <team-name> <output-script-name>
-npx tsx core_engine/src/cli/run.ts generate sample_team login-flow --har scrum_suites/sample_team/recordings/sample-login-flow.har
+npx tsx core_engine/src/cli/run.ts generate sample_team login-flow --har testSuites/sample_team/recordings/sample-login-flow.har
 ```
 
 ---
@@ -39,7 +39,7 @@ npx tsx core_engine/src/cli/run.ts generate sample_team login-flow --har scrum_s
 **Covers Requirement:** 3.1.2 (Parameterization)
 
 To make your test data dynamic (like usernames and passwords):
-1. Create a data file (e.g., `p_users.csv`) in `scrum_suites/<team>/data/`.
+1. Create a data file (e.g., `p_users.csv`) in `testSuites/<team>/data/`.
 2. Following the **Variable Naming** convention, prefix all your parameterized variables with `p_` (e.g., `p_username`, `p_password`).
 3. Under the hood, the `DataPoolManager.ts` reads this file. If the Virtual Users exceed the data pool, you can configure the runtime to `terminate`, `cycle`, or `continue_with_last`.
 
@@ -57,7 +57,7 @@ const p_username = DataPoolManager.get('p_users.csv', 'p_username');
 
 For dynamic network states (CSRF tokens, dynamic session IDs), do not write complex Regex in your JavaScript. 
 1. Use the **Variable Naming** convention: Prefix correlated values with `c_` (e.g., `c_sessionToken`).
-2. Add your rules to `scrum_suites/<team>/correlation-rules.json`.
+2. Add your rules to `testSuites/<team>/correlation-rules.json`.
 3. Set your fallback plans (`fail`, `skip`, or a `default` hardcoded value).
 
 **Example `correlation-rules.json`:**
@@ -93,7 +93,7 @@ You do not define k6 `options` inside the scripts. You control execution purely 
     "stages": [{ "duration": "5m", "target": 50 }]
   },
   "user_journeys": [
-    { "name": "browse", "scriptPath": "scrum_suites/sample_team/tests/login-flow.js", "weight": 100 }
+    { "name": "browse", "scriptPath": "testSuites/sample_team/tests/login-flow.js", "weight": 100 }
   ]
 }
 ```
@@ -108,7 +108,7 @@ If your generated script is failing, you can run a 1-VU (Virtual User) debug rep
 **Command:**
 ```bash
 # Uses the utility script via tsx to trigger the DiffChecker and generate the HTML report
-npx tsx scrum_suites/sample_team/run-debug.ts scrum_suites/sample_team/tests/login-flow.js scrum_suites/sample_team/recordings/sample-login-flow.har ./results/diff-report.html
+npx tsx testSuites/sample_team/run-debug.ts testSuites/sample_team/tests/login-flow.js testSuites/sample_team/recordings/sample-login-flow.har ./results/diff-report.html
 ```
 
 ---

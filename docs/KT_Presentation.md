@@ -16,10 +16,10 @@
     *   **Your Script:** The Recipe.
 
 ## Slide 3: Folder Structure (Where you live)
-*   **Visual Idea:** Callouts pointing to `scrum_suites/` and `config/`.
+*   **Visual Idea:** Callouts pointing to `testSuites/` and `config/`.
 *   **Talking Points:** 
     *   **`core_engine/`:** Do not touch (Engine internals).
-    *   **`scrum_suites/your-team/`:** Your home base!
+    *   **`testSuites/your-team/`:** Your home base!
         *   `tests/` -> Your `.js` definitions.
         *   `data/` -> Your `.csv` test users.
     *   **`config/`:** Changing behavior without changing code.
@@ -62,7 +62,7 @@ npm run cli -- init
 Explain: "This creates the basic folder structure and journey template automatically. No need to write from scratch."
 
 **Step 2: Take a peek at the generated script**
-Open `scrum_suites/sample_team/tests/browse-journey.js`
+Open `testSuites/sample_team/tests/browse-journey.js`
 Say: "Notice the three phases. The framework has already wired up `initPhase`, `actionPhase`, and `endPhase` for us. It also automatically wired up `startTransaction`."
 
 **Step 3: Show the Test Plan**

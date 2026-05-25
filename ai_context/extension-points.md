@@ -68,10 +68,10 @@
 
 ## EP10 — New Team Suite
 
-**Location:** `scrum_suites/<team-name>/`
+**Location:** `testSuites/<team-name>/`
 **Structure:**
 ```
-scrum_suites/<team>/
+testSuites/<team>/
   tests/          — k6 journey scripts
   data/           — CSV/JSON data files
   recordings/     — HAR files + recording logs + .recording-index.json

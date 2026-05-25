@@ -5,7 +5,7 @@
 
 ## Completed Tasks
 
-- **Environment Architecture:** Completed migration to `scrum_suites`-based environment configuration per team.
+- **Environment Architecture:** Completed migration to `testSuites`-based environment configuration per team.
 - **Dynamic Session Handling:** Refactored URL resolution and `getEnvContext` to avoid URL encoding issues with template literals.
 - **Session Debugging:** Improved `session.ts` missing config error message to include the active environment file name (dynamic via `K6_PERF_ENVIRONMENT`).
 - **Think Time Refactoring:** Replaced raw `sleep()` and `getFrameworkThinkTime()` with a robust `thinktime(minOrFixed?, max?)` utility.

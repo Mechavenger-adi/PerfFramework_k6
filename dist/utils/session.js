@@ -49,7 +49,7 @@ let _primaryBaseUrl;
 /**
  * Get the environment context for a specific team.
  *
- * @param teamName - Must match the key in scrum_suites of the loaded environment file.
+ * @param teamName - Must match the key in testSuites of the loaded environment file.
  * @param fallback - Full fallback environment used when the CLI has not injected env config
  *                   (e.g., standalone k6 run). Explicitly typed as TeamEnvironmentOverride so
  *                   it is clear which fields (baseUrl, serviceUrls, custom) are being overridden.

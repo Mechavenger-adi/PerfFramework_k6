@@ -5,7 +5,7 @@ A TypeScript-powered performance testing framework on top of Grafana k6. The fra
 ## What This Framework Provides
 
 - Declarative test plans for parallel, sequential, and hybrid journey execution.
-- Team-owned test suites under `scrum_suites/<team>/`.
+- Team-owned test suites under `testSuites/<team>/`.
 - HAR-to-k6 script generation with transaction grouping and replay metadata.
 - BYOS support for wrapping existing k6 scripts in the framework lifecycle.
 - Environment, runtime, SLA, and secret configuration resolution.
@@ -24,7 +24,7 @@ K6-PerfFramework/
     runtime_settings/          Runtime behavior such as think time and reporting
     schemas/                   JSON schemas for validation
     test_plans/                Runnable test plans
-  scrum_suites/
+  testSuites/
     <team>/
       tests/                   k6 journey scripts
       recordings/              HAR files and normalized recording logs
@@ -136,7 +136,7 @@ Example: `config/environments/dev.json`
 {
   "$schema": "../schemas/environment.schema.json",
   "name": "dev",
-  "scrum_suites": {
+  "testSuites": {
     "Jpet_new": {
       "baseUrl": "https://jpetstore.aspectran.com"
     }
@@ -144,7 +144,7 @@ Example: `config/environments/dev.json`
 }
 ```
 
-Use `scrum_suites` keys that match the team folder under `scrum_suites/`.
+Use `testSuites` keys that match the team folder under `testSuites/`.
 
 ### Runtime Settings
 
@@ -192,7 +192,7 @@ Example:
 }
 ```
 
-When a journey script path is just a file name, the framework resolves it from the matching scrum-suite test folder. Fully qualified relative paths such as `scrum_suites/Jpet_new/tests/buyanimal_raw_19thmay.js` are also supported.
+When a journey script path is just a file name, the framework resolves it from the matching scrum-suite test folder. Fully qualified relative paths such as `testSuites/Jpet_new/tests/buyanimal_raw_19thmay.js` are also supported.
 
 ## Creating a New Suite or Script
 
@@ -227,7 +227,7 @@ npm run cli -- generate-byos Jpet_new buyanimal
 This creates a script under:
 
 ```text
-scrum_suites/Jpet_new/tests/
+testSuites/Jpet_new/tests/
 ```
 
 ### Convert an Existing k6 Script
@@ -247,13 +247,13 @@ npm run cli -- convert path/to/input-script.js Jpet_new converted-script --in-pl
 Place a browser HAR file under your suite recordings folder, for example:
 
 ```text
-scrum_suites/Jpet_new/recordings/buyanimal.har
+testSuites/Jpet_new/recordings/buyanimal.har
 ```
 
 Generate the script:
 
 ```bash
-npm run generate -- Jpet_new buyanimal --har scrum_suites/Jpet_new/recordings/buyanimal.har
+npm run generate -- Jpet_new buyanimal --har testSuites/Jpet_new/recordings/buyanimal.har
 ```
 
 The generator prompts for domain selection and whether static assets should be included. It writes the generated k6 script and a normalized recording log for debug comparisons.
@@ -306,15 +306,15 @@ npm run cli -- run --plan config/test_plans/debug-test.json
 Standalone debug for one script:
 
 ```bash
-npm run cli -- debug --script scrum_suites/Jpet_new/tests/buyanimal_raw_19thmay.js
+npm run cli -- debug --script testSuites/Jpet_new/tests/buyanimal_raw_19thmay.js
 ```
 
 With an explicit recording log and output path:
 
 ```bash
 npm run cli -- debug ^
-  --script scrum_suites/Jpet_new/tests/buyanimal_raw_19thmay.js ^
-  --recording-log scrum_suites/Jpet_new/recordings/buyanimal_raw_19thmay.recording-log.json ^
+  --script testSuites/Jpet_new/tests/buyanimal_raw_19thmay.js ^
+  --recording-log testSuites/Jpet_new/recordings/buyanimal_raw_19thmay.recording-log.json ^
   --out results/debug-diff.html
 ```
 

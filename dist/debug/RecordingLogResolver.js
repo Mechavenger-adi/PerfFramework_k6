@@ -141,7 +141,7 @@ class RecordingLogResolver {
     static getSuiteRecordingContext(scriptPath) {
         const absoluteScriptPath = path.resolve(process.cwd(), scriptPath);
         const normalized = absoluteScriptPath.replace(/\\/g, '/');
-        const marker = '/scrum_suites/';
+        const marker = '/testSuites/';
         const markerIndex = normalized.lastIndexOf(marker);
         const testsMarker = '/tests/';
         const testsIndex = normalized.indexOf(testsMarker, markerIndex + marker.length);

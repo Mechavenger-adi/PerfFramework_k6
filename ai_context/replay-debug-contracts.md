@@ -15,7 +15,7 @@ Journey script (with logExchange calls)
 
 ## Recording Log Format
 
-Created by `ExchangeLogBuilder.fromGroups()` during HAR generation. Stored at `scrum_suites/<team>/recordings/<script>.recording-log.json`.
+Created by `ExchangeLogBuilder.fromGroups()` during HAR generation. Stored at `testSuites/<team>/recordings/<script>.recording-log.json`.
 
 ```json
 [

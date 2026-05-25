@@ -24,7 +24,7 @@ export class ScriptConverter {
   static convertFile(filePath: string, teamName?: string, lifecycle?: LifecycleSelection): string {
     const source = fs.readFileSync(filePath, 'utf-8');
     if (!teamName) {
-      const match = filePath.match(/[\\/]scrum_suites[\\/]([^\\/]+)[\\/]/);
+      const match = filePath.match(/[\\/]testSuites[\\/]([^\\/]+)[\\/]/);
       teamName = match ? match[1] : 'unknown_team';
     }
     return this.convert(source, teamName, lifecycle);

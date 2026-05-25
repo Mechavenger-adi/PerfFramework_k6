@@ -11,7 +11,7 @@ This file tracks the agreed work for the debug automation and reporting enhancem
 
 - [completed] Add suite-local recording-log registry and auto-resolution flow
 - [completed] Keep manual `recordingLogPath` override as highest priority
-- [completed] Restrict auto-resolution to the journey's own `scrum_suites/<team>/recordings` folder
+- [completed] Restrict auto-resolution to the journey's own `testSuites/<team>/recordings` folder
 - [completed] Handle ambiguity as a hard error requiring explicit `recordingLogPath`
 - [completed] Handle missing recording log by generating replay-only HTML with warning banner
 - [completed] Extend debug config with `autoResolveRecordingLog`

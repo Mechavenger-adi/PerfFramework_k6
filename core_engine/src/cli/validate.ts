@@ -21,7 +21,7 @@ export interface ValidateOptions {
 export function runValidate(opts: ValidateOptions): boolean {
   const {
     planPath,
-    dataRoot = 'scrum_suites',
+    dataRoot = 'testSuites',
     envFilePath,
     verbose = false,
   } = opts;

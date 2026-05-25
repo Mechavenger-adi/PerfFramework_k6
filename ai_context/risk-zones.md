@@ -63,9 +63,9 @@
 
 ## RZ9 — Multi-Team Suite Isolation
 
-**Risk:** Team folders in `scrum_suites/` are logically isolated but not enforced. Nothing prevents one team's script from importing another team's data files.
+**Risk:** Team folders in `testSuites/` are logically isolated but not enforced. Nothing prevents one team's script from importing another team's data files.
 
-**Hidden assumption:** `PathResolver` searches all of `scrum_suites/` recursively, so a filename collision across teams could resolve to the wrong file.
+**Hidden assumption:** `PathResolver` searches all of `testSuites/` recursively, so a filename collision across teams could resolve to the wrong file.
 
 ## RZ10 — JSONC Parsing in Config Pipeline
 

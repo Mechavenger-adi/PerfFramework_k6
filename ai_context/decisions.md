@@ -76,6 +76,6 @@
 
 ## D13 â€” Team-Aware Environment Overrides via Scenario Env Vars
 
-**Decision:** Keep `config/environments/<env>.json` as the environment entry point, but allow optional `teamOverrides` keyed by `scrum_suites/<team>` folder name. Inject the resolved per-journey environment into k6 using explicit `K6_PERF_*` env vars.
+**Decision:** Keep `config/environments/<env>.json` as the environment entry point, but allow optional `teamOverrides` keyed by `testSuites/<team>` folder name. Inject the resolved per-journey environment into k6 using explicit `K6_PERF_*` env vars.
 **Reasoning:** Supports multiple teams sharing logical environment names like `dev` or `uat` without hardcoding URLs in scripts or duplicating plans. Keeps the cross-layer contract explicit and compatible with the existing k6-side/runtime boundary.
 **Constraint:** Generated and converted scripts should resolve primary-host requests through runtime helpers (`resolveFrameworkUrl()`), while debug and legacy flows must preserve recorded-origin fallback behavior.

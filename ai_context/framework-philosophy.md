@@ -28,7 +28,7 @@ Sensible defaults for everything: think time, pacing, status validation, folder 
 
 ## P5 — Decoupled Core + Suite Architecture
 
-Core engine (`core_engine/`) is shared platform code. Team tests live in `scrum_suites/{team}/`. These must remain independent — no team folder should import from another team's folder.
+Core engine (`core_engine/`) is shared platform code. Team tests live in `testSuites/{team}/`. These must remain independent — no team folder should import from another team's folder.
 
 **Implication:** The core engine is designed to be publishable as an npm package. Team suites are consumers, not contributors to core.
 

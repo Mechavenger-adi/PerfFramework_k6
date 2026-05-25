@@ -87,4 +87,4 @@ Scenario env injection may provide:
 - `K6_PERF_BASE_URL`: Effective primary base URL for the current journey/team/environment
 - `K6_PERF_SERVICE_URLS`: JSON object of named service URLs
 - `K6_PERF_ENV_CUSTOM`: JSON object of custom environment values
-- `K6_PERF_TEAM`: Optional team name resolved from `scrum_suites/<team>/...`
+- `K6_PERF_TEAM`: Optional team name resolved from `testSuites/<team>/...`

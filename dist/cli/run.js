@@ -116,7 +116,7 @@ program
 program
     .command('convert <input-script> <team> <script-name>')
     .description('Convert a conventional k6 script to a framework-compatible script with logExchange and transaction wrappers')
-    .option('--in-place', 'Overwrite the input file instead of writing to scrum_suites/<team>/tests/')
+    .option('--in-place', 'Overwrite the input file instead of writing to testSuites/<team>/tests/')
     .action(async (inputScript, team, scriptName, opts) => {
     await (0, convert_1.runConvert)(inputScript, team, scriptName, { inPlace: opts.inPlace });
 });
@@ -139,7 +139,7 @@ program
     .requiredOption('--plan <path>', 'Path to the test plan JSON file')
     .option('--env-config <path>', 'Path to the environment config JSON file (auto-resolved if omitted)')
     .option('--runtime <path>', 'Path to the runtime_settings JSON file', 'config/runtime_settings/default.json')
-    .option('--data-root <path>', 'Root directory for data files', 'scrum_suites')
+    .option('--data-root <path>', 'Root directory for data files', 'testSuites')
     .option('--env-file <path>', 'Path to .env file', '.env')
     .option('--verbose', 'Print verbose validation output including completeness score')
     .action((opts) => {
@@ -254,7 +254,7 @@ program
     .option('--env-config <path>', 'Path to the environment config JSON (auto-resolved if omitted)')
     .option('--runtime <path>', 'Path to the runtime_settings JSON file', 'config/runtime_settings/default.json')
     .option('--env-file <path>', 'Path to .env file', '.env')
-    .option('--data-root <path>', 'Root directory for data files', 'scrum_suites')
+    .option('--data-root <path>', 'Root directory for data files', 'testSuites')
     .option('--debug', 'Enable debug mode (prints resolved config)')
     .option('--out <k6-output>', 'k6 --out flag value (e.g. json=results.json)')
     .allowUnknownOption()
@@ -499,7 +499,7 @@ function runJourneyDebug(plan, journey, runDir, resolvedConfig, passthroughArgs 
         vus: plan.debug?.vus ?? 1,
         iterations: plan.debug?.iterations ?? 1,
         noCookiesReset: plan.noCookiesReset,
-        teamEnvironments: resolvedConfig.environment.scrum_suites,
+        teamEnvironments: resolvedConfig.environment.testSuites,
         errorBehavior: runtime.getErrorBehavior(),
         extraK6Args: passthroughArgs,
     });
@@ -621,7 +621,7 @@ function buildRunEnvironment(plan, resolvedConfig, runId, safeReportDir, runMani
         K6_PERF_EXECUTION_MODE: plan.execution_mode,
         K6_PERF_REPORT_DIR: safeReportDir,
         K6_PERF_RUN_MANIFEST_PATH: runManifestPath.replace(/\\/g, '/'),
-        K6_PERF_TEAM_ENVIRONMENTS: JSON.stringify(resolvedConfig.environment.scrum_suites || {}),
+        K6_PERF_TEAM_ENVIRONMENTS: JSON.stringify(resolvedConfig.environment.testSuites || {}),
         ...(transactionNames.length > 0
             ? { K6_PERF_TRANSACTION_NAMES: JSON.stringify(transactionNames) }
             : {}),
@@ -702,7 +702,7 @@ function writeRunManifest(runManifestPath, plan, resolvedConfig, scenarioMetadat
         },
         environment: {
             name: resolvedConfig.environment.name,
-            scrum_suites: resolvedConfig.environment.scrum_suites,
+            testSuites: resolvedConfig.environment.testSuites,
         },
     };
     fs.writeFileSync(runManifestPath, JSON.stringify(manifest, null, 2), 'utf-8');

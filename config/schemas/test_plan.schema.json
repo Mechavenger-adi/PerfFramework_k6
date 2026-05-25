@@ -105,7 +105,7 @@
           "scriptPath": {
             "type": "string",
             "minLength": 1,
-            "description": "Path to the journey script file. Can be relative to the project root or absolute. The framework auto-resolves paths by searching scrum_suites/ if the direct path doesn't exist. Example: 'buyanimal_1_framework_lifecycle.js'."
+            "description": "Path to the journey script file. Can be relative to the project root or absolute. The framework auto-resolves paths by searching testSuites/ if the direct path doesn't exist. Example: 'buyanimal_1_framework_lifecycle.js'."
           },
           "recordingLogPath": {
             "type": "string",

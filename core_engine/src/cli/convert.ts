@@ -48,8 +48,8 @@ export async function runConvert(
     return;
   }
 
-  // Write to scrum_suites/<team>/tests/<name>.js
-  const suiteDir = path.join(process.cwd(), 'scrum_suites', teamName);
+  // Write to testSuites/<team>/tests/<name>.js
+  const suiteDir = path.join(process.cwd(), 'testSuites', teamName);
   const targetDir = path.join(suiteDir, 'tests');
   if (!fs.existsSync(targetDir)) {
     fs.mkdirSync(targetDir, { recursive: true });

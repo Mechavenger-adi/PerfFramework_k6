@@ -41,7 +41,7 @@ This is a free test application provided by k6, specifically designed for perfor
 config/
   test_plans/
     webui-load-test.json          # Test plan (load profile, journeys, SLAs)
-scrum_suites/
+testSuites/
   webui_team/
     tests/
       homepage-journey.js          # Browsing journey script

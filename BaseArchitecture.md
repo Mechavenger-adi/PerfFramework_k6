@@ -84,7 +84,7 @@ The framework should reduce boilerplate without hiding request intent. HTTP call
 │   ├── index.ts
 │   └── tsconfig.json
 │
-├── /scrum_suites
+├── /testSuites
 │   ├── /scrum-team-payments
 │   │   ├── /tests
 │   │   ├── /data
@@ -500,7 +500,7 @@ k6-framework run --plan ./config/test_plans/load-test.json
 ### Bring Your Own Scripts (BYOS)
 To support users migrating from standalone k6 or Grafana Studio, the CLI allows templating custom scripts:
 - Users run `k6-framework generate-byos <team> <script-name>`
-- A template is generated inside `scrum_suites/<team>/tests/` with the required framework skeleton
+- A template is generated inside `testSuites/<team>/tests/` with the required framework skeleton
 - Users paste their raw k6 code into the template, enabling them to bypass standard HAR generation while still using framework global settings, assertions, and logging.
 
 Without this CLI layer, adoption cost rises and the framework becomes harder to standardize.

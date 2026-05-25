@@ -122,7 +122,7 @@ Updated source files:
 - [core_engine/src/cli/run.ts](d:/repos/K6-PerfFramework/core_engine/src/cli/run.ts)
 - [core_engine/src/debug/ReplayRunner.ts](d:/repos/K6-PerfFramework/core_engine/src/debug/ReplayRunner.ts)
 - [core_engine/src/execution/PipelineRunner.ts](d:/repos/K6-PerfFramework/core_engine/src/execution/PipelineRunner.ts)
-- [scrum_suites/sample_team/run-debug.ts](d:/repos/K6-PerfFramework/scrum_suites/sample_team/run-debug.ts)
+- [testSuites/sample_team/run-debug.ts](d:/repos/K6-PerfFramework/testSuites/sample_team/run-debug.ts)
 
 Key outcomes:
 
@@ -169,7 +169,7 @@ Key outcomes:
 
 - `init` still creates the standard `config/test_plans/load-test.json`
 - `init` now also creates `config/test_plans/debug-test.json`
-- `init` now creates a sample recording log at `scrum_suites/sample_team/recordings/browse-journey.recording-log.json`
+- `init` now creates a sample recording log at `testSuites/sample_team/recordings/browse-journey.recording-log.json`
 - The scaffolded next steps now mention the debug test plan as the starting point for replay-diff execution
 
 ## Change Set 8: Recording Log Auto-Resolution And Iteration-Aware Debug Report
@@ -194,7 +194,7 @@ Updated source files:
 
 Key outcomes:
 
-- HAR generation now maintains a suite-local recording registry at `scrum_suites/<team>/recordings/.recording-index.json`
+- HAR generation now maintains a suite-local recording registry at `testSuites/<team>/recordings/.recording-index.json`
 - Debug mode can auto-resolve recording logs using:
   - explicit `recordingLogPath`
   - suite-local registry entry
@@ -237,8 +237,8 @@ Recommended test plan shape:
   "user_journeys": [
     {
       "name": "login",
-      "scriptPath": "scrum_suites/sample_team/tests/generated-sample-review.js",
-      "recordingLogPath": "scrum_suites/sample_team/recordings/generated-sample-review.recording-log.json"
+      "scriptPath": "testSuites/sample_team/tests/generated-sample-review.js",
+      "recordingLogPath": "testSuites/sample_team/recordings/generated-sample-review.recording-log.json"
     }
   ]
 }
@@ -253,8 +253,8 @@ Build and typecheck were used repeatedly during this change cycle:
 
 Manual and sample validation artifacts created during the process include:
 
-- [scrum_suites/sample_team/tests/generated-sample-review.js](d:/repos/K6-PerfFramework/scrum_suites/sample_team/tests/generated-sample-review.js)
-- [scrum_suites/sample_team/recordings/generated-sample-review.recording-log.json](d:/repos/K6-PerfFramework/scrum_suites/sample_team/recordings/generated-sample-review.recording-log.json)
+- [testSuites/sample_team/tests/generated-sample-review.js](d:/repos/K6-PerfFramework/testSuites/sample_team/tests/generated-sample-review.js)
+- [testSuites/sample_team/recordings/generated-sample-review.recording-log.json](d:/repos/K6-PerfFramework/testSuites/sample_team/recordings/generated-sample-review.recording-log.json)
 - [browse.replay-log.json](d:/repos/K6-PerfFramework/results/debug/Sample_Debug_Test/Run_2026-03-31T04-06-37-056Z/browse.replay-log.json)
 - [browse.diff.html](d:/repos/K6-PerfFramework/results/debug/Sample_Debug_Test/Run_2026-03-31T04-06-37-056Z/browse.diff.html)
 - [browse.diff.html](d:/repos/K6-PerfFramework/results/debug/Sample_Debug_Test/Run_2026-03-31T04-53-50-700Z/browse.diff.html)

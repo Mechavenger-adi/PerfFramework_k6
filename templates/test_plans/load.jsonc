@@ -20,7 +20,7 @@
   "user_journeys": [
     {
       "name": "example_journey",
-      "scriptPath": "scrum_suites/sample_team/tests/example.js",
+      "scriptPath": "testSuites/sample_team/tests/example.js",
       "weight": 100
     }
   ],

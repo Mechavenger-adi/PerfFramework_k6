@@ -1,7 +1,7 @@
 {
   "$schema": "../schemas/environment.schema.json",
   "name": "dev",
-  "scrum_suites": {
+  "testSuites": {
     "sample_team": {
       "baseUrl": "https://sample_team.dev.your-company.com",
       "serviceUrls": {

@@ -21,11 +21,11 @@ Parameterisation replaces hardcoded values (usernames, product IDs, search terms
 
 | Convention | Rule | Example |
 |:-----------|:-----|:--------|
-| **Location** | `scrum_suites/<team>/data/` | `scrum_suites/jpet_team/data/` |
+| **Location** | `testSuites/<team>/data/` | `testSuites/jpet_team/data/` |
 | **Prefix** | Parameterised columns use `p_` prefix | `p_username`, `p_password`, `p_email` |
 | **Format** | CSV (first row = header) or JSON array of objects | See below |
 
-**CSV example** (`scrum_suites/my_team/data/p_users.csv`):
+**CSV example** (`testSuites/my_team/data/p_users.csv`):
 ```csv
 p_username,p_password,p_email
 testuser001,P@ssw0rd1,testuser001@perf-test.local
@@ -33,7 +33,7 @@ testuser002,P@ssw0rd2,testuser002@perf-test.local
 testuser003,P@ssw0rd3,testuser003@perf-test.local
 ```
 
-**JSON example** (`scrum_suites/my_team/data/p_products.json`):
+**JSON example** (`testSuites/my_team/data/p_products.json`):
 ```json
 [
   { "p_productId": "PROD-001", "p_name": "Widget A", "p_price": 29.99 },
@@ -224,7 +224,7 @@ Correlation captures dynamic server-generated values (CSRF tokens, session IDs, 
 
 ### 2.2 Correlation Rule Schema
 
-Rules are defined per team in `scrum_suites/<team>/correlation-rules.json`:
+Rules are defined per team in `testSuites/<team>/correlation-rules.json`:
 
 ```json
 [
@@ -299,7 +299,7 @@ Rules are defined per team in `scrum_suites/<team>/correlation-rules.json`:
 ```javascript
 import { CorrelationEngine, RuleProcessor } from '../../../dist/index.js';
 
-const rules = RuleProcessor.loadRules('scrum_suites/my_team/correlation-rules.json');
+const rules = RuleProcessor.loadRules('testSuites/my_team/correlation-rules.json');
 const engine = new CorrelationEngine(rules);
 ```
 
@@ -342,7 +342,7 @@ http.post('https://api.example.com/checkout',
 
 ### 2.7 Full Correlated Script Example
 
-See the reference implementation at `scrum_suites/sample_team/tests/correlation-journey.js` which demonstrates:
+See the reference implementation at `testSuites/sample_team/tests/correlation-journey.js` which demonstrates:
 
 - CSRF token extraction via `jsonpath`
 - Bearer JWT extraction via `jsonpath`
@@ -366,7 +366,7 @@ const users = new SharedArray('users', function () {
   return JSON.parse(open('./data/p_users.json'));
 });
 
-const rules = RuleProcessor.loadRules('scrum_suites/my_team/correlation-rules.json');
+const rules = RuleProcessor.loadRules('testSuites/my_team/correlation-rules.json');
 const engine = new CorrelationEngine(rules);
 
 initTransactions(['t01_login', 't02_add_to_cart']);
@@ -489,7 +489,7 @@ This metadata appears in the HTML diff report under the "Variable Events" panel,
 
 | # | Improvement | Detail |
 |:--|:-----------|:-------|
-| 11 | **`validate` command for correlation rules** | `npm run cli -- validate --rules scrum_suites/my_team/correlation-rules.json` — check schema, detect duplicate names, warn about missing `isCritical` on auth tokens. |
+| 11 | **`validate` command for correlation rules** | `npm run cli -- validate --rules testSuites/my_team/correlation-rules.json` — check schema, detect duplicate names, warn about missing `isCritical` on auth tokens. |
 | 12 | **Correlation dry-run** | `npm run cli -- correlate --script <path> --rules <path> --dry-run` — run the script once and print a table showing which rules matched, what was extracted, and what failed. |
 | 13 | **Data file scaffolding** | `npm run cli -- init-data <team> --columns p_username,p_password,p_email --rows 10` — generates a CSV with placeholder data using `DynamicValueFactory`. |
 | 14 | **Converter auto-parameterisation detection** | When running `convert`, scan request bodies for patterns that look like credentials, emails, and IDs. Flag them in output with `// TODO: parameterise` comments pointing to recommended `p_` column names. |
@@ -526,7 +526,7 @@ Phase   What                                        Effort
 ## Quick Reference — Data File Locations
 
 ```
-scrum_suites/
+testSuites/
   <team>/
     data/
       p_users.csv              # User credentials

@@ -20,5 +20,5 @@
     }
   },
   "include": ["core_engine/src/**/*"],
-  "exclude": ["node_modules", "dist", "scrum_suites"]
+  "exclude": ["node_modules", "dist", "testSuites"]
 }

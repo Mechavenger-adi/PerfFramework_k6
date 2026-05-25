@@ -36,7 +36,7 @@
 
 | Function | Description |
 | :--- | :--- |
-| `runConvert()` | CLI handler for the `convert` command. Converts a conventional k6 script into a framework-compatible script with `logExchange()` calls, request definition objects, and transaction wrappers. Writes output to `scrum_suites/<team>/tests/<name>.js` or overwrites input with `--in-place` flag. |
+| `runConvert()` | CLI handler for the `convert` command. Converts a conventional k6 script into a framework-compatible script with `logExchange()` calls, request definition objects, and transaction wrappers. Writes output to `testSuites/<team>/tests/<name>.js` or overwrites input with `--in-place` flag. |
 
 ---
 
@@ -519,7 +519,7 @@ Color-coded terminal logger with ANSI support. Respects `NO_COLOR` env var and n
 ### 🏷️ Class: `PathResolver`
 | Method / Property | Description |
 | :--- | :--- |
-| `resolve()` | Resolves a script path name. 1. If it's an exact file that exists, returns the absolute path. 2. If it's just a filename (e.g. `browse-journey.js`), deeply searches `scrum_suites` for a match. @param targetPath The path or filename to resolve. @param searchRoot The root directory to search in, defaults to 'scrum_suites'. @returns The resolved absolute path, or null if not found. |
+| `resolve()` | Resolves a script path name. 1. If it's an exact file that exists, returns the absolute path. 2. If it's just a filename (e.g. `browse-journey.js`), deeply searches `testSuites` for a match. @param targetPath The path or filename to resolve. @param searchRoot The root directory to search in, defaults to 'testSuites'. @returns The resolved absolute path, or null if not found. |
 | `recursiveSearch()` | *No description provided* |
 
 

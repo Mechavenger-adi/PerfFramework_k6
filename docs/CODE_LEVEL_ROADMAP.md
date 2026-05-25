@@ -43,7 +43,7 @@ K6-PerfFramework/
 │   ├── test_plans/      ← load-test.json, debug-test.json
 │   ├── runtime_settings/← default.json (think time, pacing, error behavior)
 │   └── correlation-rules/← Token extraction rules
-├── scrum_suites/        ← Team-owned test scripts
+├── testSuites/        ← Team-owned test scripts
 │   └── <team>/
 │       ├── tests/       ← .js journey scripts
 │       ├── data/        ← .csv test data files
@@ -257,7 +257,7 @@ Last iteration or ramp-down detected: → endPhase() (once per VU)
 Uses `Math.floor()` instead of `Math.ceil()` because k6 removes VUs slightly before our check runs. Floor ensures endPhase fires in time.
 
 ### 6C. How a Journey Script Uses the Lifecycle
-📄 [buyanimal_1_framework_lifecycle.js](file:///d:/repos/K6-PerfFramework/scrum_suites/jpet_team/tests/buyanimal_1_framework_lifecycle.js) (real example)
+📄 [buyanimal_1_framework_lifecycle.js](file:///d:/repos/K6-PerfFramework/testSuites/jpet_team/tests/buyanimal_1_framework_lifecycle.js) (real example)
 
 Pattern every script follows:
 ```javascript

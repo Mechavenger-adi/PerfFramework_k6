@@ -34,7 +34,7 @@ export interface DebugReplayOptions {
   vus?: number;
   iterations?: number;
   noCookiesReset?: boolean;
-  /** Team environment configs (scrum_suites from the loaded environment file). */
+  /** Team environment configs (testSuites from the loaded environment file). */
   teamEnvironments?: Record<string, unknown>;
   /** Error behavior for the debug run (continue | stop_iteration | stop_vu | abort_test). Defaults to 'continue'. */
   errorBehavior?: string;

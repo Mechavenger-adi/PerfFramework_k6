@@ -12,8 +12,8 @@ export interface TeamEnvironmentOverride {
 export interface EnvironmentConfig {
     /** Logical name of the environment: dev | staging | uat | prod */
     name: string;
-    /** Per-team configurations keyed by scrum_suites/<team> folder name */
-    scrum_suites?: Record<string, TeamEnvironmentOverride>;
+    /** Per-team configurations keyed by testSuites/<team> folder name */
+    testSuites?: Record<string, TeamEnvironmentOverride>;
 }
 export type ErrorBehavior = 'continue' | 'stop_iteration' | 'stop_vu' | 'abort_test';
 export type ThinkTimeMode = 'fixed' | 'random';

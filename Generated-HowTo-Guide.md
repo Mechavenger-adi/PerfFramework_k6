@@ -47,7 +47,7 @@ The framework uses a clear and organized folder structure to separate concerns:
 │
 ├── /core_engine/src          ← Framework internals (do not edit)
 │
-├── /scrum_suites             ← Your team's test suites live here
+├── /testSuites             ← Your team's test suites live here
 │   └── /<your-team>
 │       ├── /tests            ← Your journey scripts (.js or .ts)
 │       ├── /data             ← Test data files (e.g., .csv, .json)
@@ -76,7 +76,7 @@ The framework provides a CLI command to scaffold a new sample test suite.
 npm run cli -- init
 ```
 
-This will create a new directory inside `scrum_suites` containing a sample project structure and files. You can rename the created directory to match your team or project name.
+This will create a new directory inside `testSuites` containing a sample project structure and files. You can rename the created directory to match your team or project name.
 
 ### Step 2: Set Up the Environment
 
@@ -118,7 +118,7 @@ The `config/runtime_settings/default.json` file controls the global behavior of 
 
 ### Step 4: Write a Journey Script
 
-A journey script is a standard k6 script that simulates a user's actions. Create a new file in your team's `tests` directory (e.g., `scrum_suites/my-new-team/tests/browse.js`).
+A journey script is a standard k6 script that simulates a user's actions. Create a new file in your team's `tests` directory (e.g., `testSuites/my-new-team/tests/browse.js`).
 
 **Example `browse.js`:**
 ```javascript
@@ -177,7 +177,7 @@ The test plan is a JSON file in the `config/test_plans` directory that brings ev
   }
 }
 ```
-*Note: The framework will automatically find `browse.js` inside the `scrum_suites` directory.*
+*Note: The framework will automatically find `browse.js` inside the `testSuites` directory.*
 
 ### Step 6: Validate the Test Plan
 
@@ -307,9 +307,9 @@ The framework provides a set of CLI commands for common tasks.
 *   `npm run cli -- run --plan <path-to-plan>`: Runs a test plan.
 *   `npm run cli -- generate-byos <team> <script>`: Generates a template for an existing k6 script.
 *   `npm run cli -- generate <your-team> <script-name> --har <path-to-har>`: Generates a journey script from a HAR file and interactively asks which domains to include and whether to keep static assets.
-*     `npm run cli -- generate sample_team login-test --har scrum_suites/sample_team/recordings/sample-login-flow.har`
+*     `npm run cli -- generate sample_team login-test --har testSuites/sample_team/recordings/sample-login-flow.har`
 *   The generator also writes a normalized recording log JSON file so replay comparison can match by `harEntryId` instead of relying only on URL/order.
-*   The generator updates a suite-local registry in `scrum_suites/<team>/recordings/.recording-index.json`, which the debug resolver uses to auto-link scripts to their recording logs.
+*   The generator updates a suite-local registry in `testSuites/<team>/recordings/.recording-index.json`, which the debug resolver uses to auto-link scripts to their recording logs.
 
 ## 8. Debug Replay Automation
 
@@ -338,7 +338,7 @@ Use a debug test plan like:
   "user_journeys": [
     {
       "name": "login",
-      "scriptPath": "scrum_suites/sample_team/tests/generated-sample-review.js"
+      "scriptPath": "testSuites/sample_team/tests/generated-sample-review.js"
     }
   ]
 }
@@ -367,7 +367,7 @@ Behavior:
 
 | Problem                      | Likely Cause                                | Solution                                                                 |
 | ---------------------------- | ------------------------------------------- | ------------------------------------------------------------------------ |
-| `Script file not found`      | `scriptPath` in test plan is incorrect.     | Ensure the script exists in one of the `scrum_suites` directories.       |
+| `Script file not found`      | `scriptPath` in test plan is incorrect.     | Ensure the script exists in one of the `testSuites` directories.       |
 | `k6: command not found`      | k6 is not installed or not in your PATH.    | [Install k6](https://grafana.com/docs/k6/latest/set-up/install-k6/).       |
 | `Required variable missing`  | A required secret is not in your `.env` file. | Copy `.env.template` to `.env` and fill in all required values.        |
 | Test fails on `401` or `403` | Script requires authentication.             | Ensure you are handling login and authentication cookies correctly.      |

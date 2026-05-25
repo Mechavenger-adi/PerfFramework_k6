@@ -22,7 +22,7 @@
       - K6_PERF_RUNTIME_METADATA (JSON), K6_PERF_SCENARIO_METADATA (JSON)
       - K6_PERF_PHASES (JSON) — lifecycle phase envelope
       - K6_PERF_BASE_URL / K6_PERF_SERVICE_URLS / K6_PERF_ENV_CUSTOM per journey
-      - team-specific environment overrides resolved from scrum_suites/<team>/... when configured
+      - team-specific environment overrides resolved from testSuites/<team>/... when configured
    c. ThresholdManager.apply() → dynamic SLA thresholds (global + journey + transaction)
    d. buildSummaryTrendStats() → custom percentiles for k6
 10. writeRunManifest() → run-manifest.json

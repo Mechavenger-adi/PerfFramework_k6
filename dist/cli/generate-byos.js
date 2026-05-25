@@ -41,7 +41,7 @@ exports.runGenerateByos = runGenerateByos;
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 function runGenerateByos(teamName, scriptName) {
-    const targetDir = path.join(process.cwd(), 'scrum_suites', teamName, 'tests');
+    const targetDir = path.join(process.cwd(), 'testSuites', teamName, 'tests');
     if (!fs.existsSync(targetDir)) {
         fs.mkdirSync(targetDir, { recursive: true });
     }

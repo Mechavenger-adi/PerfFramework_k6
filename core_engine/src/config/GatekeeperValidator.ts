@@ -32,8 +32,8 @@ export class GatekeeperValidator {
     const autoResolveRecordingLog = plan.debug?.autoResolveRecordingLog !== false;
 
     // -- 1. Environment checks ------------------
-    if (!config.environment.scrum_suites || Object.keys(config.environment.scrum_suites).length === 0) {
-      warnings.push('[Environment] No scrum_suites defined. Scripts will fall back to recorded URLs.');
+    if (!config.environment.testSuites || Object.keys(config.environment.testSuites).length === 0) {
+      warnings.push('[Environment] No testSuites defined. Scripts will fall back to recorded URLs.');
     }
     if (!config.environment.name) {
       failures.push('[Environment] name is missing or empty.');
