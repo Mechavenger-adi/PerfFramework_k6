@@ -40,7 +40,7 @@ Configuration follows a strict merge order utilizing the `ConfigurationManager.t
 
 1. **`.env` variables**: Secrets and tokens.
 2. **CLI arguments**: Flags directly passed during run commands.
-3. **Suite-level / Test Plan**: Specific test-plan SLAs and journey behavior (e.g., `load-test.json`).
+3. **Suite-level / Test Plan**: Specific test-plan SLAs and journey behavior (e.g., `load_test.json`).
 4. **Runtime settings**: General `runtime_settings/default.json` controlling things like random think-time padding, error overrides, and pacing.
 5. **Environment Config**: Environment-specific settings (e.g., `environments/dev.json`), usually pointing to specific base URLs.
 6. **Framework defaults**: Built-in fallback values.
@@ -82,7 +82,7 @@ For humans, prefer:
 
 To run a test, you typically need to create or utilize three main components: a Test Plan, Correlation Rules (optional but recommended), and the actual Test Journey script.
 
-### A. Test Plan (`config/test_plans/load-test.json`)
+### A. Test Plan (`config/test_plans/load_test.json`)
 
 The Test Plan JSON dictates *how* the tests will run (the workload model). It splits test load by weights across journeys without you needing to do the math to allocate VUs mechanically.
 

@@ -83,7 +83,7 @@ You do not define k6 `options` inside the scripts. You control execution purely 
 1. **Global Settings**: Edit `config/runtime_settings/default.json` to define global `thinkTime`, `pacing`, and `errorBehavior` (e.g., `continue` or `stop_iteration`).
 2. **Execution & Load Profile**: Create a JSON test plan in `config/test_plans/`. Define your `user_journeys` and the `global_load_profile`. The framework dynamically allocates parallel testing behavior natively.
 
-**Example Test Plan (`config/test_plans/my-load-test.json`):**
+**Example Test Plan (`config/test_plans/my-load_test.json`):**
 ```json
 {
   "name": "Release Test",
@@ -120,11 +120,11 @@ Before running a massive load test, validate your configurations. Once validated
 
 **Command (Pre-flight Validation):**
 ```bash
-npx tsx core_engine/src/cli/run.ts validate --plan config/test_plans/my-load-test.json
+npx tsx core_engine/src/cli/run.ts validate --plan config/test_plans/my-load_test.json
 ```
 
 **Command (Execute Test for CI/CD Pipeline):**
 ```bash
-npx tsx core_engine/src/cli/run.ts run --plan config/test_plans/my-load-test.json
+npx tsx core_engine/src/cli/run.ts run --plan config/test_plans/my-load_test.json
 ```
 *(In a CI environment, you would abstract this in your `package.json` under `"scripts": { "test": "..." }` and execute `npm test`).*

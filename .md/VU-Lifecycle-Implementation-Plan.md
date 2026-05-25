@@ -383,7 +383,7 @@ VUs
 
 ### Step 8: Update sample test plans
 
-- Add lifecycle example to `config/test_plans/load-test.json`
+- Add lifecycle example to `config/test_plans/load_test.json`
 - Optionally create a `config/test_plans/spike-test.json` example
 
 ---
@@ -620,7 +620,7 @@ export default function () {
 | `core_engine/src/scenario/ScenarioBuilder.ts` | New method + env injection | `computePhases()`, `K6_PERF_PHASES` env var |
 | `core_engine/src/recording/ScriptGenerator.ts` | Lifecycle-aware code generation | Conditional wrapping of init/action/end groups |
 | `core_engine/src/recording/ScriptConverter.ts` | Optional lifecycle parameter | Same wrapping for converted scripts |
-| `config/test_plans/load-test.json` | Add lifecycle example | Sample config |
+| `config/test_plans/load_test.json` | Add lifecycle example | Sample config |
 
 **No changes to:** `ReplayRunner.ts`, `HTMLDiffReporter.ts`, `PipelineRunner.ts`, `transaction.ts`, `ThresholdManager.ts`, `SLARegistry.ts`, `ExecutorFactory.ts`, `WorkloadModels.ts`, `JourneyAllocator.ts`, `ParallelExecutionManager.ts`
 

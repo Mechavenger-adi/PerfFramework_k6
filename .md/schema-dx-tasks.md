@@ -12,8 +12,8 @@
 - [x] **1.2** Create `config/schemas/test-plan.schema.json` — covers all plan fields including SLAs, debug, hybrid
 - [x] **1.3** Create `config/schemas/environment.schema.json` — environment config schema
 - [x] **1.4** Add `$schema` to `config/runtime_settings/default.json`
-- [x] **1.5** Add `$schema` to `config/test_plans/load-test.json`
-- [x] **1.6** Add `$schema` to `config/test_plans/webui-load-test.json`
+- [x] **1.5** Add `$schema` to `config/test_plans/load_test.json`
+- [x] **1.6** Add `$schema` to `config/test_plans/webui-load_test.json`
 - [x] **1.7** Add `$schema` to `config/environments/dev.json`
 - [x] **1.8** Update `SchemaValidator.ts` to load schemas from `.schema.json` files instead of inline objects
 - [x] **1.9** Update `init.ts` scaffold to include `$schema` in generated configs

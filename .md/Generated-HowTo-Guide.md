@@ -150,7 +150,7 @@ export default function () {
 
 The test plan is a JSON file in the `config/test_plans` directory that brings everything together.
 
-**Example `config/test_plans/my-load-test.json`:**
+**Example `config/test_plans/my-load_test.json`:**
 ```json
 {
   "name": "My First Load Test",
@@ -184,7 +184,7 @@ The test plan is a JSON file in the `config/test_plans` directory that brings ev
 Before running the test, use the `validate` command to check your configuration for errors.
 
 ```bash
-npm run cli -- validate --plan config/test_plans/my-load-test.json
+npm run cli -- validate --plan config/test_plans/my-load_test.json
 ```
 
 This will check for issues like missing files, invalid schemas, and incorrect configurations.
@@ -194,7 +194,7 @@ This will check for issues like missing files, invalid schemas, and incorrect co
 Once validation passes, run the test using the `run` command.
 
 ```bash
-npm run cli -- run --plan config/test_plans/my-load-test.json
+npm run cli -- run --plan config/test_plans/my-load_test.json
 ```
 
 You can also use various options to customize the run:
@@ -347,7 +347,7 @@ Use a debug test plan like:
 Run it with:
 
 ```bash
-npm run cli -- run --plan config/test_plans/debug-test.json
+npm run cli -- run --plan config/test_plans/debug_test.json
 ```
 
 Behavior:

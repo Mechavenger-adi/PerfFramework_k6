@@ -494,7 +494,7 @@ k6-framework init
 k6-framework validate
 k6-framework generate-byos my_team script-name
 k6-framework generate --har ./recordings/checkout.har
-k6-framework run --plan ./config/test_plans/load-test.json
+k6-framework run --plan ./config/test_plans/load_test.json
 ```
 
 ### Bring Your Own Scripts (BYOS)

@@ -270,7 +270,7 @@ Enhance `init` or add a `new` command with `inquirer`-style prompts:
 ? Enable debug replay mode? No
 ? Enable host monitoring? No
 
-✔ Created: config/test_plans/my-load-test.json
+✔ Created: config/test_plans/my-load_test.json
 ✔ Created: config/runtime_settings/my-load-test-runtime.json
 ```
 
@@ -364,7 +364,7 @@ Switch config files from `.json` to `.jsonc` (JSON with Comments). VS Code suppo
 Add a `config inspect` CLI command:
 
 ```bash
-npm run cli -- config inspect --plan config/test_plans/load-test.json
+npm run cli -- config inspect --plan config/test_plans/load_test.json
 ```
 
 ```

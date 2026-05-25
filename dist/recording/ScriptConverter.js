@@ -398,6 +398,21 @@ class ScriptConverter {
                 const varPattern = new RegExp(`\\b${lastOldResponseVar}\\b`, 'g');
                 emitLine = emitLine.replace(varPattern, lastResponseResName);
             }
+            // Convert standalone `check(` calls to the framework's `k6Check(`.
+            // The look-ahead block above already catches `check()` lines that appear
+            // directly after an HTTP call. This fallback handles patterns that the
+            // look-ahead misses:
+            //   • assignment forms: `const ok = check(res, {...});`
+            //   • checks not adjacent to an http call (e.g. separated by other statements)
+            //   • checks inside conditionals: `if (check(res, {...})) { ... }`
+            // Regex notes:
+            //   • `(?<![.\w])` — negative lookbehind so we don't match `obj.check(` or
+            //     `precheck(`. Empty matches allowed (start of line).
+            //   • case-sensitive — won't touch `k6Check(` (capital C).
+            //   • skip pure comment lines so commented-out checks stay commented.
+            if (!emitLine.trimStart().startsWith('//')) {
+                emitLine = emitLine.replace(/(?<![.\w])check\s*\(/g, 'k6Check(');
+            }
             // Rewrite correlation_vars assignment to use trackCorrelation
             // Pattern: `correlation_vars["key"] = match[1];` → `correlation_vars["key"] = trackCorrelation("key", match[1], "body");`
             const corrSetMatch = emitLine.match(/^(\s*)correlation_vars\s*\[\s*["']([^"']+)["']\s*\]\s*=\s*(.+?)\s*;\s*$/);
@@ -474,6 +489,12 @@ class ScriptConverter {
         return lastImportOrTrend + 1;
     }
     static matchHttpCall(line) {
+        // Skip commented-out lines — preserves `// const res = http.get(...)` as a
+        // comment rather than re-emitting it as a live request() call (which would
+        // also reference variables that were never declared).
+        const trimmed = line.trimStart();
+        if (trimmed.startsWith('//'))
+            return null;
         // Match: `let/const res = http.get(...)`, `resp = http.request(...)`, or `http.get(...)`
         const match = line.match(/(?:(?:(?:let|const|var)\s+)?(\w+)\s*=\s*)?http\.(get|post|put|patch|del|request)\s*\(/);
         if (!match)

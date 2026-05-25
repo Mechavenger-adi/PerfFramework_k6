@@ -47,13 +47,31 @@ Enterprise-grade k6 performance testing framework with:
 
 ### CLI Commands
 ```bash
-npm run cli -- init                            # Scaffold project
-npm run cli -- generate <team> <name> --har <path>  # HAR → k6 script
-npm run cli -- generate-byos <team> <name>     # BYOS template
-npm run cli -- convert <input> <team> <name> [--in-place]  # Convert conventional k6 → framework
-npm run cli -- validate --plan <path>          # Pre-flight check
-npm run cli -- run --plan <path> [--debug]     # Execute test plan
-npm run cli -- debug --script <path>           # Debug replay
+npm run cli -- init                                            # Scaffold project (copies framework schemas into the new project)
+npm run cli -- new                                             # Interactive wizard: create a test plan or runtime settings from templates
+npm run cli -- docs                                            # Auto-generate Markdown reference docs from JSON schemas
+npm run cli -- templates list [--type test_plans|runtime_settings]   # List built-in templates
+npm run cli -- generate <team> <name> --har <path>             # HAR recording → framework-shaped k6 script
+npm run cli -- generate-byos <team> <name>                     # BYOS (Bring Your Own Script) scaffold for pasting raw k6
+npm run cli -- convert <input> <team> <name> [--in-place]      # Convert conventional k6 → framework-shaped script
+npm run cli -- import curl <team> <name> --curl '<curl>'       # cURL string → framework script (Phase 1 of Request Import)
+npm run cli -- import curl <team> <name> --file <path>         # Multi-curl file (blank-line separated, `# name` comments) → script
+npm run cli -- import postman <team> <name> --file <coll.json> # Postman v2.1 collection → framework script (Phase 2)
+npm run cli -- import postman <team> <name> --file <coll.json> --folder <name>  # Filter to a single top-level folder
+npm run cli -- validate --plan <path>                          # Pre-flight check
+npm run cli -- run --plan <path> [--debug]                     # Execute test plan through k6
+npm run cli -- debug --script <path>                           # Single-iteration debug replay → HTML diff report
+```
+
+**Shortcut scripts** (in `package.json`):
+```bash
+npm run import:curl -- <team> <name> --curl '<curl>'         # Faster alias for `cli -- import curl`
+npm run import:postman -- <team> <name> --file <coll.json>   # Faster alias for `cli -- import postman`
+npm run import -- <subcommand> ...                           # Parent `import` command
+npm run generate -- <team> <name> --har <path>         # Faster alias for `cli -- generate`
+npm run validate -- --plan <path>
+npm run loadtest                                       # Runs default load_test plan
+npm run debugtest                                      # Runs default debug_test plan
 ```
 
 ### Run Command Options
@@ -85,7 +103,7 @@ K6-PerfFramework/
 |- config/
 |  |- environments/                    # Environment JSON files
 |  |- runtime_settings/                # Runtime, reporting, error, monitoring defaults
-|  |- test_plans/                      # debug-test.json, load-test.json, webui-load-test.json
+|  |- test_plans/                      # debug_test.json, load_test.json, webui-load_test.json
 |  |  `- templates/                    # Executor templates: ramping-vus, constant-vus, shared-iterations, per-vu-iterations, constant-arrival-rate, ramping-arrival-rate, externally-controlled
 |  `- correlation-rules/               # Reserved global rules folder
 |- core_engine/
@@ -129,9 +147,9 @@ K6-PerfFramework/
 │   ├── environments/dev.json          # baseUrl: https://test-api.k6.io
 │   ├── runtime_settings/default.json  # thinkTime, pacing, http, errorBehavior
 │   ├── test_plans/
-│   │   ├── debug-test.json            # 1 VU, 1 iter, debug diff mode
-│   │   ├── load-test.json             # ramping-vus 5 peak, 2 journeys 50/50
-│   │   └── webui-load-test.json       # ramping-vus 10 peak, 2 journeys 60/40
+│   │   ├── debug_test.json            # 1 VU, 1 iter, debug diff mode
+│   │   ├── load_test.json             # ramping-vus 5 peak, 2 journeys 50/50
+│   │   └── webui-load_test.json       # ramping-vus 10 peak, 2 journeys 60/40
 │   └── correlation-rules/             # (empty — rules live per-team in testSuites)
 ├── core_engine/
 │   ├── DOCS_METHODS.md                # Full API method reference
@@ -658,7 +676,7 @@ flowchart LR
 - **Scripts (2):** homepage-journey.js (HomePage/News/Contacts/Pi transactions), login-journey.js (Login/Submit/Messages/Form/Logout)
 - **HowTo guide:** HowTo-WebUI-Test.md (comprehensive setup + execution guide)
 - **Target:** https://test.k6.io | **Credentials:** admin/123
-- **Load plan:** webui-load-test.json (10 peak VUs, 60% homepage / 40% login, SLA: p95<2000ms, errorRate<10%)
+- **Load plan:** webui-load_test.json (10 peak VUs, 60% homepage / 40% login, SLA: p95<2000ms, errorRate<10%)
 
 ### my_team (Minimal)
 - **Scripts (2):** homepage-journey.js, login-journey.js
@@ -728,7 +746,7 @@ For each journey in test plan:
 }
 ```
 
-### config/test_plans/debug-test.json (CURRENTLY USED FOR DEBUG REPLAY)
+### config/test_plans/debug_test.json (CURRENTLY USED FOR DEBUG REPLAY)
 ```json
 {
   "name": "Sample Debug Test",
@@ -741,13 +759,13 @@ For each journey in test plan:
 }
 ```
 
-### config/test_plans/load-test.json
+### config/test_plans/load_test.json
 - noCookiesReset: true
 - ramping-vus: 0→5 (10s), steady 5 (30s), 5→0 (10s)
 - Journeys: browse_crocodiles (50%), checkout_crocodiles (50%)
 - SLA: p95 < 3000ms, errorRate < 40%
 
-### config/test_plans/webui-load-test.json
+### config/test_plans/webui-load_test.json
 - noCookiesReset: true
 - ramping-vus: 0→10 (15s), steady 10 (1m), 10→0 (15s)
 - Journeys: buyanimal_1_framework_lifecycle (100%)
@@ -801,7 +819,7 @@ For each journey in test plan:
 ## LAST SUCCESSFUL COMMAND
 
 ```bash
-npm run cli -- run --plan config/test_plans/debug-test.json
+npm run cli -- run --plan config/test_plans/debug_test.json
 # Exit Code: 0
 # Ran debug-test with buyanimal_raw.js (HAR-generated script, jpet_team)
 # Clean phase-based terminal output:
@@ -832,7 +850,7 @@ npm run cli -- run --plan config/test_plans/debug-test.json
 - **What:** Created AGENT-CONTEXT.md with full codebase analysis
 - **Scope:** All 11 core_engine layers, all config files, all scrum-suite teams, all documentation
 - **Status:** Framework at 81% completion (Phase 1-3 done, Phase 4 not started)
-- **Active work:** debug-test.json open in editor, last run was successful debug test against jpetstore
+- **Active work:** debug_test.json open in editor, last run was successful debug test against jpetstore
 
 ### 2026-03-31 — HTML Diff Report Body Visibility & Redirect-Awareness Fix
 - **What:** Modified `core_engine/src/debug/HTMLDiffReporter.ts` and `core_engine/src/debug/DiffChecker.ts`
@@ -912,9 +930,9 @@ npm run cli -- run --plan config/test_plans/debug-test.json
 - **Config location:** `config/runtime_settings/default.json` → `debug.failOnMissingRecordingLog`
 
 ### 2026-03-31 — Disabled Debug in Load-Test Plan for BYOS Scripts
-- **What:** Modified `config/test_plans/load-test.json`
+- **What:** Modified `config/test_plans/load_test.json`
 - **Why:** `browse-journey.js` and `checkout-journey.js` are BYOS scripts without `logExchange()` calls. Running them with `debug.enabled: true` causes k6 failures because the replay pipeline expects `[k6-perf][replay-log]` output.
-- **Fix:** Set `"debug": { "enabled": false }` in `load-test.json`. BYOS scripts need framework conversion (via `convert` command) before debug mode works.
+- **Fix:** Set `"debug": { "enabled": false }` in `load_test.json`. BYOS scripts need framework conversion (via `convert` command) before debug mode works.
 
 ### 2026-03-31 — Script Converter CLI Command
 - **What:** Created `core_engine/src/recording/ScriptConverter.ts`, `core_engine/src/cli/convert.ts`; Modified `core_engine/src/cli/run.ts`, `package.json`
@@ -1100,8 +1118,8 @@ npm run cli -- run --plan config/test_plans/debug-test.json
   >    Report: buyanimal_raw.diff.html
   ```
 
-### 2026-04-03 — debug-test.json: Switched to buyanimal_raw.js
-- **What:** Modified `config/test_plans/debug-test.json`
+### 2026-04-03 — debug_test.json: Switched to buyanimal_raw.js
+- **What:** Modified `config/test_plans/debug_test.json`
 - **Why:** Switched active debug test from converted `buyanimal_new.js` (20 requests) to HAR-generated `buyanimal_raw.js` (29 requests, full jpetstore buy-a-dog flow including static assets) for more comprehensive testing.
 - **Journey:** `buyanimal_raw`, scriptPath `buyanimal_raw.js`, recording `buyanimal_raw.recording-log.json`
 
@@ -1609,15 +1627,15 @@ npm run cli -- run --plan config/test_plans/debug-test.json
   - `core_engine/src/config/SchemaValidator.ts`
   - `config/runtime_settings/default.json`
   - `dist/config/SchemaValidator.js`
-- **Why:** Existing commands like `npm run cli -- run --plan config/test_plans/webui-load-test.json` were failing before execution because older runtime files lacked the newly introduced optional sections.
-- **Verification outcome:** Config validation now gets past the runtime_settings stage. The next visible blocker in `webui-load-test.json` is a missing journey script path (`buyanimal_1.framework-lifecycle-journey.js`), which is separate from runtime schema validation.
+- **Why:** Existing commands like `npm run cli -- run --plan config/test_plans/webui-load_test.json` were failing before execution because older runtime files lacked the newly introduced optional sections.
+- **Verification outcome:** Config validation now gets past the runtime_settings stage. The next visible blocker in `webui-load_test.json` is a missing journey script path (`buyanimal_1.framework-lifecycle-journey.js`), which is separate from runtime schema validation.
 
 ### 2026-04-06 - RuntimeConfigManager Reporting Fallback Fix
 - **What:** Hardened `RuntimeConfigManager` so reporting/error/monitoring accessors fall back to `FRAMEWORK_DEFAULTS` when merged runtime config is partial or stale.
 - **Files updated:**
   - `core_engine/src/config/RuntimeConfigManager.ts`
   - `dist/config/RuntimeConfigManager.js`
-- **Why:** `tsx core_engine/src/cli/run.ts run --plan config/test_plans/webui-load-test.json` was crashing in `getTransactionStats()` with `transactionStats is not iterable`.
+- **Why:** `tsx core_engine/src/cli/run.ts run --plan config/test_plans/webui-load_test.json` was crashing in `getTransactionStats()` with `transactionStats is not iterable`.
 - **Verification outcome:** The crash is resolved; the run now proceeds into k6 execution. Remaining failures observed are run-environment/network related (blocked outbound access to `jpetstore.aspectran.com`) and report-path polish, not runtime-config accessor crashes.
 
 ### 2026-04-08 - Cookie Persistence Fix: noCookiesReset (Root Cause of 302 Errors)
@@ -1661,10 +1679,10 @@ npm run cli -- run --plan config/test_plans/debug-test.json
 ### 2026-04-08 - Test Plan JSON Files Updated
 - **What:** Added `noCookiesReset: true` to all three test plan JSON files.
 - **Files modified:**
-  - `config/test_plans/webui-load-test.json` — added `noCookiesReset: true`
-  - `config/test_plans/debug-test.json` — added `noCookiesReset: true`
-  - `config/test_plans/load-test.json` — added `noCookiesReset: true`
-- **Note:** `debug-test.json` points to `buyanimal_1_framework_lifecycle.js` (framework lifecycle script) with 5 iterations. `webui-load-test.json` also uses this script for load testing.
+  - `config/test_plans/webui-load_test.json` — added `noCookiesReset: true`
+  - `config/test_plans/debug_test.json` — added `noCookiesReset: true`
+  - `config/test_plans/load_test.json` — added `noCookiesReset: true`
+- **Note:** `debug_test.json` points to `buyanimal_1_framework_lifecycle.js` (framework lifecycle script) with 5 iterations. `webui-load_test.json` also uses this script for load testing.
 
 ### 2026-04-08 — Fix p(99) Percentile Not Showing in Results
 - **Root cause:** Two bugs prevented `p(99)` from appearing despite being configured in `default.json`:
@@ -1681,7 +1699,7 @@ npm run cli -- run --plan config/test_plans/debug-test.json
   - `core_engine/src/types/TestPlanSchema.ts` — `SLADefinition` now uses index signature `[key: string]: number | undefined` with regex-matched percentile keys (any `pNN` or `pNN.N` pattern). Added `transaction_slas?: Record<string, SLADefinition>` to `TestPlan`.
   - `core_engine/src/assertions/ThresholdManager.ts` — Fully rewritten. `apply()` now dynamically iterates SLA keys matching `/^p(\d+(?:\.\d+)?)$/` instead of hardcoding p90/p95/p99. Consumes all three SLA tiers: `global_sla` → `http_req_duration`, `journey_slas` → `http_req_duration{scenario:name}` + `http_req_failed{scenario:name}`, `transaction_slas` → Trend metric by name. New `collectPercentiles(plan)` method returns all percentile values from all SLA definitions.
   - `core_engine/src/cli/run.ts` — `summaryTrendStats` now collects percentiles from BOTH `transactionStats` config AND `ThresholdManager.collectPercentiles(plan)`, ensuring k6 computes any percentile referenced in SLAs.
-  - `config/test_plans/webui-load-test.json` — Added example `journey_slas` and `transaction_slas` sections.
+  - `config/test_plans/webui-load_test.json` — Added example `journey_slas` and `transaction_slas` sections.
 - **SLA tiers (all config-driven, no code changes needed for new percentiles):**
   1. `global_sla` — applies to all HTTP requests globally
   2. `journey_slas` — per-scenario (keyed by journey name)  
@@ -1809,7 +1827,7 @@ npm run cli -- run --plan config/test_plans/debug-test.json
   - `config/schemas/environment.schema.json` — environment config with serviceUrls and custom fields
 - **Modified files:**
   - `config/runtime_settings/default.json` — added `$schema` reference
-  - `config/test_plans/load-test.json`, `webui-load-test.json` — added `$schema` references
+  - `config/test_plans/load_test.json`, `webui-load_test.json` — added `$schema` references
   - `config/environments/dev.json` — added `$schema` reference
   - `core_engine/src/config/SchemaValidator.ts` — loads external schema files with inline fallback, allows `$schema` property, enhanced enum error messages to show allowed values
   - `core_engine/src/cli/init.ts` — scaffolds `config/schemas/` directory, adds `$schema` to generated configs, uses `getFrameworkThinkTime` in sample scripts
@@ -1916,3 +1934,37 @@ npm run cli -- run --plan config/test_plans/debug-test.json
   - Import preservation — Converter now detects and skips duplicate lifecycle.js and session.js imports when preserving source imports.
 - **Why:** ScriptConverter's output had diverged from ScriptGenerator's conventions: used `dist/` paths, didn't import session utilities, didn't clean up `variableEvents`, and didn't fix stale import paths in re-converted scripts.
 - **Verification:** `tsc --noEmit` passes. Converter output now matches ScriptGenerator patterns for imports, request definition shape, and lifecycle contract.
+
+
+### 2026-05-25 - Request Import — Phase 1 (cURL)
+- **What:** New `import curl <team> <script-name>` CLI command produces a framework-shaped k6 script from a cURL command. Single-curl (`--curl '<string>'`) and multi-curl-file (`--file <path>`) modes both supported. Multi-curl files honor a leading `# Transaction name` comment per blank-line-separated block to name each transaction.
+- **Files added:**
+  - `core_engine/src/recording/CurlAdapter.ts` — In-house cURL parser. No external dependency. Produces synthetic `HAREntry[]` so the existing `ScriptGenerator` emits the script unchanged. Subset supported: `-X`/`--request`, `-H`/`--header`, `-d`/`--data`/`--data-raw`/`--data-binary`/`--data-ascii` (with `@file` resolution), `-u user:pass` (→ base64 `Authorization: Basic ...`), `-A`/`--user-agent`, `-e`/`--referer`, `-b`/`--cookie`, multi-line `\` continuations. Unknown/unsupported flags emit warnings — never crash.
+  - `core_engine/src/cli/import.ts` — `runImportCurl` entry point. Funnels synthetic `HAREntry[]` through a single `TransactionGroup` per curl block, then calls `ScriptGenerator.generate()`. Refuses to overwrite existing files.
+- **Files modified:**
+  - `core_engine/src/cli/run.ts` — Registered `import` parent and `import curl <team> <script-name>` subcommand. Options: `--curl <string>`, `--file <path>`, `--transaction-name <name>`. Exactly one of `--curl` or `--file` required.
+  - `package.json` — Added `import` and `import:curl` script shortcuts plus other missing aliases (`new`, `docs`, `templates`, `generate:byos`, `debug`, `run`, `debugtest`).
+- **Architectural decisions:**
+  - **No new IR.** Adapter produces `HAREntry[]` directly. Adding a separate `RequestSpec` IR would duplicate fields already in `HAREntry` and create permanent translation tax.
+  - **One pipeline, multiple adapters.** Future Postman (Phase 2) and OpenAPI (Phase 3) adapters will produce the same `HAREntry[]` and reuse `ScriptGenerator` without changes.
+  - **Dumb 1:1 translation.** v1 has no correlation hinting, no parameterization detection, no auth-flow generation. Hardcoded values + default `k6Check(res, { 'status is 2xx': ... })`. Users iterate from there.
+- **Bug fixed mid-implementation:** Tokenizer was dropping empty quoted strings (`-d ''`) — added a `started` flag so empty tokens still flush. Real curls do this regularly.
+- **Smoke-tested:** single POST with JSON body + basic auth, and a 3-block multi-curl file with named transactions, mixed methods, empty body, Bearer token. Both produced framework-compliant scripts with `transaction()`/`request()`/`k6Check()`, hoisted env baseUrl, lifecycle phases, and `thinktime()` between transactions.
+- **Deferred (per design contract):** Append mode (AST surgery), interactive wizard, smart emission, OAuth flows. See `ai_context/design-proposals.md` → "Request Import" for the full phased plan.
+
+### 2026-05-26 - Request Import — Phase 2 (Postman)
+- **What:** New `import postman <team> <script-name> --file <collection.json> [--folder <name>]` CLI command. Produces a framework-shaped k6 script from a Postman Collection v2.1 JSON file.
+- **Files added:**
+  - `core_engine/src/recording/PostmanAdapter.ts` — In-house Postman v2.1 parser. No external dependency (deviation from earlier sketch that named `postman-collection` SDK; rationale: same as cURL — well-documented stable schema, dumb 1:1 doesn't need the SDK runtime model). Recursively walks `item[]`, treats folders as `TransactionGroup`s, requests as `HAREntry`s. Nested folders flatten with dot notation (`API.Auth.Login`). Top-level requests get their own single-entry group named after the request. Handles `request.url` (string or object), `request.header` (array or raw string, filters `disabled: true`), `request.body` (raw with language-aware MIME, urlencoded, formdata as warning + JSON repr, file/none), `request.auth` (request-level only: bearer/basic/apikey → headers; oauth2/digest → warning). Pre-request/test scripts surface as console warnings (not in-script TODO comments — would have required ScriptGenerator changes, violating the "no emitter changes in Phase 2" constraint).
+- **Files modified:**
+  - `core_engine/src/cli/import.ts` — Added `runImportPostman()` + `ImportPostmanOptions`. Extracted shared `emitScript()` helper that both cURL and Postman paths now use (file writing, warning display, next-steps messaging). Header comment updated to mention both phases.
+  - `core_engine/src/cli/run.ts` — Registered `import postman <team> <script-name>` subcommand with `--file <path>` (required) and `--folder <name>` (optional, direct top-level match only).
+  - `package.json` — Added `import:postman` script alias.
+  - `.md/AGENT-CONTEXT.md` — Added Postman commands to CLI table.
+  - `ai_context/design-proposals.md` and `ai_context/todos.md` — Phase 2 marked IMPLEMENTED with deviation note about pre-request/test scripts.
+- **Architectural decisions:**
+  - **No new IR.** Adapter produces `TransactionGroup[]` directly (containing synthetic `HAREntry` objects). Reuses the same shape ScriptGenerator already consumes.
+  - **No emitter changes.** ScriptGenerator was not modified; pre-request/test scripts surface as warnings rather than embedded TODO comments. Documented tradeoff in design proposal.
+  - **Request-level auth only.** Folder/collection auth cascade is out of scope for v2; flagged as a warning when seen. Resolving cascades requires propagating parent auth through the recursion — possible but adds complexity. Defer until users ask.
+- **Smoke-tested:** v2.1 collection with (1) top-level request, (2) nested `Auth` folder with bearer-auth Whoami + raw-JSON Login with disabled header + prerequest script, (3) `Cart` folder with urlencoded body + basic auth + query string. Output: 3 transactions (Health_Check, Auth, Cart) containing 4 requests total, baseUrl hoisted to env, `Authorization: Bearer tok-123` / `Authorization: Basic YWRtaW46c2VjcmV0` correctly emitted, urlencoded body `productId=PROD-1&qty=2` (disabled `skip` filtered), prerequest script triggered a clear console warning. `--folder Auth` filter also verified.
+- **Deferred (per design contract):** Insomnia format (Phase 2.5 — thin Insomnia v4 → Postman v2.1 normalizer feeding the same adapter), collection/folder auth cascade, Postman variable resolution against `collection.variable`, environment files (`*.postman_environment.json`).

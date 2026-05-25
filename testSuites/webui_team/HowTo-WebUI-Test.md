@@ -40,7 +40,7 @@ This is a free test application provided by k6, specifically designed for perfor
 ```
 config/
   test_plans/
-    webui-load-test.json          # Test plan (load profile, journeys, SLAs)
+    webui-load_test.json          # Test plan (load profile, journeys, SLAs)
 testSuites/
   webui_team/
     tests/
@@ -54,12 +54,12 @@ testSuites/
 
 ### Step 1: Validate the test plan
 ```bash
-npx tsx core_engine/src/cli/run.ts validate --plan config/test_plans/webui-load-test.json
+npx tsx core_engine/src/cli/run.ts validate --plan config/test_plans/webui-load_test.json
 ```
 
 ### Step 2: Execute the test
 ```bash
-npx tsx core_engine/src/cli/run.ts run --plan config/test_plans/webui-load-test.json
+npx tsx core_engine/src/cli/run.ts run --plan config/test_plans/webui-load_test.json
 ```
 
 ---
@@ -130,9 +130,9 @@ Look for:
 
 | What | Where |
 |------|-------|
-| Change load profile | `config/test_plans/webui-load-test.json` -> `stages` |
-| Adjust VU count | `config/test_plans/webui-load-test.json` -> `target` in stages |
-| Change journey weight | `config/test_plans/webui-load-test.json` -> `weight` per journey |
+| Change load profile | `config/test_plans/webui-load_test.json` -> `stages` |
+| Adjust VU count | `config/test_plans/webui-load_test.json` -> `target` in stages |
+| Change journey weight | `config/test_plans/webui-load_test.json` -> `weight` per journey |
 | Add new transactions | Add sequence to `initTransactions` array and wrap a `group()` block with `startTransaction`/`endTransaction` |
 | Change target website | Update URLs in the journey `.js` files |
 | Add SLA per journey | Add `journey_slas` to the test plan JSON |

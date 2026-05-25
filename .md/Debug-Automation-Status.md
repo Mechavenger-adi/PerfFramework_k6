@@ -39,7 +39,7 @@ This file tracks the agreed work for the debug automation and reporting enhancem
 - Debug replay now captures k6 stdout and stderr into temp files for parsing instead of holding the full console output in memory.
 - Replay-log extraction now stream-parses captured output files, which avoids memory spikes on larger debug runs.
 - Large request and response body comparisons now use a lightweight similarity strategy instead of full Levenshtein distance, so HTML/API payloads can be compared without exhausting Node heap memory.
-- Verified end-to-end debug execution with a real k6 run from `config/test_plans/debug-test.json`, producing both replay-log JSON and HTML diff output successfully.
+- Verified end-to-end debug execution with a real k6 run from `config/test_plans/debug_test.json`, producing both replay-log JSON and HTML diff output successfully.
 - HTML diff report now supports collapsed-by-default request timing summary, collapsible transaction blocks, and collapsible request/response body sections for each request.
 - Request/response header status chips now use readable dark text on light backgrounds so match and diff counts stay visible.
 - Recording-log bodies are now normalized on read so base64 HAR payloads render as decoded text in the HTML diff report when they are human-readable.

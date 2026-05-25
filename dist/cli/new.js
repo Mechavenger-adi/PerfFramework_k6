@@ -70,7 +70,7 @@ function runNewWizard() {
                 return;
             }
             const selectedTemplate = files[idx];
-            rl.question('Enter filename to save as (e.g., my-load-test.jsonc): ', (filename) => {
+            rl.question('Enter filename to save as (e.g., my-load_test.jsonc): ', (filename) => {
                 let finalName = filename.trim() || `my-${typeStr}-1.jsonc`;
                 if (!finalName.endsWith('.json') && !finalName.endsWith('.jsonc')) {
                     finalName += '.jsonc';

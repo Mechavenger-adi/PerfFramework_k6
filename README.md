@@ -112,7 +112,7 @@ npm run build
 npm run typecheck
 
 # Validate a test plan
-npm run validate -- --plan config/test_plans/load-test.json
+npm run validate -- --plan config/test_plans/load_test.json
 
 # Run the default load test plan shortcut
 npm run loadtest
@@ -121,7 +121,7 @@ npm run loadtest
 npm run debug
 
 # Run any test plan
-npm run cli -- run --plan config/test_plans/load-test.json
+npm run cli -- run --plan config/test_plans/load_test.json
 ```
 
 ## Configuration Files
@@ -153,7 +153,7 @@ Runtime settings live in `config/runtime_settings/default.json`. They control th
 Use a custom runtime file with:
 
 ```bash
-npm run cli -- run --plan config/test_plans/load-test.json --runtime config/runtime_settings/default.json
+npm run cli -- run --plan config/test_plans/load_test.json --runtime config/runtime_settings/default.json
 ```
 
 ### Test Plan
@@ -264,27 +264,27 @@ Recommended flow:
 
 ```bash
 npm run build
-npm run validate -- --plan config/test_plans/load-test.json --verbose
-npm run cli -- run --plan config/test_plans/load-test.json
+npm run validate -- --plan config/test_plans/load_test.json --verbose
+npm run cli -- run --plan config/test_plans/load_test.json
 ```
 
 Optional run flags:
 
 ```bash
 # Use explicit environment config
-npm run cli -- run --plan config/test_plans/load-test.json --env-config config/environments/dev.json
+npm run cli -- run --plan config/test_plans/load_test.json --env-config config/environments/dev.json
 
 # Use explicit runtime settings
-npm run cli -- run --plan config/test_plans/load-test.json --runtime config/runtime_settings/default.json
+npm run cli -- run --plan config/test_plans/load_test.json --runtime config/runtime_settings/default.json
 
 # Use a custom .env path
-npm run cli -- run --plan config/test_plans/load-test.json --env-file .env
+npm run cli -- run --plan config/test_plans/load_test.json --env-file .env
 
 # Pass an additional k6 output
-npm run cli -- run --plan config/test_plans/load-test.json --out json=results/raw-k6-output.json
+npm run cli -- run --plan config/test_plans/load_test.json --out json=results/raw-k6-output.json
 
 # Print resolved config/debug information
-npm run cli -- run --plan config/test_plans/load-test.json --debug
+npm run cli -- run --plan config/test_plans/load_test.json --debug
 ```
 
 ## Debug Replay Mode
@@ -300,7 +300,7 @@ npm run debug
 Or run a debug-enabled plan:
 
 ```bash
-npm run cli -- run --plan config/test_plans/debug-test.json
+npm run cli -- run --plan config/test_plans/debug_test.json
 ```
 
 Standalone debug for one script:
@@ -372,7 +372,7 @@ npm run cli -- templates show local-debug --type runtime_settings
 npm run cli -- docs
 
 # Inspect final merged configuration
-npm run cli -- config inspect --plan config/test_plans/load-test.json
+npm run cli -- config inspect --plan config/test_plans/load_test.json
 ```
 
 ## Authoring Journey Scripts

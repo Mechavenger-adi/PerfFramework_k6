@@ -40,7 +40,7 @@ K6-PerfFramework/
 │   └── types/           ← TypeScript interfaces & contracts
 ├── config/              ← User-facing configs
 │   ├── environments/    ← dev.json, staging.json (base URLs)
-│   ├── test_plans/      ← load-test.json, debug-test.json
+│   ├── test_plans/      ← load_test.json, debug_test.json
 │   ├── runtime_settings/← default.json (think time, pacing, error behavior)
 │   └── correlation-rules/← Token extraction rules
 ├── testSuites/        ← Team-owned test scripts

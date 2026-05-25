@@ -50,8 +50,7 @@ function runGenerateByos(teamName, scriptName) {
         console.error(`[FAIL]  Script already exists at: ${scriptPath}`);
         process.exit(1);
     }
-    const template = `import { check } from 'k6';
-import { transaction } from '../../../dist/utils/transaction.js';
+    const template = `import { transaction, k6Check } from '../../../dist/utils/transaction.js';
 import { request } from '../../../dist/utils/request.js';
 import { createJourneyLifecycleStore, runJourneyLifecycle, thinktime } from '../../../dist/utils/lifecycle.js';
 import { clearCookies, getEnvContext } from '../../../dist/utils/session.js';
@@ -73,13 +72,19 @@ export function actionPhase(ctx) {
     //   PASTE YOUR GRAFANA STUDIO / CUSTOM K6 SCRIPT BELOW
     // ==========================================================
     //
-    // Use the framework's request() helper instead of http.* directly so each
-    // call is auto-tagged with the active transaction, replay-logged in debug
-    // mode, and snapshot-captured on 4xx/5xx.
+    // FRAMEWORK RULES (do NOT use raw k6 APIs):
+    //   • Use request() instead of http.get/post/etc. — auto-tags transaction,
+    //     replay-logs in debug mode, snapshots failures.
+    //   • Use k6Check() instead of native k6 check() — records the same metric
+    //     PLUS applies the configured errorBehavior (continue / stop_iteration
+    //     / stop_vu / abort_test) when a check fails.
+    //   • Wrap each logical step in transaction('Name', () => { ... }) for
+    //     hierarchical metrics and lifecycle gating.
+    //   • Use thinktime() between transactions — honors runtime settings.
     //
     // Example:
     //   const res = request('GET', \\\`\\\${env.baseUrl}public/crocodiles/\\\`);
-    //   check(res, { 'status 200': (r) => r.status === 200 });
+    //   k6Check(res, { 'status 200': (r) => r.status === 200 });
     //
     // For correlation, assign to ctx.correlation[...] (auto-tracked via Proxy):
     //   correlation_vars["authToken"] = res.json("token");

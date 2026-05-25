@@ -1,0 +1,11 @@
+# Login
+curl -X POST https://httpbin.org/post \
+  -H "Content-Type: application/json" \
+  -d '{"user":"alice","password":"secret"}'
+
+# Fetch profile
+curl https://httpbin.org/get?id=42 \
+  -H "Authorization: Bearer xyz"
+
+# Logout
+curl -X POST https://httpbin.org/post -d ''

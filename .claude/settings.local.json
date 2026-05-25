@@ -4,7 +4,10 @@
       "Bash(npx tsc *)",
       "Bash(npm run *)",
       "Bash(cat)",
-      "Bash(bash /tmp/rename_subs.sh)"
+      "Bash(bash /tmp/rename_subs.sh)",
+      "Bash(node dist/cli/run.js import --help)",
+      "Bash(node dist/cli/run.js import curl --help)",
+      "Bash(node dist/cli/run.js import curl --curl 'curl -X POST https://httpbin.org/post -H \"Content-Type: application/json\" -H \"Accept: application/json\" -d \"{\\\\\"username\\\\\":\\\\\"alice\\\\\",\\\\\"action\\\\\":\\\\\"login\\\\\"}\" -u admin:secret' --transaction-name login sample_team smoke_login)"
     ]
   }
 }

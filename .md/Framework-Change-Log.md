@@ -167,8 +167,8 @@ Updated source file:
 
 Key outcomes:
 
-- `init` still creates the standard `config/test_plans/load-test.json`
-- `init` now also creates `config/test_plans/debug-test.json`
+- `init` still creates the standard `config/test_plans/load_test.json`
+- `init` now also creates `config/test_plans/debug_test.json`
 - `init` now creates a sample recording log at `testSuites/sample_team/recordings/browse-journey.recording-log.json`
 - The scaffolded next steps now mention the debug test plan as the starting point for replay-diff execution
 

@@ -30,6 +30,24 @@ export function runInit(projectDir: string = process.cwd()): void {
     console.log(`  [PASS]  Created: ${dir}/`);
   }
 
+  // -- Copy JSON schemas from framework into new project -----------
+  // The framework's schemas serve as the single source of truth for validation,
+  // IDE autocomplete, and doc generation. Copying them lets the new project
+  // validate against the rich external schemas instead of falling back to the
+  // limited inline schemas in SchemaValidator.
+  // From dist/cli/init.js (__dirname = dist/cli), two levels up = repo root.
+  const frameworkSchemasDir = path.resolve(__dirname, '..', '..', 'config', 'schemas');
+  if (fs.existsSync(frameworkSchemasDir)) {
+    for (const file of fs.readdirSync(frameworkSchemasDir)) {
+      if (!file.endsWith('.schema.json')) continue;
+      const src = path.join(frameworkSchemasDir, file);
+      const dest = path.join(projectDir, 'config/schemas', file);
+      writeIfNotExists(dest, fs.readFileSync(src, 'utf-8'), `config/schemas/${file}`);
+    }
+  } else {
+    console.log(`  [WARN]  Framework schemas not found at ${frameworkSchemasDir} — skipping schema copy`);
+  }
+
   // -- Sample: environment config --------------
   writeIfNotExists(
     path.join(projectDir, 'config/environments/dev.json'),
@@ -105,7 +123,7 @@ export function runInit(projectDir: string = process.cwd()): void {
 
   // -- Sample: test plan -------------------------
   writeIfNotExists(
-    path.join(projectDir, 'config/test_plans/load-test.json'),
+    path.join(projectDir, 'config/test_plans/load_test.json'),
     JSON.stringify(
       {
         $schema: '../schemas/test-plan.schema.json',
@@ -141,12 +159,12 @@ export function runInit(projectDir: string = process.cwd()): void {
       null,
       2,
     ),
-    'config/test_plans/load-test.json',
+    'config/test_plans/load_test.json',
   );
 
   // -- Sample: debug test plan -------------------
   writeIfNotExists(
-    path.join(projectDir, 'config/test_plans/debug-test.json'),
+    path.join(projectDir, 'config/test_plans/debug_test.json'),
     JSON.stringify(
       {
         $schema: '../schemas/test-plan.schema.json',
@@ -177,7 +195,7 @@ export function runInit(projectDir: string = process.cwd()): void {
       null,
       2,
     ),
-    'config/test_plans/debug-test.json',
+    'config/test_plans/debug_test.json',
   );
 
   // -- Sample: .env template --------------------
@@ -243,10 +261,10 @@ testuser003,P@ssw0rd3,testuser003@perf-test.local
   // -- Sample: browse journey script -------------
   writeIfNotExists(
     path.join(projectDir, 'testSuites/sample_team/tests/browse-journey.js'),
-    `import { check } from 'k6';
-import { transaction } from '../../../dist/utils/transaction.js';
+    `import { transaction, k6Check } from '../../../dist/utils/transaction.js';
 import { request } from '../../../dist/utils/request.js';
 import { createJourneyLifecycleStore, runJourneyLifecycle, thinktime } from '../../../dist/utils/lifecycle.js';
+import { logReplayExchange, trackCorrelation, trackParameter } from '../../../dist/utils/replayLogger.js';
 import { clearCookies, getEnvContext } from '../../../dist/utils/session.js';
 
 const env = getEnvContext('sample_team', { baseUrl: 'https://your-dev-environment.com/' });
@@ -259,14 +277,14 @@ export function initPhase(ctx) {
 export function actionPhase(ctx) {
   transaction('Homepage', () => {
     const res1 = request('GET', \`\${env.baseUrl}\`);
-    check(res1, { 'Homepage: status 2xx': (r) => r.status >= 200 && r.status < 300 });
+    k6Check(res1, { 'Homepage: status 2xx': (r) => r.status >= 200 && r.status < 300 });
   });
 
   thinktime();
 
   transaction('Product_List', () => {
     const res1 = request('GET', \`\${env.baseUrl}products\`);
-    check(res1, { 'ProductList: status 2xx': (r) => r.status >= 200 && r.status < 300 });
+    k6Check(res1, { 'ProductList: status 2xx': (r) => r.status >= 200 && r.status < 300 });
   });
 
   thinktime();
@@ -285,10 +303,10 @@ export default function () {
   // -- Sample: checkout journey script -----------
   writeIfNotExists(
     path.join(projectDir, 'testSuites/sample_team/tests/checkout-journey.js'),
-    `import { check } from 'k6';
-import { transaction } from '../../../dist/utils/transaction.js';
+    `import { transaction, k6Check } from '../../../dist/utils/transaction.js';
 import { request } from '../../../dist/utils/request.js';
 import { createJourneyLifecycleStore, runJourneyLifecycle, thinktime } from '../../../dist/utils/lifecycle.js';
+import { logReplayExchange, trackCorrelation, trackParameter } from '../../../dist/utils/replayLogger.js';
 import { clearCookies, getEnvContext } from '../../../dist/utils/session.js';
 
 const env = getEnvContext('sample_team', { baseUrl: 'https://your-dev-environment.com/' });
@@ -303,7 +321,7 @@ export function initPhase(ctx) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username: 'testuser001', password: 'P@ssw0rd1' }),
     });
-    check(res1, { 'Login: status 200': (r) => r.status === 200 });
+    k6Check(res1, { 'Login: status 200': (r) => r.status === 200 });
     // TODO: extract auth token → ctx.correlation["authToken"] (auto-tracked via Proxy)
   });
 }
@@ -316,7 +334,7 @@ export function actionPhase(ctx) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ productId: 'PROD-001', quantity: 1 }),
     });
-    check(res1, { 'AddToCart: status 2xx': (r) => r.status >= 200 && r.status < 300 });
+    k6Check(res1, { 'AddToCart: status 2xx': (r) => r.status >= 200 && r.status < 300 });
   });
 
   thinktime();
@@ -326,7 +344,7 @@ export function actionPhase(ctx) {
       headers: { 'Content-Type': 'application/json' },
       body: '{}',
     });
-    check(res1, { 'Checkout: status 2xx': (r) => r.status >= 200 && r.status < 300 });
+    k6Check(res1, { 'Checkout: status 2xx': (r) => r.status >= 200 && r.status < 300 });
   });
 
   thinktime();
@@ -347,9 +365,9 @@ export default function () {
   console.log('  1. Copy .env.template -> .env and fill in your values');
   console.log('  2. Update config/environments/dev.json with your base URL');
   console.log('  3. Update scripts in testSuites/sample_team/tests/');
-  console.log('  4. Run: npx tsx core_engine/src/cli/run.ts validate --plan config/test_plans/load-test.json');
-  console.log('  5. Run: npx tsx core_engine/src/cli/run.ts run --plan config/test_plans/load-test.json');
-  console.log('  6. For replay debugging, start from: config/test_plans/debug-test.json\n');
+  console.log('  4. Run: npx tsx core_engine/src/cli/run.ts validate --plan config/test_plans/load_test.json');
+  console.log('  5. Run: npx tsx core_engine/src/cli/run.ts run --plan config/test_plans/load_test.json');
+  console.log('  6. For replay debugging, start from: config/test_plans/debug_test.json\n');
 }
 
 function writeIfNotExists(filePath: string, content: string, label: string): void {

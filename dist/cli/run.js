@@ -61,6 +61,7 @@ const ProgressBar_1 = require("../utils/ProgressBar");
 const convert_1 = require("./convert");
 const generate_1 = require("./generate");
 const generate_byos_1 = require("./generate-byos");
+const import_1 = require("./import");
 const init_1 = require("./init");
 const validate_1 = require("./validate");
 const templates_1 = require("./templates");
@@ -129,6 +130,36 @@ program
     .requiredOption('--har <path>', 'Path to the .har file')
     .action(async (team, scriptName, opts) => {
     await (0, generate_1.runGenerate)(opts.har, team, scriptName);
+});
+// ---------------------------------------------
+// IMPORT command family (Request Import — Phase 1)
+// ---------------------------------------------
+const importCmd = program
+    .command('import')
+    .description('Import requests from external sources (cURL in v1; Postman/OpenAPI planned)');
+importCmd
+    .command('curl <team> <script-name>')
+    .description('Import a cURL command into a framework-shaped k6 script')
+    .option('--curl <string>', 'Inline cURL command string')
+    .option('--file <path>', 'Path to a file containing one or more cURL blocks (blank-line separated; optional `# name` comment names each transaction)')
+    .option('--transaction-name <name>', 'Override the inferred transaction name (single-curl only)')
+    .action(async (team, scriptName, opts) => {
+    await (0, import_1.runImportCurl)(team, scriptName, {
+        curl: opts.curl,
+        file: opts.file,
+        transactionName: opts.transactionName,
+    });
+});
+importCmd
+    .command('postman <team> <script-name>')
+    .description('Import a Postman v2.1 collection into a framework-shaped k6 script')
+    .requiredOption('--file <path>', 'Path to a Postman v2.1 collection JSON file')
+    .option('--folder <name>', 'Only emit requests under this top-level folder (direct match)')
+    .action(async (team, scriptName, opts) => {
+    await (0, import_1.runImportPostman)(team, scriptName, {
+        file: opts.file,
+        folder: opts.folder,
+    });
 });
 // ---------------------------------------------
 // VALIDATE command

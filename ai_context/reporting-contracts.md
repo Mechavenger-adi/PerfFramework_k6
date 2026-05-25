@@ -112,7 +112,7 @@ Columns configurable via `runtime.reporting.transactionStats`.
 
 ```yaml
 # Pipeline reads ci-summary.json, not console output
-- run: npm run cli -- run --plan config/test_plans/load-test.json
+- run: npm run cli -- run --plan config/test_plans/load_test.json
 - run: |
     status=$(jq -r '.status' results/*/Run_*/ci-summary.json)
     if [ "$status" != "passed" ]; then exit 1; fi

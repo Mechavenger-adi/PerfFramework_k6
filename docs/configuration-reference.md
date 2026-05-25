@@ -9,10 +9,7 @@ Defines target environment settings: base URL, optional service URLs, optional p
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `name` | string | **Yes** | Logical environment name. Must match the filename (e.g., 'dev' for dev.json). Referenced by the test plan's 'environment' field. Common values: dev, staging, uat, preprod, prod. |
-| `baseUrl` | string | **Yes** | Primary base URL of the system under test. Exposed to scripts via `K6_PERF_BASE_URL` and used by framework URL helpers such as `resolveFrameworkUrl()`. Example: 'https://api.staging.example.com'. |
-| `serviceUrls` | object | No | Optional secondary base URLs keyed by service name. Use when your application has multiple backends (auth service, API gateway, CDN, etc.). Example: { "auth": "https://auth.example.com", "api": "https://api.example.com" }. |
-| `custom` | object | No | Any additional environment-specific key-value pairs. Accessible via resolvedConfig.environment.custom in the framework. Example: { "tenantId": "tenant-001", "region": "us-east-1", "featureFlags": true }. |
-| `teamOverrides` | object | No | Optional team-specific overrides keyed by the `testSuites/<team>` folder name. Use when multiple teams share an environment name like `dev` but target different hosts. |
+| `testSuites` | object | No | Team-specific environments keyed by the testSuites/<team> folder name. Example: { "retail-ui": { "baseUrl": "https://retail-dev.example.com" } }. |
 
 ## K6-PerfFramework Runtime Settings
 
@@ -21,6 +18,8 @@ Controls think time, pacing, HTTP behavior, error handling, reporting, error cap
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `thinkTime` | object | **Yes** | Simulates user think time (pause) between transaction groups. Applied automatically in generated/converted scripts via sleep(getFrameworkThinkTime()). Realistic think times improve load accuracy by mimicking real user behavior. |
+| `thinkTime.ignoreThinkTime` | boolean | No | If true, skips think time (sleep) entirely regardless of other settings. |
+| `thinkTime.globalOverride` | boolean | No | If true, forces the global think time settings (fixed or random) to override any specific think time values provided in the script. |
 | `thinkTime.mode` | enum (fixed \| random) | **Yes** | fixed — constant delay of 'fixed' seconds between every transaction group. random — uniform random delay between 'min' and 'max' seconds. Tip: Use 'random' for realistic production simulations; 'fixed' for deterministic debugging. |
 | `thinkTime.fixed` | number | No | Think time in seconds when mode='fixed'. Ignored when mode='random'. Example: 1 = one-second pause between transactions. |
 | `thinkTime.min` | number | No | Minimum think time in seconds when mode='random'. Must be less than 'max'. Example: 0.5 = half-second minimum pause. |
@@ -59,7 +58,7 @@ Defines a complete performance test: which journeys to run, how many VUs, what l
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `name` | string | **Yes** | Human-readable name for this test plan. Used in report titles, result folder names, and CI summary output. Example: 'Checkout Flow - Peak Load Test'. |
-| `environment` | string | **Yes** | Target environment name. Must match a config file in config/environments/<name>.json. The framework auto-resolves the environment config and injects per-journey environment URLs into k6 runtime via `K6_PERF_*` env vars. Examples: dev, staging, uat, prod. |
+| `environment` | string | **Yes** | Target environment name. Must match a config file in config/environments/<name>.json. The framework auto-resolves the environment config and injects baseUrl, serviceUrls, and secrets. Examples: dev, staging, uat, prod. |
 | `execution_mode` | enum (parallel \| sequential \| hybrid) | **Yes** | How user journeys are orchestrated: • parallel — All journeys run concurrently, VUs distributed by weight. • sequential — Journeys run one after another using startTime offsets. • hybrid — Mix parallel and sequential groups (requires hybrid_groups). Most common: 'parallel' for load tests, 'sequential' for workflow chains. |
 | `global_load_profile` | object | **Yes** | Default load profile applied to all journeys unless overridden per-journey. Defines the k6 executor type, VU count, stages, and duration. |
 | `global_load_profile.executor` | enum (ramping-vus \| constant-vus \| ramping-arrival-rate \| constant-arrival-rate \| shared-iterations \| per-vu-iterations) | **Yes** | k6 executor type: • ramping-vus — Ramp VUs up/down through stages (most common for load tests). • constant-vus — Fixed VU count for a set duration. • ramping-arrival-rate — Control request rate, not VU count. • constant-arrival-rate — Fixed requests/second. • shared-iterations — Fixed total iterations across all VUs (good for data-driven tests). • per-vu-iterations — Each VU runs a fixed number of iterations. |
@@ -90,3 +89,4 @@ Defines a complete performance test: which journeys to run, how many VUs, what l
 | `debug.reportDir` | string | No | Directory for debug replay output (HTML diff reports, replay logs). Defaults to results/debug/. |
 | `debug.failOnMissingRecordingLog` | boolean | No | When true, validation fails if any journey lacks a recordingLogPath. When false (default), a warning is issued and the journey runs without diff comparison. |
 | `noCookiesReset` | boolean | No | Global cookie persistence setting. • true (default) — Cookies persist across VU iterations (browser-like behavior). • false — Cookie jar is cleared after each iteration. Can be overridden per-journey via journey.noCookiesReset. |
+

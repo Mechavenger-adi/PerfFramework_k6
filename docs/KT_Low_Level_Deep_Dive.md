@@ -7,7 +7,7 @@ This document is designed for engineers seeking to understand the exact mathemat
 ## 1. Engine Orchestration & Load Distribution
 
 ### The Orchestration Pipeline (`cli/run.ts`)
-When `npm run cli -- run --plan config/test_plans/load-test.json` is invoked, the execution strictly follows this synchronously awaited pipeline:
+When `npm run cli -- run --plan config/test_plans/load_test.json` is invoked, the execution strictly follows this synchronously awaited pipeline:
 
 1.  **TestPlanLoader:** Validates the underlying JSON schema strictly using `ajv` (`SchemaValidator.ts`).
 2.  **ConfigurationMerge:** `ConfigurationManager.replace()` deep-merges objects in this order (highest priority overwrites): `.env variables` -> `CLI Overrides` -> `Suite/Plan Config` -> `Runtime JSON (e.g. default.json)` -> `Environment JSON (dev.json)` -> `FRAMEWORK_DEFAULTS`. 
@@ -131,7 +131,7 @@ The absolute heartbeat of the orchestration is `core_engine/src/cli/run.ts`. Bel
 // 1. Loading the Test Plan
 const testPlan = TestPlanLoader.load(options.plan);
 ```
-* **What happens:** The framework reads the `load-test.json`. It passes the JSON directly into `SchemaValidator.ts` which uses `ajv` to strictly evaluate data types (e.g. verifying `stages` is an array of objects containing `duration` and `target`). If validation fails, it throws a fatal error immediately.
+* **What happens:** The framework reads the `load_test.json`. It passes the JSON directly into `SchemaValidator.ts` which uses `ajv` to strictly evaluate data types (e.g. verifying `stages` is an array of objects containing `duration` and `target`). If validation fails, it throws a fatal error immediately.
 
 ```typescript
 // 2. Merging Configuration
