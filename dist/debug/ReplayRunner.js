@@ -40,6 +40,7 @@ const readline = __importStar(require("readline"));
 const PipelineRunner_1 = require("../execution/PipelineRunner");
 const ScenarioBuilder_1 = require("../scenario/ScenarioBuilder");
 const logger_1 = require("../utils/logger");
+const LiveConsoleLogStream_1 = require("../utils/LiveConsoleLogStream");
 const ProgressBar_1 = require("../utils/ProgressBar");
 const DiffChecker_1 = require("./DiffChecker");
 const HTMLDiffReporter_1 = require("./HTMLDiffReporter");
@@ -97,42 +98,52 @@ class ReplayRunner {
         const stamp = new Date().toISOString().slice(0, 19).replace(/[-:.]/g, '_');
         const logOutputPath = path.join(tempDir, `${scriptName}_debug_${stamp}.log`);
         logger_1.Logger.info(`\nRunning k6 debug execution for: ${scriptName}\n`);
-        const runResult = await PipelineRunner_1.PipelineRunner.executeAsync({
-            scriptPath: absScriptPath,
-            k6Options: {
-                noCookiesReset: options.noCookiesReset !== false,
-                scenarios: {
-                    debug_replay: {
-                        executor: 'per-vu-iterations',
-                        vus,
-                        iterations,
-                        env: {
-                            K6_PERF_PHASES: JSON.stringify(ScenarioBuilder_1.ScenarioBuilder.computeDebugPhaseEnvelope({
-                                executor: 'per-vu-iterations',
-                                vus,
-                                iterations,
-                            })),
-                        },
+        // Live tailer pretty-prints script console.log/warn/error and k6 framework
+        // errors in real time while k6 is running. Replaces the previous post-run
+        // recap so output appears LIVE instead of dumping at the end of the run.
+        const liveConsole = (0, LiveConsoleLogStream_1.startLiveConsoleLogStream)(logOutputPath);
+        let runResult;
+        try {
+            runResult = await PipelineRunner_1.PipelineRunner.executeAsync({
+                scriptPath: absScriptPath,
+                k6Options: {
+                    noCookiesReset: options.noCookiesReset !== false,
+                    scenarios: {
+                        debug_replay: {
+                            executor: 'per-vu-iterations',
+                            vus,
+                            iterations,
+                            env: {
+                                K6_PERF_PHASES: JSON.stringify(ScenarioBuilder_1.ScenarioBuilder.computeDebugPhaseEnvelope({
+                                    executor: 'per-vu-iterations',
+                                    vus,
+                                    iterations,
+                                })),
+                            },
+                        }
                     }
-                }
-            },
-            env: {
-                K6_PERF_DEBUG: 'true',
-                ...(transactionNames.length > 0
-                    ? { K6_PERF_TRANSACTION_NAMES: JSON.stringify(transactionNames) }
-                    : {}),
-                ...(options.teamEnvironments
-                    ? { K6_PERF_TEAM_ENVIRONMENTS: JSON.stringify(options.teamEnvironments) }
-                    : {}),
-                K6_PERF_RUNTIME_METADATA: JSON.stringify({
-                    errorBehavior: options.errorBehavior ?? 'continue',
-                    pacingEnabled: false,
-                    pacingSeconds: 0,
-                }),
-            },
-            extraK6Args: options.extraK6Args ?? [],
-            logOutputPath,
-        });
+                },
+                env: {
+                    K6_PERF_DEBUG: 'true',
+                    ...(transactionNames.length > 0
+                        ? { K6_PERF_TRANSACTION_NAMES: JSON.stringify(transactionNames) }
+                        : {}),
+                    ...(options.teamEnvironments
+                        ? { K6_PERF_TEAM_ENVIRONMENTS: JSON.stringify(options.teamEnvironments) }
+                        : {}),
+                    K6_PERF_RUNTIME_METADATA: JSON.stringify({
+                        errorBehavior: options.errorBehavior ?? 'continue',
+                        pacingEnabled: false,
+                        pacingSeconds: 0,
+                    }),
+                },
+                extraK6Args: options.extraK6Args ?? [],
+                logOutputPath,
+            });
+        }
+        finally {
+            liveConsole.stop();
+        }
         logger_1.Logger.info(`\nk6 execution complete.\n`);
         const extractSpinner = (0, ProgressBar_1.createSpinner)('Extracting replay entries');
         extractSpinner.start();
@@ -164,14 +175,10 @@ class ReplayRunner {
         });
         HTMLDiffReporter_1.HTMLDiffReporter.generateReport(diffResults, absHtmlPath, { k6Errors, k6Metrics, consoleLogs });
         reportSpinner.done('Diff report generated');
-        // Print user console.log lines from the script (filter out framework internals)
-        if (consoleLogs.length > 0) {
-            logger_1.Logger.info(`\n--- Script Console Output ---`);
-            for (const entry of consoleLogs) {
-                logger_1.Logger.info(entry);
-            }
-            logger_1.Logger.info(`-----------------------------\n`);
-        }
+        // (Script console output is now printed LIVE during the run via the
+        // `liveConsole` tailer started before k6 launch. No post-run recap is
+        // needed here — `consoleLogs` is still populated for embedding in the
+        // HTML diff report, but the terminal already showed them in real time.)
         // Clean up the temp log file now that all parsing is done
         if (logOutputPath && fs.existsSync(logOutputPath)) {
             try {
@@ -191,17 +198,23 @@ class ReplayRunner {
         const entries = [];
         this.collectReplayEntriesFromText(runResult.stdout, entries);
         this.collectReplayEntriesFromText(runResult.stderr, entries);
+        // Deduplicate file paths before reading. `PipelineRunner.executeAsync`
+        // sets `runResult.stderrPath = logOutputPath`, so the same physical file
+        // would otherwise be read twice — that bug doubled every replay entry,
+        // doubled every console-log line, and inflated the diff report's request
+        // count vs the actual k6 traffic.
+        const filePaths = new Set();
         if (runResult.stdoutPath && fs.existsSync(runResult.stdoutPath)) {
-            await this.collectReplayEntriesFromFile(runResult.stdoutPath, entries);
+            filePaths.add(path.resolve(runResult.stdoutPath));
         }
         if (runResult.stderrPath && fs.existsSync(runResult.stderrPath)) {
-            await this.collectReplayEntriesFromFile(runResult.stderrPath, entries);
+            filePaths.add(path.resolve(runResult.stderrPath));
         }
-        // Primary source: k6 writes console.log output to the --log-output file=
-        // path. When stdio is inherited (no capture), stdout/stderr are empty and
-        // the log file is the only place replay entries exist.
         if (logFilePath && fs.existsSync(logFilePath)) {
-            await this.collectReplayEntriesFromFile(logFilePath, entries);
+            filePaths.add(path.resolve(logFilePath));
+        }
+        for (const p of filePaths) {
+            await this.collectReplayEntriesFromFile(p, entries);
         }
         return entries;
     }
@@ -367,12 +380,18 @@ class ReplayRunner {
         };
         processText(runResult.stdout);
         processText(runResult.stderr);
-        // Also read from file paths if they exist
+        // Deduplicate file reads. `stderrPath` is set to the same value as
+        // `logOutputPath` by `PipelineRunner.executeAsync`, so reading both keys
+        // produced duplicated error entries previously.
+        const errorFilePaths = new Set();
         if (runResult.stdoutPath && fs.existsSync(runResult.stdoutPath)) {
-            processText(fs.readFileSync(runResult.stdoutPath, 'utf-8'));
+            errorFilePaths.add(path.resolve(runResult.stdoutPath));
         }
         if (runResult.stderrPath && fs.existsSync(runResult.stderrPath)) {
-            processText(fs.readFileSync(runResult.stderrPath, 'utf-8'));
+            errorFilePaths.add(path.resolve(runResult.stderrPath));
+        }
+        for (const p of errorFilePaths) {
+            processText(fs.readFileSync(p, 'utf-8'));
         }
         return errors;
     }
@@ -484,7 +503,11 @@ class ReplayRunner {
     static extractConsoleLogs(runResult) {
         const logs = [];
         const processLine = (line) => {
-            const consoleMatch = line.match(/level=(info|warn|debug)\s+msg="((?:\\.|[^"])*)"\s+source=console/);
+            // Include `error` so console.error() lines surface in the debug summary.
+            // Previously this regex was `(info|warn|debug)` which silently dropped
+            // every error-level log — exactly the lines a user debugging a failed
+            // run needs to see.
+            const consoleMatch = line.match(/level=(info|warn|debug|error)\s+msg="((?:\\.|[^"])*)"\s+source=console/);
             if (!consoleMatch)
                 return;
             let msg;
@@ -494,8 +517,11 @@ class ReplayRunner {
             catch {
                 msg = consoleMatch[2].replace(/\\"/g, '"');
             }
-            // Skip internal framework lines
-            if (msg.startsWith('[k6-perf]') || msg.includes('[replay-log]') || msg.includes('[snapshot-event]'))
+            // Skip only the framework's internal IPC channels — replay-log entries
+            // and snapshot-event payloads are parsed elsewhere and are noise here.
+            // We DO surface `[k6-perf][transaction:...] ERROR:` lines (and other
+            // framework error context) because those are essential debug info.
+            if (msg.includes('[replay-log]') || msg.includes('[snapshot-event]'))
                 return;
             const level = consoleMatch[1].toUpperCase();
             logs.push(`[${level}] ${msg}`);
@@ -507,11 +533,16 @@ class ReplayRunner {
         };
         processText(runResult.stdout);
         processText(runResult.stderr);
+        // Deduplicate file reads — same fix as extractReplayEntries.
+        const consoleFilePaths = new Set();
         if (runResult.stdoutPath && fs.existsSync(runResult.stdoutPath)) {
-            processText(fs.readFileSync(runResult.stdoutPath, 'utf-8'));
+            consoleFilePaths.add(path.resolve(runResult.stdoutPath));
         }
         if (runResult.stderrPath && fs.existsSync(runResult.stderrPath)) {
-            processText(fs.readFileSync(runResult.stderrPath, 'utf-8'));
+            consoleFilePaths.add(path.resolve(runResult.stderrPath));
+        }
+        for (const p of consoleFilePaths) {
+            processText(fs.readFileSync(p, 'utf-8'));
         }
         return logs;
     }

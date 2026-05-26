@@ -206,12 +206,15 @@ export class PipelineRunner {
     }
 
     // Forward slashes required for k6's --log-output file= argument on Windows.
-    // Also explicitly retain --log-output stderr so logs still reach the terminal
-    // when a file destination is added (specifying any --log-output replaces the default).
+    // We deliberately route logs ONLY to the file (no stderr) — a live tailer
+    // in the calling code reads the file as it's written and pretty-prints
+    // each line via the framework Logger. This avoids duplicate raw + pretty
+    // output in the terminal. k6's progress bar still renders normally
+    // because it does not flow through `--log-output`.
     const logPathFwd = logOutputPath ? logOutputPath.replace(/\\/g, '/') : undefined;
     const k6Args = [
       'run', absScript, '--config', optionsFile,
-      ...(logPathFwd ? ['--log-output', 'stderr', '--log-output', `file=${logPathFwd}`] : []),
+      ...(logPathFwd ? ['--log-output', `file=${logPathFwd}`] : []),
       ...extraK6Args,
     ];
 

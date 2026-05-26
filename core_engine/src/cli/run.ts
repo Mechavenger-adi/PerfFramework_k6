@@ -28,6 +28,7 @@ import { ResolvedConfig } from '../types/ConfigContracts';
 import { ReportBundle } from '../types/ReportingContracts';
 import { TestPlan, UserJourney } from '../types/TestPlanSchema';
 import { Logger } from '../utils/logger';
+import { startLiveConsoleLogStream } from '../utils/LiveConsoleLogStream';
 import { ProgressBar } from '../utils/ProgressBar';
 import { runConvert } from './convert';
 import { runGenerate } from './generate';
@@ -422,10 +423,13 @@ program
       '--summary-export', `${safeReportDir}/summary.json`,
       '--out', `web-dashboard=export=${safeReportDir}/TestSummary.html`,
       '--out', `json=${safeMetricsStreamPath}`,
-      // Mirror k6 log output (console.log, framework events) to a file for
-      // post-run snapshot parsing. Logs still appear in terminal via stderr;
-      // stdout stays uninherited so k6's animated progress bar renders correctly.
-      '--log-output', 'stderr',
+      // Send k6 log output (console.log, framework events) ONLY to the log
+      // file. A live tailer (`startLiveConsoleLogStream`) reads the file as
+      // it's written and pretty-prints each line via `Logger.*` so script
+      // console output appears in the terminal in real time, color-coded.
+      // Dropping `--log-output stderr` avoids duplicate (raw + pretty)
+      // output. k6's animated progress bar still renders normally — it does
+      // not flow through `--log-output`.
       '--log-output', `file=${safeRunLogPath}`,
       // User-supplied k6 flags forwarded verbatim (e.g. --http-debug=full).
       ...passthroughArgs,
@@ -460,6 +464,10 @@ program
     const liveDisplay = txnNamesForLive.length > 0
       ? startLiveTransactionDisplay(metricsStreamPath, txnNamesForLive, liveRuntime.getTransactionStats(), runLogPath)
       : null;
+    // Pretty-print script console.log/warn/error and k6 framework errors in
+    // real time as k6 writes them to the run log file. Replaces the previous
+    // post-run summary panel so output appears LIVE, not after the run.
+    const liveConsole = startLiveConsoleLogStream(runLogPath);
     try {
       // No onLine → stdio is fully inherited → k6's live progress bar renders correctly.
       // Snapshot events are captured via --log-output file=... and parsed post-run.
@@ -473,6 +481,7 @@ program
         runManifestPath,
       });
     } finally {
+      liveConsole.stop();
       if (liveDisplay) liveDisplay.stop();
       // Parse and persist snapshots from the mirrored log file
       parseAndFlushSnapshots(runLogPath, reportDir);
@@ -1158,13 +1167,32 @@ function startLiveTransactionDisplay(
   // output (banner + animated progress bar) to the top region via an ANSI
   // scroll region. The two never overlap. Falls back to scrollback printing
   // when stdout is not a TTY or the terminal is too short to fit both areas.
-  const termRows = process.stdout.rows || 40;
+  // Both `termRows` and `tableTop` recompute on terminal resize via the
+  // SIGWINCH handler installed below — without it, resizing mid-run drops the
+  // table off the visible region and previous renders persist as ghost copies.
   // title + top border + header row + header separator + N data rows + bottom border
   const tableRows = transactionNames.length + 5;
+  let termRows = process.stdout.rows || 40;
   // k6 needs at least ~12 rows for its banner + progress bar to remain readable
-  const useFixedTable = isTTY && termRows >= tableRows + 12;
-  const tableTop = useFixedTable ? termRows - tableRows + 1 : 0;
+  let useFixedTable = isTTY && termRows >= tableRows + 12;
+  let tableTop = useFixedTable ? termRows - tableRows + 1 : 0;
   let scrollRegionSet = false;
+
+  function recomputeLayout(): void {
+    const newRows = process.stdout.rows || 40;
+    if (newRows === termRows) return;
+    termRows = newRows;
+    useFixedTable = isTTY && termRows >= tableRows + 12;
+    const newTableTop = useFixedTable ? termRows - tableRows + 1 : 0;
+    if (newTableTop === tableTop) return;
+    tableTop = newTableTop;
+    // Reapply the scroll region so subsequent k6 output stays bounded above
+    // the new table position. Cursor parking below is done on the next tick.
+    if (scrollRegionSet && useFixedTable) {
+      process.stdout.write(`\x1b[1;${tableTop - 1}r\x1b[${tableTop - 1};1H`);
+    }
+  }
+  process.stdout.on('resize', recomputeLayout);
 
   function tick(): void {
     try {
@@ -1264,6 +1292,7 @@ function startLiveTransactionDisplay(
   return {
     stop: () => {
       clearInterval(timer);
+      process.stdout.off('resize', recomputeLayout);
       if (stats.size === 0) {
         if (scrollRegionSet) {
           // Reset scroll region and park cursor below the table area
@@ -1377,14 +1406,30 @@ function renderFixedTable(
   const lines = buildLiveTableLines(stats, transactionStats, useColor);
   if (lines.length === 0) return;
 
-  let out = '\x1b7'; // save cursor (k6's position in its scroll region)
-  // Clear the table area first (in case previous render was longer)
-  for (let row = tableTop; row <= termRows; row++) {
-    out += `\x1b[${row};1H\x1b[2K`;
+  // Single write batch: no separate "clear all rows then redraw" pass — that
+  // gap was the visible flicker. Instead, for each table row we move the
+  // cursor to the start, write the new content, then `\x1b[K` to clear any
+  // tail from a previous longer render. If this render is SHORTER than the
+  // last (e.g. terminal got taller, fewer transactions shown), tail rows
+  // through `termRows` are blanked explicitly.
+  //
+  // Cursor save/restore uses `\x1b[s`/`\x1b[u` (SCO) instead of `\x1b7`/`\x1b8`
+  // (DECSC). SCO ignores the scroll region — DECSC's behavior with scroll
+  // regions varies on Windows Terminal / ConPTY and was contributing to the
+  // "new copy of the table appears each tick" symptom.
+  let out = '\x1b[s'; // save cursor (k6's position in its scroll region)
+  for (let i = 0; i < lines.length; i++) {
+    const row = tableTop + i;
+    if (row > termRows) break;
+    // Move to row, write content, clear to EOL — one operation, no gap.
+    out += `\x1b[${row};1H${lines[i]}\x1b[K`;
   }
-  // Draw the table starting at tableTop
-  out += `\x1b[${tableTop};1H` + lines.join('\n');
-  out += '\x1b8'; // restore cursor → k6 keeps animating where it left off
+  // Blank any rows below the table that were occupied by a previous, longer
+  // render (e.g. fewer transactions shown now).
+  for (let row = tableTop + lines.length; row <= termRows; row++) {
+    out += `\x1b[${row};1H\x1b[K`;
+  }
+  out += '\x1b[u'; // restore cursor → k6 keeps animating where it left off
   process.stdout.write(out);
 }
 
@@ -1453,6 +1498,13 @@ function extractSnapshotPayload(line: string): string | null {
   const idx = line.indexOf(SNAPSHOT_EVENT_PREFIX);
   return idx !== -1 ? line.slice(idx + SNAPSHOT_EVENT_PREFIX.length).trim() : null;
 }
+
+// ---------------------------------------------
+// Live console-log stream → Logger
+// ---------------------------------------------
+// Implementation lives in `utils/LiveConsoleLogStream.ts` so both the load-
+// run path (this file) and the debug-replay path (`ReplayRunner.ts`) share
+// the same tailer logic.
 
 // ---------------------------------------------
 // Parse

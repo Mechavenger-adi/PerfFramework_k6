@@ -28,7 +28,7 @@ const __journeyLifecycleStore = createJourneyLifecycleStore();
 
 export function initPhase(ctx) {
   clearCookies();
-
+  console.log('Init phase started');
   const correlation_vars = ctx.correlation;
   trackDataRow("userdetails", getUniqueItem(FILES["userdetails"]));
   trackDataRow("pet", getUniqueItem(FILES["pet"]));
@@ -158,6 +158,14 @@ export function initPhase(ctx) {
 
   thinktime(1);
 
+  
+
+}
+
+export function actionPhase(ctx) {
+  const correlation_vars = ctx.correlation;
+  console.log('Action phase started');
+
   transaction('search_animal', function() {
   
       const res_1 = request('GET', `${env.baseUrl}/catalog/searchProducts?keyword=${getUniqueItem(FILES["pet"])["p_pet"]}`, {
@@ -190,11 +198,37 @@ export function initPhase(ctx) {
 
   thinktime(1);
 
-}
+    transaction('search_animal', function() {
+  
+      const res_1 = request('GET', `${env.baseUrl}/catalog/searchProducts?keyword=${getUniqueItem(FILES["pet"])["p_pet"]}`, {
+        headers: {
+          "sec-ch-ua": `"Chromium";v="146", "Not-A.Brand";v="24", "Google Chrome";v="146"`,
+          "sec-ch-ua-mobile": `?0`,
+          "sec-ch-ua-platform": `"Windows"`,
+          "upgrade-insecure-requests": `1`,
+          accept: `text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7`,
+          "sec-fetch-site": `same-origin`,
+          "sec-fetch-mode": `navigate`,
+          "sec-fetch-user": `?1`,
+          "sec-fetch-dest": `document`,
+          referer: `https://jpetstore.aspectran.com/`,
+          "accept-encoding": `gzip, deflate, br, zstd`,
+          "accept-language": `en-US,en;q=0.9`,
+          priority: `u=0, i`,
+          },
+        replay: { id: "req_6", recordingStartedAt: 'converted' },
+      });
+  
+      k6Check(res_1, { "status equals 200": (r) => r.status === 200 });
+  
+      regex = new RegExp('href="/products/[^"]+">(.*?)</a></strong>');
+      match = res_1.body.match(regex);
+      if (match) {
+        correlation_vars["correlation_0"] = trackCorrelation("correlation_0", match[1], "body");
+      }
+    });
 
-export function actionPhase(ctx) {
-  const correlation_vars = ctx.correlation;
-
+  thinktime(1);
   transaction('select_product', function() {
   
       const res_1 = request('GET', `${env.baseUrl}/products/${correlation_vars["correlation_0"]}`, {
@@ -217,7 +251,7 @@ export function actionPhase(ctx) {
         replay: { id: "req_7", recordingStartedAt: 'converted' },
       });
   
-      k6Check(res_1, { "status equals 503": (r) => r.status === 503 });
+      Check(res_1, { "status equals 503": (r) => r.status === 503 });
   
   
       const res_2 = request('GET', `${env.baseUrl}/products/${correlation_vars["correlation_0"]}`, {

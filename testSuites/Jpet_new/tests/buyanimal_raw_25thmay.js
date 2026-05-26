@@ -10,7 +10,7 @@ const __journeyLifecycleStore = createJourneyLifecycleStore();
 
 export function initPhase(ctx) {
   clearCookies();
-
+  console.log('Init phase started');
   transaction('t01_launch', function () {
     const res1 = request('GET', `${env.baseUrl}/`, {
       headers: {
@@ -231,6 +231,7 @@ export function initPhase(ctx) {
 }
 
 export function actionPhase(ctx) {
+  console.log('Action phase started');
   transaction('search_animal', function () {
     const res1 = request('GET', `${env.baseUrl}/catalog/searchProducts?keyword=dog`, {
       headers: {
@@ -254,8 +255,8 @@ export function actionPhase(ctx) {
         recordingStartedAt: "2026-03-31T06:10:01.078Z",
       },
     });
-    k6Check(res1, {
-      "search_animal - status is 200": (r) => r.status === 200,
+    Check(res1, {
+      "search_animal - status is 200": (r) => r.status === 203,
     });
 
     const res2 = request('GET', `${env.baseUrl}/cdn-cgi/speculation`, {

@@ -41,10 +41,10 @@
     "import:curl": "tsx core_engine/src/cli/run.ts import curl",
     "import:postman": "tsx core_engine/src/cli/run.ts import postman",
     "validate": "tsx core_engine/src/cli/run.ts validate",
-    "debug": "tsx core_engine/src/cli/run.ts debug",
+    "debug:script": "tsx core_engine/src/cli/run.ts debug",
     "run": "tsx core_engine/src/cli/run.ts run",
     "loadtest": "npm run cli -- run --plan config/test_plans/load_test.json",
-    "debugtest": "npm run cli -- run --plan config/test_plans/debug_test.json"
+    "debug": "npm run cli -- run --plan config/test_plans/debug_test.json"
   },
   "dependencies": {
     "ajv": "^8.17.1",

@@ -33,6 +33,64 @@ function getRuntimeErrorBehavior() {
 const txnStarts = {};
 const txnTrends = {};
 const txnCounters = {};
+/**
+ * Pull a user-script source location (path:line[:col]) out of an Error.stack
+ * string. k6 runs scripts under the Goja JS engine which produces stack
+ * frames in several shapes depending on the call form, e.g.:
+ *   at file:///D:/.../script.js:258:5(15)
+ *   at action_phase (file:///D:/.../script.js:258:5)
+ *   at /abs/path/script.js:42:7
+ *   script.js:42
+ * To stay robust against future format tweaks we look for any token that
+ * looks like `<something>:<digits>[:<digits>]` and pick the first one that
+ * doesn't belong to framework internals (`dist/utils/`). Returns the bare
+ * `path:line:col` (or `path:line`) substring, or `""` when nothing usable is
+ * present.
+ */
+function extractScriptLocation(stack) {
+    if (!stack || typeof stack !== 'string')
+        return '';
+    const lines = stack.split(/\r?\n/);
+    for (const raw of lines) {
+        const line = raw.trim();
+        // Match a path-ish token followed by :line or :line:col. The path may be
+        // a `file://` URL, an absolute filesystem path, or a bare filename. We
+        // exclude whitespace, parentheses, and angle brackets from the path token.
+        // The optional `(\\d+)` suffix is Goja's bytecode position — we drop it.
+        const matches = [...line.matchAll(/((?:file:\/\/)?[^\s()<>"']+):(\d+)(?::(\d+))?(?:\(\d+\))?/g)];
+        for (const m of matches) {
+            const path = m[1];
+            // Skip framework internals — surface the user's call site instead.
+            if (path.includes('/dist/utils/') || path.includes('\\dist\\utils\\'))
+                continue;
+            // Reject obviously bogus tokens (e.g. `https:` alone, k6 internal markers).
+            if (path === 'https' || path === 'http' || path === 'native')
+                continue;
+            // Skip frames inside k6's own runtime modules.
+            if (path.startsWith('k6/') || path.includes('go.k6.io'))
+                continue;
+            const lineNo = m[2];
+            const col = m[3];
+            return col ? `${path}:${lineNo}:${col}` : `${path}:${lineNo}`;
+        }
+    }
+    return '';
+}
+/**
+ * First N non-empty stack lines, joined — useful when `extractScriptLocation`
+ * couldn't find a clean frame but the raw stack still has useful info.
+ */
+function formatStackSnippet(stack, limit = 3) {
+    if (!stack || typeof stack !== 'string')
+        return '';
+    const lines = stack
+        .split(/\r?\n/)
+        .map((l) => l.trim())
+        .filter((l) => l.length > 0 && !l.includes('/dist/utils/') && !l.includes('\\dist\\utils\\'));
+    if (lines.length === 0)
+        return '';
+    return lines.slice(0, limit).map((l) => `    ${l}`).join('\n');
+}
 // Tracks the active transaction name within this VU's context (per-VU module scope in k6).
 let _activeTransaction = '';
 // Permanently stops this VU from running any more transactions.
@@ -148,13 +206,34 @@ function transaction(name, fn) {
                 const message = error && typeof error === 'object' && 'message' in error
                     ? error.message
                     : String(error);
+                // Extract the user-script location from the stack so failures point at
+                // an actual file:line:col instead of just the error message. The
+                // extractor handles several Goja stack formats; if it still can't
+                // pull a clean frame (e.g. minified or unusual format), fall back to
+                // the first few raw stack lines so the user is never stranded with
+                // just a message and no file/line info.
+                const rawStack = error?.stack;
+                const location = extractScriptLocation(rawStack);
+                const locSuffix = location
+                    ? `\n    at ${location}`
+                    : (formatStackSnippet(rawStack) ? `\n${formatStackSnippet(rawStack)}` : '');
+                // All error-behavior paths share one truth: the *current transaction
+                // body* is aborted at the point the error was thrown — anything after
+                // it inside this transaction (including subsequent request() calls)
+                // does NOT run. Previously the log only said "→ continuing to next
+                // transaction" which made it look like the framework was simply
+                // moving on, hiding the fact that 1+ requests were silently skipped.
+                // Now every branch is explicit: "skipped remaining work in this
+                // transaction; <what happens next>".
                 if (behavior === 'abort_test') {
-                    console.error(`[k6-perf][transaction:${name}] ERROR: ${message} → aborting test`);
-                    execution_1.default.test.abort(`[k6-perf][transaction:${name}] ${message}`);
+                    console.error(`[k6-perf][transaction:${name}] ERROR: ${message}${locSuffix}\n` +
+                        `  → skipped remaining work in this transaction; aborting entire test (errorBehavior=abort_test)`);
+                    execution_1.default.test.abort(`[k6-perf][transaction:${name}] ${message}${location ? ` (${location})` : ''}`);
                     return;
                 }
                 if (behavior === 'stop_vu') {
-                    console.error(`[k6-perf][transaction:${name}] ERROR: ${message} → stopping VU permanently`);
+                    console.error(`[k6-perf][transaction:${name}] ERROR: ${message}${locSuffix}\n` +
+                        `  → skipped remaining work in this transaction; this VU will not run any more iterations (errorBehavior=stop_vu)`);
                     // Mark VU as permanently terminated — lifecycle will skip all future iterations.
                     // Do NOT re-throw: we want the action phase to return cleanly so k6 doesn't
                     // see an iteration error (which would schedule a new iteration for this VU).
@@ -162,12 +241,14 @@ function transaction(name, fn) {
                     return;
                 }
                 if (behavior === 'stop_iteration') {
-                    console.error(`[k6-perf][transaction:${name}] ERROR: ${message} → stopping iteration`);
+                    console.error(`[k6-perf][transaction:${name}] ERROR: ${message}${locSuffix}\n` +
+                        `  → skipped remaining work in this transaction; ending current iteration (errorBehavior=stop_iteration)`);
                     // Re-throw so lifecycle stops the current iteration; VU resumes next iteration.
                     throw error;
                 }
                 // 'continue' — log with context and swallow, next transaction will run
-                console.error(`[k6-perf][transaction:${name}] ERROR: ${message} → continuing to next transaction`);
+                console.error(`[k6-perf][transaction:${name}] ERROR: ${message}${locSuffix}\n` +
+                    `  → skipped remaining work in this transaction; continuing to next transaction (errorBehavior=continue)`);
             }
             finally {
                 endTransaction(name);
