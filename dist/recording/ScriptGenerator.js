@@ -6,16 +6,33 @@ class ScriptGenerator {
      * Generates formatted TypeScript/JavaScript source code based on Transaction Groups.
      * Output uses the transaction() wrapper and request() helper from the framework utils.
      */
-    static generate(groups, lifecycle, teamName) {
+    static generate(groups, lifecycle, teamName, options) {
         let script = `import { transaction, k6Check } from '../../../dist/utils/transaction.js';\n`;
         script += `import { request } from '../../../dist/utils/request.js';\n`;
         script += `import { createJourneyLifecycleStore, runJourneyLifecycle, thinktime } from '../../../dist/utils/lifecycle.js';\n`;
         script += `import { logReplayExchange, trackCorrelation, trackParameter } from '../../../dist/utils/replayLogger.js';\n`;
-        script += `import { clearCookies, getEnvContext } from '../../../dist/utils/session.js';\n\n`;
+        script += `import { clearCookies, getEnvContext } from '../../../dist/utils/session.js';\n`;
+        if (options?.extraImports && options.extraImports.length > 0) {
+            // De-dupe: skip any extraImport already present in the fixed imports above.
+            const seen = new Set(script.split('\n'));
+            for (const imp of options.extraImports) {
+                if (!seen.has(imp)) {
+                    script += `${imp}\n`;
+                    seen.add(imp);
+                }
+            }
+        }
+        script += `\n`;
         const baseUrls = this.extractBaseUrls(groups);
         const primaryBaseUrl = baseUrls[0];
         const fallbackUrl = primaryBaseUrl ? primaryBaseUrl.replace(/\/+$/, '') : undefined;
         script += `const env = getEnvContext('${teamName}', ${fallbackUrl ? `{ baseUrl: '${fallbackUrl}' }` : 'undefined'});\n\n`;
+        if (options?.extraInitCode && options.extraInitCode.trim().length > 0) {
+            // Module-scope code injected here so it runs once per VU at k6 init context,
+            // before the journey lifecycle store (and therefore before any actionPhase
+            // request that references the bindings).
+            script += `${options.extraInitCode.replace(/\n+$/, '')}\n\n`;
+        }
         const initSet = new Set(lifecycle?.initGroups ?? []);
         const endSet = new Set(lifecycle?.endGroups ?? []);
         const initGroups = groups.filter((g) => initSet.has(g.name));
@@ -56,7 +73,7 @@ class ScriptGenerator {
                 const sequentialId = `req_${globalRequestId}`;
                 const urlExpr = this.buildUrlExpression(req.url, primaryBaseUrl);
                 const hasHeaders = req.headers && req.headers.length > 0;
-                const hasBody = !!this.buildRequestBody(req.postData);
+                const hasBody = !!req.postData?.expression || !!this.buildRequestBody(req.postData);
                 script += `    const ${responseName} = request('${method}', ${urlExpr}, {\n`;
                 if (hasHeaders) {
                     const headersObj = {};
@@ -64,8 +81,16 @@ class ScriptGenerator {
                     script += `      headers: ${this.formatInlineObject(headersObj, 6)},\n`;
                 }
                 if (hasBody) {
-                    const body = this.buildRequestBody(req.postData);
-                    script += `      body: ${JSON.stringify(body)},\n`;
+                    // `postData.expression` (when set) means "emit raw — this references
+                    // a module-scope binding like a file-upload var, not literal text".
+                    // Used by Postman adapter for file/multipart-file uploads.
+                    if (req.postData?.expression) {
+                        script += `      body: ${req.postData.expression},\n`;
+                    }
+                    else {
+                        const body = this.buildRequestBody(req.postData);
+                        script += `      body: ${JSON.stringify(body)},\n`;
+                    }
                 }
                 script += `      replay: {\n`;
                 script += `        id: ${JSON.stringify(sequentialId)},\n`;

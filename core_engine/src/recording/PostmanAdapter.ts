@@ -20,17 +20,58 @@
  */
 
 import * as fs from 'fs';
+import * as path from 'path';
 import { HAREntry } from '../types/HARContracts';
 import { TransactionGroup } from './TransactionGrouper';
 
 export interface PostmanParseResult {
   groups: TransactionGroup[];
   warnings: string[];
+  /**
+   * Module-scope code (file `open()` bindings) that the generator should
+   * inject at init context, populated when the collection contains file
+   * uploads or multipart-with-files. Empty string when not needed.
+   */
+  extraInitCode: string;
+  /**
+   * Additional imports required by `extraInitCode`. Empty when not needed.
+   * Typically contains `import { open } from 'k6/experimental/fs';` plus
+   * `import http from 'k6/http';` for `http.file(...)` in multipart bodies.
+   */
+  extraImports: string[];
+  /**
+   * Files that were successfully copied from the Postman-recorded path into
+   * the team's `data/` folder. Caller uses this to emit copy artifacts and
+   * inform the user. Path is the absolute source path.
+   */
+  copiedFiles: { source: string; destRelative: string }[];
 }
 
 export interface PostmanParseOptions {
   /** Only emit requests under this folder name (direct match only; no path nesting). */
   folderFilter?: string;
+  /**
+   * Where to copy file-upload source files into. Should be the absolute path
+   * to `testSuites/<team>/data/`. When set, the adapter tries to copy every
+   * `body.mode = "file"` (and formdata file fields) into this dir and rewrite
+   * the path to be relative to the generated script (`../data/<filename>`).
+   * Files that don't exist on disk get a placeholder path + a warning.
+   */
+  dataDir?: string;
+}
+
+/** Internal: a tracked file binding for k6 init-context code generation. */
+interface FileBinding {
+  /** JS identifier used at module scope (`photoBytes_1`). */
+  varName: string;
+  /** Path k6 will `open()` — relative to the script (`'../data/photo.jpg'`). */
+  scriptRelPath: string;
+  /** MIME type guessed from extension; used for `http.file()` in multipart. */
+  mime: string;
+  /** Original Postman path; preserved so we can warn if file wasn't copied. */
+  originalSrc: string;
+  /** True if the source file was found locally and copied into data/. */
+  copied: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -169,6 +210,11 @@ export class PostmanAdapter {
     const groupBuckets = new Map<string, HAREntry[]>();
     const groupOrder: string[] = [];
 
+    // Shared file-binding tracker — accumulated across all requests so the
+    // same source file referenced twice maps to one open() declaration.
+    const fileBindings: FileBinding[] = [];
+    const copiedFiles: PostmanParseResult['copiedFiles'] = [];
+
     let requestCounter = 0;
 
     const visit = (
@@ -209,6 +255,7 @@ export class PostmanAdapter {
           groupName,
           itemAuth,
           warnings,
+          { fileBindings, copiedFiles, dataDir: opts.dataDir },
         );
         if (!groupBuckets.has(groupName)) {
           groupBuckets.set(groupName, []);
@@ -229,7 +276,40 @@ export class PostmanAdapter {
       warnings.push('No requests found in the collection.');
     }
 
-    return { groups, warnings };
+    // Build the module-scope init code from collected file bindings. Each
+    // unique file becomes one `await open(...)` declaration. Imports come
+    // from a stable set so the generator can de-dupe against its own.
+    const extraImports: string[] = [];
+    let extraInitCode = '';
+    if (fileBindings.length > 0) {
+      extraImports.push("import { open } from 'k6/experimental/fs';");
+      // If any binding is used inside multipart form-data, we also need k6/http
+      // for `http.file(...)`. Detect by scanning entries' postData.expression.
+      const usesHttpFile = groups.some((g) =>
+        g.entries.some((e) => e.postData?.expression?.includes('http.file(')),
+      );
+      if (usesHttpFile) {
+        extraImports.push("import http from 'k6/http';");
+      }
+      const lines: string[] = [
+        '// ---------------------------------------------',
+        '// File upload bindings (from Postman file/formdata-file items)',
+        '// k6 init-context reads: each VU loads these once at module init.',
+        '// ---------------------------------------------',
+      ];
+      for (const b of fileBindings) {
+        if (!b.copied) {
+          lines.push(
+            `// TODO: file not found at recorded path "${b.originalSrc}".`,
+            `//       Place it at "${b.scriptRelPath}" relative to this script.`,
+          );
+        }
+        lines.push(`const ${b.varName} = await open('${b.scriptRelPath}', 'b');`);
+      }
+      extraInitCode = lines.join('\n');
+    }
+
+    return { groups, warnings, extraInitCode, extraImports, copiedFiles };
   }
 
   // -------------------------------------------------------------------------
@@ -254,6 +334,11 @@ export class PostmanAdapter {
     pageref: string,
     effectiveAuth: PostmanAuth | undefined,
     warnings: string[],
+    fileCtx: {
+      fileBindings: FileBinding[];
+      copiedFiles: PostmanParseResult['copiedFiles'];
+      dataDir?: string;
+    },
   ): HAREntry {
     const reqAny = item.request;
     if (typeof reqAny === 'string') {
@@ -274,7 +359,11 @@ export class PostmanAdapter {
     const method = (req.method ?? 'GET').toUpperCase();
     const url = this.resolveUrl(req.url, warnings, item.name ?? id);
     const headers = this.resolveHeaders(req.header);
-    const { body, bodyMime, bodyWarnings } = this.resolveBody(req.body);
+    const { body, bodyMime, expression, bodyWarnings } = this.resolveBody(
+      req.body,
+      item.name ?? id,
+      fileCtx,
+    );
     for (const w of bodyWarnings) {
       warnings.push(`[${item.name ?? id}] ${w}`);
     }
@@ -295,7 +384,7 @@ export class PostmanAdapter {
 
     this.warnOnEvents(item.event, warnings, item.name ?? id);
 
-    return this.makeEntry({ id, pageref, method, url, headers, body, bodyMime });
+    return this.makeEntry({ id, pageref, method, url, headers, body, bodyMime, expression });
   }
 
   private static makeEntry(args: {
@@ -306,6 +395,8 @@ export class PostmanAdapter {
     headers: { name: string; value: string }[];
     body: string | undefined;
     bodyMime: string | undefined;
+    /** Raw JS expression to emit as the request body — used for file uploads. */
+    expression?: string;
   }): HAREntry {
     let host = '';
     try {
@@ -313,15 +404,22 @@ export class PostmanAdapter {
     } catch {
       host = '';
     }
+    // When `expression` is set, we still surface a stub `text` (empty) so
+    // downstream consumers that only read `text` see something coherent, but
+    // ScriptGenerator branches on `expression` first.
+    const hasBody = args.body !== undefined || args.expression !== undefined;
     return {
       id: args.id,
       method: args.method,
       url: args.url,
       headers: args.headers,
-      postData:
-        args.body !== undefined
-          ? { mimeType: args.bodyMime ?? 'application/octet-stream', text: args.body }
-          : undefined,
+      postData: hasBody
+        ? {
+            mimeType: args.bodyMime ?? 'application/octet-stream',
+            text: args.body ?? '',
+            ...(args.expression ? { expression: args.expression } : {}),
+          }
+        : undefined,
       status: 200,
       responseHeaders: [],
       responseBody: undefined,
@@ -382,9 +480,17 @@ export class PostmanAdapter {
 
   private static resolveBody(
     body: PostmanBody | undefined,
+    where: string,
+    fileCtx: {
+      fileBindings: FileBinding[];
+      copiedFiles: PostmanParseResult['copiedFiles'];
+      dataDir?: string;
+    },
   ): {
     body: string | undefined;
     bodyMime: string | undefined;
+    /** When set, a raw JS expression for the body — used for file uploads. */
+    expression?: string;
     bodyWarnings: string[];
   } {
     const warnings: string[] = [];
@@ -420,22 +526,62 @@ export class PostmanAdapter {
     }
 
     if (body.mode === 'formdata') {
-      warnings.push(
-        'Body mode `formdata` (multipart) not fully supported in Phase 2. Emitted as a literal JSON representation; review and convert to k6 FormData manually.',
-      );
-      const repr = JSON.stringify(body.formdata ?? [], null, 2);
+      // Mixed text + file multipart. Emit a JS object expression so k6's
+      // http.* builds the multipart wrapper itself. File fields become
+      // `http.file(varBytes, 'name.ext', 'mime/type')` — see init code at
+      // module scope for the corresponding `open()` declarations.
+      const entries = (body.formdata ?? []).filter((e) => !e.disabled);
+      const objectParts: string[] = [];
+      for (const e of entries) {
+        const keyExpr = JSON.stringify(e.key);
+        if (e.type === 'file') {
+          const src = Array.isArray(e.src) ? e.src[0] : e.src;
+          if (!src) {
+            warnings.push(`formdata file field "${e.key}" missing src; emitting null placeholder.`);
+            objectParts.push(`  ${keyExpr}: null /* TODO: provide file */`);
+            continue;
+          }
+          const binding = this.registerFileBinding(src, fileCtx, warnings, where);
+          const fileName = path.basename(binding.scriptRelPath);
+          objectParts.push(
+            `  ${keyExpr}: http.file(${binding.varName}, ${JSON.stringify(fileName)}, ${JSON.stringify(binding.mime)})`,
+          );
+        } else {
+          objectParts.push(`  ${keyExpr}: ${JSON.stringify(e.value ?? '')}`);
+        }
+      }
+      const expression = `{\n${objectParts.join(',\n')},\n}`;
+      // For multipart-with-files, do NOT set `Content-Type` ourselves —
+      // k6 generates the boundary. If headers contain Content-Type the caller
+      // should remove it. We surface a warning so the user knows.
+      if (entries.some((e) => e.type === 'file')) {
+        warnings.push(
+          'Multipart body has file field(s). If you also pass a Content-Type header, k6 will overwrite it with the multipart boundary; safe to remove the manual header.',
+        );
+      }
       return {
-        body: repr,
+        body: undefined,
         bodyMime: 'multipart/form-data',
+        expression,
         bodyWarnings: warnings,
       };
     }
 
     if (body.mode === 'file') {
-      warnings.push(
-        'Body mode `file` (binary upload) not supported in Phase 2. Emitting empty body. Re-add file content manually.',
-      );
-      return { body: undefined, bodyMime: undefined, bodyWarnings: warnings };
+      // Raw binary upload: register a file binding and emit the var as the
+      // body expression. k6 accepts an ArrayBuffer body directly.
+      const src = body.file?.src;
+      if (!src) {
+        warnings.push('Body mode `file` declared but no `file.src` provided; emitting empty body.');
+        return { body: undefined, bodyMime: undefined, bodyWarnings: warnings };
+      }
+      const binding = this.registerFileBinding(src, fileCtx, warnings, where);
+      return {
+        body: undefined,
+        bodyMime: binding.mime,
+        expression: binding.varName,
+        bodyWarnings: warnings,
+      };
     }
 
     if (body.mode === 'graphql') {
@@ -452,6 +598,76 @@ export class PostmanAdapter {
 
     warnings.push(`Unknown body mode "${body.mode}" — emitting empty body.`);
     return { body: undefined, bodyMime: undefined, bodyWarnings: warnings };
+  }
+
+  /**
+   * Register a file referenced by a Postman item. De-duplicates by source
+   * path: the same file used twice in the collection produces one binding.
+   * If the file exists on the local filesystem AND a `dataDir` was supplied,
+   * copies the file into `dataDir/<basename>` so the generated script can
+   * reference it portably. If the file is missing, still emits the binding
+   * (with a TODO comment via `binding.copied=false`) so users can drop the
+   * file in later without re-running the import.
+   */
+  private static registerFileBinding(
+    src: string,
+    ctx: {
+      fileBindings: FileBinding[];
+      copiedFiles: PostmanParseResult['copiedFiles'];
+      dataDir?: string;
+    },
+    warnings: string[],
+    where: string,
+  ): FileBinding {
+    // Dedupe by source path.
+    const existing = ctx.fileBindings.find((b) => b.originalSrc === src);
+    if (existing) return existing;
+
+    const fileName = path.basename(src);
+    const varName = `__file_${ctx.fileBindings.length + 1}_${sanitizeName(
+      fileName.replace(/\.[^.]+$/, ''),
+    )}`;
+    const scriptRelPath = `../data/${fileName}`;
+    const mime = mimeFromExt(fileName);
+
+    // Warnings here use no `[where]` prefix — the caller (`requestToHAREntry`)
+    // wraps every emitted warning with `[item.name]` so adding it here would
+    // produce `[Name] [Name] ...` in the user-visible output.
+    let copied = false;
+    void where;
+    if (ctx.dataDir) {
+      try {
+        if (fs.existsSync(src)) {
+          fs.mkdirSync(ctx.dataDir, { recursive: true });
+          const dest = path.join(ctx.dataDir, fileName);
+          fs.copyFileSync(src, dest);
+          copied = true;
+          ctx.copiedFiles.push({ source: src, destRelative: scriptRelPath });
+        } else {
+          warnings.push(
+            `file "${src}" not found on disk; emitting binding with placeholder path "${scriptRelPath}". Drop the file into the suite's data/ folder before running the script.`,
+          );
+        }
+      } catch (err) {
+        warnings.push(
+          `failed to copy "${src}" into data dir: ${(err as Error).message}. Binding still emitted; place the file manually.`,
+        );
+      }
+    } else {
+      warnings.push(
+        `no dataDir configured; emitted binding "${scriptRelPath}" but did not copy file. Place "${fileName}" at that path manually.`,
+      );
+    }
+
+    const binding: FileBinding = {
+      varName,
+      scriptRelPath,
+      mime,
+      originalSrc: src,
+      copied,
+    };
+    ctx.fileBindings.push(binding);
+    return binding;
   }
 
   private static authToHeaders(
@@ -523,4 +739,44 @@ function safeJsonParse(s: string): unknown {
   } catch {
     return s;
   }
+}
+
+/**
+ * Guess a MIME type from a filename extension. Covers the formats users
+ * realistically upload via Postman; unknowns fall back to octet-stream so the
+ * generated script is always runnable.
+ */
+function mimeFromExt(filename: string): string {
+  const ext = filename.toLowerCase().split('.').pop() ?? '';
+  const map: Record<string, string> = {
+    png: 'image/png',
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    gif: 'image/gif',
+    webp: 'image/webp',
+    svg: 'image/svg+xml',
+    bmp: 'image/bmp',
+    pdf: 'application/pdf',
+    zip: 'application/zip',
+    gz: 'application/gzip',
+    tar: 'application/x-tar',
+    json: 'application/json',
+    xml: 'application/xml',
+    csv: 'text/csv',
+    txt: 'text/plain',
+    md: 'text/markdown',
+    html: 'text/html',
+    htm: 'text/html',
+    mp3: 'audio/mpeg',
+    mp4: 'video/mp4',
+    mov: 'video/quicktime',
+    wav: 'audio/wav',
+    doc: 'application/msword',
+    docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    xls: 'application/vnd.ms-excel',
+    xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    ppt: 'application/vnd.ms-powerpoint',
+    pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  };
+  return map[ext] ?? 'application/octet-stream';
 }

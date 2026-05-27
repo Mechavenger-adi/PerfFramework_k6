@@ -7,6 +7,16 @@ export interface HAREntry {
     mimeType: string;
     text: string;
     params?: { name: string; value: string }[];
+    /**
+     * When set, ScriptGenerator emits this string as a RAW JS expression for
+     * the request body — bypassing the default JSON.stringify of `text`.
+     * Use this when the body needs to reference module-scope bindings, e.g.
+     * file uploads (`expression: 'photoBytes'`) or multipart with file fields
+     * (`expression: "{ name: 'alice', photo: http.file(photoBytes, 'photo.jpg', 'image/jpeg') }"`).
+     * Synthetic HAR sources (Postman / cURL) can use this to wire up init-context
+     * code without changing the per-request emission shape.
+     */
+    expression?: string;
   };
   status: number;
   responseHeaders: { name: string; value: string }[];

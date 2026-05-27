@@ -1,0 +1,137 @@
+{
+  "info": {
+    "name": "Dummy Complex APIs",
+    "_postman_id": "12345-67890-abcdef",
+    "description": "A dummy collection with complex APIs for testing",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"username\": \"testuser\", \"password\": \"P@ssw0rd\" }"
+            },
+            "url": {
+              "raw": "https://dummyapi.com/auth/login",
+              "protocol": "https",
+              "host": ["dummyapi", "com"],
+              "path": ["auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Refresh Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "https://dummyapi.com/auth/refresh",
+              "protocol": "https",
+              "host": ["dummyapi", "com"],
+              "path": ["auth", "refresh"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Get User Profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "https://dummyapi.com/users/{{userId}}?include=posts,comments",
+              "protocol": "https",
+              "host": ["dummyapi", "com"],
+              "path": ["users", "{{userId}}"],
+              "query": [
+                { "key": "include", "value": "posts,comments" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update User Settings",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"notifications\": true, \"theme\": \"dark\" }"
+            },
+            "url": {
+              "raw": "https://dummyapi.com/users/{{userId}}/settings",
+              "protocol": "https",
+              "host": ["dummyapi", "com"],
+              "path": ["users", "{{userId}}", "settings"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Orders",
+      "item": [
+        {
+          "name": "Create Order",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"items\": [{\"id\": \"123\", \"qty\": 2}], \"paymentMethod\": \"card\" }"
+            },
+            "url": {
+              "raw": "https://dummyapi.com/orders",
+              "protocol": "https",
+              "host": ["dummyapi", "com"],
+              "path": ["orders"]
+            }
+          }
+        },
+        {
+          "name": "Get Order Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "https://dummyapi.com/orders/{{orderId}}/status",
+              "protocol": "https",
+              "host": ["dummyapi", "com"],
+              "path": ["orders", "{{orderId}}", "status"]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    { "key": "accessToken", "value": "" },
+    { "key": "userId", "value": "001" },
+    { "key": "orderId", "value": "A1001" }
+  ]
+}

@@ -141,13 +141,17 @@ const importCmd = program
 importCmd
     .command('curl <team> <script-name>')
     .description('Import a cURL command into a framework-shaped k6 script')
-    .option('--curl <string>', 'Inline cURL command string')
+    .option('--curl <string>', 'Inline cURL command string (shell-quoting required; for browser-copied curls prefer --clipboard or --file)')
     .option('--file <path>', 'Path to a file containing one or more cURL blocks (blank-line separated; optional `# name` comment names each transaction)')
+    .option('--stdin', 'Read cURL command from stdin (pipe-friendly: `clip | npm run import:curl … --stdin`)')
+    .option('--clipboard', 'Read cURL command from the OS clipboard (works directly with Chrome/Edge/Firefox "Copy as cURL")')
     .option('--transaction-name <name>', 'Override the inferred transaction name (single-curl only)')
     .action(async (team, scriptName, opts) => {
     await (0, import_1.runImportCurl)(team, scriptName, {
         curl: opts.curl,
         file: opts.file,
+        stdin: opts.stdin,
+        clipboard: opts.clipboard,
         transactionName: opts.transactionName,
     });
 });

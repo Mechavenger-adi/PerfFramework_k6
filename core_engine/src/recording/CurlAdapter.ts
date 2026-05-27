@@ -268,9 +268,40 @@ export class CurlAdapter {
   // Internals
   // -------------------------------------------------------------------------
 
-  /** Join lines ending with `\` (POSIX continuation) into one logical line. */
+  /**
+   * Join continuation lines into one logical line and normalize cmd.exe-style
+   * escape syntax produced by Chrome DevTools' "Copy as cURL (cmd)" option.
+   *
+   * Handles:
+   *   - POSIX:    `\` at end of line     (bash, zsh, "Copy as cURL (bash)")
+   *   - cmd.exe:  `^` at end of line     ("Copy as cURL (cmd)")
+   *   - cmd.exe:  `^"`  → `"`            (escaped double-quote inside `"..."`)
+   *   - cmd.exe:  `^X` for special X     (defensive escapes Chrome emits around
+   *                                       JSON braces, backslashes, %, &, etc.
+   *                                       inside `"..."` arguments)
+   *
+   * Cmd-style is detected by the presence of at least one `^"` in the input;
+   * we only strip the broader `^X` escapes in that mode so legitimate `^`
+   * characters in bash-style curls are preserved.
+   *
+   * NOT handled:
+   *   - PowerShell backtick escapes (`` `" ``, `` `n ``, etc.) — that format
+   *     is more complex; users on PS should pick "Copy as cURL (bash)" or
+   *     paste into a file and use `--file`.
+   */
   private static normalizeContinuations(s: string): string {
-    return s.replace(/\\\r?\n\s*/g, ' ').trim();
+    let out = s;
+    // Continuation: backslash (POSIX) or caret (cmd) at end of line.
+    out = out.replace(/[\\^]\r?\n\s*/g, ' ');
+    // Detect cmd.exe-style input by its unambiguous fingerprint: `^"`.
+    const isCmdStyle = /\^"/.test(out);
+    if (isCmdStyle) {
+      // Strip cmd's `^` escape before any char it treats as "escape this".
+      // Includes the quote case (`^"` → `"`) plus defensive escapes Chrome
+      // emits around JSON syntax: `{` `}` `\` `(` `)` `&` `|` `<` `>` `%` `^`.
+      out = out.replace(/\^(["{}\\()&|<>%^])/g, '$1');
+    }
+    return out.trim();
   }
 
   /**

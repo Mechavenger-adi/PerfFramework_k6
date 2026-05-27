@@ -5,23 +5,64 @@ export interface LifecycleSelection {
   endGroups: string[];
 }
 
+export interface GenerateOptions {
+  /**
+   * Raw JS code to inject at module scope, AFTER the env declaration and BEFORE
+   * the journey lifecycle store. Used by synthetic-source adapters (Postman)
+   * that need init-context bindings — e.g. `const photoBytes = await open('../data/photo.jpg', 'b');`
+   * for file uploads. The generator auto-adds the appropriate imports when
+   * file bindings are detected; callers supply additional imports via
+   * `extraImports`.
+   */
+  extraInitCode?: string;
+  /**
+   * Additional import statements to add at the top of the file (one per line).
+   * Example: `[\"import { open } from 'k6/experimental/fs';\"]`.
+   * De-duplicated by string equality with existing imports.
+   */
+  extraImports?: string[];
+}
+
 export class ScriptGenerator {
   /**
    * Generates formatted TypeScript/JavaScript source code based on Transaction Groups.
    * Output uses the transaction() wrapper and request() helper from the framework utils.
    */
-  static generate(groups: TransactionGroup[], lifecycle: LifecycleSelection | undefined, teamName: string): string {
+  static generate(
+    groups: TransactionGroup[],
+    lifecycle: LifecycleSelection | undefined,
+    teamName: string,
+    options?: GenerateOptions,
+  ): string {
     let script = `import { transaction, k6Check } from '../../../dist/utils/transaction.js';\n`;
     script += `import { request } from '../../../dist/utils/request.js';\n`;
     script += `import { createJourneyLifecycleStore, runJourneyLifecycle, thinktime } from '../../../dist/utils/lifecycle.js';\n`;
     script += `import { logReplayExchange, trackCorrelation, trackParameter } from '../../../dist/utils/replayLogger.js';\n`;
-    script += `import { clearCookies, getEnvContext } from '../../../dist/utils/session.js';\n\n`;
+    script += `import { clearCookies, getEnvContext } from '../../../dist/utils/session.js';\n`;
+    if (options?.extraImports && options.extraImports.length > 0) {
+      // De-dupe: skip any extraImport already present in the fixed imports above.
+      const seen = new Set(script.split('\n'));
+      for (const imp of options.extraImports) {
+        if (!seen.has(imp)) {
+          script += `${imp}\n`;
+          seen.add(imp);
+        }
+      }
+    }
+    script += `\n`;
 
     const baseUrls = this.extractBaseUrls(groups);
     const primaryBaseUrl = baseUrls[0];
 
     const fallbackUrl = primaryBaseUrl ? primaryBaseUrl.replace(/\/+$/, '') : undefined;
     script += `const env = getEnvContext('${teamName}', ${fallbackUrl ? `{ baseUrl: '${fallbackUrl}' }` : 'undefined'});\n\n`;
+
+    if (options?.extraInitCode && options.extraInitCode.trim().length > 0) {
+      // Module-scope code injected here so it runs once per VU at k6 init context,
+      // before the journey lifecycle store (and therefore before any actionPhase
+      // request that references the bindings).
+      script += `${options.extraInitCode.replace(/\n+$/, '')}\n\n`;
+    }
 
     const initSet = new Set(lifecycle?.initGroups ?? []);
     const endSet = new Set(lifecycle?.endGroups ?? []);
@@ -76,7 +117,7 @@ export class ScriptGenerator {
 
         const urlExpr = this.buildUrlExpression(req.url, primaryBaseUrl);
         const hasHeaders = req.headers && req.headers.length > 0;
-        const hasBody = !!this.buildRequestBody(req.postData);
+        const hasBody = !!req.postData?.expression || !!this.buildRequestBody(req.postData);
 
         script += `    const ${responseName} = request('${method}', ${urlExpr}, {\n`;
 
@@ -87,8 +128,15 @@ export class ScriptGenerator {
         }
 
         if (hasBody) {
-          const body = this.buildRequestBody(req.postData);
-          script += `      body: ${JSON.stringify(body)},\n`;
+          // `postData.expression` (when set) means "emit raw — this references
+          // a module-scope binding like a file-upload var, not literal text".
+          // Used by Postman adapter for file/multipart-file uploads.
+          if (req.postData?.expression) {
+            script += `      body: ${req.postData.expression},\n`;
+          } else {
+            const body = this.buildRequestBody(req.postData);
+            script += `      body: ${JSON.stringify(body)},\n`;
+          }
         }
 
         script += `      replay: {\n`;

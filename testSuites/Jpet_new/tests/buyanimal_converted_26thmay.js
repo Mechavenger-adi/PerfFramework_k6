@@ -28,7 +28,7 @@ const __journeyLifecycleStore = createJourneyLifecycleStore();
 
 export function initPhase(ctx) {
   clearCookies();
-  console.log('Init phase started');
+
   const correlation_vars = ctx.correlation;
   trackDataRow("userdetails", getUniqueItem(FILES["userdetails"]));
   trackDataRow("pet", getUniqueItem(FILES["pet"]));
@@ -158,13 +158,10 @@ export function initPhase(ctx) {
 
   thinktime(1);
 
-  
-
 }
 
 export function actionPhase(ctx) {
   const correlation_vars = ctx.correlation;
-  console.log('Action phase started');
 
   transaction('search_animal', function() {
   
@@ -198,9 +195,6 @@ export function actionPhase(ctx) {
 
   thinktime(1);
 
-
-
-  thinktime(1);
   transaction('select_product', function() {
   
       const res_1 = request('GET', `${env.baseUrl}/products/${correlation_vars["correlation_0"]}`, {
@@ -223,7 +217,7 @@ export function actionPhase(ctx) {
         replay: { id: "req_7", recordingStartedAt: 'converted' },
       });
   
-      Check(res_1, { "status equals 503": (r) => r.status === 503 });
+      k6Check(res_1, { "status equals 503": (r) => r.status === 503 });
   
   
       const res_2 = request('GET', `${env.baseUrl}/products/${correlation_vars["correlation_0"]}`, {
