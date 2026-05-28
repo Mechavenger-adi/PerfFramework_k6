@@ -148,6 +148,7 @@ export async function runImportPostman(
     extraImports: result.extraImports,
     copiedFiles: result.copiedFiles,
     entryComments: result.entryComments,
+    entryNames: result.entryNames,
   });
 }
 
@@ -164,6 +165,8 @@ interface EmitScriptExtras {
   copiedFiles?: { source: string; destRelative: string }[];
   /** Per-entry comment blocks (Postman pre-request / test scripts → notes). */
   entryComments?: Map<string, { before: string[]; after: string[] }>;
+  /** Per-entry metric name tags (Postman item names). */
+  entryNames?: Map<string, string>;
 }
 
 function emitScript(
@@ -178,6 +181,7 @@ function emitScript(
     extraInitCode: extras.extraInitCode,
     extraImports: extras.extraImports,
     entryComments: extras.entryComments,
+    entryNames: extras.entryNames,
   });
 
   const suiteDir = path.join(process.cwd(), 'testSuites', team);

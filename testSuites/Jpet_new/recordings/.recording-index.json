@@ -16,5 +16,11 @@
     "recordingLogPath": "testSuites\\jpet_new\\recordings\\buyanimal_raw_25thmay.recording-log.json",
     "sourceHarPath": "C:\\Users\\aditk\\Documents\\k6-studio\\Recordings\\jpetstore.aspectran.com_animals.har",
     "generatedAt": "2026-05-25T07:49:42.447Z"
+  },
+  {
+    "scriptPath": "testSuites\\Jpet_new\\tests\\buyanimal_raw_28thmay.js",
+    "recordingLogPath": "testSuites\\Jpet_new\\recordings\\buyanimal_raw_28thmay.recording-log.json",
+    "sourceHarPath": "C:\\Users\\aditk\\Documents\\k6-studio\\Recordings\\jpetstore.aspectran.com_animals.har",
+    "generatedAt": "2026-05-28T13:17:22.150Z"
   }
 ]

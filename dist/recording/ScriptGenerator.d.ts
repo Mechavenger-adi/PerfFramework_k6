@@ -31,6 +31,12 @@ export interface GenerateOptions {
         before: string[];
         after: string[];
     }>;
+    /**
+     * Per-entry metric name tags keyed by HAREntry.id. When present, emitted as
+     * the request's `name` option (`name: 'Transaction_request'`) so per-request
+     * k6 metrics group under it instead of the raw URL.
+     */
+    entryNames?: Map<string, string>;
 }
 export declare class ScriptGenerator {
     /**
@@ -39,6 +45,22 @@ export declare class ScriptGenerator {
      */
     static generate(groups: TransactionGroup[], lifecycle: LifecycleSelection | undefined, teamName: string, options?: GenerateOptions): string;
     private static buildPhaseFunction;
+    /**
+     * Derive a short, identifiable per-request metric name tag in the form
+     * `METHOD_lastSegment_n`:
+     *   - `METHOD`      → HTTP verb (GET, POST, …)
+     *   - `lastSegment` → last non-empty URL path segment, query stripped,
+     *                     sanitized to [A-Za-z0-9_], capped at 25 chars
+     *                     (`/` → `root`)
+     *   - `_n`          → script-wide occurrence count of this exact
+     *                     METHOD_segment (1-based) across all phases and
+     *                     transactions, so repeats are disambiguated and the
+     *                     suffix never resets.
+     *
+     * Shared default for HAR / cURL / convert; Postman overrides with its item
+     * name. `counters` is script-wide and mutated in place.
+     */
+    static deriveRequestName(method: string, url: string, counters: Map<string, number>): string;
     /**
      * Returns the URL expression to embed directly in the generated script (no extra quoting needed).
      * Same-domain paths become `${env.baseUrl}/path` template literals so request() receives an

@@ -54,6 +54,13 @@ export interface PostmanParseResult {
    * the generator substitutes with the response variable name.
    */
   entryComments: Map<string, { before: string[]; after: string[] }>;
+  /**
+   * Per-entry metric name tag (sidecar to HAREntry). Keys are HAREntry.id;
+   * values are `TransactionName_requestname` strings the ScriptGenerator
+   * emits as the request's `name` option so per-request k6 metrics group
+   * under a stable, human-readable tag instead of the raw URL.
+   */
+  entryNames: Map<string, string>;
 }
 
 export interface PostmanParseOptions {
@@ -225,6 +232,10 @@ export class PostmanAdapter {
     const copiedFiles: PostmanParseResult['copiedFiles'] = [];
     // Per-entry comment blocks (prerequest → before request, test → after k6Check).
     const entryComments: PostmanParseResult['entryComments'] = new Map();
+    // Per-entry metric name tags (Postman item name). Keyed by entry id.
+    const entryNames: PostmanParseResult['entryNames'] = new Map();
+    // Collision tracker: transaction → (itemName → occurrence count).
+    const nameCollision = new Map<string, Map<string, number>>();
 
     let requestCounter = 0;
 
@@ -269,6 +280,16 @@ export class PostmanAdapter {
           warnings,
           { fileBindings, copiedFiles, dataDir: opts.dataDir, entryComments },
         );
+        // Per-request metric name tag = the Postman item name (clean,
+        // human-given). The `transaction` tag already carries the folder
+        // context, so we don't prefix it here. On a name collision within
+        // the same transaction, append _2/_3 to keep tags distinct.
+        const baseName = requestName;
+        const seen = (nameCollision.get(groupName)?.get(baseName) ?? 0) + 1;
+        if (!nameCollision.has(groupName)) nameCollision.set(groupName, new Map());
+        nameCollision.get(groupName)!.set(baseName, seen);
+        const nameTag = seen === 1 ? baseName : `${baseName}_${seen}`;
+        entryNames.set(entryId, nameTag);
         if (!groupBuckets.has(groupName)) {
           groupBuckets.set(groupName, []);
           groupOrder.push(groupName);
@@ -321,7 +342,7 @@ export class PostmanAdapter {
       extraInitCode = lines.join('\n');
     }
 
-    return { groups, warnings, extraInitCode, extraImports, copiedFiles, entryComments };
+    return { groups, warnings, extraInitCode, extraImports, copiedFiles, entryComments, entryNames };
   }
 
   // -------------------------------------------------------------------------
@@ -437,7 +458,11 @@ export class PostmanAdapter {
       responseHeaders: [],
       responseBody: undefined,
       pageref: args.pageref,
-      startedDateTime: '1970-01-01T00:00:00.000Z',
+      // Postman items aren't real recordings — there's no capture timestamp.
+      // Use the 'converted' marker (matching ScriptConverter) so the replay
+      // metadata reads `recordingStartedAt: "converted"` instead of a
+      // misleading 1970 epoch placeholder.
+      startedDateTime: 'converted',
       time: 0,
       mimeType: args.bodyMime ?? '',
       host,

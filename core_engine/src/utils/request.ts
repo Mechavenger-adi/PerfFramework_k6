@@ -294,6 +294,10 @@ export function request(
       transaction,
       har_entry_id: harEntryId,
       recording_started_at: recordingStartedAt,
+      // When a request name is supplied, expose it as k6's standard `name`
+      // tag so per-request metrics group under it (e.g. "Auth_Login")
+      // instead of the raw URL. Caller-supplied tags still win via the spread.
+      ...(options?.name ? { name: options.name } : {}),
       ...(options?.tags ?? {}),
     },
   };

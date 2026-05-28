@@ -1,5 +1,5 @@
 import * as fs from 'fs';
-import { LifecycleSelection } from './ScriptGenerator';
+import { LifecycleSelection, ScriptGenerator } from './ScriptGenerator';
 
 /**
  * ScriptConverter
@@ -54,6 +54,10 @@ export class ScriptConverter {
     let currentGroupName = '';
     let insideGroup = false;
     let groupBraceDepth = 0;
+    // Script-wide counter for derived `METHOD_lastSegment_n` name tags. Shared
+    // across all transactions/phases so the `_n` suffix counts occurrences of
+    // each distinct endpoint across the whole script and never resets.
+    const nameCounters = new Map<string, number>();
     // Track the last response variable so we can rename references
     let lastOldResponseVar = '';
     let lastResponseResName = '';
@@ -340,6 +344,8 @@ export class ScriptConverter {
           resName,
           indent,
           primaryBaseUrl,
+          false,
+          nameCounters,
         );
         result.push(requestCall);
 
@@ -674,6 +680,7 @@ export class ScriptConverter {
     indent: string,
     primaryBaseUrl?: string,
     assignOnly = false,
+    nameCounters?: Map<string, number>,
   ): string {
     const inner = indent + '  ';
     const m = method === 'DEL' ? 'DELETE' : method;
@@ -681,6 +688,15 @@ export class ScriptConverter {
 
     const assignPrefix = assignOnly ? `${resName} = ` : `const ${resName} = `;
     let s = `${indent}${assignPrefix}request('${m}', ${resolvedUrl}, {\n`;
+
+    // Per-request metric `name` tag (`METHOD_lastSegment_n`) — same derivation
+    // as ScriptGenerator so HAR-generated and converted scripts tag metrics
+    // identically. Derived from the original `url` (not the runtime expression)
+    // so the path segment is clean.
+    if (nameCounters) {
+      const nameTag = ScriptGenerator.deriveRequestName(m, url, nameCounters);
+      s += `${inner}name: ${JSON.stringify(nameTag)},\n`;
+    }
 
     // Headers — extract from paramsStr if present
     let headersStr: string | null = null;

@@ -43,7 +43,10 @@
                   "",
                   "// Generate random username",
                   "const randomUser = `user_${Math.floor(Math.random() * 10000)}`;",
-                  "pm.environment.set(\"randomUser\", randomUser);"
+                  "pm.environment.set(\"randomUser\", randomUser);",
+                  "pm.test(\"Status code is 302\", function () {",
+                  "    pm.response.to.have.status(302);",
+                  "});"
                 ],
                 "type": "text/javascript"
               }

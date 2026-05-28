@@ -42,20 +42,25 @@ class ScriptGenerator {
         // Script-wide request counter so req_1…req_N is sequential across all phases.
         let scriptRequestId = 0;
         const entryComments = options?.entryComments;
-        script += this.buildPhaseFunction('initPhase', initGroups, primaryBaseUrl, scriptRequestId, entryComments);
+        const entryNames = options?.entryNames;
+        // Script-wide name-tag counter. Shared across every phase and transaction so
+        // the `_n` suffix on `METHOD_segment_n` counts occurrences of each distinct
+        // endpoint across the whole script and never resets.
+        const nameCounters = new Map();
+        script += this.buildPhaseFunction('initPhase', initGroups, primaryBaseUrl, scriptRequestId, entryComments, entryNames, nameCounters);
         scriptRequestId += initGroups.reduce((s, g) => s + g.entries.length, 0);
         script += `\n`;
-        script += this.buildPhaseFunction('actionPhase', actionGroups, primaryBaseUrl, scriptRequestId, entryComments);
+        script += this.buildPhaseFunction('actionPhase', actionGroups, primaryBaseUrl, scriptRequestId, entryComments, entryNames, nameCounters);
         scriptRequestId += actionGroups.reduce((s, g) => s + g.entries.length, 0);
         script += `\n`;
-        script += this.buildPhaseFunction('endPhase', endGroups, primaryBaseUrl, scriptRequestId, entryComments);
+        script += this.buildPhaseFunction('endPhase', endGroups, primaryBaseUrl, scriptRequestId, entryComments, entryNames, nameCounters);
         script += `\n`;
         script += `export default function () {\n`;
         script += `  runJourneyLifecycle(__journeyLifecycleStore, { initPhase, actionPhase, endPhase });\n`;
         script += `}\n`;
         return script;
     }
-    static buildPhaseFunction(functionName, groups, primaryBaseUrl, startRequestId = 0, entryComments) {
+    static buildPhaseFunction(functionName, groups, primaryBaseUrl, startRequestId = 0, entryComments, entryNames, nameCounters = new Map()) {
         let script = `export function ${functionName}(ctx) {\n`;
         let globalRequestId = startRequestId;
         if (functionName === 'initPhase') {
@@ -87,6 +92,12 @@ class ScriptGenerator {
                     }
                 }
                 script += `    const ${responseName} = request('${method}', ${urlExpr}, {\n`;
+                // Per-request metric `name` tag. Adapter override (Postman item name)
+                // takes precedence; otherwise derive `METHOD_lastSegment_n` from the
+                // request itself. request() surfaces this as k6's `name` tag so
+                // per-request metrics group under it instead of the raw URL.
+                const nameTag = entryNames?.get(req.id) ?? this.deriveRequestName(method, req.url, nameCounters);
+                script += `      name: ${JSON.stringify(nameTag)},\n`;
                 if (hasHeaders) {
                     const headersObj = {};
                     req.headers.forEach((h) => { headersObj[h.name] = h.value; });
@@ -131,6 +142,44 @@ class ScriptGenerator {
         });
         script += `}\n`;
         return script;
+    }
+    /**
+     * Derive a short, identifiable per-request metric name tag in the form
+     * `METHOD_lastSegment_n`:
+     *   - `METHOD`      → HTTP verb (GET, POST, …)
+     *   - `lastSegment` → last non-empty URL path segment, query stripped,
+     *                     sanitized to [A-Za-z0-9_], capped at 25 chars
+     *                     (`/` → `root`)
+     *   - `_n`          → script-wide occurrence count of this exact
+     *                     METHOD_segment (1-based) across all phases and
+     *                     transactions, so repeats are disambiguated and the
+     *                     suffix never resets.
+     *
+     * Shared default for HAR / cURL / convert; Postman overrides with its item
+     * name. `counters` is script-wide and mutated in place.
+     */
+    static deriveRequestName(method, url, counters) {
+        let segment = 'root';
+        try {
+            const u = new URL(url);
+            const parts = u.pathname.split('/').filter((p) => p.length > 0);
+            if (parts.length > 0)
+                segment = parts[parts.length - 1];
+        }
+        catch {
+            // Relative or unparseable URL — take the last path-ish chunk before any query.
+            const pathOnly = url.split('?')[0].replace(/\/+$/, '');
+            const parts = pathOnly.split('/').filter((p) => p.length > 0);
+            if (parts.length > 0)
+                segment = parts[parts.length - 1];
+        }
+        segment = segment.replace(/[^A-Za-z0-9_]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '') || 'root';
+        if (segment.length > 25)
+            segment = segment.slice(0, 25);
+        const base = `${method.toUpperCase()}_${segment}`;
+        const n = (counters.get(base) ?? 0) + 1;
+        counters.set(base, n);
+        return `${base}_${n}`;
     }
     /**
      * Returns the URL expression to embed directly in the generated script (no extra quoting needed).
