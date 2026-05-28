@@ -147,6 +147,7 @@ export async function runImportPostman(
     extraInitCode: result.extraInitCode,
     extraImports: result.extraImports,
     copiedFiles: result.copiedFiles,
+    entryComments: result.entryComments,
   });
 }
 
@@ -161,6 +162,8 @@ interface EmitScriptExtras {
   extraImports?: string[];
   /** Files the adapter successfully copied into testSuites/<team>/data/. */
   copiedFiles?: { source: string; destRelative: string }[];
+  /** Per-entry comment blocks (Postman pre-request / test scripts → notes). */
+  entryComments?: Map<string, { before: string[]; after: string[] }>;
 }
 
 function emitScript(
@@ -174,6 +177,7 @@ function emitScript(
   const scriptContent = ScriptGenerator.generate(groups, undefined, team, {
     extraInitCode: extras.extraInitCode,
     extraImports: extras.extraImports,
+    entryComments: extras.entryComments,
   });
 
   const suiteDir = path.join(process.cwd(), 'testSuites', team);

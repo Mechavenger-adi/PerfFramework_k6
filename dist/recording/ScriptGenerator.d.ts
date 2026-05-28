@@ -19,6 +19,18 @@ export interface GenerateOptions {
      * De-duplicated by string equality with existing imports.
      */
     extraImports?: string[];
+    /**
+     * Per-entry comment blocks keyed by HAREntry.id (`req_1`, …). Values are
+     * line arrays the generator emits verbatim:
+     *   - `before` → above the `request(...)` call inside the transaction
+     *   - `after`  → after the default `k6Check(...)` for that request
+     * Lines may include the `__RES__` placeholder; we substitute the actual
+     * response variable name (`res1`, `res2`, …) at emit time.
+     */
+    entryComments?: Map<string, {
+        before: string[];
+        after: string[];
+    }>;
 }
 export declare class ScriptGenerator {
     /**

@@ -41,20 +41,21 @@ class ScriptGenerator {
         script += `const __journeyLifecycleStore = createJourneyLifecycleStore();\n\n`;
         // Script-wide request counter so req_1…req_N is sequential across all phases.
         let scriptRequestId = 0;
-        script += this.buildPhaseFunction('initPhase', initGroups, primaryBaseUrl, scriptRequestId);
+        const entryComments = options?.entryComments;
+        script += this.buildPhaseFunction('initPhase', initGroups, primaryBaseUrl, scriptRequestId, entryComments);
         scriptRequestId += initGroups.reduce((s, g) => s + g.entries.length, 0);
         script += `\n`;
-        script += this.buildPhaseFunction('actionPhase', actionGroups, primaryBaseUrl, scriptRequestId);
+        script += this.buildPhaseFunction('actionPhase', actionGroups, primaryBaseUrl, scriptRequestId, entryComments);
         scriptRequestId += actionGroups.reduce((s, g) => s + g.entries.length, 0);
         script += `\n`;
-        script += this.buildPhaseFunction('endPhase', endGroups, primaryBaseUrl, scriptRequestId);
+        script += this.buildPhaseFunction('endPhase', endGroups, primaryBaseUrl, scriptRequestId, entryComments);
         script += `\n`;
         script += `export default function () {\n`;
         script += `  runJourneyLifecycle(__journeyLifecycleStore, { initPhase, actionPhase, endPhase });\n`;
         script += `}\n`;
         return script;
     }
-    static buildPhaseFunction(functionName, groups, primaryBaseUrl, startRequestId = 0) {
+    static buildPhaseFunction(functionName, groups, primaryBaseUrl, startRequestId = 0, entryComments) {
         let script = `export function ${functionName}(ctx) {\n`;
         let globalRequestId = startRequestId;
         if (functionName === 'initPhase') {
@@ -74,6 +75,17 @@ class ScriptGenerator {
                 const urlExpr = this.buildUrlExpression(req.url, primaryBaseUrl);
                 const hasHeaders = req.headers && req.headers.length > 0;
                 const hasBody = !!req.postData?.expression || !!this.buildRequestBody(req.postData);
+                // Adapter-supplied notes (Postman pre-request scripts, after
+                // translation) emit ABOVE the request call so the user sees them
+                // exactly where they apply. `__RES__` placeholder → the response
+                // variable name for THIS request.
+                const notes = entryComments?.get(req.id);
+                if (notes && notes.before.length > 0) {
+                    for (const line of notes.before) {
+                        const subbed = line.replace(/__RES__/g, responseName);
+                        script += subbed.trim().length === 0 ? `\n` : `    ${subbed}\n`;
+                    }
+                }
                 script += `    const ${responseName} = request('${method}', ${urlExpr}, {\n`;
                 if (hasHeaders) {
                     const headersObj = {};
@@ -100,6 +112,14 @@ class ScriptGenerator {
                 script += `    k6Check(${responseName}, {\n`;
                 script += `      ${JSON.stringify(`${groupItem.name} - status is ${req.status}`)}: (r) => r.status === ${req.status},\n`;
                 script += `    });\n`;
+                // Test-script notes (after translation) emit BELOW the default
+                // k6Check. `__RES__` substituted with the response variable.
+                if (notes && notes.after.length > 0) {
+                    for (const line of notes.after) {
+                        const subbed = line.replace(/__RES__/g, responseName);
+                        script += subbed.trim().length === 0 ? `\n` : `    ${subbed}\n`;
+                    }
+                }
                 if (reqIndex < groupItem.entries.length - 1) {
                     script += `\n`;
                 }

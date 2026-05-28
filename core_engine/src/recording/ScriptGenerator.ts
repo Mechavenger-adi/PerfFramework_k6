@@ -21,6 +21,15 @@ export interface GenerateOptions {
    * De-duplicated by string equality with existing imports.
    */
   extraImports?: string[];
+  /**
+   * Per-entry comment blocks keyed by HAREntry.id (`req_1`, …). Values are
+   * line arrays the generator emits verbatim:
+   *   - `before` → above the `request(...)` call inside the transaction
+   *   - `after`  → after the default `k6Check(...)` for that request
+   * Lines may include the `__RES__` placeholder; we substitute the actual
+   * response variable name (`res1`, `res2`, …) at emit time.
+   */
+  entryComments?: Map<string, { before: string[]; after: string[] }>;
 }
 
 export class ScriptGenerator {
@@ -74,13 +83,14 @@ export class ScriptGenerator {
 
     // Script-wide request counter so req_1…req_N is sequential across all phases.
     let scriptRequestId = 0;
-    script += this.buildPhaseFunction('initPhase', initGroups, primaryBaseUrl, scriptRequestId);
+    const entryComments = options?.entryComments;
+    script += this.buildPhaseFunction('initPhase', initGroups, primaryBaseUrl, scriptRequestId, entryComments);
     scriptRequestId += initGroups.reduce((s, g) => s + g.entries.length, 0);
     script += `\n`;
-    script += this.buildPhaseFunction('actionPhase', actionGroups, primaryBaseUrl, scriptRequestId);
+    script += this.buildPhaseFunction('actionPhase', actionGroups, primaryBaseUrl, scriptRequestId, entryComments);
     scriptRequestId += actionGroups.reduce((s, g) => s + g.entries.length, 0);
     script += `\n`;
-    script += this.buildPhaseFunction('endPhase', endGroups, primaryBaseUrl, scriptRequestId);
+    script += this.buildPhaseFunction('endPhase', endGroups, primaryBaseUrl, scriptRequestId, entryComments);
     script += `\n`;
     script += `export default function () {\n`;
     script += `  runJourneyLifecycle(__journeyLifecycleStore, { initPhase, actionPhase, endPhase });\n`;
@@ -93,6 +103,7 @@ export class ScriptGenerator {
     groups: TransactionGroup[],
     primaryBaseUrl?: string,
     startRequestId = 0,
+    entryComments?: Map<string, { before: string[]; after: string[] }>,
   ): string {
     let script = `export function ${functionName}(ctx) {\n`;
     let globalRequestId = startRequestId;
@@ -118,6 +129,18 @@ export class ScriptGenerator {
         const urlExpr = this.buildUrlExpression(req.url, primaryBaseUrl);
         const hasHeaders = req.headers && req.headers.length > 0;
         const hasBody = !!req.postData?.expression || !!this.buildRequestBody(req.postData);
+
+        // Adapter-supplied notes (Postman pre-request scripts, after
+        // translation) emit ABOVE the request call so the user sees them
+        // exactly where they apply. `__RES__` placeholder → the response
+        // variable name for THIS request.
+        const notes = entryComments?.get(req.id);
+        if (notes && notes.before.length > 0) {
+          for (const line of notes.before) {
+            const subbed = line.replace(/__RES__/g, responseName);
+            script += subbed.trim().length === 0 ? `\n` : `    ${subbed}\n`;
+          }
+        }
 
         script += `    const ${responseName} = request('${method}', ${urlExpr}, {\n`;
 
@@ -148,6 +171,15 @@ export class ScriptGenerator {
         script += `    k6Check(${responseName}, {\n`;
         script += `      ${JSON.stringify(`${groupItem.name} - status is ${req.status}`)}: (r) => r.status === ${req.status},\n`;
         script += `    });\n`;
+
+        // Test-script notes (after translation) emit BELOW the default
+        // k6Check. `__RES__` substituted with the response variable.
+        if (notes && notes.after.length > 0) {
+          for (const line of notes.after) {
+            const subbed = line.replace(/__RES__/g, responseName);
+            script += subbed.trim().length === 0 ? `\n` : `    ${subbed}\n`;
+          }
+        }
 
         if (reqIndex < groupItem.entries.length - 1) {
           script += `\n`;

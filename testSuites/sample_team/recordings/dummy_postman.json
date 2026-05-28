@@ -1,8 +1,8 @@
 {
   "info": {
-    "name": "Dummy Complex APIs",
-    "_postman_id": "12345-67890-abcdef",
-    "description": "A dummy collection with complex APIs for testing",
+    "name": "Enterprise Dummy APIs",
+    "_postman_id": "99999-88888-77777",
+    "description": "A large dummy collection with complex APIs, workflows, and dynamic scripts",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -18,7 +18,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{ \"username\": \"testuser\", \"password\": \"P@ssw0rd\" }"
+              "raw": "{ \"username\": \"{{randomUser}}\", \"password\": \"P@ssw0rd\", \"dob\": \"{{randomDOB}}\" }"
             },
             "url": {
               "raw": "https://dummyapi.com/auth/login",
@@ -26,22 +26,43 @@
               "host": ["dummyapi", "com"],
               "path": ["auth", "login"]
             }
-          }
-        },
-        {
-          "name": "Refresh Token",
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
-            ],
-            "url": {
-              "raw": "https://dummyapi.com/auth/refresh",
-              "protocol": "https",
-              "host": ["dummyapi", "com"],
-              "path": ["auth", "refresh"]
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Generate random year between 1970 and 2005",
+                  "const year = Math.floor(Math.random() * (2005 - 1970 + 1)) + 1970;",
+                  "// Generate random month (01 to 12)",
+                  "const month = String(Math.floor(Math.random() * 12) + 1).padStart(2, '0');",
+                  "// Generate random day (01 to 28)",
+                  "const day = String(Math.floor(Math.random() * 28) + 1).padStart(2, '0');",
+                  "const randomDOB = `${year}-${month}-${day}`;",
+                  "pm.environment.set(\"randomDOB\", randomDOB);",
+                  "",
+                  "// Generate random username",
+                  "const randomUser = `user_${Math.floor(Math.random() * 10000)}`;",
+                  "pm.environment.set(\"randomUser\", randomUser);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "let jsonData = pm.response.json();",
+                  "pm.collectionVariables.set('accessToken', jsonData.accessToken);",
+                  "pm.collectionVariables.set('refreshToken', jsonData.refreshToken);",
+                  "pm.test('Login successful', function () {",
+                  "    pm.expect(jsonData).to.have.property('accessToken');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
             }
-          }
+          ]
         }
       ]
     },
@@ -49,42 +70,39 @@
       "name": "Users",
       "item": [
         {
-          "name": "Get User Profile",
+          "name": "Create User",
           "request": {
-            "method": "GET",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
-            ],
-            "url": {
-              "raw": "https://dummyapi.com/users/{{userId}}?include=posts,comments",
-              "protocol": "https",
-              "host": ["dummyapi", "com"],
-              "path": ["users", "{{userId}}"],
-              "query": [
-                { "key": "include", "value": "posts,comments" }
-              ]
-            }
-          }
-        },
-        {
-          "name": "Update User Settings",
-          "request": {
-            "method": "PUT",
+            "method": "POST",
             "header": [
               { "key": "Authorization", "value": "Bearer {{accessToken}}" },
               { "key": "Content-Type", "value": "application/json" }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{ \"notifications\": true, \"theme\": \"dark\" }"
+              "raw": "{ \"username\": \"{{randomUser}}\", \"dob\": \"{{randomDOB}}\", \"email\": \"{{randomUser}}@test.com\" }"
             },
             "url": {
-              "raw": "https://dummyapi.com/users/{{userId}}/settings",
+              "raw": "https://dummyapi.com/users",
               "protocol": "https",
               "host": ["dummyapi", "com"],
-              "path": ["users", "{{userId}}", "settings"]
+              "path": ["users"]
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "let jsonData = pm.response.json();",
+                  "pm.collectionVariables.set('userId', jsonData.id);",
+                  "pm.test('User created successfully', function () {",
+                  "    pm.expect(jsonData).to.have.property('id');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
         }
       ]
     },
@@ -101,7 +119,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{ \"items\": [{\"id\": \"123\", \"qty\": 2}], \"paymentMethod\": \"card\" }"
+              "raw": "{ \"items\": [{\"id\": \"123\", \"qty\": 2}], \"paymentMethod\": \"card\", \"orderRef\": \"{{randomOrderId}}\" }"
             },
             "url": {
               "raw": "https://dummyapi.com/orders",
@@ -109,20 +127,76 @@
               "host": ["dummyapi", "com"],
               "path": ["orders"]
             }
-          }
-        },
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Generate random order ID",
+                  "const randomOrderId = `ORD-${Math.floor(Math.random() * 100000)}`;",
+                  "pm.environment.set(\"randomOrderId\", randomOrderId);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "let jsonData = pm.response.json();",
+                  "pm.collectionVariables.set('orderId', jsonData.orderId);",
+                  "pm.test('Order created successfully', function () {",
+                  "    pm.expect(jsonData).to.have.property('orderId');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Payments",
+      "item": [
         {
-          "name": "Get Order Status",
+          "name": "Process Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"orderId\": \"{{orderId}}\", \"amount\": 2500, \"currency\": \"INR\" }"
+            },
+            "url": {
+              "raw": "https://dummyapi.com/payments",
+              "protocol": "https",
+              "host": ["dummyapi", "com"],
+              "path": ["payments"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Analytics",
+      "item": [
+        {
+          "name": "Get User Activity",
           "request": {
             "method": "GET",
             "header": [
               { "key": "Authorization", "value": "Bearer {{accessToken}}" }
             ],
             "url": {
-              "raw": "https://dummyapi.com/orders/{{orderId}}/status",
+              "raw": "https://dummyapi.com/analytics/users/{{userId}}/activity",
               "protocol": "https",
               "host": ["dummyapi", "com"],
-              "path": ["orders", "{{orderId}}", "status"]
+              "path": ["analytics", "users", "{{userId}}", "activity"]
             }
           }
         }
@@ -131,7 +205,11 @@
   ],
   "variable": [
     { "key": "accessToken", "value": "" },
-    { "key": "userId", "value": "001" },
-    { "key": "orderId", "value": "A1001" }
+    { "key": "refreshToken", "value": "" },
+    { "key": "userId", "value": "" },
+    { "key": "orderId", "value": "" },
+    { "key": "randomDOB", "value": "" },
+    { "key": "randomUser", "value": "" },
+    { "key": "randomOrderId", "value": "" }
   ]
 }

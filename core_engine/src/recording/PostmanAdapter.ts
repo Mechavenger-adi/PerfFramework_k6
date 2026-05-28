@@ -23,6 +23,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { HAREntry } from '../types/HARContracts';
 import { TransactionGroup } from './TransactionGrouper';
+import { translatePostmanScript } from './PostmanScriptTranslator';
 
 export interface PostmanParseResult {
   groups: TransactionGroup[];
@@ -45,6 +46,14 @@ export interface PostmanParseResult {
    * inform the user. Path is the absolute source path.
    */
   copiedFiles: { source: string; destRelative: string }[];
+  /**
+   * Per-entry comment blocks (sidecar to HAREntry — no contract changes).
+   * Keys are HAREntry.id (`req_1`, `req_2`, …). Values are line arrays the
+   * ScriptGenerator emits verbatim above the request call (`before`) and
+   * after the default k6Check (`after`). Lines may contain `__RES__` which
+   * the generator substitutes with the response variable name.
+   */
+  entryComments: Map<string, { before: string[]; after: string[] }>;
 }
 
 export interface PostmanParseOptions {
@@ -214,6 +223,8 @@ export class PostmanAdapter {
     // same source file referenced twice maps to one open() declaration.
     const fileBindings: FileBinding[] = [];
     const copiedFiles: PostmanParseResult['copiedFiles'] = [];
+    // Per-entry comment blocks (prerequest → before request, test → after k6Check).
+    const entryComments: PostmanParseResult['entryComments'] = new Map();
 
     let requestCounter = 0;
 
@@ -249,13 +260,14 @@ export class PostmanAdapter {
         }
 
         requestCounter++;
+        const entryId = `req_${requestCounter}`;
         const entry = this.requestToHAREntry(
           item,
-          `req_${requestCounter}`,
+          entryId,
           groupName,
           itemAuth,
           warnings,
-          { fileBindings, copiedFiles, dataDir: opts.dataDir },
+          { fileBindings, copiedFiles, dataDir: opts.dataDir, entryComments },
         );
         if (!groupBuckets.has(groupName)) {
           groupBuckets.set(groupName, []);
@@ -309,7 +321,7 @@ export class PostmanAdapter {
       extraInitCode = lines.join('\n');
     }
 
-    return { groups, warnings, extraInitCode, extraImports, copiedFiles };
+    return { groups, warnings, extraInitCode, extraImports, copiedFiles, entryComments };
   }
 
   // -------------------------------------------------------------------------
@@ -338,6 +350,7 @@ export class PostmanAdapter {
       fileBindings: FileBinding[];
       copiedFiles: PostmanParseResult['copiedFiles'];
       dataDir?: string;
+      entryComments: PostmanParseResult['entryComments'];
     },
   ): HAREntry {
     const reqAny = item.request;
@@ -382,7 +395,7 @@ export class PostmanAdapter {
       headers.push(h);
     }
 
-    this.warnOnEvents(item.event, warnings, item.name ?? id);
+    this.processEvents(item.event, warnings, item.name ?? id, id, fileCtx.entryComments);
 
     return this.makeEntry({ id, pageref, method, url, headers, body, bodyMime, expression });
   }
@@ -712,20 +725,61 @@ export class PostmanAdapter {
     return [];
   }
 
-  private static warnOnEvents(
+  /**
+   * Process an item's `event[]` slots and stash translated/preserved script
+   * lines into the per-entry comments map keyed by HAREntry id. The
+   * ScriptGenerator emits the `before` lines above the `request(...)` call
+   * and the `after` lines below the default `k6Check(...)` at emission time.
+   *
+   * The translator (see PostmanScriptTranslator) handles the safe-rewrite
+   * subset (`pm.environment.set/get`, `pm.response.code/json/headers`, etc.)
+   * and emits `// TODO[port-postman]:` lines for everything else. We only
+   * warn at the CLI when nothing in the script could be translated — that's
+   * the case worth flagging because the user has the most manual work.
+   */
+  private static processEvents(
     events: PostmanEvent[] | undefined,
     warnings: string[],
     where: string,
+    entryId: string,
+    entryComments: PostmanParseResult['entryComments'],
   ): void {
     if (!events || events.length === 0) return;
+
+    const slot = entryComments.get(entryId) ?? { before: [], after: [] };
+    let touched = false;
+
     for (const ev of events) {
       if (ev.disabled) continue;
-      if (ev.listen === 'prerequest' || ev.listen === 'test') {
+      if (ev.listen !== 'prerequest' && ev.listen !== 'test') continue;
+
+      const rawLines = Array.isArray(ev.script?.exec)
+        ? (ev.script!.exec as string[])
+        : typeof ev.script?.exec === 'string'
+          ? (ev.script!.exec as string).split(/\r?\n/)
+          : [];
+      if (rawLines.length === 0) continue;
+
+      const result = translatePostmanScript(rawLines, ev.listen);
+      if (result.lines.length === 0) continue;
+
+      if (ev.listen === 'prerequest') {
+        if (slot.before.length > 0) slot.before.push(''); // spacer if multiple slots
+        slot.before.push(...result.lines);
+      } else {
+        if (slot.after.length > 0) slot.after.push('');
+        slot.after.push(...result.lines);
+      }
+      touched = true;
+
+      if (result.hasTodos && !result.fullyTranslated) {
         warnings.push(
-          `[${where}] Postman ${ev.listen} script present; ports do not translate to k6. Emit a TODO comment and review manually.`,
+          `[${where}] Postman ${ev.listen} script: some lines couldn't be auto-translated and were left as TODO comments. Review the generated script.`,
         );
       }
     }
+
+    if (touched) entryComments.set(entryId, slot);
   }
 }
 
