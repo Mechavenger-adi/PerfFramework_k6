@@ -86,7 +86,7 @@ export class TimeseriesArtifactBuilder {
     return runtime.build(endTs);
   }
 
-  private static asNumber(value: string | number | undefined): number {
+  private static asNumber(value: string | number | boolean | undefined): number {
     return typeof value === 'number' ? value : 0;
   }
 }

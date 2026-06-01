@@ -18,6 +18,7 @@ import { PipelineRunner } from '../execution/PipelineRunner';
 import { ScenarioBuilder } from '../scenario/ScenarioBuilder';
 import { ArtifactWriter } from '../reporting/ArtifactWriter';
 import { EventArtifactBuilder } from '../reporting/EventArtifactBuilder';
+import { ErrorRuntime } from '../runtime/ErrorRuntime';
 import { RunReportGenerator } from '../reporting/RunReportGenerator';
 import { RunSummaryBuilder } from '../reporting/RunSummaryBuilder';
 import { TimeseriesArtifactBuilder } from '../reporting/TimeseriesArtifactBuilder';
@@ -909,6 +910,26 @@ function finalizeRunArtifacts(options: {
     journeyName,
     summaryData: summaryData as any,
   });
+
+  // Pass/fail provenance check: if any transaction row was produced via the
+  // legacy native-check fallback (no `<name>_checkrate` Rate metric), surface
+  // a visible warning. The fallback returns an estimate derived from k6's
+  // per-check `passes`/`fails` totals, which can under-count when failures
+  // span multiple checks and over-count when a single check runs more than
+  // once per iteration. Exact per-iteration counts require `transaction()`
+  // (auto-registered in framework-generated scripts).
+  const estimatedRows = transactionMetrics.transactions.filter((row) => row.estimated === true);
+  if (transactionMetrics.hasEstimatedRows && estimatedRows.length > 0) {
+    const estimatedNames = estimatedRows.map((row) => row.transaction).slice(0, 5);
+    const more = estimatedRows.length > 5 ? ` (+${estimatedRows.length - 5} more)` : '';
+    Logger.warn(
+      `Pass/fail for ${estimatedRows.length} transaction(s) was estimated from native k6 check counts ` +
+      `because the per-iteration <name>_checkrate Rate metric was not present. Values shown are ` +
+      `estimates — they can under-count when failures span multiple checks and over-count when a check ` +
+      `runs more than once per iteration. Affected: ${estimatedNames.join(', ')}${more}. Re-run with the ` +
+      `current framework (scripts must use transaction() + k6Check()) for exact per-iteration counts.`,
+    );
+  }
   const eventArtifacts = EventArtifactBuilder.build({
     runId: options.runId,
     planName: options.plan.name,
@@ -924,6 +945,26 @@ function finalizeRunArtifacts(options: {
     options.hostSnapshots,
   );
   eventArtifacts.warnings.push(...monitoringWarnings);
+
+  // Mirror the estimated-pass/fail console warning into warnings.ndjson so it
+  // also lands in the RunReport's Warnings tab and any downstream CI consumer
+  // of the artifact pipeline. Single run-level event (not one per row) — the
+  // affected transaction names are listed in the message.
+  if (transactionMetrics.hasEstimatedRows && estimatedRows.length > 0) {
+    const estimatedNames = estimatedRows.map((row) => row.transaction);
+    eventArtifacts.warnings.push(
+      ErrorRuntime.buildWarningEvent(
+        options.runId,
+        'estimated_pass_fail',
+        `Pass/fail for ${estimatedRows.length} transaction(s) is approximate — derived from native k6 ` +
+          `check counts because the per-iteration <name>_checkrate Rate metric was unavailable. Values ` +
+          `are estimates (can under- or over-count depending on check shape). For exact per-iteration ` +
+          `counts, run scripts that use transaction() + k6Check().`,
+        // Stored as an extra so the warnings table / consumers can see which transactions are flagged.
+        { affectedTransactions: estimatedNames } as any,
+      ),
+    );
+  }
   const ciSummary = RunSummaryBuilder.buildCiSummary({
     runId: options.runId,
     planName: options.plan.name,
@@ -1142,6 +1183,15 @@ interface LiveTxnStats {
   wM2: number;
   checkPasses: Map<string, number>; // checkName → cumulative pass count
   checkFails:  Map<string, number>; // checkName → cumulative fail count
+  // Per-iteration pass/fail derived from the framework's `<name>_checkrate`
+  // Rate metric (one Point per transaction iteration; value=1 pass, value=0
+  // fail). When at least one such sample arrives, these are EXACT counts and
+  // override the native-check estimate below. Without these samples (old runs
+  // or scripts not using `transaction()`), the renderer falls back to the
+  // max(check.fails) approximation over the `checkPasses`/`checkFails` maps.
+  txnPasses: number;
+  txnFails: number;
+  hasRateSamples: boolean;
 }
 
 function pct(values: number[], p: number): string {
@@ -1233,6 +1283,7 @@ function startLiveTransactionDisplay(
                   count: 0, total: 0, min: Infinity, max: -Infinity,
                   values: [], wMean: 0, wM2: 0,
                   checkPasses: new Map(), checkFails: new Map(),
+                  txnPasses: 0, txnFails: 0, hasRateSamples: false,
                 };
                 const checkName = tags.check ?? 'check';
                 if (entry.data.value === 1) {
@@ -1244,6 +1295,30 @@ function startLiveTransactionDisplay(
                 continue;
               }
 
+              // ── per-iteration pass/fail Rate metric → exact counts ──
+              // `<name>_checkrate` emits one Point per `Rate.add(...)` call
+              // (value=1 pass, value=0 fail) — pushed exactly once per
+              // transaction iteration from `transaction()`'s finally block.
+              // When present, these are ground truth and override the native-
+              // check estimate used by the renderer below.
+              if (entry.metric.endsWith('_checkrate')) {
+                const baseName = entry.metric.slice(0, -'_checkrate'.length);
+                const rateDisplay = normToDisplay.get(baseName)
+                  ?? normToDisplay.get(baseName.replace(/[^a-zA-Z0-9]+/g, '_'));
+                if (!rateDisplay || typeof entry.data?.value !== 'number') continue;
+                const rs: LiveTxnStats = stats.get(rateDisplay) ?? {
+                  count: 0, total: 0, min: Infinity, max: -Infinity,
+                  values: [], wMean: 0, wM2: 0,
+                  checkPasses: new Map(), checkFails: new Map(),
+                  txnPasses: 0, txnFails: 0, hasRateSamples: false,
+                };
+                if (entry.data.value === 1) rs.txnPasses++;
+                else                        rs.txnFails++;
+                rs.hasRateSamples = true;
+                stats.set(rateDisplay, rs);
+                continue;
+              }
+
               // ── transaction timing metric → count + timing stats ──
               const displayName = normToDisplay.get(entry.metric);
               if (!displayName || typeof entry.data?.value !== 'number') continue;
@@ -1252,6 +1327,7 @@ function startLiveTransactionDisplay(
                 count: 0, total: 0, min: Infinity, max: -Infinity,
                 values: [], wMean: 0, wM2: 0,
                 checkPasses: new Map(), checkFails: new Map(),
+                txnPasses: 0, txnFails: 0, hasRateSamples: false,
               };
               s.count++;
               s.total += v;
@@ -1325,10 +1401,14 @@ function buildLiveTableLines(
   transactionStats: string[],
   useColor: boolean,
 ): string[] {
-  // Per-transaction iterations where AT LEAST ONE check failed. Used as a
-  // lower bound on the failed-iteration count — more defensible than the old
-  // `count - min(passes)` formula, which silently reported 0 fails when the
-  // checkPasses map was empty but checkFails had entries.
+  // Estimate failed-iteration count from native k6 check aggregates. Only
+  // used when the framework's `<name>_checkrate` Rate metric is unavailable
+  // (legacy data path). Imperfect — see TransactionMetricsBuilder for the
+  // full discussion. This estimate can under-count (failures spread across
+  // multiple checks) and over-count (a single check evaluated multiple times
+  // per iteration); the cap at `count` clamps the worst over-count to "all
+  // failed" rather than producing impossible values, but it's still wrong in
+  // both directions on edge cases.
   const failedIterations = (s: LiveTxnStats): number => {
     if (s.checkFails.size === 0) return 0;
     let maxFails = 0;
@@ -1339,12 +1419,23 @@ function buildLiveTableLines(
   type ColDef = { header: string; width: number; val: (name: string, s: LiveTxnStats) => string };
   const ALL_COLS: Record<string, ColDef> = {
     count:   { header: 'Count',   width: 7,  val: (_n, s) => String(s.count) },
+    // Pass/Fail resolution mirrors TransactionMetricsBuilder so the live view
+    // and the final report agree:
+    //   1. PREFERRED — exact counts from the `<name>_checkrate` Rate metric.
+    //      Each transaction iteration emits exactly one sample, so
+    //      txnPasses + txnFails === count by construction.
+    //   2. FALLBACK — estimate from native check aggregates (older runs /
+    //      scripts without `transaction()`).
     pass:    { header: 'Pass',    width: 7,  val: (_n, s) => {
+      if (s.hasRateSamples) return String(s.txnPasses);
       // No check data at all → assume the transaction passed (it completed)
       if (s.checkPasses.size === 0 && s.checkFails.size === 0) return String(s.count);
       return String(Math.max(0, s.count - failedIterations(s)));
     } },
-    fail:    { header: 'Fail',    width: 6,  val: (_n, s) => String(failedIterations(s)) },
+    fail:    { header: 'Fail',    width: 6,  val: (_n, s) => {
+      if (s.hasRateSamples) return String(s.txnFails);
+      return String(failedIterations(s));
+    } },
     avg:     { header: 'Avg(ms)', width: 8,  val: (_n, s) => s.count > 0 ? String(Math.round(s.total / s.count)) : '-' },
     min:     { header: 'Min(ms)', width: 8,  val: (_n, s) => s.count > 0 ? String(Math.round(s.min)) : '-' },
     max:     { header: 'Max(ms)', width: 8,  val: (_n, s) => s.count > 0 ? String(Math.round(s.max)) : '-' },

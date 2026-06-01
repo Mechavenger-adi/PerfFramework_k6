@@ -94,7 +94,7 @@ export class RunSummaryBuilder {
     return value.ok === false;
   }
 
-  private static asNumber(value: string | number | undefined): number | undefined {
+  private static asNumber(value: string | number | boolean | undefined): number | undefined {
     return typeof value === 'number' ? value : undefined;
   }
 }

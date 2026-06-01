@@ -414,6 +414,138 @@ If a barrel is introduced, it must contain only k6-safe runtime helpers.
 
 ---
 
+## Proposal 3: Per-Iteration Transaction Pass/Fail Metric
+
+**Status:** Approved — ready for implementation
+**Affects:** `transaction.ts`, `TransactionMetricsBuilder.ts`. Scripts that go through `transaction()` / `k6Check()` automatically benefit; no script-level changes required.
+
+### Problem
+
+Transaction pass/fail in `transaction-metrics.json` and the unified report is currently reconstructed from k6's check aggregates in `handleSummary.json` via:
+
+```
+pass = min(check.passes across the group's checks)  capped at <name>_count
+fail = count - pass
+```
+
+This silently hides failures in several real scenarios:
+
+- A check is evaluated more than once per transaction iteration (multi-request transactions, retry loops). `min(passes)` can exceed the transaction execution count, so capping at `count` forces `fail = 0` even when fails are non-zero.
+  - Concrete case from a real run: `select_product` transaction, `count = 163`, check `status is 503` `passes=163/fails=0`, check `status is 200` `passes=194/fails=132`. `min(163, 194) = 163 = count` → reported `fail = 0` despite 132 real check failures.
+- Different requests inside the same transaction have independent checks with different totals; `min` latches onto the cleanest one and ignores the failing one.
+- A request throws (transport error, correlation failure, runtime error inside `request()`). No check ran, so summary-based aggregation reports the transaction as fully passed.
+
+k6's native `checks` view and the live metrics stream show these failures correctly. Only our per-transaction rollup is wrong.
+
+### Solution
+
+Track transaction pass/fail at the point of truth — the iteration itself — and publish it as a first-class k6 `Rate` metric. Stop trying to reconstruct it from check aggregates after the fact.
+
+A transaction iteration is **failed** if any of the following happened during it:
+
+- a `k6Check(...)` returned `false` while the transaction was active
+- the transaction body threw — including transport errors surfaced by `request()`, correlation/extraction errors, and any user-thrown exception
+
+Otherwise it is **passed** (transactions with zero checks count as passed — successful completion with no observed failure).
+
+Exactly **one** sample is added to the per-transaction `Rate` metric per `transaction()` invocation, in the `finally` block, before `endTransaction()`. This holds regardless of how many checks the body contains — N checks ≠ N samples.
+
+### Required behavior
+
+```typescript
+const txnResults: Record<string, Rate> = {};
+let _currentIterationFailed = false;   // per-VU, per-active-transaction flag
+
+export function transaction(name: string, fn: () => void): void {
+  // existing nesting / VU-terminated guards unchanged
+
+  _activeTransaction = name;
+  try {
+    group(name, () => {
+      startTransaction(name);
+      _currentIterationFailed = false;          // reset at iteration boundary
+      try {
+        fn();
+      } catch (error) {
+        _currentIterationFailed = true;         // any thrown error = failed iteration
+        // existing errorBehavior handling unchanged
+      } finally {
+        txnResults[name]?.add(!_currentIterationFailed);   // exactly one sample
+        endTransaction(name);
+      }
+    });
+  } finally {
+    _activeTransaction = '';
+  }
+}
+
+export function k6Check(val, sets): boolean {
+  const passed = nativeCheck(val, sets);
+  if (!passed && _activeTransaction !== '') {
+    _currentIterationFailed = true;
+  }
+  // existing errorBehavior handling unchanged
+  return passed;
+}
+```
+
+### Metric contract
+
+For every transaction registered via the auto-init manifest (`K6_PERF_TRANSACTION_NAMES`) or legacy `initTransactions([...])`, three metrics are created in init context:
+
+| Metric name      | Type    | Purpose                                                                                                       |
+|------------------|---------|---------------------------------------------------------------------------------------------------------------|
+| `<name>`         | Trend   | Duration of each transaction (existing)                                                                       |
+| `<name>_count`   | Counter | Number of `startTransaction` calls (existing)                                                                 |
+| `<name>_checkrate` | Rate    | One sample per iteration: `true` if all checks passed and no error was raised, `false` otherwise (**new**)    |
+
+Invariants:
+
+- `passes + fails === <name>_count.count` by construction — one `Rate.add` per `startTransaction`.
+- VUs skipped via `stop_vu` / lifecycle gating neither increment the counter nor push to the Rate.
+- Nested-transaction rejection happens before `startTransaction`, so neither metric is touched.
+- The Rate's samples are implicitly group-tagged because `.add` runs inside `group(name, ...)`.
+
+### Edge-case truth table
+
+| Scenario                                                       | flag at finally | Rate sample |
+|----------------------------------------------------------------|-----------------|-------------|
+| All checks pass, body completes                                | false           | pass        |
+| At least one `k6Check` returns false (continue mode)           | true            | fail        |
+| Body throws transport error                                    | true            | fail        |
+| Body throws under `stop_iteration` (re-thrown)                 | true            | fail (finally pushes before re-throw propagates) |
+| Body throws under `stop_vu` (no re-throw)                      | true            | fail        |
+| Body throws under `abort_test`                                 | true            | fail (push happens before VU exits) |
+| Body completes with zero checks called                         | false           | pass        |
+| Raw k6 `check()` used instead of `k6Check` and fails           | unchanged       | pass (documented limitation; framework-generated scripts always use `k6Check`) |
+| `k6Check` called outside any transaction                       | unchanged       | nothing pushed |
+
+### Reporting integration
+
+`TransactionMetricsBuilder` MUST prefer the new `Rate` metric when present:
+
+- If `<name>_checkrate` exists in the summary, set `row.pass = values.passes`, `row.fail = values.fails`. `count` continues to come from `<name>_count`.
+- If absent (legacy runs, scripts that don't go through `transaction()`), fall back to the existing `min(passes)` aggregation. This preserves the previous behavior for historical reports.
+
+`errorPct` continues to derive from `(fail / count) * 100`.
+
+### Backward compatibility
+
+- Old generated scripts that pre-date `transaction()` continue to work; their reports use the existing aggregation fallback.
+- Existing `<name>` Trend and `<name>_count` Counter names are unchanged. Adding the Rate adds one extra metric per transaction; no removals.
+- Thresholds keyed off `<name>_checkrate` can be expressed by users (e.g. `'login_checkrate': ['rate>0.99']`).
+
+### Acceptance criteria
+
+1. A transaction whose body throws an error (with no checks) is reported `fail`, not `pass`.
+2. A transaction with multiple checks where exactly one fails per iteration is reported with `fail = number-of-failing-iterations`, regardless of how many checks live in the body.
+3. `passes + fails === count` for every transaction in every summary produced by the new code path.
+4. Live metrics stream, k6 native `checks` view, and the custom report agree on the direction of failure (whenever any of them shows fails, the others do too).
+5. Reports from older runs that lack `<name>_checkrate` still render via the legacy aggregation path.
+6. The live transaction display reads the same `<name>_checkrate` Point samples from the streaming JSON output, so the live view and the post-run summary report agree by construction.
+
+---
+
 ## Combined Generated Script Direction
 
 ### Target Pattern

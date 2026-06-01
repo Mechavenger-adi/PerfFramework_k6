@@ -1,5 +1,5 @@
 {
-  "$schema": "../schemas/test-plan.schema.json",
+  "$schema": "../schemas/test_plan.schema.json",
   "name": "WebUI Load Test - jpet",
   "environment": "dev",
   "execution_mode": "parallel",
@@ -32,8 +32,8 @@
   "noCookiesReset": true,
   "user_journeys": [
     {
-      "name": "buyanimal_raw_20thmay",
-      "scriptPath": "buyanimal_raw_20thmay.js",
+      "name": "buy_animal_1stJune_converted",
+      "scriptPath": "buy_animal_1stJune_converted.js",
       "weight": 100
     }
   ],

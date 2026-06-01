@@ -387,9 +387,36 @@ export class RunReportGenerator {
 
     function renderTransactions() {
       const rows = reportData.transactions.transactions;
-      document.getElementById('panel-transactions').innerHTML = rows.length
-        ? renderTable(rows, ['transaction', 'count', 'pass', 'fail', 'errorPct', ...reportData.config.transactionStats.filter((stat) => !['count', 'pass', 'fail'].includes(stat))])
-        : '<div class="empty">No transaction metrics were captured for this run.</div>';
+      const host = document.getElementById('panel-transactions');
+      if (!rows.length) {
+        host.innerHTML = '<div class="empty">No transaction metrics were captured for this run.</div>';
+        return;
+      }
+      // Mark estimated rows visibly: append a "≈" suffix to the transaction
+      // name so the column shows e.g. "checkout ≈". The full row object stays
+      // untouched in reportData; we only mutate a presentation copy.
+      const presentationRows = rows.map(function(row) {
+        if (row.estimated === true) {
+          return Object.assign({}, row, { transaction: String(row.transaction || '') + ' ≈' });
+        }
+        return row;
+      });
+      const columns = ['transaction', 'count', 'pass', 'fail', 'errorPct', ...reportData.config.transactionStats.filter((stat) => !['count', 'pass', 'fail'].includes(stat))];
+      const tableHtml = renderTable(presentationRows, columns);
+      // Banner: surfaces the pass/fail provenance issue at the top of the
+      // panel. Fires when ANY row used the native-check fallback (no
+      // <name>_checkrate Rate metric). Estimate semantics described inline so
+      // users don't have to dig for the design doc.
+      const estimated = rows.filter(function(r) { return r.estimated === true; });
+      const banner = estimated.length > 0
+        ? '<div class="notice notice-warn" style="margin-bottom:12px;padding:10px 14px;border-left:4px solid #f59e0b;background:#fef3c7;color:#78350f;border-radius:4px;font-size:13px;line-height:1.5">'
+            + '<strong>Approximate pass/fail (' + estimated.length + ' transaction' + (estimated.length === 1 ? '' : 's') + ', marked with ≈).</strong> '
+            + 'Pass/fail for these rows was derived from native k6 <code>check()</code> aggregates because the per-iteration <code>&lt;name&gt;_checkrate</code> Rate metric was not present. '
+            + 'These are <strong>estimates</strong>, not exact counts — they can under-count when failures span multiple checks, and over-count when a single check runs more than once per iteration. '
+            + 'For exact per-iteration counts, run scripts that go through the framework <code>transaction()</code> + <code>k6Check()</code> wrappers.'
+          + '</div>'
+        : '';
+      host.innerHTML = banner + tableHtml;
     }
 
     function renderErrors() {

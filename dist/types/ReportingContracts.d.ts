@@ -9,12 +9,27 @@ export interface TransactionMetricRow {
     avg?: number;
     min?: number;
     max?: number;
-    [stat: string]: string | number | undefined;
+    /**
+     * True when pass/fail were derived from raw k6 check aggregates (legacy
+     * fallback) instead of the per-iteration `<name>_checkrate` Rate metric.
+     * Estimates can both under-count (failures span multiple checks) and
+     * over-count (a single check runs more than once per iteration); they are
+     * shown only when no Rate metric is available. See Proposal 3 in
+     * `ai_context/design-proposals.md`.
+     */
+    estimated?: boolean;
+    [stat: string]: string | number | boolean | undefined;
 }
 export interface TransactionMetricsFile {
     runId: string;
     stats: string[];
     transactions: TransactionMetricRow[];
+    /**
+     * True when at least one row in `transactions` was produced via the legacy
+     * aggregation fallback (`estimated: true`). Lets downstream consumers emit
+     * a single run-level warning without iterating the row list.
+     */
+    hasEstimatedRows?: boolean;
 }
 export interface CiTransactionSummary {
     name: string;

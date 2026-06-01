@@ -1,5 +1,5 @@
 {
-  "$schema": "../schemas/test-plan.schema.json",
+  "$schema": "../schemas/test_plan.schema.json",
   "name": "WebUI Load Test - test.k6.io",
   "environment": "dev",
   "execution_mode": "parallel",

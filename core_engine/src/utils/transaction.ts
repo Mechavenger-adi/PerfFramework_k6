@@ -1,7 +1,7 @@
 // @ts-ignore
 import { group, check as nativeCheck } from 'k6';
 // @ts-ignore - K6 runtime module
-import { Counter, Trend } from 'k6/metrics';
+import { Counter, Rate, Trend } from 'k6/metrics';
 // @ts-ignore - K6 runtime module
 import exec from 'k6/execution';
 
@@ -24,6 +24,16 @@ function getRuntimeErrorBehavior(): string {
 const txnStarts: Record<string, number> = {};
 const txnTrends: Record<string, Trend> = {};
 const txnCounters: Record<string, Counter> = {};
+// Per-transaction pass/fail Rate. One sample is pushed per transaction iteration
+// (in transaction()'s finally block); `true` = all checks passed and no error
+// was raised, `false` = any check failed or the body threw. See Proposal 3 in
+// ai_context/design-proposals.md.
+const txnResults: Record<string, Rate> = {};
+
+// True iff the currently-active transaction has observed at least one failure
+// (failed k6Check or thrown error) during this iteration. Reset at the start of
+// every transaction(), read once in finally, then reset by the next transaction.
+let _currentIterationFailed = false;
 
 /**
  * Pull a user-script source location (path:line[:col]) out of an Error.stack
@@ -121,6 +131,13 @@ export function initTransactions(names: string[]): void {
     if (!txnCounters[name]) {
       txnCounters[name] = new Counter(`${name}_count`);
     }
+    if (!txnResults[name]) {
+      // One sample per transaction iteration (see Proposal 3). passes + fails
+      // equals <name>_count by construction. Metric name is <name>_checkrate
+      // — a Rate whose passes/fails reflect whether every k6Check inside the
+      // transaction passed (and no error was raised) for that iteration.
+      txnResults[name] = new Rate(`${name}_checkrate`);
+    }
   });
 }
 
@@ -200,9 +217,19 @@ export function transaction(name: string, fn: () => void): void {
   try {
     group(name, () => {
       startTransaction(name);
+      // Reset the per-iteration failure flag at the iteration boundary.
+      // k6Check (on failure) and the catch below flip it to true; the finally
+      // block reads it once to push a single sample to <name>_checkrate.
+      _currentIterationFailed = false;
       try {
         fn();
       } catch (error) {
+        // Any thrown error inside the body counts as a failed iteration —
+        // transport errors from request(), correlation failures, user-thrown
+        // exceptions. The flag stays set through every errorBehavior branch
+        // (continue / stop_iteration / stop_vu / abort_test), so the finally
+        // pushes Rate.add(false) regardless of how this iteration ends.
+        _currentIterationFailed = true;
         const behavior = errorBehavior;
         const message =
           error && typeof error === 'object' && 'message' in error
@@ -264,6 +291,12 @@ export function transaction(name: string, fn: () => void): void {
           `  → skipped remaining work in this transaction; continuing to next transaction (errorBehavior=continue)`,
         );
       } finally {
+        // Exactly one sample per transaction iteration, before endTransaction
+        // so it can never be skipped. By construction:
+        //   <name>_checkrate.passes + <name>_checkrate.fails === <name>_count
+        if (txnResults[name]) {
+          txnResults[name].add(!_currentIterationFailed);
+        }
         endTransaction(name);
       }
     });
@@ -284,6 +317,13 @@ export function k6Check(
 ): boolean {
   const passed = nativeCheck(val, sets);
   if (!passed) {
+    // Mark the current iteration as failed so transaction()'s finally block
+    // pushes Rate.add(false) for the active transaction. Guarded on
+    // _activeTransaction so a check called outside any transaction can't leak
+    // a stale "failed" state into the next transaction.
+    if (_activeTransaction !== '') {
+      _currentIterationFailed = true;
+    }
     const behavior = getRuntimeErrorBehavior();
     const txn = getCurrentTransaction();
     const ctx = txn ? `[transaction:${txn}]` : '';
