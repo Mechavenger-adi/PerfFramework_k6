@@ -28,6 +28,8 @@
     "build": "tsc",
     "build:watch": "tsc --watch",
     "typecheck": "tsc --noEmit",
+    "start": "tsx core_engine/src/cli/run.ts",
+    "menu": "tsx core_engine/src/cli/run.ts menu",
     "cli": "tsx core_engine/src/cli/run.ts",
     "watch": "tsx watch core_engine/src/cli/run.ts",
     "init": "tsx core_engine/src/cli/run.ts init",

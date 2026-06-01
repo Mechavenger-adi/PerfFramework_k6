@@ -47,6 +47,8 @@ Enterprise-grade k6 performance testing framework with:
 
 ### CLI Commands
 ```bash
+npm start                                                      # Launch the interactive command panel (menu-driven authoring/running) — TTY required
+npm run menu                                                   # Explicit alias for `npm start` — always launches the interactive panel
 npm run cli -- init                                            # Scaffold project (copies framework schemas into the new project)
 npm run cli -- new                                             # Interactive wizard: create a test plan or runtime settings from templates
 npm run cli -- docs                                            # Auto-generate Markdown reference docs from JSON schemas
@@ -110,7 +112,7 @@ K6-PerfFramework/
 |  |- DOCS_METHODS.md                  # API reference
 |  `- src/
 |     |- index.ts                      # Barrel export
-|     |- cli/                          # run.ts, init.ts, generate.ts, generate-byos.ts, convert.ts, validate.ts
+|     |- cli/                          # run.ts, init.ts, generate.ts, generate-byos.ts, convert.ts, validate.ts, interactive.ts (menu panel)
 |     |- config/                       # Config loading, merge, validation, gatekeeping
 |     |- scenario/                     # Workload models, executors, scenario envelopes
 |     |- execution/                    # k6 execution, VU allocation, host monitoring
@@ -2033,3 +2035,25 @@ npm run cli -- run --plan config/test_plans/debug_test.json
   - `core_engine/src/recording/ScriptConverter.ts` — `partitionLifecycleStatements` now sanitizes `lifecycle.initGroups` and `lifecycle.endGroups` through `sanitizeTransactionName` before building the Set. `sanitizeTransactionName` is idempotent on clean identifiers, so users who type already-sanitized names are unaffected. Inline comment documents the issue with a concrete failing example so future readers don't reintroduce it.
 - **No script-output behavior change for runs that didn't trip the bug.** Conversions that already produced correct phase placement still do; conversions that previously misclassified now place transactions in the user-selected phase.
 - **Verification:** `npm run build` clean. `dist/` rebuilt.
+
+### 2026-06-01 — Interactive Command Panel (Proposal 4) + `--curl '#'` Bypass Fix
+- **What:** New menu-driven entry point for local DX. Bare `k6-framework` / `npm run cli` on a TTY now launches an interactive panel that walks users through framework features without flag-memorization. Direct CLI commands are unchanged. Bundled a small fix to `runImportCurl` so the inline `--curl '<string>'` mode now honors `# Transaction name` comments the same way `--file`/`--stdin`/`--clipboard` always did.
+- **Why:** ~15 CLI commands with their own required flags and argument order is a discoverability cliff for new users and a memory-tax for returning users. CI scripts version their commands so the friction is concentrated locally — solved by a TTY-gated panel that's additive to the existing surface.
+- **Files added:**
+  - `core_engine/src/cli/interactive.ts` — Main module. Three menu groups (Author / Run / Project) covering twelve actions: Generate from HAR, Convert k6 → framework, BYOS, Import cURL, Import Postman, Run, Debug, Validate, Init, Templates, Config inspect, Features. Built on `readline/promises` (no new deps; matches the existing `new` / `LifecyclePrompt` style). Shared helpers: `pickOrCreateTeam` (lists `testSuites/*` and auto-scaffolds `{tests,data,recordings}/` when creating new), `pickFile` (globs cwd + immediate subdirs for `.har`/`.postman_collection.json`/`.js`, skips `node_modules`/`.git`/`dist`/`results`/dot-folders, falls back to manual path), `pickPlan` (lists `config/test_plans/*.json`), `confirm` / `askInput` / `pickFromOptions`. Workspace detection on entry — if cwd has neither `config/` nor `testSuites/`, prompts to `init` first. `run` and `debug` re-spawn the CLI as a child process (`spawn(process.execPath, [argv[1], 'run', '--plan', path], { stdio: 'inherit' })`) so the ANSI scroll-region live-metrics display doesn't clash with the panel's readline loop. Per-action errors caught and surfaced without killing the panel; SIGINT trap exits cleanly. Postman wizard parses just enough of the collection to list top-level folder names for an inline filter pick.
+- **Files modified:**
+  - `core_engine/src/cli/run.ts` — Root `program.action(async () => …)` added: when no subcommand AND `process.stdin.isTTY && process.stdout.isTTY`, dynamic-imports `./interactive.js` and runs the panel; otherwise falls through to commander's `outputHelp()` (preserving CI behavior). New `menu` subcommand wired to the same handler without the TTY gate (explicit intent overrides discovery heuristic). Dynamic `import('./interactive.js')` keeps interactive code out of CI startup hot path.
+  - `core_engine/src/cli/import.ts` — `--curl '<string>'` mode now runs `CurlAdapter.splitMultiCurlFile(opts.curl)` first (matching the file/stdin/clipboard paths), falls back to wrapping the whole string as a single block if the splitter returns nothing, and honors `--transaction-name` only when there's no `# Name` comment in the input. Previously the `--curl` path bypassed the splitter entirely so a leading `#` line became part of the curl body.
+  - `ai_context/design-proposals.md` — Proposal 4 added with problem statement, required behavior, menu structure, non-goals, backward compatibility, the bundled `--curl` bypass fix, and acceptance criteria.
+  - `ai_context/todos.md` — Top-of-completed entry added.
+  - `.md/AGENT-CONTEXT.md` — CLI Commands block shows the panel-launching invocations; directory tree mentions `interactive.ts`; this change-log entry.
+- **Why the `run`/`debug` re-spawn:** `run` installs an ANSI `\x1b[1;<top>r` scroll region in `startLiveTransactionDisplay` so the live metrics table sits at the bottom while k6's progress bar redraws above. If `run` were called in-process from the panel, those escape codes would corrupt the readline-managed menu redraw (and vice versa). Spawning a clean child with `stdio: 'inherit'` sidesteps the conflict — the child owns the terminal until it exits, then control returns to the panel.
+- **Bonus fix details:** In a single-string `--curl 'foo'` invocation, leading `# bar` lines now become the transaction name. Multi-block strings (blank-line separated) also work in-line via the splitter. The change is one branch in `import.ts` and is covered by the existing `splitMultiCurlFile` logic — no new test surface needed.
+- **Out of v1 (per design contract):** No arrow-key navigation or `@inquirer/prompts` dependency, no live preview pane, no inline editing of test plans, no watch mode.
+- **Verification:** `npm run build` clean, `tsc --noEmit` clean. `dist/` rebuilt. CI behavior unchanged (TTY gate). All existing direct CLI commands work identically.
+
+### 2026-06-01 — `npm start` → Interactive Panel (Headline Invocation)
+- **What:** Added `"start": "tsx core_engine/src/cli/run.ts"` and `"menu": "tsx core_engine/src/cli/run.ts menu"` to `package.json` scripts. `npm start` is now the canonical way to open the interactive command panel; `npm run menu` is the explicit-verb alias.
+- **Why:** `npm start` is the universal Node-ecosystem convention for "launch the main thing." It mirrors the production binary behavior (`k6-framework` with no args on a TTY) so the local-dev command and the production command have the same shape. Adding a dedicated `start` script makes the panel discoverable without making users type `npm run cli` (where `cli` reads as "the CLI" — confusing when direct commands are also part of the CLI).
+- **Backward compatibility:** `npm run cli` is unchanged and still works as a raw passthrough (e.g. `npm run cli -- run --plan ...`). All other shortcut scripts (`import:curl`, `import:postman`, `generate`, `convert`, `validate`, `loadtest`, etc.) are untouched.
+- **No code changes.** Wiring continues to live in `run.ts` (root `program.action()` + `menu` subcommand from the earlier panel work) — `package.json` just gives those wired entry points convenient npm-script names.

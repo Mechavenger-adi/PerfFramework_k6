@@ -546,6 +546,86 @@ Invariants:
 
 ---
 
+## Proposal 4: Interactive Command Panel
+
+**Status:** Approved — initial implementation shipped (2026-06-01).
+**Affects:** `core_engine/src/cli/interactive.ts` (new), `core_engine/src/cli/run.ts` (root-action wiring), `core_engine/src/cli/import.ts` (`--curl '#'` parse fix).
+
+### Problem
+
+The framework exposes ~15 CLI commands (`init`, `new`, `docs`, `templates`, `generate`, `generate-byos`, `convert`, `import curl`, `import postman`, `validate`, `run`, `debug`, `config inspect`, `features`, …). Each has its own required flags, options, and argument order. New users — and even returning users coming back to the project after time away — can't remember the exact invocation and are blocked at the terminal.
+
+CI / scripted environments don't have this problem (the commands are versioned in shell scripts), so the friction is concentrated locally.
+
+### Goal
+
+Ship a discoverable, menu-driven entry point that walks users through framework actions without removing or renaming the existing direct CLI commands. The panel exists in addition to the flags-based commands, not instead of them. CI and any caller that pipes input/output continues to work unchanged.
+
+### Required behavior
+
+1. **Invocation surface (two routes, same handler):**
+   - Bare `k6-framework` / `npm run cli` with no subcommand AND on a TTY → launches the panel.
+   - Explicit `k6-framework menu` / `npm run cli menu` → always launches the panel.
+   - Non-TTY or piped invocations (CI) → falls through to commander's help output unchanged.
+2. **Thin orchestrator.** The panel is a UX layer over existing CLI handlers (`runGenerate`, `runConvert`, `runImportCurl`, `runImportPostman`, `runGenerateByos`, `runInit`, `runValidate`, `listTemplates`, `inspectConfig`, `listFeatures`). No business logic duplication — every fix in a CLI handler benefits the panel automatically.
+3. **Workspace detection on entry.** If the current directory has neither `config/` nor `testSuites/`, prompt the user to initialize a project before entering the menu loop. The user can decline; subsequent actions will surface their own errors.
+4. **Team scaffolding from actions.** Author wizards (Generate / Convert / BYOS / Import cURL / Import Postman) all share a `pickOrCreateTeam` helper. Creating a new team auto-creates `testSuites/<team>/{tests,data,recordings}/`. Idempotent — safe to call when the team already exists.
+5. **Smart input discovery.** File pickers glob the cwd + immediate subdirs for `.har`, `.postman_collection.json`, `*.js`, etc., present a numbered list, and allow manual path entry as a fallback. Skips `node_modules`, `.git`, `dist`, `results`, and dot-folders. Test plan picker lists `config/test_plans/*.json`.
+6. **cURL input modes.** Three sources presented as a sub-menu: clipboard (default — pairs with browser DevTools "Copy as cURL"), file path, or paste-here (read until blank line). All three feed the same downstream `runImportCurl` so the `# Transaction name` comment is honored uniformly.
+7. **`run` and `debug` re-spawn.** These actions re-spawn the CLI as a child process (`spawn(process.execPath, [argv[1], 'run', '--plan', path], { stdio: 'inherit' })`) instead of calling the handler in-process. Reason: `run` installs an ANSI scroll region for the live transaction table; running it inside the panel's `readline` loop would corrupt both displays.
+8. **Stickiness.** After each action completes, prompt for Enter to return to the menu. Ctrl+C exits cleanly via a SIGINT trap. Per-action errors are caught and reported; the panel doesn't crash.
+
+### Top-level menu structure
+
+Three groups, twelve actions, plus exit:
+
+```
+Author
+  1. Generate script from HAR
+  2. Convert native k6 script → framework script
+  3. Bring Your Own Script (BYOS scaffold)
+  4. Create API test from cURL (clipboard or file)
+  5. Create API test from Postman collection
+Run
+  6. Run a test plan
+  7. Debug replay (single-iteration HTML diff)
+  8. Validate a test plan
+Project
+  9. Initialize a new project / scaffold
+  10. List or show templates
+  11. Inspect resolved config for a plan
+  12. List framework features
+  0. Exit
+```
+
+### Non-goals (v1)
+
+- No arrow-key / fuzzy navigation (no `@inquirer/prompts` or `ink` dependency). Built-in `readline/promises` only — matches the existing `new` / `LifecyclePrompt` style.
+- No live preview pane / split-screen TUI.
+- No editing of existing test plans inline (`new` already handles creation).
+- No watch-mode or filesystem-event triggers.
+- No remote / SSH execution.
+
+### Backward compatibility
+
+- Every existing direct CLI command (`generate`, `convert`, `import curl`, …) is untouched. The root `program.action(...)` only fires when no subcommand is provided.
+- TTY gate on the bare-invocation route ensures piped contexts (CI, pre-commit hooks, `| tee`) keep their current help-output behavior.
+- The new `menu` subcommand is additive.
+
+### Bonus fix bundled in this proposal
+
+`--curl '<string>'` mode in `runImportCurl` previously bypassed `splitMultiCurlFile`, so a leading `# Transaction name` line passed inline got treated as part of the curl body. Now the same multi-block splitter runs for all four input modes (`--file`, `--stdin`, `--clipboard`, `--curl`), so the `#` naming convention works uniformly.
+
+### Acceptance criteria
+
+1. `k6-framework` with no args on a TTY shows the menu; piped or non-TTY invocations show help.
+2. Every direct CLI command continues to work identically — no regressions.
+3. Creating a team via the panel produces `testSuites/<team>/{tests,data,recordings}/`.
+4. The panel detects a non-workspace cwd and offers `init` before entering the menu.
+5. `--curl '# Name\ncurl ...'` (single-string) names the transaction "Name" — same behavior as `--file` and `--clipboard`.
+
+---
+
 ## Combined Generated Script Direction
 
 ### Target Pattern

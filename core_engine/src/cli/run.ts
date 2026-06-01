@@ -51,6 +51,35 @@ program
   .version('1.0.0');
 
 // ---------------------------------------------
+// Root action — launch the interactive panel when no subcommand is given
+// AND we're attached to a TTY. CI / piped invocations fall through to
+// commander's default help output so scripting behavior is unchanged.
+// ---------------------------------------------
+program.action(async () => {
+  // commander already runs subcommand actions; this only fires when no
+  // subcommand is supplied. Gate on TTY so `k6-framework | tee` etc. still
+  // show help rather than blocking on an interactive prompt that nobody can
+  // answer.
+  if (process.stdin.isTTY && process.stdout.isTTY) {
+    const { runInteractivePanel } = await import('./interactive.js');
+    await runInteractivePanel();
+    return;
+  }
+  program.outputHelp();
+});
+
+// Explicit `menu` alias for users who prefer to type a command. Same handler
+// as the bare invocation — does NOT gate on TTY because asking for `menu`
+// is explicit intent.
+program
+  .command('menu')
+  .description('Launch the interactive command panel (same as running with no subcommand on a TTY)')
+  .action(async () => {
+    const { runInteractivePanel } = await import('./interactive.js');
+    await runInteractivePanel();
+  });
+
+// ---------------------------------------------
 // INIT command
 // ---------------------------------------------
 

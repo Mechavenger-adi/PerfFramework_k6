@@ -81,7 +81,19 @@ export async function runImportCurl(
       blocks = [{ curlText: text.trim(), transactionName: opts.transactionName }];
     }
   } else {
-    blocks = [{ curlText: opts.curl!, transactionName: opts.transactionName }];
+    // --curl '<string>' mode. Run the same multi-block splitter the
+    // file/stdin/clipboard paths use so a leading `# Transaction name`
+    // comment is honored even when the user passes the curl inline. Without
+    // this branch the `#` line stayed inside the curl block and the
+    // transaction was named "transaction_1" with the `#` line treated as
+    // raw curl input.
+    blocks = CurlAdapter.splitMultiCurlFile(opts.curl!);
+    if (blocks.length === 0 && opts.curl!.trim()) {
+      blocks = [{ curlText: opts.curl!.trim(), transactionName: opts.transactionName }];
+    } else if (opts.transactionName && blocks.length === 1 && !blocks[0].transactionName) {
+      // Honor --transaction-name when the input has no `# Name` comment.
+      blocks[0].transactionName = opts.transactionName;
+    }
   }
 
   if (blocks.length === 0) {
