@@ -163,7 +163,14 @@ export function initPhase(ctx) {
 
   thinktime(1);
 
-  transaction('search_animal', function() {
+
+
+}
+
+export function actionPhase(ctx) {
+  const correlation_vars = ctx.correlation;
+
+    transaction('search_animal', function() {
   
       const res_1 = request('GET', `${env.baseUrl}/catalog/searchProducts?keyword=${getUniqueItem(FILES["pet"])["p_pet"]}`, {
         name: "GET_searchProducts_1",
@@ -195,11 +202,6 @@ export function initPhase(ctx) {
     });
 
   thinktime(1);
-
-}
-
-export function actionPhase(ctx) {
-  const correlation_vars = ctx.correlation;
 
   transaction('select_product', function() {
   

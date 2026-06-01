@@ -944,8 +944,20 @@ export class ScriptConverter {
     actionGroups: string[];
     endGroups: string[];
   } {
-    const initSet = new Set(lifecycle.initGroups ?? []);
-    const endSet = new Set(lifecycle.endGroups ?? []);
+    // Sanitize lifecycle selections through the same transformation the main
+    // convert pass applies to `group(...)` → `transaction(...)` names (see
+    // `sanitizeTransactionName`). By the time we get here, every statement in
+    // the body carries the SANITIZED form, but the user-provided
+    // `lifecycle.initGroups` / `lifecycle.endGroups` still hold the ORIGINAL
+    // raw names from the prompt. Without this normalization, any group name
+    // containing characters that change under sanitization — spaces, hyphens,
+    // dots, slashes, or a leading digit — would silently fall through to the
+    // action phase even when the user selected it as init/end.
+    //   e.g. raw "Step 1 - Login" → sanitized "Step_1_Login" → set miss → action
+    // sanitizeTransactionName is idempotent on already-clean identifiers, so
+    // users who type sanitized names directly are unaffected.
+    const initSet = new Set((lifecycle.initGroups ?? []).map((n) => this.sanitizeTransactionName(n)));
+    const endSet = new Set((lifecycle.endGroups ?? []).map((n) => this.sanitizeTransactionName(n)));
 
     // Pattern: simple `let varname[=literal];` declarations safe to hoist to
     // module scope. Matches `let p_check;`, `let p_check = 0;`, `let foo = "bar";`,
