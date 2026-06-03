@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { createInterface } from 'node:readline/promises';
+import { Interface, createInterface } from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
 import { ScriptConverter } from '../recording/ScriptConverter';
 import { LifecycleSelection } from '../recording/ScriptGenerator';
@@ -16,7 +16,7 @@ export async function runConvert(
   inputPath: string,
   teamName: string,
   scriptName: string,
-  options: { inPlace?: boolean },
+  options: { inPlace?: boolean; externalRl?: Interface },
 ): Promise<void> {
   const absoluteInput = path.resolve(process.cwd(), inputPath);
   if (!fs.existsSync(absoluteInput)) {
@@ -32,11 +32,14 @@ export async function runConvert(
   let lifecycleSelection: LifecycleSelection = { initGroups: [], endGroups: [] };
 
   if (process.stdin.isTTY && process.stdout.isTTY) {
-    const rl = createInterface({ input, output });
+    // Reuse the caller's readline interface when supplied (the interactive
+    // panel). A second interface on the same stdin double-echoes keystrokes.
+    const rl = options.externalRl ?? createInterface({ input, output });
+    const ownsRl = options.externalRl === undefined;
     try {
       lifecycleSelection = await promptForLifecycleSelection(rl, groupNames);
     } finally {
-      rl.close();
+      if (ownsRl) rl.close();
     }
   }
 

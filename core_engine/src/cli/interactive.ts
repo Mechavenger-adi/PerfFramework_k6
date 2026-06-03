@@ -22,16 +22,13 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { Interface, createInterface } from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
-import { Logger } from '../utils/logger';
+import { Logger, ansi } from '../utils/logger';
 import { runInit } from './init';
 import { runGenerate } from './generate';
 import { runConvert } from './convert';
 import { runGenerateByos } from './generate-byos';
 import { runImportCurl, runImportPostman } from './import';
 import { runValidate } from './validate';
-import { listFeatures } from './features';
-import { listTemplates } from './templates';
-import { inspectConfig } from './config-inspect';
 
 // ---------------------------------------------------------------------------
 // Public entry point
@@ -121,9 +118,6 @@ type MenuChoice =
   | 'debug'
   | 'validate'
   | 'init'
-  | 'templates'
-  | 'features'
-  | 'config-inspect'
   | 'exit';
 
 interface MenuItem {
@@ -155,9 +149,6 @@ const MENU_GROUPS: Array<{ heading: string; items: MenuItem[] }> = [
     heading: 'Project',
     items: [
       { key: '9', label: 'Initialize a new project / scaffold', choice: 'init' },
-      { key: '10', label: 'List or show templates', choice: 'templates' },
-      { key: '11', label: 'Inspect resolved config for a plan', choice: 'config-inspect' },
-      { key: '12', label: 'List framework features', choice: 'features' },
     ],
   },
 ];
@@ -176,7 +167,7 @@ async function showMenuAndPick(rl: Interface): Promise<MenuChoice> {
   const flat = MENU_GROUPS.flatMap((g) => g.items);
   const valid = new Set(flat.map((i) => i.key));
   while (true) {
-    const ans = (await rl.question('\nSelect an option (number, or 0 to exit): ')).trim();
+    const ans = (await rl.question(cq('\nSelect an option (number, or 0 to exit): '))).trim();
     if (ans === '' || ans === '0' || ans.toLowerCase() === 'q' || ans.toLowerCase() === 'exit') {
       return 'exit';
     }
@@ -199,9 +190,6 @@ async function dispatch(choice: MenuChoice, rl: Interface): Promise<void> {
     case 'debug':          return wizardDebug(rl);
     case 'validate':       return wizardValidate(rl);
     case 'init':           return wizardInit(rl);
-    case 'templates':      return wizardTemplates(rl);
-    case 'features':       listFeatures(); return;
-    case 'config-inspect': return wizardConfigInspect(rl);
     case 'exit':           return;
   }
 }
@@ -219,19 +207,55 @@ async function wizardGenerate(rl: Interface): Promise<void> {
   if (!team) return;
   const scriptName = await askScriptName(rl, harPath);
   if (!scriptName) return;
-  await runGenerate(harPath, team, scriptName);
+  await runGenerate(harPath, team, scriptName, rl);
+  await maybeKeepReferenceCopy(rl, harPath, team, 'HAR recording');
 }
 
 async function wizardConvert(rl: Interface): Promise<void> {
   Logger.header('Convert native k6 script → framework script');
   const inputPath = await pickFile(rl, '.js', 'k6 script');
   if (!inputPath) return;
+
+  // Ask the destination question first, because it decides whether the team /
+  // script-name prompts even apply. In-place conversion rewrites the original
+  // file and must keep the team implied by that file's location — asking for a
+  // (possibly different) team or name would silently discard those answers,
+  // which is exactly the surprise users hit otherwise.
+  const inPlace = await confirm(
+    rl,
+    'Overwrite the input file in place instead of writing a copy to another team?',
+    false,
+  );
+
+  if (inPlace) {
+    const team = teamFromPath(inputPath) ?? 'unknown_team';
+    Logger.detail(
+      `Converting in place — the file stays where it is, under team "${team}".`,
+    );
+    // scriptName is unused for in-place writes; pass the existing basename.
+    const scriptName = path.basename(inputPath).replace(/\.js$/i, '');
+    await runConvert(inputPath, team, scriptName, { inPlace: true, externalRl: rl });
+    return;
+  }
+
+  // Copy mode: now the team + name are the destination for the new file.
   const team = await pickOrCreateTeam(rl);
   if (!team) return;
   const scriptName = await askScriptName(rl, inputPath);
   if (!scriptName) return;
-  const inPlace = await confirm(rl, 'Overwrite the input file in place instead of writing a copy?', false);
-  await runConvert(inputPath, team, scriptName, { inPlace });
+  await runConvert(inputPath, team, scriptName, { inPlace: false, externalRl: rl });
+  await maybeKeepReferenceCopy(rl, inputPath, team, 'k6 script');
+}
+
+/**
+ * Derive the team name from a path under testSuites/<team>/… . Mirrors the
+ * regex ScriptConverter uses so an in-place conversion embeds the same team
+ * context the file already lives in. Returns null when the path isn't inside a
+ * testSuites/<team>/ folder (e.g. an external script).
+ */
+function teamFromPath(filePath: string): string | null {
+  const match = path.resolve(filePath).match(/[\\/]testSuites[\\/]([^\\/]+)[\\/]/);
+  return match ? match[1] : null;
 }
 
 async function wizardByos(rl: Interface): Promise<void> {
@@ -260,6 +284,16 @@ async function wizardImportCurl(rl: Interface): Promise<void> {
   if (!source) return;
 
   if (source === 'clipboard') {
+    output.write('\nCopy the cURL command to your clipboard now:\n');
+    output.write('  • Browser DevTools → Network tab → right-click the request → Copy → "Copy as cURL".\n');
+    output.write('  • Or copy any cURL command text from your terminal/editor.\n');
+    // Confirm the copy happened before we read the clipboard, so we don't
+    // silently parse whatever stale text was there from before.
+    const copied = await confirm(rl, 'Have you copied the cURL to your clipboard?', false);
+    if (!copied) {
+      Logger.detail('No problem — copy the cURL first, then run this action again.');
+      return;
+    }
     await runImportCurl(team, scriptName, { clipboard: true });
     return;
   }
@@ -321,15 +355,7 @@ async function wizardRun(rl: Interface): Promise<void> {
   // of a direct invocation including the live transaction table. Running
   // inside the panel would have to disable that table to avoid scroll-region
   // confusion with the menu's redraws.
-  const { spawn } = await import('node:child_process');
-  await new Promise<void>((resolve) => {
-    const child = spawn(
-      process.execPath,
-      [process.argv[1], 'run', '--plan', planPath],
-      { stdio: 'inherit' },
-    );
-    child.on('exit', () => resolve());
-  });
+  await spawnSelf(['run', '--plan', planPath]);
 }
 
 async function wizardDebug(rl: Interface): Promise<void> {
@@ -338,15 +364,7 @@ async function wizardDebug(rl: Interface): Promise<void> {
   if (!scriptPath) return;
   // Same reasoning as `run` — debug spawns k6 and streams output; re-spawn
   // for clean stdio inheritance instead of trying to run it under readline.
-  const { spawn } = await import('node:child_process');
-  await new Promise<void>((resolve) => {
-    const child = spawn(
-      process.execPath,
-      [process.argv[1], 'debug', '--script', scriptPath],
-      { stdio: 'inherit' },
-    );
-    child.on('exit', () => resolve());
-  });
+  await spawnSelf(['debug', '--script', scriptPath]);
 }
 
 async function wizardValidate(rl: Interface): Promise<void> {
@@ -363,26 +381,87 @@ async function wizardInit(rl: Interface): Promise<void> {
   runInit(ans || cwd);
 }
 
-async function wizardTemplates(rl: Interface): Promise<void> {
-  Logger.header('Templates');
-  const which = await pickFromOptions(rl, 'Which template type?', [
-    { key: '1', label: 'Test plans', value: 'test_plans' as const },
-    { key: '2', label: 'Runtime settings', value: 'runtime_settings' as const },
-  ]);
-  if (!which) return;
-  listTemplates(which);
-}
-
-async function wizardConfigInspect(rl: Interface): Promise<void> {
-  Logger.header('Inspect resolved config');
-  const planPath = await pickPlan(rl);
-  if (!planPath) return;
-  inspectConfig(planPath, undefined, undefined, undefined);
-}
-
 // ---------------------------------------------------------------------------
 // Shared helpers — workspace, teams, files, prompts
 // ---------------------------------------------------------------------------
+
+/**
+ * Is `absPath` located inside the current framework workspace (the cwd tree)?
+ * Used to decide whether a source file is "already in the framework folder".
+ */
+function isInsideWorkspace(absPath: string): boolean {
+  const rel = path.relative(process.cwd(), absPath);
+  return rel !== '' && !rel.startsWith('..') && !path.isAbsolute(rel);
+}
+
+/**
+ * After a generate/convert that consumed an external source file, offer to
+ * keep a copy of the original in the team's recordings/ folder for reference.
+ *
+ * Skips silently when the source already lives inside the framework folder
+ * (no point duplicating it) or when a copy with the same name is already
+ * present. Best-effort: a failed copy warns but never aborts the wizard.
+ */
+async function maybeKeepReferenceCopy(
+  rl: Interface,
+  sourcePath: string,
+  team: string,
+  kindLabel: string,
+): Promise<void> {
+  const abs = path.resolve(process.cwd(), sourcePath);
+  if (!fs.existsSync(abs)) return;
+  // Already in the framework folder — nothing to preserve.
+  if (isInsideWorkspace(abs)) return;
+
+  const recordingsDir = path.join(process.cwd(), 'testSuites', team, 'recordings');
+  const dest = path.join(recordingsDir, path.basename(abs));
+  if (fs.existsSync(dest)) return; // a reference copy already exists
+
+  const keep = await confirm(
+    rl,
+    `Keep a copy of the original ${kindLabel} in this project's recordings folder for reference?`,
+    true,
+  );
+  if (!keep) return;
+
+  try {
+    fs.mkdirSync(recordingsDir, { recursive: true });
+    fs.copyFileSync(abs, dest);
+    Logger.pass(`Saved reference copy: ${path.relative(process.cwd(), dest)}`);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    Logger.warn(`Could not save reference copy: ${msg}`);
+  }
+}
+
+/**
+ * Re-invoke this same CLI as a child process with `subArgs`, inheriting stdio.
+ * Used by the Run/Debug actions, which want the exact behavior (and live
+ * transaction table) of a direct invocation rather than running under the
+ * panel's readline loop.
+ *
+ * Must preserve the launching runtime: when the panel is started via tsx on
+ * the TypeScript source (e.g. `tsx core_engine/src/cli/run.ts`), the entry
+ * point is a `.ts` file that bare `node` cannot execute. Detect that and
+ * re-run through node's tsx loader (`node --import tsx <entry>`); for a
+ * compiled `.js` entry, spawn node directly.
+ */
+async function spawnSelf(subArgs: string[]): Promise<void> {
+  const { spawn } = await import('node:child_process');
+  const entry = process.argv[1];
+  const isTsEntry = /\.(ts|mts|cts)$/i.test(entry);
+  const nodeArgs = isTsEntry
+    ? ['--import', 'tsx', entry, ...subArgs]
+    : [entry, ...subArgs];
+  await new Promise<void>((resolve) => {
+    const child = spawn(process.execPath, nodeArgs, { stdio: 'inherit' });
+    child.on('exit', () => resolve());
+    child.on('error', (err) => {
+      Logger.fail(`Failed to launch: ${err.message}`);
+      resolve();
+    });
+  });
+}
 
 function isFrameworkWorkspace(): boolean {
   return (
@@ -423,7 +502,7 @@ async function pickOrCreateTeam(rl: Interface): Promise<string | null> {
   existing.forEach((name, idx) => output.write(`  ${idx + 1}. ${name}\n`));
   output.write(`  ${existing.length + 1}. + Create a new team\n`);
   while (true) {
-    const ans = (await rl.question('\nSelect team (number) or type a team name: ')).trim();
+    const ans = (await rl.question(cq('\nSelect team (number) or type a team name: '))).trim();
     if (!ans) return null;
     const asNum = Number(ans);
     if (Number.isInteger(asNum) && asNum >= 1 && asNum <= existing.length) {
@@ -443,7 +522,7 @@ async function pickOrCreateTeam(rl: Interface): Promise<string | null> {
 }
 
 async function createTeamInteractive(rl: Interface): Promise<string | null> {
-  const name = (await rl.question('Team name (folder under testSuites/): ')).trim();
+  const name = (await rl.question(cq('Team name (folder under testSuites/): '))).trim();
   if (!name) return null;
   if (!/^[a-zA-Z0-9_\- ]+$/.test(name)) {
     Logger.warn('Team name should contain only letters, digits, underscores, hyphens, or spaces.');
@@ -494,19 +573,55 @@ async function pickFile(
     output.write(`\nFound ${label}(s):\n`);
     found.forEach((f, idx) => output.write(`  ${idx + 1}. ${path.relative(process.cwd(), f)}\n`));
     output.write(`  ${found.length + 1}. Enter a different path manually\n`);
-    const ans = (await rl.question(`\nPick a ${label} (number or path): `)).trim();
+    output.write('  (You can paste a full path or a relative one — surrounding quotes are OK.)\n');
+    const ans = cleanPath(await rl.question(cq(`\nPick a ${label} (number or path): `)));
     if (!ans) return null;
     const n = Number(ans);
     if (Number.isInteger(n) && n >= 1 && n <= found.length) return found[n - 1];
     if (Number.isInteger(n) && n === found.length + 1) {
-      const manual = (await rl.question(`Path to ${label}: `)).trim();
-      return manual || null;
+      const manual = cleanPath(await rl.question(cq(`Path to ${label}: `)));
+      return resolveUserPath(manual, label);
     }
     // Free-text path
-    return ans;
+    return resolveUserPath(ans, label);
   }
-  const manual = (await rl.question(`Path to ${label}: `)).trim();
-  return manual || null;
+  const manual = cleanPath(await rl.question(`Path to ${label}: `));
+  return resolveUserPath(manual, label);
+}
+
+/**
+ * Normalize a user-typed path string. Trims whitespace and strips a single
+ * layer of surrounding single/double quotes — Windows "Copy as path" and many
+ * shells wrap pasted paths in `"..."`, which otherwise defeats absolute-path
+ * detection (path.resolve would treat the quoted string as relative and join
+ * it onto the cwd).
+ */
+function cleanPath(raw: string): string {
+  let s = raw.trim();
+  if (s.length >= 2) {
+    const first = s[0];
+    const last = s[s.length - 1];
+    if ((first === '"' && last === '"') || (first === "'" && last === "'")) {
+      s = s.slice(1, -1).trim();
+    }
+  }
+  return s;
+}
+
+/**
+ * Resolve a user-supplied file path (absolute or relative to cwd) and verify
+ * it exists before handing it to a CLI handler. Returns null if the user
+ * entered nothing; warns and returns null if the path can't be found so the
+ * wizard can re-prompt rather than failing deep inside a handler.
+ */
+function resolveUserPath(raw: string, label: string): string | null {
+  if (!raw) return null;
+  const abs = path.resolve(process.cwd(), raw);
+  if (!fs.existsSync(abs)) {
+    Logger.warn(`${label} not found at: ${abs}`);
+    return null;
+  }
+  return abs;
 }
 
 /**
@@ -546,38 +661,38 @@ async function pickPlan(rl: Interface): Promise<string | null> {
   const plansDir = path.join(process.cwd(), 'config', 'test_plans');
   if (!fs.existsSync(plansDir)) {
     Logger.warn('No config/test_plans/ folder found. Provide a path manually.');
-    const ans = (await rl.question('Path to test plan JSON: ')).trim();
-    return ans || null;
+    const manual = cleanPath(await rl.question(cq('Path to test plan JSON: ')));
+    return resolveUserPath(manual, 'Test plan');
   }
   const plans = fs
     .readdirSync(plansDir)
     .filter((name) => name.endsWith('.json') || name.endsWith('.jsonc'))
     .sort();
   if (plans.length === 0) {
-    const ans = (await rl.question('No plans found. Path to test plan JSON: ')).trim();
-    return ans || null;
+    const manual = cleanPath(await rl.question(cq('No plans found. Path to test plan JSON: ')));
+    return resolveUserPath(manual, 'Test plan');
   }
   output.write('\nAvailable test plans:\n');
   plans.forEach((p, idx) => output.write(`  ${idx + 1}. ${p}\n`));
   output.write(`  ${plans.length + 1}. Enter a different path\n`);
-  const ans = (await rl.question('\nPick a plan (number or path): ')).trim();
+  const ans = cleanPath(await rl.question(cq('\nPick a plan (number or path): ')));
   if (!ans) return null;
   const n = Number(ans);
   if (Number.isInteger(n) && n >= 1 && n <= plans.length) {
     return path.join('config', 'test_plans', plans[n - 1]);
   }
   if (Number.isInteger(n) && n === plans.length + 1) {
-    const manual = (await rl.question('Path to test plan JSON: ')).trim();
-    return manual || null;
+    const manual = cleanPath(await rl.question(cq('Path to test plan JSON: ')));
+    return resolveUserPath(manual, 'Test plan');
   }
-  return ans;
+  return resolveUserPath(ans, 'Test plan');
 }
 
 /** Suggest a script name based on an input file path. */
 async function askScriptName(rl: Interface, suggestFromPath: string): Promise<string | null> {
   const base = path.basename(suggestFromPath).replace(/\.[^.]+$/, '');
   const suggestion = base.replace(/[^a-zA-Z0-9_-]+/g, '_');
-  const ans = (await rl.question(`Script name [${suggestion}]: `)).trim();
+  const ans = (await rl.question(cq(`Script name [${suggestion}]: `))).trim();
   return ans || suggestion || null;
 }
 
@@ -610,13 +725,21 @@ async function readUntilBlankLine(rl: Interface): Promise<string> {
 }
 
 async function askInput(rl: Interface, label: string): Promise<string | null> {
-  const ans = (await rl.question(label + ' ')).trim();
+  const ans = (await rl.question(cq(label + ' '))).trim();
   return ans || null;
 }
 
+/** Wrap a question/prompt string in the panel's prompt color (cyan). */
+function cq(text: string): string {
+  return `${ansi.cyan}${text}${ansi.reset}`;
+}
+
 async function confirm(rl: Interface, question: string, defaultYes: boolean): Promise<boolean> {
+  // Color-code the prompt: cyan question + a yellow [Y/n] hint with the
+  // default choice capitalized, matching the rest of the panel's styling.
   const hint = defaultYes ? 'Y/n' : 'y/N';
-  const ans = (await rl.question(`${question} [${hint}] `)).trim().toLowerCase();
+  const styled = `${ansi.cyan}${question}${ansi.reset} ${ansi.bold}${ansi.yellow}[${hint}]${ansi.reset} `;
+  const ans = (await rl.question(styled)).trim().toLowerCase();
   if (!ans) return defaultYes;
   return ans === 'y' || ans === 'yes';
 }
@@ -638,7 +761,7 @@ async function pickFromOptions<T>(
   }
   const valid = new Map(options.map((o) => [o.key, o]));
   while (true) {
-    const ans = (await rl.question(`\n${prompt} (number, or blank to cancel): `)).trim();
+    const ans = (await rl.question(cq(`\n${prompt} (number, or blank to cancel): `))).trim();
     if (!ans) return null;
     const picked = valid.get(ans);
     if (picked) return picked.value;

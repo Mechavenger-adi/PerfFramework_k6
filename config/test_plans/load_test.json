@@ -8,22 +8,14 @@
     "startVUs": 0,
     "stages": [
       {
-        "duration": "5s",
-        "target": 5
-      },
-      {
-        "duration": "30s",
-        "target": 5
-      },
-       {
-        "duration": "30s",
-        "target": 10
-      },
-          {
         "duration": "30s",
         "target": 15
       },
       {
+        "duration": "3m",
+        "target": 15
+      },
+       {
         "duration": "30s",
         "target": 0
       }
@@ -32,8 +24,8 @@
   "noCookiesReset": true,
   "user_journeys": [
     {
-      "name": "buy_animal_1stJune_converted",
-      "scriptPath": "buy_animal_1stJune_converted.js",
+      "name": "buy_working_covert",
+      "scriptPath": "buy_working_covert.js",
       "weight": 100
     }
   ],

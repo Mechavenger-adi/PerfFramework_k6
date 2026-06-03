@@ -898,7 +898,14 @@ export class ScriptConverter {
       : '';
 
     return beforeDefault
-      + (baseUrls.length > 0 ? envBlock + '\n\n' : '')
+      // Always emit `const env` — every converted request references
+      // `env.baseUrl`, so omitting it leaves `env` undefined and throws at
+      // runtime (no replay logs → debug diff fails). When no literal base URL
+      // was detected (e.g. re-converting an already-templated script whose URLs
+      // are `${env.baseUrl}/…`), envBlock falls back to
+      // getEnvContext(team, undefined), which resolves the URL at runtime from
+      // the team environment config (K6_PERF_TEAM_ENVIRONMENTS).
+      + envBlock + '\n\n'
       + moduleDeclsBlock
       + `const __journeyLifecycleStore = createJourneyLifecycleStore();\n\n`
       + this.renderPhaseFunction('initPhase', grouped.initPrelude, grouped.initGroups)

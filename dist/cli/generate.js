@@ -45,7 +45,12 @@ const ScriptGenerator_1 = require("../recording/ScriptGenerator");
 const ExchangeLog_1 = require("../debug/ExchangeLog");
 const RecordingLogResolver_1 = require("../debug/RecordingLogResolver");
 const LifecyclePrompt_1 = require("./LifecyclePrompt");
-async function runGenerate(harPath, teamName, outName) {
+const logger_1 = require("../utils/logger");
+/** Wrap a prompt string in the framework's prompt color (cyan). */
+function cq(text) {
+    return `${logger_1.ansi.cyan}${text}${logger_1.ansi.reset}`;
+}
+async function runGenerate(harPath, teamName, outName, externalRl) {
     const absoluteHarPath = path.resolve(process.cwd(), harPath);
     if (!fs.existsSync(absoluteHarPath)) {
         console.error(`HAR file not found: ${absoluteHarPath}`);
@@ -54,7 +59,11 @@ async function runGenerate(harPath, teamName, outName) {
     console.log(`Loading HAR from: ${absoluteHarPath}`);
     const discoveredEntries = HARParser_1.HARParser.readEntries(absoluteHarPath);
     const domainStats = DomainFilter_1.DomainFilter.summarize(discoveredEntries);
-    const rl = (0, promises_1.createInterface)({ input: node_process_1.stdin, output: node_process_1.stdout });
+    // Reuse the caller's readline interface when one is supplied (e.g. the
+    // interactive panel). Creating a second interface on the same stdin makes
+    // both echo every keystroke — letters appear doubled ("split" → "sspplliitt").
+    const rl = externalRl ?? (0, promises_1.createInterface)({ input: node_process_1.stdin, output: node_process_1.stdout });
+    const ownsRl = externalRl === undefined;
     let allowedDomains;
     let excludeStaticAssets;
     let lifecycleSelection = { initGroups: [], endGroups: [] };
@@ -70,7 +79,8 @@ async function runGenerate(harPath, teamName, outName) {
         lifecycleSelection = await (0, LifecyclePrompt_1.promptForLifecycleSelection)(rl, groups.map((group) => group.name));
     }
     finally {
-        rl.close();
+        if (ownsRl)
+            rl.close();
     }
     const scriptContent = ScriptGenerator_1.ScriptGenerator.generate(groups, lifecycleSelection, teamName);
     const recordingLog = ExchangeLog_1.ExchangeLogBuilder.fromGroups(groups);
@@ -109,7 +119,7 @@ async function promptForDomains(rl, domainStats) {
     domainStats.forEach((domain, index) => {
         console.log(`  ${index + 1}. ${domain.host} (${domain.count} request${domain.count === 1 ? '' : 's'})`);
     });
-    const answer = await rl.question('\nEnter the domain numbers or host names to include (comma-separated, or "all"): ');
+    const answer = await rl.question(cq('\nEnter the domain numbers or host names to include (comma-separated, or "all"): '));
     const trimmed = answer.trim();
     if (!trimmed) {
         return [domainStats[0].host];
@@ -141,7 +151,7 @@ async function promptForDomains(rl, domainStats) {
     return Array.from(chosen);
 }
 async function promptForStaticAssetPreference(rl) {
-    const answer = await rl.question('Do you want to include static assets such as css, js, images, and fonts? [y/N]: ');
+    const answer = await rl.question(cq('Do you want to include static assets such as css, js, images, and fonts? [y/N]: '));
     const normalized = answer.trim().toLowerCase();
     const includeStatic = normalized === 'y' || normalized === 'yes';
     return !includeStatic;

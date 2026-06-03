@@ -1,5 +1,11 @@
 import { Interface } from 'node:readline/promises';
 import { LifecycleSelection } from '../recording/ScriptGenerator';
+import { ansi } from '../utils/logger';
+
+/** Wrap a prompt string in the framework's prompt color (cyan). */
+function cq(text: string): string {
+  return `${ansi.cyan}${text}${ansi.reset}`;
+}
 
 export async function promptForLifecycleSelection(
   rl: Interface,
@@ -15,7 +21,7 @@ export async function promptForLifecycleSelection(
   });
 
   const lifecycleAnswer = await rl.question(
-    '\nSelect lifecycle groups? Press Enter to skip, or type "split" to choose init/end groups: ',
+    cq('\nSelect lifecycle groups? Press Enter to skip, or type "split" to choose init/end groups: '),
   );
 
   if (!lifecycleAnswer.trim() || lifecycleAnswer.trim().toLowerCase() === 'skip') {
@@ -23,10 +29,10 @@ export async function promptForLifecycleSelection(
   }
 
   while (true) {
-    const initAnswer = await rl.question('Enter init group numbers or names (comma-separated, blank for none): ');
+    const initAnswer = await rl.question(cq('Enter init group numbers or names (comma-separated, blank for none): '));
     const initGroups = parseSelections(initAnswer, groupNames);
 
-    const endAnswer = await rl.question('Enter end group numbers or names (comma-separated, blank for none): ');
+    const endAnswer = await rl.question(cq('Enter end group numbers or names (comma-separated, blank for none): '));
     const endGroups = parseSelections(endAnswer, groupNames);
 
     const overlap = endGroups.filter((group) => initGroups.includes(group));

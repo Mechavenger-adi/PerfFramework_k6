@@ -1,0 +1,44 @@
+[
+  {
+    "scriptPath": "testSuites\\testpro\\tests\\buy.js",
+    "recordingLogPath": "testSuites\\testpro\\recordings\\buy.recording-log.json",
+    "sourceHarPath": "C:\\Users\\aditk\\Documents\\k6-studio\\Recordings\\jpetstore.aspectran.com_animals.har",
+    "generatedAt": "2026-06-02T07:20:10.808Z"
+  },
+  {
+    "scriptPath": "testSuites\\testpro\\tests\\checkhar.js",
+    "recordingLogPath": "testSuites\\testpro\\recordings\\checkhar.recording-log.json",
+    "sourceHarPath": "C:\\Users\\aditk\\Documents\\k6-studio\\Recordings\\jpetstore.aspectran.com_animals.har",
+    "generatedAt": "2026-06-02T07:29:01.155Z"
+  },
+  {
+    "scriptPath": "testSuites\\testpro\\tests\\testcheckhar.js",
+    "recordingLogPath": "testSuites\\testpro\\recordings\\testcheckhar.recording-log.json",
+    "sourceHarPath": "C:\\Users\\aditk\\Documents\\k6-studio\\Recordings\\jpetstore.aspectran.com_animals.har",
+    "generatedAt": "2026-06-02T07:31:14.451Z"
+  },
+  {
+    "scriptPath": "testSuites\\testpro\\tests\\testharcheck_1.js",
+    "recordingLogPath": "testSuites\\testpro\\recordings\\testharcheck_1.recording-log.json",
+    "sourceHarPath": "C:\\Users\\aditk\\Documents\\k6-studio\\Recordings\\jpetstore.aspectran.com_animals.har",
+    "generatedAt": "2026-06-02T07:32:55.516Z"
+  },
+  {
+    "scriptPath": "testSuites\\testpro\\tests\\testhar_!.js",
+    "recordingLogPath": "testSuites\\testpro\\recordings\\testhar_!.recording-log.json",
+    "sourceHarPath": "C:\\Users\\aditk\\Documents\\k6-studio\\Recordings\\jpetstore.aspectran.com_animals.har",
+    "generatedAt": "2026-06-02T07:34:09.631Z"
+  },
+  {
+    "scriptPath": "testSuites\\testpro\\tests\\tes.js",
+    "recordingLogPath": "testSuites\\testpro\\recordings\\tes.recording-log.json",
+    "sourceHarPath": "C:\\Users\\aditk\\Documents\\k6-studio\\Recordings\\jpetstore.aspectran.com_animals.har",
+    "generatedAt": "2026-06-02T07:43:17.824Z"
+  },
+  {
+    "scriptPath": "testSuites\\testpro\\tests\\testt.js",
+    "recordingLogPath": "testSuites\\testpro\\recordings\\testt.recording-log.json",
+    "sourceHarPath": "C:\\Users\\aditk\\Documents\\k6-studio\\Recordings\\jpetstore.aspectran.com_animals.har",
+    "generatedAt": "2026-06-02T07:47:17.544Z"
+  }
+]
