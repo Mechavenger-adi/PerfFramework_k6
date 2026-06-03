@@ -11,7 +11,7 @@
  *    response evaluator, etc.).
  *  - Produces `TransactionGroup[]` containing synthetic `HAREntry` objects so
  *    the existing ScriptGenerator emits the script unchanged.
- *  - Nested folders flatten with dot notation (`API.Auth.Login`).
+ *  - Nested folders flatten with underscore notation (`API_Auth_Login`).
  *  - Request-level auth only. Collection/folder auth cascade is out of scope
  *    for v1 — flagged as a warning when seen.
  *  - Pre-request and test scripts are not translatable (different runtime);
@@ -281,7 +281,7 @@ export class PostmanAdapter {
           const nextPath = [...folderPath, sanitizeName(item.name ?? 'folder')];
           if (item.auth) {
             warnings.push(
-              `Folder "${nextPath.join('.')}" has folder-level auth; cascade not applied in v1. Re-declare auth on each request or post-edit the script.`,
+              `Folder "${nextPath.join('/')}" has folder-level auth; cascade not applied in v1. Re-declare auth on each request or post-edit the script.`,
             );
           }
           visit(item.item, nextPath, itemAuth);
@@ -294,7 +294,7 @@ export class PostmanAdapter {
         }
 
         const requestName = sanitizeName(item.name ?? `request_${requestCounter + 1}`);
-        const groupName = folderPath.length > 0 ? folderPath.join('.') : requestName;
+        const groupName = folderPath.length > 0 ? folderPath.join('_') : requestName;
 
         // Prefix match: include the request when its folder path starts with
         // the filter segments (so the chosen folder AND its whole subtree are
