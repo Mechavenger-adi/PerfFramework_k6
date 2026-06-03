@@ -29,6 +29,7 @@ import { runConvert } from './convert';
 import { runGenerateByos } from './generate-byos';
 import { runImportCurl, runImportPostman } from './import';
 import { runValidate } from './validate';
+import { PostmanAdapter } from '../recording/PostmanAdapter';
 
 // ---------------------------------------------------------------------------
 // Public entry point
@@ -203,11 +204,13 @@ async function wizardGenerate(rl: Interface): Promise<void> {
   Logger.header('Generate script from HAR');
   const harPath = await pickFile(rl, '.har', 'HAR file');
   if (!harPath) return;
-  const team = await pickOrCreateTeam(rl);
+  const team = await pickOrCreateProject(rl);
   if (!team) return;
   const scriptName = await askScriptName(rl, harPath);
   if (!scriptName) return;
-  await runGenerate(harPath, team, scriptName, rl);
+  const target = await resolveScriptTarget(rl, team, scriptName);
+  if (!target) return;
+  await runGenerate(harPath, team, target.name, rl);
   await maybeKeepReferenceCopy(rl, harPath, team, 'HAR recording');
 }
 
@@ -238,12 +241,14 @@ async function wizardConvert(rl: Interface): Promise<void> {
     return;
   }
 
-  // Copy mode: now the team + name are the destination for the new file.
-  const team = await pickOrCreateTeam(rl);
+  // Copy mode: now the project + name are the destination for the new file.
+  const team = await pickOrCreateProject(rl);
   if (!team) return;
   const scriptName = await askScriptName(rl, inputPath);
   if (!scriptName) return;
-  await runConvert(inputPath, team, scriptName, { inPlace: false, externalRl: rl });
+  const target = await resolveScriptTarget(rl, team, scriptName);
+  if (!target) return;
+  await runConvert(inputPath, team, target.name, { inPlace: false, externalRl: rl });
   await maybeKeepReferenceCopy(rl, inputPath, team, 'k6 script');
 }
 
@@ -260,19 +265,24 @@ function teamFromPath(filePath: string): string | null {
 
 async function wizardByos(rl: Interface): Promise<void> {
   Logger.header('Bring Your Own Script (BYOS)');
-  const team = await pickOrCreateTeam(rl);
+  const team = await pickOrCreateProject(rl);
   if (!team) return;
   const scriptName = await askInput(rl, 'Script name (without .js):');
   if (!scriptName) return;
-  runGenerateByos(team, scriptName);
+  const target = await resolveScriptTarget(rl, team, scriptName);
+  if (!target) return;
+  runGenerateByos(team, target.name, { overwrite: target.overwrite });
 }
 
 async function wizardImportCurl(rl: Interface): Promise<void> {
   Logger.header('Create API test from cURL');
-  const team = await pickOrCreateTeam(rl);
+  const team = await pickOrCreateProject(rl);
   if (!team) return;
   const scriptName = await askInput(rl, 'Script name (without .js):');
   if (!scriptName) return;
+  const target = await resolveScriptTarget(rl, team, scriptName);
+  if (!target) return;
+  const onConflict = target.overwrite ? 'overwrite' : 'error';
 
   // Three input modes: clipboard, file, paste. Default to clipboard since
   // "Copy as cURL" from a browser DevTools is the most common workflow.
@@ -294,13 +304,13 @@ async function wizardImportCurl(rl: Interface): Promise<void> {
       Logger.detail('No problem — copy the cURL first, then run this action again.');
       return;
     }
-    await runImportCurl(team, scriptName, { clipboard: true });
+    await runImportCurl(team, target.name, { clipboard: true, onConflict });
     return;
   }
   if (source === 'file') {
     const filePath = await pickFile(rl, '.curl', 'curl file', /\.(curl|txt|sh)$/i);
     if (!filePath) return;
-    await runImportCurl(team, scriptName, { file: filePath });
+    await runImportCurl(team, target.name, { file: filePath, onConflict });
     return;
   }
   // paste mode — collect until blank line
@@ -315,34 +325,67 @@ async function wizardImportCurl(rl: Interface): Promise<void> {
   // Feed the pasted text through --curl. Note: import.ts now treats the
   // `--curl` source the same as `--stdin`/`--clipboard` — it runs
   // splitMultiCurlFile first, so leading `# name` comments are honored.
-  await runImportCurl(team, scriptName, { curl: text });
+  await runImportCurl(team, target.name, { curl: text, onConflict });
 }
 
 async function wizardImportPostman(rl: Interface): Promise<void> {
   Logger.header('Create API test from Postman collection');
-  const team = await pickOrCreateTeam(rl);
-  if (!team) return;
-  const scriptName = await askInput(rl, 'Script name (without .js):');
+  const project = await pickOrCreateProject(rl);
+  if (!project) return;
+  const scriptName = await askInput(rl, 'Script name (used as-is for a combined script, or as a fallback base when splitting):');
   if (!scriptName) return;
   const filePath = await pickFile(rl, '.postman_collection.json', 'Postman collection', /\.postman_collection\.json$/i);
   if (!filePath) return;
 
-  // Optional folder filter. Parse just enough of the collection to list its
-  // top-level folder names so the user can pick one without re-typing.
-  let folder: string | undefined;
-  const folderChoices = readTopLevelPostmanFolders(filePath);
-  if (folderChoices.length > 0) {
-    const want = await confirm(rl, 'Filter to a specific top-level folder?', false);
+  // Optional folder filter. Enumerate the FULL folder tree (any depth) so the
+  // user can pick a nested folder without typing its path. The selected
+  // folder's sanitized segment array is passed straight to the importer, which
+  // includes that folder and its whole subtree.
+  let folder: string[] | undefined;
+  const folders = PostmanAdapter.listFolderPathsFromFile(filePath);
+  if (folders.length > 0) {
+    const want = await confirm(rl, 'Filter to a specific folder (includes its subfolders)?', false);
     if (want) {
       const picked = await pickFromOptions(
         rl,
         'Which folder?',
-        folderChoices.map((name, idx) => ({ key: String(idx + 1), label: name, value: name })),
+        folders.map((f, idx) => ({
+          key: String(idx + 1),
+          label: folderTreeLabel(f),
+          value: f.sanitizedPath,
+        })),
       );
       if (picked) folder = picked;
     }
   }
-  await runImportPostman(team, scriptName, { file: filePath, folder });
+
+  // Per-API split: one script per individual request instead of one combined.
+  const splitPerRequest = await confirm(
+    rl,
+    'Create a separate script for each API request (instead of one combined script)?',
+    false,
+  );
+
+  let finalName = scriptName;
+  let onConflict: 'error' | 'overwrite' | 'skip' = 'error';
+  if (splitPerRequest) {
+    // Split filenames are generated, so we can't pre-resolve one name — ask a
+    // policy for how to treat any that already exist.
+    const policy = await pickFromOptions(rl, 'If a generated script already exists, what should I do?', [
+      { key: '1', label: 'Overwrite the existing file(s)', value: 'overwrite' as const },
+      { key: '2', label: 'Skip the existing file(s), write the rest', value: 'skip' as const },
+      { key: '3', label: 'Cancel', value: 'cancel' as const },
+    ]);
+    if (!policy || policy === 'cancel') return;
+    onConflict = policy;
+  } else {
+    const target = await resolveScriptTarget(rl, project, scriptName);
+    if (!target) return;
+    finalName = target.name;
+    onConflict = target.overwrite ? 'overwrite' : 'error';
+  }
+
+  await runImportPostman(project, finalName, { file: filePath, folder, splitPerRequest, onConflict });
 }
 
 async function wizardRun(rl: Interface): Promise<void> {
@@ -470,8 +513,8 @@ function isFrameworkWorkspace(): boolean {
   );
 }
 
-/** List existing team folders under testSuites/ (one folder per team). */
-function listExistingTeams(): string[] {
+/** List existing project folders under testSuites/ (one folder per project). */
+function listExistingProjects(): string[] {
   const root = path.join(process.cwd(), 'testSuites');
   if (!fs.existsSync(root)) return [];
   return fs
@@ -488,70 +531,70 @@ function listExistingTeams(): string[] {
 }
 
 /**
- * Pick an existing team or create a new one. New teams get the standard
+ * Pick an existing project or create a new one. New projects get the standard
  * `tests/`, `data/`, `recordings/` subfolders so subsequent actions
  * (Generate / Import / Convert) drop files into the right place.
  */
-async function pickOrCreateTeam(rl: Interface): Promise<string | null> {
-  const existing = listExistingTeams();
+async function pickOrCreateProject(rl: Interface): Promise<string | null> {
+  const existing = listExistingProjects();
   if (existing.length === 0) {
-    Logger.detail('No teams found under testSuites/ yet — let\'s create one.');
-    return await createTeamInteractive(rl);
+    Logger.detail('No projects found under testSuites/ yet — let\'s create one.');
+    return await createProjectInteractive(rl);
   }
-  output.write('\nExisting teams:\n');
+  output.write('\nExisting projects:\n');
   existing.forEach((name, idx) => output.write(`  ${idx + 1}. ${name}\n`));
-  output.write(`  ${existing.length + 1}. + Create a new team\n`);
+  output.write(`  ${existing.length + 1}. + Create a new project\n`);
   while (true) {
-    const ans = (await rl.question(cq('\nSelect team (number) or type a team name: '))).trim();
+    const ans = (await rl.question(cq('\nSelect project (number) or type a project name: '))).trim();
     if (!ans) return null;
     const asNum = Number(ans);
     if (Number.isInteger(asNum) && asNum >= 1 && asNum <= existing.length) {
       return existing[asNum - 1];
     }
     if (Number.isInteger(asNum) && asNum === existing.length + 1) {
-      return await createTeamInteractive(rl);
+      return await createProjectInteractive(rl);
     }
-    // Treat free-text input as a team name; create if missing.
+    // Treat free-text input as a project name; create if missing.
     if (existing.includes(ans)) return ans;
-    const create = await confirm(rl, `Team "${ans}" doesn't exist. Create it?`, true);
+    const create = await confirm(rl, `Project "${ans}" doesn't exist. Create it?`, true);
     if (create) {
-      ensureTeamScaffold(ans);
+      ensureProjectScaffold(ans);
       return ans;
     }
   }
 }
 
-async function createTeamInteractive(rl: Interface): Promise<string | null> {
-  const name = (await rl.question(cq('Team name (folder under testSuites/): '))).trim();
+async function createProjectInteractive(rl: Interface): Promise<string | null> {
+  const name = (await rl.question(cq('Project name (folder under testSuites/): '))).trim();
   if (!name) return null;
   if (!/^[a-zA-Z0-9_\- ]+$/.test(name)) {
-    Logger.warn('Team name should contain only letters, digits, underscores, hyphens, or spaces.');
+    Logger.warn('Project name should contain only letters, digits, underscores, hyphens, or spaces.');
     return null;
   }
-  ensureTeamScaffold(name);
+  ensureProjectScaffold(name);
   return name;
 }
 
 /**
- * Create the standard team folder layout if it doesn't exist.
- * Idempotent — safe to call when the team already exists.
+ * Create the standard project folder layout if it doesn't exist.
+ * Idempotent — safe to call when the project already exists.
  */
-function ensureTeamScaffold(teamName: string): void {
-  const teamRoot = path.join(process.cwd(), 'testSuites', teamName);
+function ensureProjectScaffold(projectName: string): void {
+  const projectRoot = path.join(process.cwd(), 'testSuites', projectName);
   const subdirs = ['tests', 'data', 'recordings'];
   const created: string[] = [];
   for (const sub of subdirs) {
-    const full = path.join(teamRoot, sub);
+    const full = path.join(projectRoot, sub);
     if (!fs.existsSync(full)) {
       fs.mkdirSync(full, { recursive: true });
-      created.push(`testSuites/${teamName}/${sub}/`);
+      created.push(`testSuites/${projectName}/${sub}/`);
     }
   }
   if (created.length > 0) {
-    Logger.pass(`Created team "${teamName}":`);
+    Logger.pass(`Created project "${projectName}":`);
     for (const c of created) Logger.detail(`  • ${c}`);
   } else {
-    Logger.detail(`Team "${teamName}" already exists — using it.`);
+    Logger.detail(`Project "${projectName}" already exists — using it.`);
   }
 }
 
@@ -696,18 +739,42 @@ async function askScriptName(rl: Interface, suggestFromPath: string): Promise<st
   return ans || suggestion || null;
 }
 
-/** Read top-level folder names from a Postman v2.1 collection for a quick filter pick. */
-function readTopLevelPostmanFolders(filePath: string): string[] {
-  try {
-    const json = JSON.parse(fs.readFileSync(filePath, 'utf-8')) as {
-      item?: Array<{ name?: string; item?: unknown[] }>;
-    };
-    return (json.item ?? [])
-      .filter((it) => Array.isArray(it.item))
-      .map((it) => it.name ?? '')
-      .filter(Boolean);
-  } catch {
-    return [];
+/**
+ * Resolve a target script name against existing files in the project's
+ * `tests/` folder. If the file already exists, ask whether to overwrite it,
+ * save under a different name (re-checking that one too), or cancel. Returns
+ * the chosen `{ name, overwrite }`, or null if the user cancelled.
+ *
+ * Shared by every authoring wizard (Generate / Convert / BYOS / cURL / Postman)
+ * so the "already exists" experience is consistent across features.
+ */
+async function resolveScriptTarget(
+  rl: Interface,
+  project: string,
+  scriptName: string,
+): Promise<{ name: string; overwrite: boolean } | null> {
+  let name = scriptName;
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const file = name.endsWith('.js') ? name : `${name}.js`;
+    const full = path.join(process.cwd(), 'testSuites', project, 'tests', file);
+    if (!fs.existsSync(full)) return { name, overwrite: false };
+
+    const choice = await pickFromOptions(
+      rl,
+      `"${file}" already exists in project "${project}". What would you like to do?`,
+      [
+        { key: '1', label: 'Overwrite the existing file', value: 'overwrite' as const },
+        { key: '2', label: 'Save under a different name', value: 'rename' as const },
+        { key: '3', label: 'Cancel', value: 'cancel' as const },
+      ],
+    );
+    if (!choice || choice === 'cancel') return null;
+    if (choice === 'overwrite') return { name, overwrite: true };
+
+    const newName = await askInput(rl, 'New script name (without .js):');
+    if (!newName) return null;
+    name = newName;
   }
 }
 
@@ -756,8 +823,11 @@ async function pickFromOptions<T>(
   options: OptionChoice<T>[],
 ): Promise<T | null> {
   output.write('\n');
+  // Right-align the keys so labels start in the same column regardless of
+  // single- vs double-digit numbers (keeps indented trees readable).
+  const keyWidth = Math.max(...options.map((o) => o.key.length));
   for (const opt of options) {
-    output.write(`  ${opt.key}. ${opt.label}\n`);
+    output.write(`  ${opt.key.padStart(keyWidth)}. ${opt.label}\n`);
   }
   const valid = new Map(options.map((o) => [o.key, o]));
   while (true) {
@@ -767,6 +837,18 @@ async function pickFromOptions<T>(
     if (picked) return picked.value;
     Logger.warn(`Invalid option "${ans}".`);
   }
+}
+
+/**
+ * Render a Postman folder as an indented tree row: top-level folders sit flush
+ * left, nested folders are indented per level and prefixed with a `└─` branch
+ * so the hierarchy is unmistakable in the numbered list.
+ */
+function folderTreeLabel(f: { rawPath: string[]; depth: number }): string {
+  const leaf = f.rawPath[f.rawPath.length - 1];
+  if (f.depth <= 1) return leaf;
+  const indent = '   '.repeat(f.depth - 2);
+  return `${indent}└─ ${leaf}`;
 }
 
 function printBanner(): void {

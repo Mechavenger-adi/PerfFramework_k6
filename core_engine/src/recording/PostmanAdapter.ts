@@ -61,11 +61,36 @@ export interface PostmanParseResult {
    * under a stable, human-readable tag instead of the raw URL.
    */
   entryNames: Map<string, string>;
+  /**
+   * Per-entry sanitized folder path (sidecar to HAREntry). Keys are HAREntry.id;
+   * values are the array of sanitized folder segments the request lives under
+   * (empty for requests at the collection root). Used by the importer to build
+   * collision-safe filenames when splitting a folder into per-request scripts.
+   */
+  entryFolders: Map<string, string[]>;
+}
+
+/** A folder node discovered in a Postman collection (for the interactive picker). */
+export interface PostmanFolderInfo {
+  /** Original folder names along the path (for display). */
+  rawPath: string[];
+  /** Sanitized folder names along the path (for matching / filtering). */
+  sanitizedPath: string[];
+  /** Nesting depth (1 = top-level). */
+  depth: number;
 }
 
 export interface PostmanParseOptions {
-  /** Only emit requests under this folder name (direct match only; no path nesting). */
-  folderFilter?: string;
+  /**
+   * Only emit requests under this folder path. Accepts either:
+   *  - a path string with `/` separators (e.g. `"API/Auth"`), or
+   *  - an array of folder segments (e.g. `["API", "Auth"]`).
+   * A single segment matches a top-level folder (backward compatible).
+   * Matching is prefix-based: the folder AND all of its descendant subfolders
+   * are included. Segments are sanitized the same way folder names are, so the
+   * caller may pass raw or already-sanitized names.
+   */
+  folderFilter?: string | string[];
   /**
    * Where to copy file-upload source files into. Should be the absolute path
    * to `testSuites/<team>/data/`. When set, the adapter tries to copy every
@@ -234,8 +259,13 @@ export class PostmanAdapter {
     const entryComments: PostmanParseResult['entryComments'] = new Map();
     // Per-entry metric name tags (Postman item name). Keyed by entry id.
     const entryNames: PostmanParseResult['entryNames'] = new Map();
+    // Per-entry sanitized folder path. Keyed by entry id.
+    const entryFolders: PostmanParseResult['entryFolders'] = new Map();
     // Collision tracker: transaction → (itemName → occurrence count).
     const nameCollision = new Map<string, Map<string, number>>();
+
+    // Normalize the (possibly nested) folder filter into sanitized segments.
+    const filterSegments = normalizeFolderFilter(opts.folderFilter);
 
     let requestCounter = 0;
 
@@ -266,7 +296,10 @@ export class PostmanAdapter {
         const requestName = sanitizeName(item.name ?? `request_${requestCounter + 1}`);
         const groupName = folderPath.length > 0 ? folderPath.join('.') : requestName;
 
-        if (opts.folderFilter && folderPath[0] !== sanitizeName(opts.folderFilter)) {
+        // Prefix match: include the request when its folder path starts with
+        // the filter segments (so the chosen folder AND its whole subtree are
+        // kept). A single-segment filter behaves like the old top-level match.
+        if (filterSegments && !pathHasPrefix(folderPath, filterSegments)) {
           continue;
         }
 
@@ -290,6 +323,7 @@ export class PostmanAdapter {
         nameCollision.get(groupName)!.set(baseName, seen);
         const nameTag = seen === 1 ? baseName : `${baseName}_${seen}`;
         entryNames.set(entryId, nameTag);
+        entryFolders.set(entryId, [...folderPath]);
         if (!groupBuckets.has(groupName)) {
           groupBuckets.set(groupName, []);
           groupOrder.push(groupName);
@@ -342,7 +376,38 @@ export class PostmanAdapter {
       extraInitCode = lines.join('\n');
     }
 
-    return { groups, warnings, extraInitCode, extraImports, copiedFiles, entryComments, entryNames };
+    return { groups, warnings, extraInitCode, extraImports, copiedFiles, entryComments, entryNames, entryFolders };
+  }
+
+  /**
+   * Enumerate every folder node in a collection (at every depth), in tree
+   * order, for the interactive folder picker. Each entry carries the raw path
+   * (for display) and the sanitized path (for use as a `folderFilter`).
+   */
+  static listFolderPaths(collection: PostmanCollectionFile): PostmanFolderInfo[] {
+    const out: PostmanFolderInfo[] = [];
+    const walk = (items: PostmanItem[], rawPath: string[], sanitizedPath: string[]): void => {
+      for (const item of items) {
+        if (!item.item) continue; // only folders
+        const rawName = item.name ?? 'folder';
+        const rawNext = [...rawPath, rawName];
+        const sanNext = [...sanitizedPath, sanitizeName(rawName)];
+        out.push({ rawPath: rawNext, sanitizedPath: sanNext, depth: rawNext.length });
+        walk(item.item, rawNext, sanNext);
+      }
+    };
+    walk(collection.item ?? [], [], []);
+    return out;
+  }
+
+  /** Like {@link listFolderPaths} but reads the collection from a JSON file. */
+  static listFolderPathsFromFile(filePath: string): PostmanFolderInfo[] {
+    try {
+      const json = JSON.parse(fs.readFileSync(filePath, 'utf-8')) as PostmanCollectionFile;
+      return this.listFolderPaths(json);
+    } catch {
+      return [];
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -810,6 +875,30 @@ export class PostmanAdapter {
 
 function sanitizeName(s: string): string {
   return s.replace(/[^a-zA-Z0-9_]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '') || 'unnamed';
+}
+
+/**
+ * Normalize a folder filter (path string with `/` separators, or a segment
+ * array) into an array of sanitized segments. Returns undefined when no
+ * meaningful filter was supplied.
+ */
+function normalizeFolderFilter(filter: string | string[] | undefined): string[] | undefined {
+  if (!filter) return undefined;
+  const rawSegments = Array.isArray(filter) ? filter : filter.split('/');
+  // Drop empty path segments (leading/trailing/double separators) BEFORE
+  // sanitizing, so a genuinely odd folder name isn't lost to the 'unnamed'
+  // fallback.
+  const sanitized = rawSegments
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((s) => sanitizeName(s));
+  return sanitized.length > 0 ? sanitized : undefined;
+}
+
+/** True when `folderPath` begins with every segment of `prefix`, in order. */
+function pathHasPrefix(folderPath: string[], prefix: string[]): boolean {
+  if (folderPath.length < prefix.length) return false;
+  return prefix.every((seg, i) => folderPath[i] === seg);
 }
 
 function safeJsonParse(s: string): unknown {

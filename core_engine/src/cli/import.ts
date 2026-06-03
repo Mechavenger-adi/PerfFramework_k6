@@ -16,6 +16,15 @@ import { PostmanAdapter } from '../recording/PostmanAdapter';
 import { ScriptGenerator } from '../recording/ScriptGenerator';
 import { TransactionGroup } from '../recording/TransactionGrouper';
 
+/**
+ * What to do when a target script file already exists:
+ *  - 'error'     : print an error and exit (default; CLI behavior).
+ *  - 'overwrite' : replace the existing file.
+ *  - 'skip'      : leave the existing file untouched (used for per-request
+ *                  splits where only some names collide).
+ */
+export type ConflictPolicy = 'error' | 'overwrite' | 'skip';
+
 export interface ImportCurlOptions {
   /** Inline curl string (shell-quoting required). Mutually exclusive with other sources. */
   curl?: string;
@@ -27,13 +36,27 @@ export interface ImportCurlOptions {
   clipboard?: boolean;
   /** Optional override for the transaction name when importing a single curl. */
   transactionName?: string;
+  /** What to do if the target script already exists. Defaults to 'error'. */
+  onConflict?: ConflictPolicy;
 }
 
 export interface ImportPostmanOptions {
   /** Path to a Postman v2.1 collection JSON file. Required. */
   file: string;
-  /** Optional: only emit requests under this top-level folder name. */
-  folder?: string;
+  /**
+   * Optional folder filter. Accepts a nested path (`"API/Auth"`) or an array
+   * of folder segments (`["API", "Auth"]`); the chosen folder and its whole
+   * subtree are imported.
+   */
+  folder?: string | string[];
+  /**
+   * When true, emit one script per individual request (API) instead of a
+   * single combined script. Files are named `<folder>_<request>.js`, escalating
+   * up the folder path only as needed to stay collision-free.
+   */
+  splitPerRequest?: boolean;
+  /** What to do if a target script already exists. Defaults to 'error'. */
+  onConflict?: ConflictPolicy;
 }
 
 export async function runImportCurl(
@@ -124,7 +147,7 @@ export async function runImportCurl(
     groups.push({ name: safeGroupName, entries: [result.entry] });
   }
 
-  emitScript(team, scriptName, groups, allWarnings, requestCounter);
+  emitScript(team, scriptName, groups, allWarnings, requestCounter, { onConflict: opts.onConflict });
 }
 
 export async function runImportPostman(
@@ -155,13 +178,22 @@ export async function runImportPostman(
   }
 
   const requestCount = result.groups.reduce((sum, g) => sum + g.entries.length, 0);
-  emitScript(team, scriptName, result.groups, result.warnings, requestCount, {
+  const extras: EmitScriptExtras = {
     extraInitCode: result.extraInitCode,
     extraImports: result.extraImports,
     copiedFiles: result.copiedFiles,
     entryComments: result.entryComments,
     entryNames: result.entryNames,
-  });
+    entryFolders: result.entryFolders,
+    onConflict: opts.onConflict,
+  };
+
+  if (opts.splitPerRequest) {
+    emitScriptsPerRequest(team, scriptName, result.groups, result.warnings, extras);
+    return;
+  }
+
+  emitScript(team, scriptName, result.groups, result.warnings, requestCount, extras);
 }
 
 // ---------------------------------------------------------------------------
@@ -179,6 +211,53 @@ interface EmitScriptExtras {
   entryComments?: Map<string, { before: string[]; after: string[] }>;
   /** Per-entry metric name tags (Postman item names). */
   entryNames?: Map<string, string>;
+  /** Per-entry sanitized folder path (for collision-safe split filenames). */
+  entryFolders?: Map<string, string[]>;
+  /** What to do if the target script already exists. Defaults to 'error'. */
+  onConflict?: ConflictPolicy;
+}
+
+/**
+ * Generate the script content for `groups` and write it to
+ * testSuites/<team>/tests/<scriptName>.js. Returns the absolute path written,
+ * or null when the file already existed and the conflict policy is 'skip'.
+ * With the default 'error' policy an existing file prints an error and exits;
+ * 'overwrite' replaces it. Performs no success logging — callers own messaging.
+ */
+function writeScriptFile(
+  team: string,
+  scriptName: string,
+  groups: TransactionGroup[],
+  extras: EmitScriptExtras = {},
+): string | null {
+  const targetDir = path.join(process.cwd(), 'testSuites', team, 'tests');
+  const outName = scriptName.endsWith('.js') ? scriptName : `${scriptName}.js`;
+  const outPath = path.join(targetDir, outName);
+  const policy = extras.onConflict ?? 'error';
+
+  if (fs.existsSync(outPath)) {
+    if (policy === 'skip') return null;
+    if (policy === 'error') {
+      console.error(
+        `Error: ${path.relative(process.cwd(), outPath)} already exists. Choose a different script name or remove the existing file.`,
+      );
+      process.exit(1);
+    }
+    // 'overwrite' falls through to the write below.
+  }
+
+  const scriptContent = ScriptGenerator.generate(groups, undefined, team, {
+    extraInitCode: extras.extraInitCode,
+    extraImports: extras.extraImports,
+    entryComments: extras.entryComments,
+    entryNames: extras.entryNames,
+  });
+
+  if (!fs.existsSync(targetDir)) {
+    fs.mkdirSync(targetDir, { recursive: true });
+  }
+  fs.writeFileSync(outPath, scriptContent, 'utf-8');
+  return outPath;
 }
 
 function emitScript(
@@ -189,50 +268,145 @@ function emitScript(
   requestCount: number,
   extras: EmitScriptExtras = {},
 ): void {
-  const scriptContent = ScriptGenerator.generate(groups, undefined, team, {
-    extraInitCode: extras.extraInitCode,
-    extraImports: extras.extraImports,
-    entryComments: extras.entryComments,
-    entryNames: extras.entryNames,
-  });
-
-  const suiteDir = path.join(process.cwd(), 'testSuites', team);
-  const targetDir = path.join(suiteDir, 'tests');
-  if (!fs.existsSync(targetDir)) {
-    fs.mkdirSync(targetDir, { recursive: true });
+  const outPath = writeScriptFile(team, scriptName, groups, extras);
+  if (outPath === null) {
+    const outName = scriptName.endsWith('.js') ? scriptName : `${scriptName}.js`;
+    console.log(`\n[SKIP] ${outName} already exists — left it unchanged.`);
+    return;
   }
-
-  const outName = scriptName.endsWith('.js') ? scriptName : `${scriptName}.js`;
-  const outPath = path.join(targetDir, outName);
-
-  if (fs.existsSync(outPath)) {
-    console.error(
-      `Error: ${path.relative(process.cwd(), outPath)} already exists. Choose a different script name or remove the existing file.`,
-    );
-    process.exit(1);
-  }
-
-  fs.writeFileSync(outPath, scriptContent, 'utf-8');
 
   console.log(`\n[PASS] Wrote ${path.relative(process.cwd(), outPath)}`);
   console.log(
     `       ${groups.length} transaction${groups.length === 1 ? '' : 's'}, ${requestCount} request${requestCount === 1 ? '' : 's'}.`,
   );
 
-  if (extras.copiedFiles && extras.copiedFiles.length > 0) {
-    console.log(`\nCopied ${extras.copiedFiles.length} file${extras.copiedFiles.length === 1 ? '' : 's'} into data/:`);
-    for (const f of extras.copiedFiles) {
-      console.log(`  • ${f.source}  →  ${f.destRelative}`);
+  printCopiedFiles(extras.copiedFiles);
+  printWarnings(warnings);
+  printNextSteps();
+}
+
+/**
+ * Emit one script per individual request (API). Each script holds a single
+ * transaction with one request. Filenames are `<folder>_<request>`, using only
+ * as many trailing folder segments as needed to stay unique within this run
+ * (see {@link buildSplitName}).
+ */
+function emitScriptsPerRequest(
+  team: string,
+  baseName: string,
+  groups: TransactionGroup[],
+  warnings: string[],
+  extras: EmitScriptExtras = {},
+): void {
+  const entryFolders = extras.entryFolders ?? new Map<string, string[]>();
+  const entryNames = extras.entryNames ?? new Map<string, string>();
+  const entryComments = extras.entryComments ?? new Map<string, { before: string[]; after: string[] }>();
+
+  const usedNames = new Set<string>();
+  const written: string[] = [];
+  const skipped: string[] = [];
+
+  for (const group of groups) {
+    for (const entry of group.entries) {
+      const folderSegs = entryFolders.get(entry.id) ?? [];
+      const requestName = entryNames.get(entry.id) ?? entry.id;
+      const scriptName = buildSplitName(folderSegs, requestName, usedNames, baseName);
+
+      // Slice per-entry extras. Only carry file init/imports into a script that
+      // actually references a file binding, so request scripts without uploads
+      // stay clean.
+      const comment = entryComments.get(entry.id);
+      const perComments: Map<string, { before: string[]; after: string[] }> = comment
+        ? new Map([[entry.id, comment]])
+        : new Map();
+      const perNames = new Map<string, string>([[entry.id, requestName]]);
+      const usesFile = !!entry.postData?.expression && /__file_|http\.file\(/.test(entry.postData.expression);
+
+      const outPath = writeScriptFile(team, scriptName, [{ name: group.name, entries: [entry] }], {
+        extraInitCode: usesFile ? extras.extraInitCode : undefined,
+        extraImports: usesFile ? extras.extraImports : undefined,
+        entryComments: perComments,
+        entryNames: perNames,
+        onConflict: extras.onConflict,
+      });
+      if (outPath === null) {
+        skipped.push(`${scriptName}.js`);
+      } else {
+        written.push(path.relative(process.cwd(), outPath));
+      }
     }
   }
 
-  if (warnings.length > 0) {
-    console.log('\nWarnings:');
-    for (const w of warnings) {
-      console.log(`  • ${w}`);
+  console.log(
+    `\n[PASS] Wrote ${written.length} script${written.length === 1 ? '' : 's'} (one per request) into testSuites/${team}/tests/:`,
+  );
+  for (const rel of written) {
+    console.log(`  • ${rel}`);
+  }
+  if (skipped.length > 0) {
+    console.log(`\n[SKIP] ${skipped.length} script${skipped.length === 1 ? '' : 's'} already existed and ${skipped.length === 1 ? 'was' : 'were'} left unchanged:`);
+    for (const s of skipped) {
+      console.log(`  • ${s}`);
     }
   }
 
+  printCopiedFiles(extras.copiedFiles);
+  printWarnings(warnings);
+  printNextSteps();
+}
+
+/**
+ * Build a collision-safe filename for a per-request split script. Starts from
+ * `<immediateParentFolder>_<request>` and walks up the folder path one segment
+ * at a time until the name is unique, falling back to a numeric suffix.
+ */
+function buildSplitName(
+  folderSegs: string[],
+  requestName: string,
+  used: Set<string>,
+  baseName: string,
+): string {
+  const start = folderSegs.length > 0 ? 1 : 0;
+  for (let take = start; take <= folderSegs.length; take++) {
+    const segs = take > 0 ? folderSegs.slice(folderSegs.length - take) : [];
+    const name = sanitizeFileStem([...segs, requestName].join('_'));
+    if (name && !used.has(name)) {
+      used.add(name);
+      return name;
+    }
+  }
+  // Exhausted the folder path — fall back to the user's base name + index.
+  const stem = sanitizeFileStem([...folderSegs, requestName].join('_')) || baseName;
+  let n = 2;
+  let name = `${stem}_${n}`;
+  while (used.has(name)) {
+    name = `${stem}_${++n}`;
+  }
+  used.add(name);
+  return name;
+}
+
+function sanitizeFileStem(s: string): string {
+  return s.replace(/[^a-zA-Z0-9_-]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
+}
+
+function printCopiedFiles(copiedFiles: EmitScriptExtras['copiedFiles']): void {
+  if (!copiedFiles || copiedFiles.length === 0) return;
+  console.log(`\nCopied ${copiedFiles.length} file${copiedFiles.length === 1 ? '' : 's'} into data/:`);
+  for (const f of copiedFiles) {
+    console.log(`  • ${f.source}  →  ${f.destRelative}`);
+  }
+}
+
+function printWarnings(warnings: string[]): void {
+  if (warnings.length === 0) return;
+  console.log('\nWarnings:');
+  for (const w of warnings) {
+    console.log(`  • ${w}`);
+  }
+}
+
+function printNextSteps(): void {
   console.log('\nNext steps:');
   console.log('  1. Review the generated script and adjust k6Check() assertions.');
   console.log('  2. Add this script to a test plan (config/test_plans/*.json) under journeys.');

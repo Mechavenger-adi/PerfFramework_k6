@@ -178,11 +178,13 @@ importCmd
   .command('postman <team> <script-name>')
   .description('Import a Postman v2.1 collection into a framework-shaped k6 script')
   .requiredOption('--file <path>', 'Path to a Postman v2.1 collection JSON file')
-  .option('--folder <name>', 'Only emit requests under this top-level folder (direct match)')
+  .option('--folder <path>', 'Only emit requests under this folder. Supports nested paths, e.g. "API/Auth" (includes the whole subtree)')
+  .option('--split-per-request', 'Emit one script per request (API) instead of a single combined script')
   .action(async (team, scriptName, opts) => {
     await runImportPostman(team, scriptName, {
       file: opts.file,
       folder: opts.folder,
+      splitPerRequest: opts.splitPerRequest === true,
     });
   });
 
