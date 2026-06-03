@@ -219,37 +219,50 @@ async function wizardConvert(rl: Interface): Promise<void> {
   const inputPath = await pickFile(rl, '.js', 'k6 script');
   if (!inputPath) return;
 
-  // Ask the destination question first, because it decides whether the team /
-  // script-name prompts even apply. In-place conversion rewrites the original
-  // file and must keep the team implied by that file's location — asking for a
-  // (possibly different) team or name would silently discard those answers,
-  // which is exactly the surprise users hit otherwise.
-  const inPlace = await confirm(
-    rl,
-    'Overwrite the input file in place instead of writing a copy to another team?',
-    false,
-  );
+  // The "overwrite in place" option only makes sense when the input file is
+  // already inside a project (testSuites/<project>/…). For an external path
+  // (e.g. C:\Users\…\script.js) converting "in place" would write a framework
+  // script back into some arbitrary folder — never what's wanted — so we don't
+  // ask, and always write the converted copy into a chosen project instead.
+  const sourceProject = teamFromPath(inputPath);
+
+  let inPlace = false;
+  let destProject: string | null;
+
+  if (sourceProject) {
+    inPlace = await confirm(
+      rl,
+      `This script is already in project "${sourceProject}". Overwrite it in place with the converted version?`,
+      false,
+    );
+    destProject = inPlace ? sourceProject : await pickOrCreateProject(rl);
+  } else {
+    destProject = await pickOrCreateProject(rl);
+  }
+  if (!destProject) return;
 
   if (inPlace) {
-    const team = teamFromPath(inputPath) ?? 'unknown_team';
     Logger.detail(
-      `Converting in place — the file stays where it is, under team "${team}".`,
+      `Converting in place — overwriting ${path.relative(process.cwd(), path.resolve(inputPath))} (project "${destProject}").`,
     );
     // scriptName is unused for in-place writes; pass the existing basename.
     const scriptName = path.basename(inputPath).replace(/\.js$/i, '');
-    await runConvert(inputPath, team, scriptName, { inPlace: true, externalRl: rl });
+    await runConvert(inputPath, destProject, scriptName, { inPlace: true, externalRl: rl });
     return;
   }
 
-  // Copy mode: now the project + name are the destination for the new file.
-  const team = await pickOrCreateProject(rl);
-  if (!team) return;
+  // Copy mode: choose the destination name, resolve any same-name conflict in
+  // the project (overwrite / rename / cancel), then convert into
+  // testSuites/<project>/tests/.
   const scriptName = await askScriptName(rl, inputPath);
   if (!scriptName) return;
-  const target = await resolveScriptTarget(rl, team, scriptName);
+  const target = await resolveScriptTarget(rl, destProject, scriptName);
   if (!target) return;
-  await runConvert(inputPath, team, target.name, { inPlace: false, externalRl: rl });
-  await maybeKeepReferenceCopy(rl, inputPath, team, 'k6 script');
+  await runConvert(inputPath, destProject, target.name, { inPlace: false, externalRl: rl });
+
+  // Offer to keep the original script as a reference copy in the destination
+  // project's recordings/ folder.
+  await maybeKeepReferenceCopy(rl, inputPath, destProject, 'k6 script');
 }
 
 /**

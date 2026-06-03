@@ -311,6 +311,10 @@ function emitScriptsPerRequest(
       const folderSegs = entryFolders.get(entry.id) ?? [];
       const requestName = entryNames.get(entry.id) ?? entry.id;
       const scriptName = buildSplitName(folderSegs, requestName, usedNames, baseName);
+      // For a per-request script the transaction is named with the full folder
+      // path AND the request name (e.g. `Parent_Child_login`), not just the
+      // folder path — so a single-request script reads unambiguously.
+      const transactionName = [...folderSegs, requestName].join('_') || group.name;
 
       // Slice per-entry extras. Only carry file init/imports into a script that
       // actually references a file binding, so request scripts without uploads
@@ -322,7 +326,7 @@ function emitScriptsPerRequest(
       const perNames = new Map<string, string>([[entry.id, requestName]]);
       const usesFile = !!entry.postData?.expression && /__file_|http\.file\(/.test(entry.postData.expression);
 
-      const outPath = writeScriptFile(team, scriptName, [{ name: group.name, entries: [entry] }], {
+      const outPath = writeScriptFile(team, scriptName, [{ name: transactionName, entries: [entry] }], {
         extraInitCode: usesFile ? extras.extraInitCode : undefined,
         extraImports: usesFile ? extras.extraImports : undefined,
         entryComments: perComments,
