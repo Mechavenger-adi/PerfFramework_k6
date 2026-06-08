@@ -86,6 +86,14 @@
           "type": "number",
           "minimum": 1,
           "description": "Total iterations for 'shared-iterations' or per-VU iterations for 'per-vu-iterations'. For shared-iterations: all VUs share this pool. For per-vu-iterations: each VU runs this many."
+        },
+        "gracefulRampDown": {
+          "type": "string",
+          "description": "Time k6 waits for an in-flight iteration to finish before removing a VU during ramp-down (ramping-vus / ramping-arrival-rate). k6 duration string, e.g. '30s', '2m'. Defaults to k6's 30s when omitted. Gives endPhase (logout) room to complete before a VU is removed."
+        },
+        "gracefulStop": {
+          "type": "string",
+          "description": "Time k6 waits for in-flight iterations to finish at scenario end before forcibly stopping (all executors except externally-controlled). k6 duration string, e.g. '30s'. Defaults to k6's 30s when omitted."
         }
       }
     },

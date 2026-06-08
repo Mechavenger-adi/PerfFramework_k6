@@ -770,6 +770,12 @@ function buildRunEnvironment(
     ...(transactionNames.length > 0
       ? { K6_PERF_TRANSACTION_NAMES: JSON.stringify(transactionNames) }
       : {}),
+    // Forward the V2 lifecycle flag from .env (EnvResolver uses dotenv.parse, so
+    // .env vars don't reach process.env on their own). Shell/CI env still works
+    // too, since PipelineRunner spreads process.env into the k6 child.
+    ...(resolvedConfig.secrets['K6_PERF_LIFECYCLE_V2']
+      ? { K6_PERF_LIFECYCLE_V2: resolvedConfig.secrets['K6_PERF_LIFECYCLE_V2'] }
+      : {}),
   };
 }
 

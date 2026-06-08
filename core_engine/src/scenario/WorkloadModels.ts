@@ -20,6 +20,8 @@ export interface K6ExecutorConfig {
   timeUnit?: string;
   preAllocatedVUs?: number;
   maxVUs?: number;
+  gracefulRampDown?: string;
+  gracefulStop?: string;
   exec?: string;
   tags?: Record<string, string>;
   env?: Record<string, string>;
@@ -169,5 +171,7 @@ export function toK6ExecutorConfig(profile: GlobalLoadProfile): K6ExecutorConfig
     timeUnit: profile.timeUnit,
     preAllocatedVUs: profile.preAllocatedVUs,
     maxVUs: profile.maxVUs,
+    gracefulRampDown: profile.gracefulRampDown,
+    gracefulStop: profile.gracefulStop,
   };
 }

@@ -20,6 +20,8 @@ export interface K6ScenarioDefinition {
   timeUnit?: string;
   preAllocatedVUs?: number;
   maxVUs?: number;
+  gracefulRampDown?: string;
+  gracefulStop?: string;
   startTime?: string;
   tags?: Record<string, string>;
   env?: Record<string, string>;

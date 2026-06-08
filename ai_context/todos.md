@@ -71,7 +71,20 @@
 
 ## Current / In-Progress Tasks
 
-*(Currently no active tasks)*
+- **Lifecycle Redesign V2 (per `design_proposal.md`):** Reliable, proactive, VU-driven `endPhase` (logout) across all executors. Full design captured in root `design_proposal.md` (proposal body starts at line 11). Root cause being fixed: k6 has no per-VU teardown hook, and the current (V1) detector triggers logout *reactively* at/after k6's VU removal (`lifecycle.ts` `getEndSignal` → `vuId > target`), so the logout iteration never arrives. V2 makes each VU compute a **proactive deadline** and self-exit a margin *before* k6 removes it.
+  - **DONE — Graceful passthrough:** `gracefulRampDown` / `gracefulStop` now flow to k6. Added to `GlobalLoadProfile` (`TestPlanSchema.ts`), `K6ExecutorConfig` + `toK6ExecutorConfig` (`WorkloadModels.ts`), `K6ScenarioDefinition` (`ScenarioBuilder.ts`), and `global_load_profile.properties` (`config/schemas/test_plan.schema.json`). Unset → omitted → k6 keeps its 30s defaults (zero behavior change unless set). Usable in any `global_load_profile` or per-journey `loadProfile`.
+  - **DONE — V2 lifecycle engine** in `lifecycle.ts`, gated behind env var `K6_PERF_LIFECYCLE_V2=true` (k6 inherits system env). V1 path untouched when the flag is off.
+    - `terminalDeadlineMs(curve, vuId)` = `sup{ t : target(t) ≥ vuId − 0.5 }` — last permanent downward crossing. Correct for load/soak/stress/step-down/spike/multi-spike (look-ahead avoids premature logout of VUs k6 will reuse); survivors get total duration → logout under `gracefulStop`. The `−0.5` half-step is the margin that makes the VU self-exit just before k6's integer removal.
+    - `computeEndPlan(phases)` → per-VU `EndPlan` by family: **ramping** (deadline; also covers constant-vus via its synthetic ramping envelope), **count** (`per-vu-iterations` / `shared-iterations`, deterministic last-iteration; zero-work shared VUs end before any action), **arrival** (`constant/ramping-arrival-rate` → action-only, init/end disabled + one-time runtime notice), **external** (best-effort, no auto-end).
+    - `runJourneyLifecycleV2()` shell: init-once (or arrival notice) → boundary end-check → action → post-action end-check. Either check fires while the VU is still scheduled (deadline < k6 removal), so `endPhase` always runs, then the VU parks and k6 reclaims it harmlessly.
+    - `isEnding()` exported (and from `index.ts`) for long action loops: `while (!isEnding()) { transaction(...); thinktime(); }`. `getTransactionGate()` consults the V2 plan when the flag is on.
+  - **TODO — remaining for V2 to reach the full design:**
+    - Make the flag discoverable: add a `runtime_settings` option (e.g. `lifecycle.v2`) that injects `K6_PERF_LIFECYCLE_V2` via `buildScenarioEnv`, instead of relying only on the OS env var.
+    - §8 fully-native constant-vus: stop emitting the synthetic `→0` ramp in `ScenarioBuilder.computePhaseEnvelope` (`ScenarioBuilder.ts:337-349`); emit real `durationMs`+`vus` and compute `deadline = duration − margin` with an optional load-preserving vuId stagger. (V2 already improves constant-vus by reinterpreting the synthetic timeline, but this removes the executor-misrepresentation + end-of-test load shave.)
+    - Strategy D (`externally-controlled`): add the heartbeat end-check (currently never auto-logs-out).
+    - Arrival-rate UX: prompt author to put everything in `actionPhase` at generation/conversion time (`generate`, `convert`, `LifecyclePrompt`); expose k6 `setup()`/`teardown()` to journey scripts for true once-only logic.
+    - Generated/converted/scaffold scripts: adopt the `while (!isEnding()) { ... }` action-loop pattern in `ScriptGenerator.ts`, `ScriptConverter.ts`, `init.ts`, `generate-byos.ts`.
+    - Validation: run load / soak / spike / step / constant-vus / iteration / arrival-rate plans with the flag on; confirm one clean logout per VU and gradual ramp-down. Then flip the default and retire V1.
 
 ## Future Tasks / Backlog
 
