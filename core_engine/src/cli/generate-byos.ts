@@ -6,16 +6,20 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-export function runGenerateByos(teamName: string, scriptName: string): void {
+export function runGenerateByos(
+  teamName: string,
+  scriptName: string,
+  opts: { overwrite?: boolean } = {},
+): void {
   const targetDir = path.join(process.cwd(), 'testSuites', teamName, 'tests');
-  
+
   if (!fs.existsSync(targetDir)) {
     fs.mkdirSync(targetDir, { recursive: true });
   }
 
   const scriptPath = path.join(targetDir, `${scriptName}.js`);
 
-  if (fs.existsSync(scriptPath)) {
+  if (fs.existsSync(scriptPath) && !opts.overwrite) {
     console.error(`[FAIL]  Script already exists at: ${scriptPath}`);
     process.exit(1);
   }

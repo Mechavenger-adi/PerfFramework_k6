@@ -363,19 +363,255 @@ export interface TransactionGate {
 }
 
 export function getTransactionGate(): TransactionGate {
-  const phases = getPhaseMetadata();
   const runtime = getRuntimeMetadata();
+  const onSkip = (name: string) => {
+    console.log(`[k6-perf][lifecycle] Skipping action transaction '${name}' — VU lifecycle ending`);
+  };
+
+  if (isLifecycleV2Enabled()) {
+    return {
+      shouldSkipBeforeStart: isEndDueBefore(),
+      errorBehavior: runtime.errorBehavior || 'continue',
+      onSkip,
+    };
+  }
+
+  const phases = getPhaseMetadata();
   const endSignal = getEndSignal(phases);
   return {
     shouldSkipBeforeStart: endSignal.beforeAction,
     errorBehavior: runtime.errorBehavior || 'continue',
-    onSkip: (name: string) => {
-      console.log(`[k6-perf][lifecycle] Skipping action transaction '${name}' — VU lifecycle ending`);
-    },
+    onSkip,
   };
 }
 
+// ── Lifecycle V2 (design_proposal.md) ─────────────────────────
+// Proactive, VU-driven end-detection. Gated behind K6_PERF_LIFECYCLE_V2 so the
+// default (V1) path is byte-for-byte unchanged until validated. Enable with the
+// environment variable K6_PERF_LIFECYCLE_V2=true (k6 inherits system env vars).
+
+function isLifecycleV2Enabled(): boolean {
+  const v = __ENV.K6_PERF_LIFECYCLE_V2;
+  return v === 'true' || v === '1';
+}
+
+type EndFamily = 'ramping' | 'count' | 'arrival' | 'external';
+
+interface EndPlan {
+  family: EndFamily;
+  /** Absolute wall-clock ms at/after which this VU logs out (ramping / time-based). */
+  deadlineMs?: number;
+  /** 0-based index of the last action iteration to run (count-based). */
+  lastIteration?: number;
+  /** Arrival-rate: init/end disabled, action-only. */
+  endDisabled?: boolean;
+  /** shared-iterations VUs that drew zero work — end before any action. */
+  endBeforeAction?: boolean;
+}
+
+// Per-VU plan cache. k6 instantiates the script module fresh per VU, so module
+// scope is per-VU state. isEnding() reads this for long in-action loops.
+let activeEndPlan: EndPlan | null = null;
+let arrivalNoticePrinted = false;
+
+interface CurvePoint { tMs: number; vus: number; }
+
+/** Build the piecewise-linear VU curve: (0, startVUs) followed by the timeline. */
+function buildVuCurve(phases: PhaseMetadata): CurvePoint[] {
+  const points: CurvePoint[] = [{ tMs: 0, vus: Number(phases.startVUs || 0) }];
+  for (const stage of phases.timeline!) {
+    points.push({ tMs: Number(stage.endMs || 0), vus: Number(stage.vus || 0) });
+  }
+  return points;
+}
+
+/**
+ * Terminal-crossing deadline for a VU of id `vuId`.
+ *
+ * Returns sup{ t : target(t) >= vuId - 0.5 } — the LAST time the curve is at or
+ * above the (margin-shifted) threshold. After that instant the curve stays below
+ * vuId forever, so the VU is never needed again and should log out. The -0.5
+ * half-step makes the VU self-exit just BEFORE k6's integer removal, guaranteeing
+ * the VU is still scheduled when endPhase runs.
+ *
+ * Because we have the whole curve up front, this is correct for every ramping
+ * shape: load, soak, stress, step-down, spike, and multi-spike (a VU only ends at
+ * the dip after which it is never exceeded again — no premature logout of VUs k6
+ * will reuse). Survivors that never cross (curve ends above the VU) get the total
+ * duration → they log out at scenario end under gracefulStop.
+ */
+function terminalDeadlineMs(curve: CurvePoint[], vuId: number): number {
+  const threshold = vuId - 0.5;
+  const totalMs = curve[curve.length - 1].tMs;
+  let sup = -1;
+
+  for (let i = 1; i < curve.length; i += 1) {
+    const a = curve[i - 1];
+    const b = curve[i];
+    if (b.vus >= threshold) {
+      // Segment ends at/above threshold → the latest at-or-above time is its end.
+      sup = Math.max(sup, b.tMs);
+    } else if (a.vus >= threshold) {
+      // Descending crossing within [a, b]: solve a.vus + p*(b.vus - a.vus) = threshold.
+      const dv = b.vus - a.vus; // < 0 here
+      const tCross = a.tMs + ((threshold - a.vus) / dv) * (b.tMs - a.tMs);
+      sup = Math.max(sup, tCross);
+    }
+  }
+
+  if (sup < 0) {
+    // Curve never reaches this VU's id (phantom/over-provisioned) — be conservative
+    // and never log out early; let scenario end + gracefulStop handle it.
+    return totalMs;
+  }
+  return sup;
+}
+
+/** Compute the per-VU EndPlan once, from the injected phase envelope. */
+function computeEndPlan(phases: PhaseMetadata): EndPlan {
+  const mode = phases.mode;
+
+  // Ramping family (also covers constant-vus, which the envelope encodes as a
+  // synthetic ramping-vus timeline) — terminal-crossing deadline.
+  if (mode === 'ramping-vus' && Array.isArray(phases.timeline) && phases.timeline.length > 0) {
+    const curve = buildVuCurve(phases);
+    const deadlineMs = exec.scenario.startTime + terminalDeadlineMs(curve, exec.vu.idInInstance);
+    return { family: 'ramping', deadlineMs };
+  }
+
+  // Per-VU iterations — deterministic last-iteration exit.
+  if (mode === 'per-vu-iterations') {
+    const total = Math.max(Number(phases.totalIterations || 1), 1);
+    return { family: 'count', lastIteration: total - 1 };
+  }
+
+  // Shared iterations — distribute the pool; zero-work VUs end before any action.
+  if (mode === 'shared-iterations') {
+    const total = Math.max(Number(phases.totalIterations || 1), 1);
+    const vus = Math.max(Number(phases.vus || 1), 1);
+    const assigned = Math.max(Math.ceil((total - (exec.vu.idInInstance - 1)) / vus), 0);
+    if (assigned <= 0) {
+      return { family: 'count', lastIteration: -1, endBeforeAction: true };
+    }
+    return { family: 'count', lastIteration: assigned - 1 };
+  }
+
+  // Arrival-rate — open model: action-only, init/end disabled.
+  if (mode === 'constant-arrival-rate' || mode === 'ramping-arrival-rate') {
+    return { family: 'arrival', endDisabled: true };
+  }
+
+  // externally-controlled / unsupported — best-effort (no predictable curve).
+  return { family: 'external' };
+}
+
+/** Should this VU end BEFORE running another action? */
+function isEndDueBefore(): boolean {
+  if (!activeEndPlan) return false;
+  if (activeEndPlan.endBeforeAction) return true;
+  if (activeEndPlan.deadlineMs !== undefined) return Date.now() >= activeEndPlan.deadlineMs;
+  return false;
+}
+
+/** Should this VU end AFTER the action it just ran? */
+function isEndDueAfter(): boolean {
+  if (!activeEndPlan) return false;
+  if (activeEndPlan.deadlineMs !== undefined) return Date.now() >= activeEndPlan.deadlineMs;
+  if (activeEndPlan.lastIteration !== undefined) {
+    return exec.vu.iterationInScenario >= activeEndPlan.lastIteration;
+  }
+  return false;
+}
+
+/**
+ * Script-facing: true once this VU has reached its logout deadline. Use it as the
+ * guard of a long action loop so the loop bails out near the deadline instead of
+ * overrunning it:
+ *
+ *   while (!isEnding()) { transaction('search', () => {...}); thinktime(); }
+ *
+ * Only meaningful for the ramping (time-deadline) family; returns false otherwise.
+ */
+export function isEnding(): boolean {
+  return (
+    activeEndPlan !== null &&
+    activeEndPlan.deadlineMs !== undefined &&
+    Date.now() >= activeEndPlan.deadlineMs
+  );
+}
+
+function runJourneyLifecycleV2(store: JourneyLifecycleStore, phaseFns: PhaseFns): void {
+  const runtime = getRuntimeMetadata();
+  const phases = getPhaseMetadata();
+  const state = store.state;
+
+  if (state.terminated || state.ended || isVuTerminated()) {
+    sleep(86400);
+    return;
+  }
+
+  if (!state.initialized) {
+    activeEndPlan = computeEndPlan(phases);
+
+    if (activeEndPlan.endDisabled) {
+      // Arrival-rate: init/end disabled. Announce once if the script defines them.
+      if ((phaseFns.initPhase || phaseFns.endPhase) && !arrivalNoticePrinted) {
+        console.log(
+          '[k6-perf][lifecycle] Arrival-rate executor — init/end phases are disabled; '
+          + 'all logic runs in actionPhase per iteration.',
+        );
+        arrivalNoticePrinted = true;
+      }
+      state.initialized = true;
+    } else {
+      const initBehavior = runSafely(store, 'init', phaseFns.initPhase, runtime);
+      state.initialized = true;
+      if (initBehavior !== 'continue' || state.terminated) {
+        return;
+      }
+    }
+  }
+
+  // Arrival-rate / external best-effort families: action-only, no proactive end.
+  if (activeEndPlan && activeEndPlan.endDisabled) {
+    frameworkIterations.add(1);
+    runSafely(store, 'action', phaseFns.actionPhase, runtime);
+    if (runtime.pacingEnabled && Number(runtime.pacingSeconds || 0) > 0) {
+      sleep(Number(runtime.pacingSeconds));
+    }
+    return;
+  }
+
+  // (1) Boundary check — catches VUs whose deadline passed between iterations.
+  if (isEndDueBefore() && phaseFns.endPhase) {
+    runSafely(store, 'end', phaseFns.endPhase, runtime);
+    state.ended = true;
+    return;
+  }
+
+  frameworkIterations.add(1);
+  const actionBehavior = runSafely(store, 'action', phaseFns.actionPhase, runtime);
+  if (actionBehavior !== 'continue' || state.terminated || isVuTerminated()) {
+    return;
+  }
+
+  if (runtime.pacingEnabled && Number(runtime.pacingSeconds || 0) > 0) {
+    sleep(Number(runtime.pacingSeconds));
+  }
+
+  // (2) Post-action check — catches VUs that crossed their deadline DURING the action.
+  if (isEndDueAfter() && phaseFns.endPhase) {
+    runSafely(store, 'end', phaseFns.endPhase, runtime);
+    state.ended = true;
+  }
+}
+
 export function runJourneyLifecycle(store: JourneyLifecycleStore, phaseFns: PhaseFns): void {
+  if (isLifecycleV2Enabled()) {
+    runJourneyLifecycleV2(store, phaseFns);
+    return;
+  }
+
   const runtime = getRuntimeMetadata();
   const phases = getPhaseMetadata();
   const state = store.state;

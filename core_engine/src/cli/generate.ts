@@ -9,8 +9,19 @@ import { LifecycleSelection, ScriptGenerator } from '../recording/ScriptGenerato
 import { ExchangeLogBuilder } from '../debug/ExchangeLog';
 import { RecordingLogResolver } from '../debug/RecordingLogResolver';
 import { promptForLifecycleSelection } from './LifecyclePrompt';
+import { ansi } from '../utils/logger';
 
-export async function runGenerate(harPath: string, teamName: string, outName: string): Promise<void> {
+/** Wrap a prompt string in the framework's prompt color (cyan). */
+function cq(text: string): string {
+  return `${ansi.cyan}${text}${ansi.reset}`;
+}
+
+export async function runGenerate(
+  harPath: string,
+  teamName: string,
+  outName: string,
+  externalRl?: Interface,
+): Promise<void> {
   const absoluteHarPath = path.resolve(process.cwd(), harPath);
   if (!fs.existsSync(absoluteHarPath)) {
     console.error(`HAR file not found: ${absoluteHarPath}`);
@@ -21,7 +32,11 @@ export async function runGenerate(harPath: string, teamName: string, outName: st
 
   const discoveredEntries = HARParser.readEntries(absoluteHarPath);
   const domainStats = DomainFilter.summarize(discoveredEntries);
-  const rl = createInterface({ input, output });
+  // Reuse the caller's readline interface when one is supplied (e.g. the
+  // interactive panel). Creating a second interface on the same stdin makes
+  // both echo every keystroke — letters appear doubled ("split" → "sspplliitt").
+  const rl = externalRl ?? createInterface({ input, output });
+  const ownsRl = externalRl === undefined;
   let allowedDomains: string[];
   let excludeStaticAssets: boolean;
   let lifecycleSelection: LifecycleSelection = { initGroups: [], endGroups: [] };
@@ -36,7 +51,7 @@ export async function runGenerate(harPath: string, teamName: string, outName: st
     groups = TransactionGrouper.group(entries);
     lifecycleSelection = await promptForLifecycleSelection(rl, groups.map((group) => group.name));
   } finally {
-    rl.close();
+    if (ownsRl) rl.close();
   }
   const scriptContent = ScriptGenerator.generate(groups, lifecycleSelection, teamName);
   const recordingLog = ExchangeLogBuilder.fromGroups(groups);
@@ -85,7 +100,7 @@ async function promptForDomains(
   });
 
   const answer = await rl.question(
-    '\nEnter the domain numbers or host names to include (comma-separated, or "all"): ',
+    cq('\nEnter the domain numbers or host names to include (comma-separated, or "all"): '),
   );
 
   const trimmed = answer.trim();
@@ -127,7 +142,7 @@ async function promptForDomains(
 
 async function promptForStaticAssetPreference(rl: Interface): Promise<boolean> {
   const answer = await rl.question(
-    'Do you want to include static assets such as css, js, images, and fonts? [y/N]: ',
+    cq('Do you want to include static assets such as css, js, images, and fonts? [y/N]: '),
   );
   const normalized = answer.trim().toLowerCase();
   const includeStatic = normalized === 'y' || normalized === 'yes';

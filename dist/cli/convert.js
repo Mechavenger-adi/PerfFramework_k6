@@ -58,12 +58,16 @@ async function runConvert(inputPath, teamName, scriptName, options) {
     const groupNames = ScriptConverter_1.ScriptConverter.extractGroupNames(source);
     let lifecycleSelection = { initGroups: [], endGroups: [] };
     if (process.stdin.isTTY && process.stdout.isTTY) {
-        const rl = (0, promises_1.createInterface)({ input: node_process_1.stdin, output: node_process_1.stdout });
+        // Reuse the caller's readline interface when supplied (the interactive
+        // panel). A second interface on the same stdin double-echoes keystrokes.
+        const rl = options.externalRl ?? (0, promises_1.createInterface)({ input: node_process_1.stdin, output: node_process_1.stdout });
+        const ownsRl = options.externalRl === undefined;
         try {
             lifecycleSelection = await (0, LifecyclePrompt_1.promptForLifecycleSelection)(rl, groupNames);
         }
         finally {
-            rl.close();
+            if (ownsRl)
+                rl.close();
         }
     }
     const converted = ScriptConverter_1.ScriptConverter.convert(source, teamName, lifecycleSelection);

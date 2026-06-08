@@ -31,8 +31,8 @@
   },
   "user_journeys": [
     {
-      "name": "buyanimal_converted_25thmay",
-      "scriptPath": "buyanimal_converted_25thmay.js"
+      "name": "buy_working_covert",
+      "scriptPath": "buy_working_covert.js"
     }
   ]
 }

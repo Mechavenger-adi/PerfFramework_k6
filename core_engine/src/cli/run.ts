@@ -178,11 +178,13 @@ importCmd
   .command('postman <team> <script-name>')
   .description('Import a Postman v2.1 collection into a framework-shaped k6 script')
   .requiredOption('--file <path>', 'Path to a Postman v2.1 collection JSON file')
-  .option('--folder <name>', 'Only emit requests under this top-level folder (direct match)')
+  .option('--folder <path>', 'Only emit requests under this folder. Supports nested paths, e.g. "API/Auth" (includes the whole subtree)')
+  .option('--split-per-request', 'Emit one script per request (API) instead of a single combined script')
   .action(async (team, scriptName, opts) => {
     await runImportPostman(team, scriptName, {
       file: opts.file,
       folder: opts.folder,
+      splitPerRequest: opts.splitPerRequest === true,
     });
   });
 
@@ -768,6 +770,12 @@ function buildRunEnvironment(
     K6_PERF_TEAM_ENVIRONMENTS: JSON.stringify(resolvedConfig.environment.testSuites || {}),
     ...(transactionNames.length > 0
       ? { K6_PERF_TRANSACTION_NAMES: JSON.stringify(transactionNames) }
+      : {}),
+    // Forward the V2 lifecycle flag from .env (EnvResolver uses dotenv.parse, so
+    // .env vars don't reach process.env on their own). Shell/CI env still works
+    // too, since PipelineRunner spreads process.env into the k6 child.
+    ...(resolvedConfig.secrets['K6_PERF_LIFECYCLE_V2']
+      ? { K6_PERF_LIFECYCLE_V2: resolvedConfig.secrets['K6_PERF_LIFECYCLE_V2'] }
       : {}),
   };
 }

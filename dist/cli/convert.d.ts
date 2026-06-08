@@ -1,3 +1,4 @@
+import { Interface } from 'node:readline/promises';
 /**
  * CLI handler for `convert` command.
  * Converts a conventional k6 script into a framework-compatible script
@@ -5,4 +6,5 @@
  */
 export declare function runConvert(inputPath: string, teamName: string, scriptName: string, options: {
     inPlace?: boolean;
+    externalRl?: Interface;
 }): Promise<void>;
