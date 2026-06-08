@@ -7,7 +7,12 @@
       "Bash(bash /tmp/rename_subs.sh)",
       "Bash(node dist/cli/run.js import --help)",
       "Bash(node dist/cli/run.js import curl --help)",
-      "Bash(node dist/cli/run.js import curl --curl 'curl -X POST https://httpbin.org/post -H \"Content-Type: application/json\" -H \"Accept: application/json\" -d \"{\\\\\"username\\\\\":\\\\\"alice\\\\\",\\\\\"action\\\\\":\\\\\"login\\\\\"}\" -u admin:secret' --transaction-name login sample_team smoke_login)"
+      "Bash(node dist/cli/run.js import curl --curl 'curl -X POST https://httpbin.org/post -H \"Content-Type: application/json\" -H \"Accept: application/json\" -d \"{\\\\\"username\\\\\":\\\\\"alice\\\\\",\\\\\"action\\\\\":\\\\\"login\\\\\"}\" -u admin:secret' --transaction-name login sample_team smoke_login)",
+      "Bash(node -e ' *)",
+      "Bash(node dist/cli/run.js --help)",
+      "Bash(grep -n '`points`\\\\|`metric:foo`\\\\|`metric=foo`' core_engine/src/reporting/RunReportGenerator.ts)",
+      "Bash(grep -n '`' core_engine/src/reporting/RunReportGenerator.ts)",
+      "Bash(grep -v '\\\\\\\\\\\\\\\\`')"
     ]
   }
 }

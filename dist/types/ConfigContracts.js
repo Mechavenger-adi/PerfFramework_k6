@@ -15,7 +15,10 @@ exports.FRAMEWORK_DEFAULTS = {
         includeErrorTable: true,
         timeseries: {
             enabled: true,
-            bucketSizeSeconds: 10,
+            // Default 1-second granularity per Proposal 5. Users can raise this
+            // for long-running tests where HTML size or memory matter.
+            bucketSizeSeconds: 1,
+            keepRawMetricsStream: true,
         },
     },
     errors: {

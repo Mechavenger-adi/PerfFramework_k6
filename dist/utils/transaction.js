@@ -232,6 +232,30 @@ function transaction(name, fn) {
                 const message = error && typeof error === 'object' && 'message' in error
                     ? error.message
                     : String(error);
+                // Wave 3: surface caught exceptions as structured error events AND
+                // attach a snapshot of the most recent request envelope (helps
+                // diagnose throws that occurred AFTER an HTTP call inside the
+                // transaction body, e.g. JSON parse failures, missing correlation
+                // tokens). Best-effort — never let event emission shadow the
+                // original error.
+                try {
+                    console.log('[k6-perf][error-event] ' + JSON.stringify({
+                        ts: new Date().toISOString(),
+                        type: 'transaction_error',
+                        transaction: name,
+                        message,
+                        errorBehavior: behavior,
+                        vu: typeof execution_1.default !== 'undefined' && execution_1.default.vu ? execution_1.default.vu.idInInstance : undefined,
+                        iteration: typeof execution_1.default !== 'undefined' && execution_1.default.vu ? execution_1.default.vu.iterationInScenario : undefined,
+                    }));
+                }
+                catch { /* defensive */ }
+                try {
+                    const hook = globalThis.__k6PerfCaptureSnapshotFromLastRequest;
+                    if (typeof hook === 'function')
+                        hook('transaction_error', message);
+                }
+                catch { /* defensive */ }
                 // Extract the user-script location from the stack so failures point at
                 // an actual file:line:col instead of just the error message. The
                 // extractor handles several Goja stack formats; if it still can't
@@ -310,6 +334,43 @@ function k6Check(val, sets) {
         const behavior = getRuntimeErrorBehavior();
         const txn = getCurrentTransaction();
         const ctx = txn ? `[transaction:${txn}]` : '';
+        // Wave 3: surface the failing check as a structured error event AND
+        // trigger a request-context snapshot (using the most recent request()
+        // call's envelope) so the report's Errors tab gets a per-occurrence
+        // entry and the Snapshots tab a full request/response to diagnose.
+        // Compute the list of failing keys so the event payload is useful.
+        const failingKeys = [];
+        try {
+            for (const key of Object.keys(sets)) {
+                try {
+                    if (!sets[key](val))
+                        failingKeys.push(key);
+                }
+                catch {
+                    failingKeys.push(key);
+                }
+            }
+        }
+        catch { /* defensive: never let event emission throw */ }
+        const failMsg = `check() failed: ${failingKeys.length > 0 ? failingKeys.join(', ') : 'unknown assertion'}`;
+        try {
+            console.log('[k6-perf][error-event] ' + JSON.stringify({
+                ts: new Date().toISOString(),
+                type: 'check_failed',
+                transaction: txn || undefined,
+                message: failMsg,
+                failingChecks: failingKeys,
+                vu: typeof execution_1.default !== 'undefined' && execution_1.default.vu ? execution_1.default.vu.idInInstance : undefined,
+                iteration: typeof execution_1.default !== 'undefined' && execution_1.default.vu ? execution_1.default.vu.iterationInScenario : undefined,
+            }));
+        }
+        catch { /* never let logging throw */ }
+        try {
+            const hook = globalThis.__k6PerfCaptureSnapshotFromLastRequest;
+            if (typeof hook === 'function')
+                hook('check_failed', failMsg);
+        }
+        catch { /* defensive: snapshot best-effort */ }
         if (behavior === 'abort_test') {
             console.error(`[k6-perf]${ctx} check() failed → aborting test`);
             execution_1.default.test.abort(`[k6-perf]${ctx} check() failed — aborting test`);

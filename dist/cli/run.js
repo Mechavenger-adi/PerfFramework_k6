@@ -503,7 +503,7 @@ program
         process.removeListener('SIGTERM', forceExitHandler);
     }
     const k6EndTime = new Date().toISOString();
-    const generatedArtifacts = finalizeRunArtifacts({
+    const generatedArtifacts = await finalizeRunArtifacts({
         runId,
         reportDir,
         plan,
@@ -512,6 +512,7 @@ program
         hostSnapshots,
         k6StartTime,
         k6EndTime,
+        transactionNames: txnNamesForLive,
     });
     logger_1.Logger.pass('Unified report artifacts generated');
     logger_1.Logger.detail(`Unified HTML report: ${generatedArtifacts.runReportHtml}`);
@@ -779,7 +780,7 @@ function writeRunManifest(runManifestPath, plan, resolvedConfig, scenarioMetadat
     };
     fs.writeFileSync(runManifestPath, JSON.stringify(manifest, null, 2), 'utf-8');
 }
-function finalizeRunArtifacts(options) {
+async function finalizeRunArtifacts(options) {
     const summaryPath = path.join(options.reportDir, 'summary.json');
     const handleSummaryPath = path.join(options.reportDir, 'handleSummary.json');
     const transactionMetricsPath = path.join(options.reportDir, 'transaction-metrics.json');
@@ -806,6 +807,11 @@ function finalizeRunArtifacts(options) {
     // over --summary-export's flat format
     const primarySummaryPath = fs.existsSync(handleSummaryPath) ? handleSummaryPath : summaryPath;
     const summaryData = JSON.parse(fs.readFileSync(primarySummaryPath, 'utf-8'));
+    // Hoisted from later in the function — `summaryMetricsAny` is read by
+    // both the Wave 3 error-pipeline expansion (threshold breaches → errors)
+    // and the Summary tab data build. Declaring once here avoids reading the
+    // metrics map twice and keeps the threshold-iteration order deterministic.
+    const summaryMetricsAny = (summaryData.metrics ?? {});
     const runtime = new RuntimeConfigManager_1.RuntimeConfigManager(options.resolvedConfig.runtime);
     const journeyName = options.plan.user_journeys.length === 1 ? options.plan.user_journeys[0].name : 'all';
     const transactionMetrics = TransactionMetricsBuilder_1.TransactionMetricsBuilder.build({
@@ -842,6 +848,47 @@ function finalizeRunArtifacts(options) {
     });
     const monitoringWarnings = HostMonitor_1.HostMonitor.buildWarnings(options.runId, options.resolvedConfig.runtime.monitoring, options.hostSnapshots);
     eventArtifacts.warnings.push(...monitoringWarnings);
+    // Wave 3: merge k6-side `[k6-perf][error-event]` / `[k6-perf][warning-event]`
+    // markers emitted by transaction.ts / request.ts (check failures, caught
+    // exceptions, snapshot cap-hit). Without this merge, those failures only
+    // existed in the raw k6 log and never made it to the report's Errors /
+    // Warnings tabs.
+    const runLogPath = path.join(options.reportDir, 'k6-run.log');
+    const k6Events = extractK6PerfEvents(runLogPath);
+    if (k6Events.errors.length > 0) {
+        // Cast loosely — these payloads were produced by the k6 side and may have
+        // arbitrary extras (failingChecks[], message, etc.). The reporting bundle
+        // accepts Record<string, unknown> rows for errors/warnings.
+        eventArtifacts.errors.push(...k6Events.errors);
+    }
+    if (k6Events.warnings.length > 0) {
+        eventArtifacts.warnings.push(...k6Events.warnings);
+    }
+    // Wave 3: also surface every breached threshold as an ERROR in addition to
+    // the existing warning event. Reasoning: a breached SLA is a run-level
+    // failure (already reflected in ciSummary.status === 'failed'), so users
+    // expect to see it in the Errors tab — not buried in Warnings next to
+    // host-monitor advisories.
+    const breachedThresholdMetricNames = [];
+    for (const [metricName, m] of Object.entries(summaryMetricsAny)) {
+        for (const [rule, res] of Object.entries(m.thresholds ?? {})) {
+            const breached = typeof res === 'boolean' ? res : res?.ok === false;
+            if (!breached)
+                continue;
+            breachedThresholdMetricNames.push(`${metricName}:${rule}`);
+            eventArtifacts.errors.push({
+                ts: new Date().toISOString(),
+                type: 'threshold_breach',
+                level: 'error',
+                runId: options.runId,
+                transaction: metricName,
+                message: `Threshold breached for ${metricName}: ${rule}`,
+            });
+        }
+    }
+    if (breachedThresholdMetricNames.length > 0) {
+        logger_1.Logger.detail(`Threshold breaches surfaced into errors: ${breachedThresholdMetricNames.slice(0, 5).join(', ')}${breachedThresholdMetricNames.length > 5 ? ` (+${breachedThresholdMetricNames.length - 5} more)` : ''}`);
+    }
     // Mirror the estimated-pass/fail console warning into warnings.ndjson so it
     // also lands in the RunReport's Warnings tab and any downstream CI consumer
     // of the artifact pipeline. Single run-level event (not one per row) — the
@@ -868,7 +915,7 @@ function finalizeRunArtifacts(options) {
     const startTime = options.k6StartTime ?? new Date().toISOString();
     const endTime = options.k6EndTime ?? new Date().toISOString();
     const reportAgents = buildReportAgents(eventArtifacts);
-    const timeseries = TimeseriesArtifactBuilder_1.TimeseriesArtifactBuilder.build({
+    const timeseries = await TimeseriesArtifactBuilder_1.TimeseriesArtifactBuilder.build({
         bucketSizeSeconds: runtime.getTimeseriesBucketSizeSeconds(),
         startTime,
         endTime,
@@ -878,6 +925,12 @@ function finalizeRunArtifacts(options) {
         warnings: eventArtifacts.warnings,
         agents: reportAgents,
         systemSnapshots: options.hostSnapshots,
+        // Path the live-metrics tail was already reading from — re-parse it
+        // post-run to build per-second buckets for the report's line charts.
+        metricsStreamPath: path.join(options.reportDir, 'metrics-stream.json'),
+        // Transaction manifest from the same env var the runtime auto-init uses,
+        // so the parser knows which custom-named metrics are transactions.
+        transactionNames: options.transactionNames,
     });
     ArtifactWriter_1.ArtifactWriter.writeJson(transactionMetricsPath, transactionMetrics);
     ArtifactWriter_1.ArtifactWriter.writeNdjson(errorsPath, eventArtifacts.errors);
@@ -895,6 +948,59 @@ function finalizeRunArtifacts(options) {
         }
         catch { /* skip malformed */ }
     }
+    // Wave 3: build a structured threshold table for the Summary tab. Reads
+    // every metric's `thresholds` block from handleSummary.json. `ok === true`
+    // (or `boolean === false` in --summary-export style) means the threshold
+    // held; otherwise it breached.
+    const thresholdRows = [];
+    for (const [metricName, m] of Object.entries(summaryMetricsAny)) {
+        for (const [rule, res] of Object.entries(m.thresholds ?? {})) {
+            const breached = typeof res === 'boolean' ? res : res?.ok === false;
+            thresholdRows.push({ metric: metricName, rule, ok: !breached });
+        }
+    }
+    // Plan profile for the Summary tab. Surfaces executor + key shape fields
+    // (stages, vus, iterations, rate, …) so users see "what did I just run"
+    // without opening the test plan JSON. Strips function fields if any
+    // serializer choked.
+    const planProfile = {
+        name: options.plan.name,
+        environment: options.plan.environment,
+        executionMode: options.plan.execution_mode,
+        journeys: (options.plan.user_journeys ?? []).map((j) => ({
+            name: j.name,
+            scriptPath: j.scriptPath,
+            weight: j.weight,
+            vus: j.vus,
+        })),
+        globalLoadProfile: options.plan.global_load_profile,
+    };
+    // Runtime settings snippet — the knobs users most often want to confirm
+    // matched their intent. Full config still lives in the resolved-config
+    // JSON; this is a quick at-a-glance pane.
+    const runtimeSnapshot = {
+        thinkTime: options.resolvedConfig.runtime.thinkTime,
+        pacing: options.resolvedConfig.runtime.pacing,
+        http: options.resolvedConfig.runtime.http,
+        errorBehavior: options.resolvedConfig.runtime.errorBehavior,
+        debugMode: options.resolvedConfig.runtime.debugMode,
+        reporting: {
+            transactionStats: options.resolvedConfig.runtime.reporting.transactionStats,
+            timeseries: options.resolvedConfig.runtime.reporting.timeseries,
+        },
+        errors: options.resolvedConfig.runtime.errors,
+        monitoring: options.resolvedConfig.runtime.monitoring,
+    };
+    // Run-wide totals from the per-bucket timeseries (Proposal 5 Wave 1).
+    // Falls back to k6 summary-aggregate values when the stream wasn't parsed.
+    const totals = timeseries.totals
+        ?? {
+            requests: (summaryMetricsAny.http_reqs?.values?.count) ?? 0,
+            iterations: (summaryMetricsAny.iterations?.values?.count) ?? 0,
+            httpFailures: 0,
+            dataReceived: (summaryMetricsAny.data_received?.values?.count) ?? 0,
+            dataSent: (summaryMetricsAny.data_sent?.values?.count) ?? 0,
+        };
     const reportBundle = {
         meta: {
             runId: options.runId,
@@ -913,6 +1019,10 @@ function finalizeRunArtifacts(options) {
         summary: {
             rawSummaryPath: summaryPath.replace(/\\/g, '/'),
             ciSummary,
+            planProfile,
+            runtimeSnapshot,
+            thresholds: thresholdRows,
+            totals,
         },
         transactions: transactionMetrics,
         timeseries,
@@ -925,6 +1035,22 @@ function finalizeRunArtifacts(options) {
         },
     };
     fs.writeFileSync(runReportPath, RunReportGenerator_1.RunReportGenerator.generate(reportBundle), 'utf-8');
+    // Honor `reporting.timeseries.keepRawMetricsStream` (default true). When
+    // false, the raw k6 streaming JSON is removed now that the per-bucket
+    // time-series artifact has been derived from it. Useful for CI runs
+    // where the file would otherwise sit in storage indefinitely.
+    if (!runtime.shouldKeepRawMetricsStream()) {
+        const streamFile = path.join(options.reportDir, 'metrics-stream.json');
+        try {
+            if (fs.existsSync(streamFile)) {
+                fs.rmSync(streamFile, { force: true });
+                logger_1.Logger.detail(`Removed raw metrics stream (reporting.timeseries.keepRawMetricsStream=false): ${streamFile}`);
+            }
+        }
+        catch (err) {
+            logger_1.Logger.warn(`Could not remove ${streamFile}: ${err.message}`);
+        }
+    }
     return {
         runReportHtml: runReportPath,
         transactionMetricsJson: transactionMetricsPath,
@@ -1377,6 +1503,8 @@ function renderScrollbackTable(stats, transactionStats, useColor) {
 // Snapshot event parser (reads k6 log file post-run)
 // ---------------------------------------------
 const SNAPSHOT_EVENT_PREFIX = '[k6-perf][snapshot-event] ';
+const ERROR_EVENT_PREFIX = '[k6-perf][error-event] ';
+const WARNING_EVENT_PREFIX = '[k6-perf][warning-event] ';
 /**
  * Reads the mirrored k6 log file, extracts snapshot events emitted during the
  * run, and writes a consolidated snapshots.json to the report directory.
@@ -1404,6 +1532,61 @@ function parseAndFlushSnapshots(runLogPath, reportDir) {
         fs.writeFileSync(path.join(reportDir, 'snapshots.json'), JSON.stringify(snapshots, null, 2), 'utf-8');
     }
     catch { /* ignore */ }
+}
+/**
+ * Wave 3: scan the mirrored run log for any `[k6-perf][*-event]` JSON
+ * payloads emitted by the k6 side (`transaction.ts` and `request.ts`) and
+ * return them as structured event lists. Used by `finalizeRunArtifacts` to
+ * merge per-iteration check failures, transaction exceptions, and snapshot-
+ * cap warnings into the same error/warning pipelines the rest of reporting
+ * consumes. Best-effort — malformed lines are skipped.
+ */
+function extractK6PerfEvents(runLogPath) {
+    const errors = [];
+    const warnings = [];
+    if (!fs.existsSync(runLogPath))
+        return { errors, warnings };
+    try {
+        const content = fs.readFileSync(runLogPath, 'utf-8');
+        for (const line of content.split('\n')) {
+            const errPayload = extractPayloadWithPrefix(line, ERROR_EVENT_PREFIX);
+            if (errPayload) {
+                try {
+                    errors.push(JSON.parse(errPayload));
+                }
+                catch { /* skip */ }
+                continue;
+            }
+            const warnPayload = extractPayloadWithPrefix(line, WARNING_EVENT_PREFIX);
+            if (warnPayload) {
+                try {
+                    warnings.push(JSON.parse(warnPayload));
+                }
+                catch { /* skip */ }
+            }
+        }
+    }
+    catch { /* log file unreadable */ }
+    return { errors, warnings };
+}
+/** Same dequote logic as snapshot extraction, parameterized on the prefix. */
+function extractPayloadWithPrefix(line, prefix) {
+    const consoleMatch = line.match(/msg="((?:\\.|[^"])*)"\s+source=console/);
+    if (consoleMatch) {
+        let rawMessage;
+        try {
+            rawMessage = JSON.parse(`"${consoleMatch[1]}"`);
+        }
+        catch {
+            rawMessage = consoleMatch[1].replace(/\\"/g, '"');
+        }
+        const idx = rawMessage.indexOf(prefix);
+        if (idx !== -1)
+            return rawMessage.slice(idx + prefix.length).trim();
+        return null;
+    }
+    const idx = line.indexOf(prefix);
+    return idx !== -1 ? line.slice(idx + prefix.length).trim() : null;
 }
 function extractSnapshotPayload(line) {
     // k6 logfmt format: level=info msg="[k6-perf][snapshot-event] {...}" source=console

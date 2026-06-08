@@ -91,6 +91,18 @@ class RuntimeConfigManager {
     getTimeseriesBucketSizeSeconds() {
         return this.timeseriesConfig.bucketSizeSeconds ?? ConfigContracts_1.FRAMEWORK_DEFAULTS.reporting.timeseries.bucketSizeSeconds ?? 10;
     }
+    /**
+     * When false, the raw k6 streaming-JSON file (`metrics-stream.json`) is
+     * deleted after the unified report finishes generating. The file is the
+     * source of truth for the per-second time-series charts and is several
+     * MB per minute of high-RPS traffic — useful for re-analysis but heavy
+     * for CI / storage-constrained environments.
+     */
+    shouldKeepRawMetricsStream() {
+        return this.timeseriesConfig.keepRawMetricsStream
+            ?? ConfigContracts_1.FRAMEWORK_DEFAULTS.reporting.timeseries.keepRawMetricsStream
+            ?? true;
+    }
     // ---------------------------------------------
     // Error Capture
     // ---------------------------------------------

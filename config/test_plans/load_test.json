@@ -12,19 +12,11 @@
         "target": 5
       },
       {
-        "duration": "30s",
+        "duration": "120s",
         "target": 5
       },
-       {
-        "duration": "30s",
-        "target": 10
-      },
-          {
-        "duration": "30s",
-        "target": 15
-      },
       {
-        "duration": "30s",
+        "duration": "5s",
         "target": 0
       }
     ]

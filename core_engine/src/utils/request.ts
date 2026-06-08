@@ -221,42 +221,127 @@ function serializeBodyForLog(body: RequestBody | undefined): string | undefined 
 }
 
 // ── Snapshot emission ─────────────────────────────────────────
+// Wave 3 (Proposal 5):
+//   • Snapshots can now be triggered by k6Check failures and caught
+//     transaction() exceptions, not just HTTP `status >= 400`. The legacy
+//     auto-trigger from `request()` is preserved; the new entry points are
+//     `captureRequestSnapshot()` (manual) and `recordRequestContextForSnapshot()`
+//     (called on every request so k6Check can attach to the most recent res).
+//   • A cap-hit warning event is emitted exactly once per run when
+//     `maxSnapshotsPerRun` is first reached — surfaces in the report's
+//     Warnings tab so users know to raise the cap.
 
+/** Last-request context, refreshed on every `request()` call so a downstream
+ * k6Check failure can produce a full request+response snapshot without the
+ * caller threading anything explicitly. Per-VU (k6 module scope). */
+interface LastRequestContext {
+  method: string;
+  url: string;
+  options: RequestOptions | undefined;
+  res: any;
+}
+let _lastRequestContext: LastRequestContext | null = null;
+let _capHitWarned = false;
+
+export function recordRequestContextForSnapshot(
+  method: string,
+  resolvedUrl: string,
+  options: RequestOptions | undefined,
+  res: any,
+): void {
+  _lastRequestContext = { method, url: resolvedUrl, options, res };
+}
+
+/**
+ * Emit a snapshot of the current request context. Returns true if a snapshot
+ * was emitted, false if it was suppressed (feature off, cap hit, no context).
+ * The `type` field distinguishes trigger sources for downstream consumers
+ * ("http_status_failed", "check_failed", "transaction_error").
+ */
+export function captureRequestSnapshot(
+  type: string,
+  context: {
+    method: string;
+    url: string;
+    options: RequestOptions | undefined;
+    res: any;
+    /** Optional human-readable note attached to the snapshot. */
+    message?: string;
+  },
+): boolean {
+  const cfg = getSnapshotConfig();
+  if (!cfg.captureSnapshotOnFailure) return false;
+  if (_snapshotCount >= cfg.maxSnapshotsPerRun) {
+    // Emit the cap-hit warning EXACTLY once per VU so the Warnings tab
+    // surfaces it. Without this users had no way to tell that snapshots
+    // were silently dropping past the configured ceiling.
+    if (!_capHitWarned) {
+      _capHitWarned = true;
+      console.log('[k6-perf][warning-event] ' + JSON.stringify({
+        ts: new Date().toISOString(),
+        type: 'snapshot_cap_reached',
+        message: `Snapshot cap (${cfg.maxSnapshotsPerRun}) reached; further failures will not be captured. Increase \`runtime.errors.maxSnapshotsPerRun\` to keep more.`,
+        transaction: getCurrentTransaction(),
+        vu: exec.vu.idInInstance,
+      }));
+    }
+    return false;
+  }
+  if (!context.res) return false;
+  _snapshotCount++;
+
+  const payload = {
+    ts: new Date().toISOString(),
+    type,
+    journey: typeof __ENV !== 'undefined' ? (__ENV.K6_PERF_JOURNEY_NAME || '') : '',
+    transaction: getCurrentTransaction(),
+    requestName: context.options?.name || context.url,
+    vu: exec.vu.idInInstance,
+    iteration: exec.vu.iterationInScenario,
+    phase: 'action',
+    message: context.message,
+    request: {
+      method: context.method,
+      url: context.url,
+      headers: cfg.includeRequestHeaders ? context.options?.headers : undefined,
+      body: cfg.includeRequestBody ? serializeBodyForLog(context.options?.body) : undefined,
+    },
+    response: {
+      status: context.res.status,
+      headers: cfg.includeResponseHeaders ? (context.res.headers ?? undefined) : undefined,
+      body: cfg.includeResponseBody && typeof context.res.body === 'string' ? context.res.body : undefined,
+    },
+  };
+  console.log('[k6-perf][snapshot-event] ' + JSON.stringify(payload));
+  return true;
+}
+
+/**
+ * Capture a snapshot using the most recent `request()` call's context.
+ * Used by k6Check failures and transaction() catch blocks so callers don't
+ * need to thread the request envelope through the assertion layer.
+ */
+export function captureSnapshotFromLastRequest(type: string, message?: string): boolean {
+  if (!_lastRequestContext) return false;
+  return captureRequestSnapshot(type, { ..._lastRequestContext, message });
+}
+
+/** Internal: legacy HTTP-status-failure trigger, kept for source compatibility. */
 function emitSnapshotEvent(
   method: string,
   resolvedUrl: string,
   options: RequestOptions | undefined,
   res: any,
 ): void {
-  const cfg = getSnapshotConfig();
-  if (!cfg.captureSnapshotOnFailure) return;
   if (!res || res.status < 400) return;
-  if (_snapshotCount >= cfg.maxSnapshotsPerRun) return;
-  _snapshotCount++;
-
-  const payload = {
-    ts: new Date().toISOString(),
-    type: 'http_request_failed',
-    journey: typeof __ENV !== 'undefined' ? (__ENV.K6_PERF_JOURNEY_NAME || '') : '',
-    transaction: getCurrentTransaction(),
-    requestName: options?.name || resolvedUrl,
-    vu: exec.vu.idInInstance,
-    iteration: exec.vu.iterationInScenario,
-    phase: 'action',
-    request: {
-      method,
-      url: resolvedUrl,
-      headers: cfg.includeRequestHeaders ? options?.headers : undefined,
-      body: cfg.includeRequestBody ? serializeBodyForLog(options?.body) : undefined,
-    },
-    response: {
-      status: res.status,
-      headers: cfg.includeResponseHeaders ? (res.headers ?? undefined) : undefined,
-      body: cfg.includeResponseBody && typeof res.body === 'string' ? res.body : undefined,
-    },
-  };
-  console.log('[k6-perf][snapshot-event] ' + JSON.stringify(payload));
+  captureRequestSnapshot('http_status_failed', { method, url: resolvedUrl, options, res });
 }
+
+// Install a globalThis hook so `transaction.ts` (which can't import from
+// `request.ts` without creating a cycle) can trigger a snapshot from
+// k6Check failures and transaction() catch blocks without threading the
+// request envelope through. Set once at module init.
+(globalThis as any).__k6PerfCaptureSnapshotFromLastRequest = captureSnapshotFromLastRequest;
 
 // ── Main request helper ───────────────────────────────────────
 
@@ -345,6 +430,10 @@ export function request(
       res = http.request(method, resolvedUrl, body, k6Params);
   }
 
+  // Stash the request/response context BEFORE the legacy 4xx/5xx auto-
+  // trigger so a k6Check() failure that follows this request can call
+  // `captureSnapshotFromLastRequest()` and get a full envelope back.
+  recordRequestContextForSnapshot(method, resolvedUrl, options, res);
   emitSnapshotEvent(method, resolvedUrl, options, res);
 
   if (res && res.status >= 400) {

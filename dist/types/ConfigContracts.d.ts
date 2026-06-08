@@ -45,6 +45,15 @@ export interface TimeSeriesReportingConfig {
     enabled: boolean;
     /** Bucket size in seconds for aggregated timeseries points */
     bucketSizeSeconds?: number;
+    /**
+     * Retain the raw `metrics-stream.json` k6 streaming output file in the
+     * run folder after the unified report is generated. When `false`, the
+     * file is deleted to save disk (typical CI use case). When `true` (the
+     * default), it stays for ad-hoc re-analysis or external tooling.
+     * The file can be several MB to several hundred MB for long high-RPS
+     * runs — toggle off when storage-constrained.
+     */
+    keepRawMetricsStream?: boolean;
 }
 export interface ReportingConfig {
     /** Visible transaction stats/columns in reports */

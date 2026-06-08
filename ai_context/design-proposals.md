@@ -626,6 +626,131 @@ Project
 
 ---
 
+## Proposal 5: Custom HTML Report — Phased Overhaul
+
+**Status:** Wave 1 implemented (2026-06-01). Waves 2–4 planned.
+**Affects:** `core_engine/src/reporting/RunReportGenerator.ts`, `core_engine/src/reporting/TimeseriesArtifactBuilder.ts`, `core_engine/src/reporting/TimeseriesStreamParser.ts` (new), `core_engine/src/types/ReportingContracts.ts`, `core_engine/src/types/ConfigContracts.ts`, `core_engine/src/cli/run.ts`, `core_engine/src/config/RuntimeConfigManager.ts`, `core_engine/src/config/SchemaValidator.ts`, `config/schemas/runtime_settings.schema.json`.
+
+### Problem
+
+The post-run `RunReport.html` had eight separate shortcomings, all stemming from the same root cause: the timeseries pipeline only stamped a single end-of-run point per metric, so every "trend" panel was actually a one-bar bar chart over aggregate values, and downstream features (saved time ranges, system graph, error completeness, snapshot triggers, summary depth) had nothing to compose against.
+
+Specific complaints surfaced by the user:
+
+1. No filter on the Transactions table.
+2. Transaction response time was a bar chart; should be an interactive line chart with per-second granularity.
+3. The standard k6 web-dashboard graphs (req/s, response-time percentiles, VUs, iteration rate, data in/out, http failure rate) are absent.
+4. The time-range filter is local to the Graphs tab; should be a sticky global control with saveable named intervals.
+5. Summary tab is shallow.
+6. Error tab doesn't capture all error sources.
+7. Snapshot capture often misses (gated on `status >= 400`, hard cap silently truncates).
+8. System tab is two tables; should include an interactive CPU/memory chart.
+
+Future vision: convert this into a live dashboard streaming over an in-run HTTP server (SSE/WebSocket).
+
+### Phased plan
+
+| Wave | Scope | Status |
+|------|-------|--------|
+| 1 | Per-second time-series pipeline + line-chart Graphs tab + interactive System tab + bucket-size and stream-retention runtime knobs | **Shipped 2026-06-01** |
+| 2 | Global sticky time range + saved intervals (localStorage) + drag-to-zoom (chartjs-plugin-zoom) + Transactions tab filter/sort/CSV export | **Shipped 2026-06-02** |
+| 3 | Summary depth + error pipeline completeness + snapshot trigger expansion + cap-hit warning + threshold breaches surfaced into errors | **Shipped 2026-06-02** |
+| 4 | Live dashboard (long-running local HTTP server + SSE stream + companion HTML) | Pending (future) |
+
+Waves are independent and ship-able. Wave 1 unblocks the rest by establishing the data shape every subsequent wave consumes.
+
+### Wave 1: per-second time series + interactive charts
+
+#### Root cause analysis
+
+`TimeseriesArtifactBuilder.build()` previously called `runtime.addOverviewPoint(endTs, …)` ONCE — and the same for each transaction — producing a `timeseries.json` with exactly one point per series. The raw per-sample Points existed (k6 writes them to `metrics-stream.json` via `--out json=`) but were never parsed for the report. Everything downstream — bar charts, "Load Overview" KV cards based on the last bucket, the absence of a System chart — followed from this.
+
+#### New module: `TimeseriesStreamParser`
+
+Line-by-line parser over `metrics-stream.json`:
+
+- **Memory-bounded streaming.** Uses `readline` over a `fs.createReadStream` so multi-hundred-MB streams parse without blowing the heap. A cheap `indexOf('"type":"Point"')` discards Metric definitions and other line types before any JSON parse.
+- **Bucketing.** Per-sample timestamps are floored to `bucketSizeSeconds` boundaries. Default 1 s; configurable via `reporting.timeseries.bucketSizeSeconds`. Final output is a dense, contiguous bucket array so chart libraries draw flat lines through empty windows rather than jumping over gaps.
+- **Per-metric semantics.**
+  - Counter metrics (`http_reqs`, `iterations`, `data_received`, `data_sent`, `<txn>_count`) accumulate deltas per bucket.
+  - Trend metrics (`http_req_duration`, `iteration_duration`, `<txn>`) retain raw samples per bucket and compute `avg`/`min`/`max`/`p90`/`p95`/`p99` at finalize. Per-bucket samples are discarded after finalize so memory stays bounded.
+  - Rate metrics (`http_req_failed`, `<txn>_checkrate`) split passes/fails per bucket — for `_checkrate` these are the exact per-iteration transaction outcomes from Proposal 3.
+  - Gauge metrics (`vus`, `vus_max`) keep the last sample / max-seen per bucket.
+- **Transaction classification.** Uses the `K6_PERF_TRANSACTION_NAMES` manifest when available, so user-named metrics don't get misclassified as transactions. Falls back to the `transaction` tag on `http_req_duration` for legacy runs.
+
+#### Schema expansion (additive, non-breaking)
+
+`TimeSeriesPoint` is unchanged structurally (still `{ ts, [key]: string|number|undefined }`), but its docstring now enumerates the Wave 1 keys per series type (overview / per-transaction / per-agent). Renderers and external consumers treat each field as optional; older runs with the legacy single-point shape still render via the report's fallback path.
+
+#### Charts shipped in Wave 1
+
+Graphs tab (replaces prior bar+donut layout):
+
+1. HTTP Request Rate (req/s) — line.
+2. HTTP Response Time — avg + p90 + p95 + p99 in a single overlaid line chart.
+3. HTTP Failure Rate (%) — line.
+4. Virtual Users — active + max in one chart.
+5. Iterations rate + iteration-duration p95 — overlaid lines.
+6. Data Transferred — `data_received` and `data_sent` (B/s) — overlaid lines.
+7. Per-Transaction Response Time — multi-line; metric picker (`durationAvg`/`p90`/`p95`/`p99`/`max`); substring filter for transactions.
+8. Per-Transaction Pass Rate — multi-line; pass / (pass+fail) over time, computed from `_checkrate` Rate samples.
+
+System tab (replaces table-only layout):
+
+9. Host Resource Usage Over Time — CPU% (solid) and Memory% (dashed) per agent, color-paired.
+
+#### Runtime knobs
+
+`reporting.timeseries.bucketSizeSeconds` is honored end-to-end. Default lowered from `10` to `1` so out-of-the-box runs get per-second resolution; users can raise it for long soaks where HTML size is the constraint.
+
+`reporting.timeseries.keepRawMetricsStream` (new, default `true`). When `false`, `metrics-stream.json` is deleted from the run folder after the report is generated — useful for CI / storage-constrained environments where the multi-MB file would otherwise accumulate.
+
+#### Backward compatibility
+
+- Old runs that have no `metrics-stream.json` (or an unreadable one) fall through to the legacy single-endTime-point path. The Graphs tab shows a yellow banner explaining the absence so users know it's a data-shape gap, not a rendering bug.
+- Existing `timeseries.json` consumers (anything reading the artifact externally) see the same shape, just with more keys per point. The legacy keys (`avg`, `p95`, `errorRate`, `avgDuration`, `p95Duration`) are still emitted alongside the new ones.
+- `bucketSizeSeconds: 10` configurations from existing test plans still work; the default change only affects new defaults.
+
+#### Acceptance criteria
+
+1. A fresh run with default runtime settings produces a `timeseries.json` with at least one bucket per second of test execution for `overview`, plus one bucket per second for each transaction registered via `K6_PERF_TRANSACTION_NAMES`.
+2. The Graphs tab renders nine line charts (eight overview/transaction + one system).
+3. Per-transaction charts honor the substring filter and metric selector.
+4. With `keepRawMetricsStream: false`, the run folder contains no `metrics-stream.json` after the report finishes; the unified report still renders correctly because the timeseries artifact is already derived.
+5. A run from before Wave 1 (no `metrics-stream.json` on disk) renders the report with the legacy single-point fallback and the in-panel warning banner — does not crash.
+
+### Wave 2: global time range + saved intervals + table polish (SHIPPED 2026-06-02)
+
+- **Sticky global toolbar.** Time range UI moved out of the Graphs tab into a sticky `<div class="global-toolbar">` above the tab strip. Single global `window.__k6PerfRange` is the source of truth; updates dispatch a `rangechange` CustomEvent on `document`, and every range-aware tab (Summary / Graphs / Transactions / Errors / Snapshots / System) re-renders on receipt. Tabs that don't care (Warnings) ignore it.
+- **`chartjs-plugin-zoom`** added via two CDN script tags (hammer.js + plugin). Every line chart gets `plugins.zoom`: drag-rectangle to zoom (X-axis only), shift-pan, reset-zoom built into the toolbar's "Full run" button. The `onZoomComplete` callback maps the resulting bucket-index range back to ISO timestamps and pushes them through `updateGlobalTimeRange`, so a zoom on any chart rescopes every other chart and tab in lockstep.
+- **Saved intervals** persisted to `localStorage` under the key `k6perf-intervals-<runId>`. UI: name input + Save button in the toolbar, list of chips below (click chip to apply, × to delete). Per-run scoped so different runs' interval bookmarks don't mix.
+- **Transactions tab**: search box (substring match on transaction name), sortable column headers (click to toggle asc/desc with ▲/▼/⇅ indicators, numeric columns default to descending), per-row count label, CSV Export button that writes the current filter+sort result to a Blob and triggers a download (`transactions-<runId>.csv`). Sort + filter state persists across rangechange re-renders via module-scope variables.
+
+### Wave 3: summary depth + error completeness + snapshot trigger expansion (SHIPPED 2026-06-02)
+
+- **Deeper Summary tab.** KV-card row expanded from 4 to 11 metrics (Transactions, Total Requests, Total Iterations, HTTP Failures, Errors, Warnings, Threshold Failures, Duration; second row: Data Received, Data Sent, Avg req/s). New Plan card surfaces plan name + env + execution mode + executor + stages or vus/iterations/duration + journey list with weights and scriptPaths. New Threshold table lists every rule with ✓/✗ status and pass/breach summary in the header. New Runtime Snapshot card surfaces the most-asked-about knobs (think time, pacing, error behavior, HTTP timeout, snapshot config, monitoring, bucket size) as KV cards plus a collapsible `<pre>` with the full runtime config JSON. Existing top-slowest + top-failing tables retained.
+- **`[k6-perf][error-event]` and `[k6-perf][warning-event]` console markers** emitted by the k6 side:
+  - `transaction.ts` `k6Check` on failure: emits `error-event` with `type:'check_failed'`, the failing-check name list, VU + iteration tags.
+  - `transaction.ts` `transaction()` catch block: emits `error-event` with `type:'transaction_error'`, the error message, the active errorBehavior branch taken.
+  - `request.ts` snapshot cap hit: emits `warning-event` with `type:'snapshot_cap_reached'` exactly once per VU so users know to raise the cap.
+- **Stdout tailer in `run.ts`.** New `extractK6PerfEvents(runLogPath)` parses the mirrored k6 log file for the new markers and returns structured event lists. `finalizeRunArtifacts` merges them into `eventArtifacts.errors` and `.warnings` before building the report bundle, so they flow into both `errors.ndjson` / `warnings.ndjson` and the report's Errors / Warnings tabs.
+- **Snapshot trigger expansion.** `request.ts` now records every successful call's `(method, url, options, res)` tuple in a per-VU `_lastRequestContext` slot. `captureSnapshotFromLastRequest(type, message?)` reads it and emits a full request+response snapshot regardless of HTTP status. A `globalThis.__k6PerfCaptureSnapshotFromLastRequest` hook is installed at request.ts module load so `transaction.ts` (which can't import from request.ts without a cycle) can fire snapshots from `k6Check` failures and `transaction()` catch blocks. The legacy `res.status >= 400` auto-trigger is preserved.
+- **Cap-hit warning.** When `_snapshotCount` first reaches `maxSnapshotsPerRun`, a `[k6-perf][warning-event]` with `type:'snapshot_cap_reached'` is emitted (once per VU). The Warnings tab surfaces it so users running into the cap know to raise it instead of wondering why later failures have no snapshot.
+- **Threshold breaches surfaced into errors.** `finalizeRunArtifacts` walks every metric's `thresholds` block and adds a `type:'threshold_breach'` error event for each breached rule, in addition to the existing warning event. A breached SLA is a run-level failure (already reflected in `ciSummary.status === 'failed'`), so users expect to see it in the Errors tab and not buried in Warnings next to host-monitor advisories.
+
+### Wave 4 (future): live dashboard
+
+A long-running local HTTP server (started by `run.ts`, killed on shutdown) that:
+
+- Tails the same `metrics-stream.json` the post-run parser uses.
+- Aggregates into the same bucket shape Wave 1 produces.
+- Pushes per-bucket updates to a connected browser via Server-Sent Events.
+- Reuses the Wave-1 Chart.js layouts unchanged — the live view is the same HTML page, fed by a streaming data source instead of a static `reportData` blob.
+
+Prerequisite: Wave 1's parser + bucket schema (done). Independent design proposal will follow once Waves 2–3 ship and live-view requirements are concretely scoped.
+
+---
+
 ## Combined Generated Script Direction
 
 ### Target Pattern

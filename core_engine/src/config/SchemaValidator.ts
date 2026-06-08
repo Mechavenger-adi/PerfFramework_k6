@@ -103,6 +103,7 @@ const RUNTIME_SETTINGS_SCHEMA_INLINE = {
           properties: {
             enabled: { type: 'boolean' },
             bucketSizeSeconds: { type: 'number', minimum: 1 },
+            keepRawMetricsStream: { type: 'boolean' },
           },
         },
       },

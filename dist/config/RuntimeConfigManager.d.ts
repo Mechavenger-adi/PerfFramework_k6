@@ -28,6 +28,14 @@ export declare class RuntimeConfigManager {
     shouldIncludeErrorTable(): boolean;
     isTimeseriesEnabled(): boolean;
     getTimeseriesBucketSizeSeconds(): number;
+    /**
+     * When false, the raw k6 streaming-JSON file (`metrics-stream.json`) is
+     * deleted after the unified report finishes generating. The file is the
+     * source of truth for the per-second time-series charts and is several
+     * MB per minute of high-RPS traffic — useful for re-analysis but heavy
+     * for CI / storage-constrained environments.
+     */
+    shouldKeepRawMetricsStream(): boolean;
     shouldCaptureSnapshotOnFailure(): boolean;
     getMaxSnapshotsPerRun(): number;
     shouldIncludeRequestHeadersInSnapshots(): boolean;

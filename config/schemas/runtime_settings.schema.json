@@ -146,8 +146,13 @@
             "bucketSizeSeconds": {
               "type": "number",
               "minimum": 1,
-              "description": "Aggregation bucket size in seconds for timeseries data points. Smaller = more granular charts but larger data. Recommended: 5–10 for short tests (<5min), 30–60 for long tests (>30min).",
-              "default": 10
+              "description": "Aggregation bucket size in seconds for timeseries data points. Smaller = more granular charts but larger data. Default 1 produces per-second resolution on every overview/transaction/system chart; raise to 5–10 for >30-min runs or 30–60 for hour-plus soaks if HTML size becomes an issue.",
+              "default": 1
+            },
+            "keepRawMetricsStream": {
+              "type": "boolean",
+              "description": "Retain the raw k6 streaming-JSON output file (`metrics-stream.json`) in the run folder after the unified report finishes. When `false`, the file is deleted automatically — useful for CI / storage-constrained environments. When `true` (default), it stays for ad-hoc re-analysis. The file can be tens to hundreds of MB for long high-RPS runs.",
+              "default": true
             }
           }
         }

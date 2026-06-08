@@ -123,8 +123,59 @@ export class RunReportGenerator {
       background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent);
       border-radius: 999px; padding: 3px 10px; cursor: pointer; font-size: 12px; font-weight: 600;
     }
+    /* ── Wave 2: sticky global toolbar + saved intervals + sortable tables ── */
+    .global-toolbar {
+      position: sticky; top: 0; z-index: 50;
+      background: rgba(255,253,248,0.94);
+      backdrop-filter: blur(12px) saturate(160%);
+      -webkit-backdrop-filter: blur(12px) saturate(160%);
+      border: 1px solid var(--border); border-radius: 14px;
+      padding: 10px 14px; margin: 12px 0 16px;
+      display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.04);
+    }
+    .global-toolbar label { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+    .global-toolbar input[type="datetime-local"], .global-toolbar input[type="text"], .global-toolbar select {
+      padding: 6px 10px; font-size: 13px;
+    }
+    .global-toolbar .small-btn {
+      background: var(--panel); border: 1px solid var(--border); color: var(--ink);
+      border-radius: 999px; padding: 6px 12px; cursor: pointer; font-weight: 600; font-size: 12px;
+    }
+    .global-toolbar .small-btn:hover { background: var(--accent-soft); border-color: var(--accent); }
+    .global-toolbar .small-btn.primary { background: var(--accent); color: white; border-color: var(--accent); }
+    .global-toolbar .divider { width: 1px; height: 22px; background: var(--border); margin: 0 4px; }
+    .saved-list { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+    .saved-chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      background: var(--accent-soft); color: var(--accent);
+      border: 1px solid var(--accent); border-radius: 999px;
+      padding: 3px 4px 3px 10px; font-size: 12px; font-weight: 600; cursor: pointer;
+    }
+    .saved-chip:hover { background: #cdebef; }
+    .saved-chip .x {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 18px; height: 18px; border-radius: 50%;
+      background: transparent; color: var(--accent); border: none;
+      cursor: pointer; font-size: 14px; line-height: 1; padding: 0;
+    }
+    .saved-chip .x:hover { background: rgba(0,95,115,0.12); }
+    th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+    th.sortable:hover { color: var(--accent); }
+    th.sortable .sort-arrow { opacity: 0.4; margin-left: 4px; font-size: 11px; }
+    th.sortable.sorted .sort-arrow { opacity: 1; color: var(--accent); }
+    .txn-toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+    .txn-toolbar input[type="search"] { padding: 6px 10px; font-size: 13px; min-width: 240px; }
+    .csv-btn {
+      background: var(--accent); color: white; border: none;
+      border-radius: 999px; padding: 6px 14px; cursor: pointer; font-weight: 600; font-size: 12px;
+    }
+    .csv-btn:hover { background: #004a5c; }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <!-- chartjs-plugin-zoom: drag/pinch to zoom every line chart; selections become the global time range. -->
+  <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1"></script>
 </head>
 <body>
   <div class="shell">
@@ -138,6 +189,23 @@ export class RunReportGenerator {
         <span>Ended: ${this.escapeHtml(bundle.meta.endTime)}</span>
       </div>
     </section>
+    <!-- Wave 2: global time range toolbar (sticky). Single source of truth
+         for the visible window across every tab. Saved intervals persist to
+         localStorage keyed by runId so analyses survive page reloads. -->
+    <div class="global-toolbar" id="global-toolbar">
+      <label>Time Range</label>
+      <input id="gtb-from" type="datetime-local" />
+      <span>→</span>
+      <input id="gtb-to" type="datetime-local" />
+      <button class="small-btn primary" id="gtb-apply">Apply</button>
+      <button class="small-btn" id="gtb-reset">Full run</button>
+      <span class="divider"></span>
+      <label>Save as</label>
+      <input id="gtb-name" type="text" placeholder="interval name" />
+      <button class="small-btn" id="gtb-save">Save</button>
+      <span class="divider"></span>
+      <span class="saved-list" id="gtb-saved-list"></span>
+    </div>
     <div class="tabs" id="tabs"></div>
     <section id="panel-summary" class="tab-panel active"></section>
     <section id="panel-graphs" class="tab-panel"></section>
@@ -197,20 +265,123 @@ export class RunReportGenerator {
       button.classList.add('active');
     }
 
+    // Wave 3: deeper Summary tab. Sections (top → bottom):
+    //   1. KV cards: top-level run health (transactions, total reqs, errors,
+    //      warnings, threshold failures, total iterations).
+    //   2. Plan card: name + env + executor + journey breakdown.
+    //   3. Threshold table: every rule with pass/fail icon.
+    //   4. Top tables: slowest + most-failing transactions.
+    //   5. Runtime snapshot: the knobs the run used (think time, error
+    //      behavior, http config, monitoring, …).
     function renderSummary() {
-      const summary = reportData.summary;
-      const ci = summary.ciSummary;
+      const summary = reportData.summary || {};
+      const ci = summary.ciSummary || { thresholdFailures: 0, errorCount: 0, warningCount: 0 };
       const transactions = reportData.transactions.transactions;
       const slowest = [...transactions].sort((a, b) => (b.avg || 0) - (a.avg || 0)).slice(0, 5);
       const failing = [...transactions].sort((a, b) => (b.fail || 0) - (a.fail || 0)).slice(0, 5);
+      const totals = summary.totals || {};
+      const planProfile = summary.planProfile || {};
+      const runtimeSnapshot = summary.runtimeSnapshot || {};
+      const thresholds = summary.thresholds || [];
+
+      // Compact human formatter for bytes (B / KB / MB / GB).
+      const fmtBytes = (n) => {
+        const v = Number(n) || 0;
+        if (v >= 1e9) return (v / 1e9).toFixed(2) + ' GB';
+        if (v >= 1e6) return (v / 1e6).toFixed(2) + ' MB';
+        if (v >= 1e3) return (v / 1e3).toFixed(2) + ' KB';
+        return v.toFixed(0) + ' B';
+      };
+      const fmtDuration = () => {
+        const ms = new Date(reportData.meta.endTime).getTime() - new Date(reportData.meta.startTime).getTime();
+        if (!Number.isFinite(ms) || ms < 0) return '—';
+        const totalSec = Math.round(ms / 1000);
+        const h = Math.floor(totalSec / 3600);
+        const m = Math.floor((totalSec % 3600) / 60);
+        const s = totalSec % 60;
+        return (h > 0 ? h + 'h ' : '') + (m > 0 || h > 0 ? m + 'm ' : '') + s + 's';
+      };
+
+      // Plan card body — degrades gracefully when planProfile is absent
+      // (e.g. older runs whose bundle predates Wave 3).
+      const profile = planProfile.globalLoadProfile || {};
+      const stagesRow = profile.stages
+        ? profile.stages.map((s) => '<code>' + escapeHtml(s.duration) + ' → ' + s.target + ' VUs</code>').join(' ')
+        : '';
+      const journeyList = (planProfile.journeys || []).map((j) =>
+        '<li><strong>' + escapeHtml(j.name || '') + '</strong>'
+        + (j.weight != null ? ' <span class="subtle">(weight ' + j.weight + ')</span>' : '')
+        + (j.vus != null ? ' <span class="subtle">(vus ' + j.vus + ')</span>' : '')
+        + '<br><span class="subtle">' + escapeHtml(j.scriptPath || '') + '</span></li>'
+      ).join('');
+
+      const passedCount = thresholds.filter((t) => t.ok).length;
+      const breachedCount = thresholds.length - passedCount;
+      const thresholdTableHtml = thresholds.length === 0
+        ? '<div class="empty">No thresholds configured for this run.</div>'
+        : '<table><thead><tr><th>Metric</th><th>Rule</th><th>Status</th></tr></thead><tbody>'
+          + thresholds.map((t) =>
+              '<tr>'
+              + '<td>' + escapeHtml(t.metric) + '</td>'
+              + '<td><code>' + escapeHtml(t.rule) + '</code></td>'
+              + '<td>' + (t.ok
+                  ? '<span style="color:#15803d;font-weight:600">✓ pass</span>'
+                  : '<span style="color:#b91c1c;font-weight:600">✗ fail</span>')
+              + '</td>'
+              + '</tr>'
+            ).join('')
+          + '</tbody></table>';
+
+      // Runtime snapshot — just the most-asked-about knobs. Pretty JSON
+      // beneath so users can copy/paste exact values if they need to.
+      const runtimeKeyLines = [
+        ['Think time', (runtimeSnapshot.thinkTime && runtimeSnapshot.thinkTime.mode) || '—'],
+        ['Pacing', (runtimeSnapshot.pacing && runtimeSnapshot.pacing.enabled) ? 'enabled' : 'disabled'],
+        ['Error behavior', runtimeSnapshot.errorBehavior || '—'],
+        ['HTTP timeout', (runtimeSnapshot.http && runtimeSnapshot.http.timeoutSeconds) ? runtimeSnapshot.http.timeoutSeconds + 's' : '—'],
+        ['Snapshots on failure', (runtimeSnapshot.errors && runtimeSnapshot.errors.captureSnapshotOnFailure) ? 'on (cap ' + runtimeSnapshot.errors.maxSnapshotsPerRun + ')' : 'off'],
+        ['Host monitoring', (runtimeSnapshot.monitoring && runtimeSnapshot.monitoring.enabled) ? 'enabled' : 'disabled'],
+        ['Bucket size', (runtimeSnapshot.reporting && runtimeSnapshot.reporting.timeseries && runtimeSnapshot.reporting.timeseries.bucketSizeSeconds) + 's'],
+      ];
 
       document.getElementById('panel-summary').innerHTML = \`
         <div class="cards">
           <div class="card"><h3>Transactions</h3><strong>\${transactions.length}</strong></div>
-          <div class="card"><h3>Threshold Failures</h3><strong>\${ci.thresholdFailures}</strong></div>
+          <div class="card"><h3>Total Requests</h3><strong>\${(totals.requests || 0).toLocaleString()}</strong></div>
+          <div class="card"><h3>Total Iterations</h3><strong>\${(totals.iterations || 0).toLocaleString()}</strong></div>
+          <div class="card"><h3>HTTP Failures</h3><strong>\${(totals.httpFailures || 0).toLocaleString()}</strong></div>
           <div class="card"><h3>Errors</h3><strong>\${ci.errorCount}</strong></div>
           <div class="card"><h3>Warnings</h3><strong>\${ci.warningCount}</strong></div>
+          <div class="card"><h3>Threshold Failures</h3><strong>\${ci.thresholdFailures}</strong></div>
+          <div class="card"><h3>Duration</h3><strong>\${fmtDuration()}</strong></div>
         </div>
+        <div class="cards">
+          <div class="card"><h3>Data Received</h3><strong>\${fmtBytes(totals.dataReceived)}</strong></div>
+          <div class="card"><h3>Data Sent</h3><strong>\${fmtBytes(totals.dataSent)}</strong></div>
+          <div class="card"><h3>Avg req/s</h3><strong>\${(((totals.requests || 0) / Math.max(1, (new Date(reportData.meta.endTime).getTime() - new Date(reportData.meta.startTime).getTime()) / 1000))).toFixed(2)}</strong></div>
+        </div>
+
+        <div class="split">
+          <div class="card">
+            <h3>Plan</h3>
+            <p style="margin:6px 0"><strong>\${escapeHtml(planProfile.name || reportData.meta.plan || '—')}</strong>
+              <span class="subtle"> — env: <code>\${escapeHtml(planProfile.environment || reportData.meta.environment || '—')}</code></span>
+            </p>
+            <p style="margin:6px 0" class="subtle">Mode: <code>\${escapeHtml(planProfile.executionMode || '—')}</code>
+              · Executor: <code>\${escapeHtml(profile.executor || '—')}</code>
+              \${profile.duration ? '· Duration: <code>' + escapeHtml(profile.duration) + '</code>' : ''}
+              \${profile.vus != null ? '· VUs: <code>' + profile.vus + '</code>' : ''}
+              \${profile.iterations != null ? '· Iterations: <code>' + profile.iterations + '</code>' : ''}
+            </p>
+            \${stagesRow ? '<p style="margin:6px 0">Stages: ' + stagesRow + '</p>' : ''}
+            \${journeyList ? '<ul style="margin:8px 0;padding-left:20px">' + journeyList + '</ul>' : ''}
+          </div>
+          <div class="card">
+            <h3>Thresholds (\${passedCount}/\${thresholds.length} passing\${breachedCount > 0 ? ', <span style="color:#b91c1c">' + breachedCount + ' breached</span>' : ''})</h3>
+            \${thresholdTableHtml}
+          </div>
+        </div>
+
         <div class="split">
           <div class="card">
             <h3>Top Slowest Transactions</h3>
@@ -221,169 +392,447 @@ export class RunReportGenerator {
             \${renderMiniTable(failing, ['transaction', 'fail', 'errorPct'])}
           </div>
         </div>
+
+        <div class="card" style="margin-top:18px">
+          <h3>Runtime Snapshot</h3>
+          <div class="cards" style="margin-bottom:12px">
+            \${runtimeKeyLines.map(([k, v]) => '<div class="card"><h3>' + escapeHtml(k) + '</h3><strong style="font-size:14px">' + escapeHtml(String(v)) + '</strong></div>').join('')}
+          </div>
+          <details>
+            <summary class="subtle" style="cursor:pointer">Show full runtime config</summary>
+            <pre style="background:#1d2731;color:#c8d8e0;border-radius:10px;padding:14px;font-size:11px;line-height:1.5;overflow:auto;max-height:360px;margin-top:10px">\${escapeHtml(JSON.stringify(runtimeSnapshot, null, 2))}</pre>
+          </details>
+        </div>
       \`;
+    }
+
+    // ── Wave 1 (Proposal 5): per-second line charts ─────────────────
+    // The streaming JSON output is post-parsed into per-bucket aggregates
+    // (see TimeseriesStreamParser), so every chart below is a real trend
+    // line over wallclock time — req/s, HTTP duration percentiles, VUs,
+    // iterations, data in/out, per-transaction response time, per-
+    // transaction checkrate. The legacy bar/donut charts are kept only as
+    // a fallback when the stream file was unreadable.
+    let graphChartInstances = [];
+    function destroyGraphCharts() {
+      for (const c of graphChartInstances) { try { c.destroy(); } catch {} }
+      graphChartInstances = [];
+    }
+
+    // Format helper: trim "2026-06-01T14:53:54.000Z" → "14:53:54". The bucket
+    // ts is ISO, but for hourly+ runs an absolute time on the X axis would
+    // be unreadable — short form keeps tick labels legible.
+    function fmtBucketTs(ts) {
+      const d = new Date(ts);
+      const pad = (v) => String(v).padStart(2, '0');
+      return pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+    }
+
+    function lineDataset(label, color, points, valueKey) {
+      return {
+        label,
+        data: points.map((p) => Number(p[valueKey] || 0)),
+        borderColor: color,
+        backgroundColor: color + '22',
+        borderWidth: 2,
+        pointRadius: 0,
+        pointHoverRadius: 4,
+        tension: 0.2,
+        fill: false,
+      };
+    }
+
+    // \`points\` is the source bucket array backing the chart — its index
+    // aligns with chart.scales.x ticks, so a zoom selection maps cleanly
+    // back to bucket timestamps and broadcasts via updateGlobalTimeRange.
+    // Pass null to disable zoom→range broadcast (e.g. for the per-transaction
+    // charts where the user picks the metric/filter separately).
+    function lineOptions(yTitle, opts, points) {
+      opts = opts || {};
+      const zoomPlugin = points && points.length > 1 ? {
+        zoom: {
+          // Drag a rectangle to zoom; resulting range becomes the global
+          // time window so every other chart and tab updates in lockstep.
+          drag: { enabled: true, backgroundColor: 'rgba(0,95,115,0.12)' },
+          mode: 'x',
+          onZoomComplete: ({ chart }) => {
+            const xs = chart.scales.x;
+            const lo = Math.max(0, Math.floor(xs.min));
+            const hi = Math.min(points.length - 1, Math.ceil(xs.max));
+            const startTs = points[lo] && points[lo].ts;
+            const endTs = points[hi] && points[hi].ts;
+            if (startTs && endTs && startTs !== endTs) {
+              // Reset the chart's own zoom — the global rerender will
+              // produce the zoomed-in chart from a smaller dataset, so we
+              // don't want the plugin's transient zoom to compound.
+              try { chart.resetZoom(); } catch {}
+              updateGlobalTimeRange(startTs, endTs);
+              hydrateTimeInputs(
+                document.getElementById('gtb-from'),
+                document.getElementById('gtb-to'),
+              );
+            }
+          },
+        },
+        pan: { enabled: true, mode: 'x', modifierKey: 'shift' },
+        limits: { x: { min: 'original', max: 'original' } },
+      } : undefined;
+      return {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { position: 'top', labels: { usePointStyle: true, padding: 12, boxWidth: 10 } },
+          tooltip: {
+            backgroundColor: 'rgba(29,39,49,0.92)',
+            titleFont: { size: 12 },
+            bodyFont: { size: 12 },
+            padding: 10,
+            cornerRadius: 8,
+          },
+          ...(zoomPlugin ? { zoom: zoomPlugin } : {}),
+        },
+        scales: {
+          x: { ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 10, font: { size: 11 } }, grid: { color: 'rgba(0,0,0,0.04)' } },
+          y: {
+            title: { display: !!yTitle, text: yTitle || '', color: '#66717d' },
+            grid: { color: 'rgba(0,0,0,0.04)' },
+            beginAtZero: opts.beginAtZero !== false,
+            ...(opts.suggestedMax ? { suggestedMax: opts.suggestedMax } : {}),
+          },
+        },
+      };
     }
 
     function renderGraphs() {
+      destroyGraphCharts();
       const stats = reportData.config.transactionStats;
       const transactions = reportData.transactions.transactions;
-      const topFive = [...transactions].sort((a, b) => (b.count || 0) - (a.count || 0)).slice(0, reportData.config.defaultTopTransactions || 5);
       const range = getSelectedRange();
-      const overviewPoints = filterSeriesByRange(reportData.timeseries.series.overview, range);
-      const selectedOverview = overviewPoints[overviewPoints.length - 1] || null;
+      const overviewPoints = filterSeriesByRange(reportData.timeseries.series.overview || [], range);
+      const hasTimeseries = overviewPoints.length > 1;
+      const labels = overviewPoints.map((p) => fmtBucketTs(p.ts));
+      // Per-transaction series filtered by the same range. Keys here are the
+      // transaction names declared via the framework manifest.
+      const txnSeriesMap = reportData.timeseries.series.transactions || {};
+      const txnNames = Object.keys(txnSeriesMap).sort();
+      const filteredTxnSeries = {};
+      for (const name of txnNames) {
+        filteredTxnSeries[name] = filterSeriesByRange(txnSeriesMap[name] || [], range);
+      }
 
-      document.getElementById('panel-graphs').innerHTML = \`
-        <div class="toolbar">
-          <label><strong>Time Range</strong></label>
-          <input id="global-from" type="datetime-local" />
-          <input id="global-to" type="datetime-local" />
-          <button id="apply-time-filter" class="tab-btn">Apply</button>
-          <label><strong>Transaction View</strong></label>
-          <select id="txn-view-mode">
-            <option value="top">Top 5</option>
-            <option value="all">All</option>
-          </select>
-          <input id="txn-filter" type="search" placeholder="Filter transactions" />
-        </div>
-        <div class="split">
-          <div class="graph-shell">
+      // Banner only renders when we don't have proper time-series data — the
+      // single-point legacy fallback can't be drawn as a line.
+      const banner = !hasTimeseries
+        ? '<div class="notice notice-warn" style="margin-bottom:12px;padding:10px 14px;border-left:4px solid #f59e0b;background:#fef3c7;color:#78350f;border-radius:4px;font-size:13px;line-height:1.5">'
+            + '<strong>No per-second time-series available.</strong> The k6 streaming output (<code>metrics-stream.json</code>) was missing or unreadable for this run, so the charts below show a single end-of-run sample only. Future runs will produce full line charts automatically.'
+          + '</div>'
+        : '';
+
+      document.getElementById('panel-graphs').innerHTML = banner + \`
+        <div class="graph-shell">
+          <div class="chart-box">
+            <h3>HTTP Request Rate</h3>
+            <div class="chart-canvas-wrap" style="min-height:240px"><canvas id="chart-req-rate"></canvas></div>
+          </div>
+          <div class="chart-box">
+            <h3>HTTP Response Time (ms)</h3>
+            <div class="chart-canvas-wrap" style="min-height:280px"><canvas id="chart-http-duration"></canvas></div>
+          </div>
+          <div class="chart-box">
+            <h3>HTTP Failure Rate</h3>
+            <div class="chart-canvas-wrap" style="min-height:220px"><canvas id="chart-http-failed"></canvas></div>
+          </div>
+          <div class="split">
             <div class="chart-box">
-              <h3>Load Overview</h3>
-              \${selectedOverview ? renderOverviewCards(selectedOverview) : '<div class="empty">No overview points in the selected time range.</div>'}
+              <h3>Virtual Users</h3>
+              <div class="chart-canvas-wrap" style="min-height:220px"><canvas id="chart-vus"></canvas></div>
             </div>
             <div class="chart-box">
-              <h3>Transaction Response Time (ms)</h3>
-              <div class="chart-canvas-wrap"><canvas id="txn-bar-chart"></canvas></div>
-            </div>
-            <div class="chart-box">
-              <h3>Pass / Fail Distribution</h3>
-              <div class="donut-wrap"><canvas id="txn-donut-chart"></canvas></div>
+              <h3>Iteration Rate (per bucket)</h3>
+              <div class="chart-canvas-wrap" style="min-height:220px"><canvas id="chart-iter-rate"></canvas></div>
             </div>
           </div>
-          <div class="card">
-            <h3>Attached Summary Table</h3>
-            <div id="graph-table-host"></div>
+          <div class="chart-box">
+            <h3>Iteration Duration (ms)</h3>
+            <div class="chart-canvas-wrap" style="min-height:240px"><canvas id="chart-iter-duration"></canvas></div>
+          </div>
+          <div class="chart-box">
+            <h3>Data Transferred (bytes/sec)</h3>
+            <div class="chart-canvas-wrap" style="min-height:220px"><canvas id="chart-data"></canvas></div>
+          </div>
+          <!-- ── HTTP timing breakdown (parity with k6 web-dashboard Timings tab) ── -->
+          <h3 style="margin:20px 0 8px;font-size:18px;color:var(--accent)">HTTP Timing Breakdown</h3>
+          <p class="subtle" style="margin:0 0 12px">Each phase is a slice of the total <code>http_req_duration</code>. Useful for pinpointing whether slow requests are server-side (waiting), network-side (sending/receiving), or pool-side (blocked).</p>
+          <div class="split">
+            <div class="chart-box">
+              <h3>Request Waiting (TTFB)</h3>
+              <div class="chart-canvas-wrap" style="min-height:200px"><canvas id="chart-http-waiting"></canvas></div>
+            </div>
+            <div class="chart-box">
+              <h3>TLS Handshaking</h3>
+              <div class="chart-canvas-wrap" style="min-height:200px"><canvas id="chart-http-tls"></canvas></div>
+            </div>
+          </div>
+          <div class="split">
+            <div class="chart-box">
+              <h3>Request Sending</h3>
+              <div class="chart-canvas-wrap" style="min-height:200px"><canvas id="chart-http-sending"></canvas></div>
+            </div>
+            <div class="chart-box">
+              <h3>Request Connecting</h3>
+              <div class="chart-canvas-wrap" style="min-height:200px"><canvas id="chart-http-connecting"></canvas></div>
+            </div>
+          </div>
+          <div class="split">
+            <div class="chart-box">
+              <h3>Request Receiving</h3>
+              <div class="chart-canvas-wrap" style="min-height:200px"><canvas id="chart-http-receiving"></canvas></div>
+            </div>
+            <div class="chart-box">
+              <h3>Request Blocked</h3>
+              <div class="chart-canvas-wrap" style="min-height:200px"><canvas id="chart-http-blocked"></canvas></div>
+            </div>
+          </div>
+          <div class="chart-box">
+            <h3>Per-Transaction Response Time
+              <span style="font-weight:400;font-size:12px;color:#66717d">— pick a metric below; lines are per-transaction</span>
+            </h3>
+            <div class="toolbar" style="margin:8px 0">
+              <label>Metric</label>
+              <select id="txn-metric">
+                <option value="durationAvg">Average</option>
+                <option value="durationP90">p90</option>
+                <option value="durationP95" selected>p95</option>
+                <option value="durationP99">p99</option>
+                <option value="durationMax">Max</option>
+              </select>
+              <input id="txn-filter" type="search" placeholder="Filter transactions (substring)" />
+            </div>
+            <div class="chart-canvas-wrap" style="min-height:320px"><canvas id="chart-per-txn-duration"></canvas></div>
+          </div>
+          <div class="chart-box">
+            <h3>Per-Transaction Pass Rate</h3>
+            <div class="chart-canvas-wrap" style="min-height:280px"><canvas id="chart-per-txn-pass"></canvas></div>
           </div>
         </div>
       \`;
 
-      const host = document.getElementById('graph-table-host');
-      const select = document.getElementById('txn-view-mode');
-      const filter = document.getElementById('txn-filter');
-      const fromInput = document.getElementById('global-from');
-      const toInput = document.getElementById('global-to');
-      const applyButton = document.getElementById('apply-time-filter');
+      // Time range is now driven by the sticky global toolbar — see
+      // setupGlobalToolbar() + the rangechange listener wired below.
+      const txnMetricSelect = document.getElementById('txn-metric');
+      const txnFilter = document.getElementById('txn-filter');
+      txnMetricSelect.onchange = renderPerTransactionChart;
+      txnFilter.oninput = renderPerTransactionChart;
 
-      hydrateTimeInputs(fromInput, toInput);
+      if (!overviewPoints.length) return;
 
-      let barChartInstance = null;
-      let donutChartInstance = null;
+      // All overview charts share the same X-axis points; passing
+      // \`overviewPoints\` into lineOptions lights up drag-to-zoom on every
+      // chart and makes the resulting selection the global time range.
+      // ── HTTP request rate (req/s) ──────────────────────────────
+      graphChartInstances.push(new Chart(document.getElementById('chart-req-rate'), {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [lineDataset('Requests / sec', '#005f73', overviewPoints, 'requestRate')],
+        },
+        options: lineOptions('req/s', {}, overviewPoints),
+      }));
 
-      function renderAttachedTable() {
-        const source = select.value === 'all' ? transactions : topFive;
-        const filtered = source.filter((row) => row.transaction.toLowerCase().includes(filter.value.toLowerCase()));
-        const columns = ['transaction', ...stats];
-        host.innerHTML = filtered.length ? renderTable(filtered, columns) : '<div class="empty">No transactions match the current filter.</div>';
-        renderBarChart(filtered);
-        renderDonutChart(transactions);
-      }
+      // ── HTTP duration percentile series ─────────────────────────
+      graphChartInstances.push(new Chart(document.getElementById('chart-http-duration'), {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            lineDataset('avg', '#0a9396', overviewPoints, 'httpDurationAvg'),
+            lineDataset('p90', '#94a3b8', overviewPoints, 'httpDurationP90'),
+            lineDataset('p95', '#f59e0b', overviewPoints, 'httpDurationP95'),
+            lineDataset('p99', '#b91c1c', overviewPoints, 'httpDurationP99'),
+          ],
+        },
+        options: lineOptions('ms', {}, overviewPoints),
+      }));
 
-      function renderBarChart(rows) {
-        if (barChartInstance) barChartInstance.destroy();
-        const canvas = document.getElementById('txn-bar-chart');
-        if (!canvas || !rows.length) return;
-        const labels = rows.map(r => r.transaction.length > 30 ? r.transaction.slice(0, 27) + '...' : r.transaction);
-        const avgData = rows.map(r => Number(r.avg || 0));
-        const p90Data = rows.map(r => Number(r['p(90)'] || 0));
-        const maxData = rows.map(r => Number(r.max || 0));
-        barChartInstance = new Chart(canvas, {
-          type: 'bar',
+      // ── HTTP failed rate ────────────────────────────────────────
+      graphChartInstances.push(new Chart(document.getElementById('chart-http-failed'), {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [lineDataset('Failed (%)', '#b91c1c', overviewPoints.map((p) => ({ pct: Number(p.httpFailedRate || 0) * 100 })), 'pct')],
+        },
+        options: lineOptions('%', { suggestedMax: 5 }, overviewPoints),
+      }));
+
+      // ── VUs ─────────────────────────────────────────────────────
+      graphChartInstances.push(new Chart(document.getElementById('chart-vus'), {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            lineDataset('VUs (active)', '#005f73', overviewPoints, 'vus'),
+            lineDataset('VUs Max', '#94a3b8', overviewPoints, 'vusMax'),
+          ],
+        },
+        options: lineOptions('VUs', {}, overviewPoints),
+      }));
+
+      // ── Iteration rate (counts only — duration gets its own chart so
+      //   the percentile lines aren't crushed by the count scale).
+      graphChartInstances.push(new Chart(document.getElementById('chart-iter-rate'), {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            lineDataset('iterations / bucket', '#0a9396', overviewPoints, 'iterations'),
+          ],
+        },
+        options: lineOptions('count', {}, overviewPoints),
+      }));
+
+      // ── Iteration Duration (avg + percentile overlay) ───────────
+      graphChartInstances.push(new Chart(document.getElementById('chart-iter-duration'), {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            lineDataset('avg', '#0a9396', overviewPoints, 'iterationDurationAvg'),
+            lineDataset('p90', '#94a3b8', overviewPoints, 'iterationDurationP90'),
+            lineDataset('p95', '#f59e0b', overviewPoints, 'iterationDurationP95'),
+            lineDataset('p99', '#b91c1c', overviewPoints, 'iterationDurationP99'),
+          ],
+        },
+        options: lineOptions('ms', {}, overviewPoints),
+      }));
+
+      // ── Data received / sent ────────────────────────────────────
+      graphChartInstances.push(new Chart(document.getElementById('chart-data'), {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            lineDataset('data_received (B/s)', '#005f73', overviewPoints, 'dataReceived'),
+            lineDataset('data_sent (B/s)', '#0a9396', overviewPoints, 'dataSent'),
+          ],
+        },
+        options: lineOptions('bytes/sec', {}, overviewPoints),
+      }));
+
+      // ── HTTP timing breakdown (six phases × four percentiles each) ──
+      // One helper since all six charts share the same dataset shape.
+      // Hovering tooltips show all four lines stacked for a given bucket.
+      //
+      // Special case: TLS handshake, TCP connect, and connection-pool block
+      // only fire on NEW connection establishment. Once HTTP/2 + connection
+      // reuse kicks in, every subsequent request skips these phases and the
+      // metric is 0 for nearly every bucket. Rather than draw a flat line
+      // along the X axis (which reads as "broken chart"), we detect the all-
+      // zero case and swap in a friendly placeholder explaining why.
+      function phaseChart(canvasId, fieldBase) {
+        const el = document.getElementById(canvasId);
+        if (!el) return;
+        // Walk overviewPoints once to test whether the bucket window has any
+        // non-zero sample across any of the four percentile keys. Cheaper
+        // than instantiating Chart.js and finding an empty canvas after.
+        const keys = [fieldBase + 'Avg', fieldBase + 'P90', fieldBase + 'P95', fieldBase + 'P99'];
+        let hasData = false;
+        for (const p of overviewPoints) {
+          for (const k of keys) { if (Number(p[k]) > 0) { hasData = true; break; } }
+          if (hasData) break;
+        }
+        if (!hasData) {
+          // Replace the canvas with an inline notice. We rebuild the parent's
+          // innerHTML so future re-renders (on rangechange) get a fresh canvas
+          // to draw into when data DOES exist in the new window.
+          const parent = el.parentElement;
+          if (parent) {
+            parent.innerHTML = '<div class="empty" style="padding:24px;text-align:center;font-size:13px;line-height:1.6">'
+              + 'No samples in this window. <span class="subtle">This phase typically only fires on new connection establishment; persistent / HTTP/2 connections skip it.</span>'
+              + '</div>';
+          }
+          return;
+        }
+        graphChartInstances.push(new Chart(el, {
+          type: 'line',
           data: {
             labels,
             datasets: [
-              { label: 'Avg', data: avgData, backgroundColor: 'rgba(0,95,115,0.85)', borderRadius: 4, barPercentage: 0.7, categoryPercentage: 0.8 },
-              { label: 'p90', data: p90Data, backgroundColor: 'rgba(10,147,150,0.7)', borderRadius: 4, barPercentage: 0.7, categoryPercentage: 0.8 },
-              { label: 'Max', data: maxData, backgroundColor: 'rgba(194,65,12,0.5)', borderRadius: 4, barPercentage: 0.7, categoryPercentage: 0.8 }
-            ]
+              lineDataset('avg', '#0a9396', overviewPoints, fieldBase + 'Avg'),
+              lineDataset('p90', '#94a3b8', overviewPoints, fieldBase + 'P90'),
+              lineDataset('p95', '#f59e0b', overviewPoints, fieldBase + 'P95'),
+              lineDataset('p99', '#b91c1c', overviewPoints, fieldBase + 'P99'),
+            ],
           },
-          options: {
-            indexAxis: 'y',
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-              legend: { position: 'top', labels: { usePointStyle: true, padding: 16 } },
-              tooltip: {
-                backgroundColor: 'rgba(29,39,49,0.92)',
-                titleFont: { size: 13 },
-                bodyFont: { size: 12 },
-                padding: 12,
-                cornerRadius: 8,
-                callbacks: {
-                  afterBody: function(items) {
-                    const idx = items[0].dataIndex;
-                    const row = rows[idx];
-                    return 'Count: ' + (row.count || 0) + '  |  Fail: ' + (row.fail || 0) + '  |  Err%: ' + (row.errorPct || 0) + '%';
-                  }
-                }
-              }
-            },
-            scales: {
-              x: { title: { display: true, text: 'Duration (ms)', color: '#66717d' }, grid: { color: 'rgba(0,0,0,0.04)' } },
-              y: { grid: { display: false }, ticks: { font: { size: 11 } } }
-            }
-          }
-        });
-        canvas.parentElement.style.minHeight = Math.max(280, rows.length * 50) + 'px';
+          options: lineOptions('ms', {}, overviewPoints),
+        }));
       }
+      phaseChart('chart-http-waiting',    'httpReqWaiting');
+      phaseChart('chart-http-tls',        'httpReqTlsHandshaking');
+      phaseChart('chart-http-sending',    'httpReqSending');
+      phaseChart('chart-http-connecting', 'httpReqConnecting');
+      phaseChart('chart-http-receiving',  'httpReqReceiving');
+      phaseChart('chart-http-blocked',    'httpReqBlocked');
 
-      function renderDonutChart(rows) {
-        if (donutChartInstance) donutChartInstance.destroy();
-        const canvas = document.getElementById('txn-donut-chart');
-        if (!canvas || !rows.length) return;
-        const totalPass = rows.reduce((s, r) => s + (r.pass || 0), 0);
-        const totalFail = rows.reduce((s, r) => s + (r.fail || 0), 0);
-        donutChartInstance = new Chart(canvas, {
-          type: 'doughnut',
-          data: {
-            labels: ['Pass', 'Fail'],
-            datasets: [{
-              data: [totalPass, totalFail],
-              backgroundColor: ['#15803d', '#b91c1c'],
-              hoverBackgroundColor: ['#16a34a', '#dc2626'],
-              borderWidth: 2,
-              borderColor: '#fffdf8'
-            }]
-          },
-          options: {
-            responsive: true,
-            cutout: '60%',
-            plugins: {
-              legend: { position: 'bottom', labels: { padding: 16, usePointStyle: true } },
-              tooltip: {
-                backgroundColor: 'rgba(29,39,49,0.92)',
-                padding: 12,
-                cornerRadius: 8,
-                callbacks: {
-                  label: function(ctx) {
-                    const total = totalPass + totalFail;
-                    const pct = total > 0 ? ((ctx.parsed / total) * 100).toFixed(1) : '0';
-                    return ctx.label + ': ' + ctx.parsed.toLocaleString() + ' (' + pct + '%)';
-                  }
-                }
-              }
-            }
-          }
-        });
+      function renderPerTransactionChart() {
+        // Drop any prior chart instances for the two per-txn canvases —
+        // their indices in graphChartInstances are 6+ (after the six
+        // overview charts). Cleanest is to slice them off and re-create.
+        for (let i = graphChartInstances.length - 1; i >= 6; i--) {
+          try { graphChartInstances[i].destroy(); } catch {}
+          graphChartInstances.splice(i, 1);
+        }
+
+        const metric = txnMetricSelect.value;
+        const filterText = txnFilter.value.toLowerCase();
+        const visibleNames = txnNames.filter((n) => !filterText || n.toLowerCase().includes(filterText));
+        // Stable color palette per transaction — modulo a 10-color cycle.
+        const palette = ['#005f73','#0a9396','#f59e0b','#b91c1c','#7c3aed','#15803d','#c2410c','#0369a1','#a16207','#6b21a8'];
+        // We use the FIRST txn series for labels; assumes all series share
+        // the same bucket grid (true by construction in the parser).
+        const baseLabels = visibleNames.length > 0
+          ? filteredTxnSeries[visibleNames[0]].map((p) => fmtBucketTs(p.ts))
+          : labels;
+        const durationDatasets = visibleNames.map((name, idx) => lineDataset(name, palette[idx % palette.length], filteredTxnSeries[name], metric));
+        // Per-txn charts use the first-txn's bucket array for zoom mapping.
+        // All transactions share the same bucket grid by construction, so
+        // any of their series works as the index→ts mapping for zoom.
+        const zoomPoints = visibleNames.length > 0 ? filteredTxnSeries[visibleNames[0]] : null;
+        graphChartInstances.push(new Chart(document.getElementById('chart-per-txn-duration'), {
+          type: 'line',
+          data: { labels: baseLabels, datasets: durationDatasets },
+          options: lineOptions('ms', {}, zoomPoints),
+        }));
+
+        // Pass rate per transaction over time: pass / (pass+fail) per bucket
+        const passDatasets = visibleNames.map((name, idx) => ({
+          label: name,
+          data: filteredTxnSeries[name].map((p) => {
+            const pass = Number(p.pass || 0), fail = Number(p.fail || 0);
+            return pass + fail > 0 ? (pass / (pass + fail)) * 100 : null;
+          }),
+          borderColor: palette[idx % palette.length],
+          backgroundColor: palette[idx % palette.length] + '22',
+          borderWidth: 2,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+          tension: 0.2,
+          spanGaps: true,
+        }));
+        graphChartInstances.push(new Chart(document.getElementById('chart-per-txn-pass'), {
+          type: 'line',
+          data: { labels: baseLabels, datasets: passDatasets },
+          options: lineOptions('% pass', { suggestedMax: 100 }, zoomPoints),
+        }));
       }
-
-      select.onchange = renderAttachedTable;
-      filter.oninput = renderAttachedTable;
-      applyButton.onclick = () => {
-        updateGlobalTimeRange(fromInput.value, toInput.value);
-        renderGraphs();
-      };
-      renderAttachedTable();
+      renderPerTransactionChart();
     }
+
+    // Wave 2: Transactions tab gains search + sortable columns + CSV export.
+    // Sort state lives in module scope so re-renders (e.g. after the global
+    // range changes or new sort is applied) preserve the user's last choice.
+    const _txnSortState = { column: 'count', direction: 'desc' };
+    let _txnFilterText = '';
 
     function renderTransactions() {
       const rows = reportData.transactions.transactions;
@@ -392,9 +841,6 @@ export class RunReportGenerator {
         host.innerHTML = '<div class="empty">No transaction metrics were captured for this run.</div>';
         return;
       }
-      // Mark estimated rows visibly: append a "≈" suffix to the transaction
-      // name so the column shows e.g. "checkout ≈". The full row object stays
-      // untouched in reportData; we only mutate a presentation copy.
       const presentationRows = rows.map(function(row) {
         if (row.estimated === true) {
           return Object.assign({}, row, { transaction: String(row.transaction || '') + ' ≈' });
@@ -402,11 +848,8 @@ export class RunReportGenerator {
         return row;
       });
       const columns = ['transaction', 'count', 'pass', 'fail', 'errorPct', ...reportData.config.transactionStats.filter((stat) => !['count', 'pass', 'fail'].includes(stat))];
-      const tableHtml = renderTable(presentationRows, columns);
-      // Banner: surfaces the pass/fail provenance issue at the top of the
-      // panel. Fires when ANY row used the native-check fallback (no
-      // <name>_checkrate Rate metric). Estimate semantics described inline so
-      // users don't have to dig for the design doc.
+
+      // Banner for estimated rows (Proposal 3 fallback).
       const estimated = rows.filter(function(r) { return r.estimated === true; });
       const banner = estimated.length > 0
         ? '<div class="notice notice-warn" style="margin-bottom:12px;padding:10px 14px;border-left:4px solid #f59e0b;background:#fef3c7;color:#78350f;border-radius:4px;font-size:13px;line-height:1.5">'
@@ -416,7 +859,115 @@ export class RunReportGenerator {
             + 'For exact per-iteration counts, run scripts that go through the framework <code>transaction()</code> + <code>k6Check()</code> wrappers.'
           + '</div>'
         : '';
-      host.innerHTML = banner + tableHtml;
+
+      // Filter toolbar: free-text substring match on the transaction name +
+      // CSV export of the currently-visible rows (post-filter, post-sort).
+      const toolbar =
+        '<div class="txn-toolbar">'
+          + '<input id="txn-search" type="search" placeholder="Filter transactions…" value="' + escapeHtml(_txnFilterText) + '" />'
+          + '<span class="subtle" id="txn-count-label"></span>'
+          + '<span style="flex:1"></span>'
+          + '<button class="csv-btn" id="txn-csv">Export CSV</button>'
+        + '</div>';
+
+      host.innerHTML = banner + toolbar + '<div id="txn-table-host"></div>';
+
+      const searchInput = document.getElementById('txn-search');
+      const tableHost = document.getElementById('txn-table-host');
+      const countLabel = document.getElementById('txn-count-label');
+      const csvBtn = document.getElementById('txn-csv');
+
+      function renderInner() {
+        // Filter → sort → render. Done from \`presentationRows\` so the ≈
+        // marker on estimated rows participates in the search.
+        const filtered = presentationRows.filter((r) =>
+          !_txnFilterText || String(r.transaction || '').toLowerCase().includes(_txnFilterText.toLowerCase()),
+        );
+        const sortKey = _txnSortState.column;
+        const dir = _txnSortState.direction === 'asc' ? 1 : -1;
+        const sorted = [...filtered].sort((a, b) => {
+          const va = a[sortKey], vb = b[sortKey];
+          if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * dir;
+          return String(va == null ? '' : va).localeCompare(String(vb == null ? '' : vb)) * dir;
+        });
+        tableHost.innerHTML = renderSortableTable(sorted, columns, _txnSortState);
+        countLabel.textContent = sorted.length + ' of ' + presentationRows.length + ' transactions';
+        // Wire header clicks for sort toggling. Re-run after every render
+        // because innerHTML wipes the prior listeners.
+        tableHost.querySelectorAll('th.sortable').forEach((th) => {
+          th.addEventListener('click', () => {
+            const col = th.dataset.col;
+            if (_txnSortState.column === col) {
+              _txnSortState.direction = _txnSortState.direction === 'asc' ? 'desc' : 'asc';
+            } else {
+              _txnSortState.column = col;
+              // Numeric defaults are most useful in descending order
+              // (largest count/fail/avg first); strings ascending.
+              const sampleVal = sorted[0] ? sorted[0][col] : null;
+              _txnSortState.direction = typeof sampleVal === 'number' ? 'desc' : 'asc';
+            }
+            renderInner();
+          });
+        });
+      }
+
+      searchInput.addEventListener('input', () => {
+        _txnFilterText = searchInput.value;
+        renderInner();
+      });
+
+      csvBtn.onclick = () => {
+        // Export the currently-visible rows (after filter + sort). Includes
+        // a leading column header row. Each cell is quoted if it contains
+        // a comma, double-quote, or newline; embedded quotes are doubled.
+        const csvEscape = (v) => {
+          const s = v == null ? '' : String(v);
+          // Note the regex source is double-escaped because this entire
+          // script lives inside a TS template literal. A bare backslash-n
+          // there would emit an actual newline into the regex literal in
+          // the rendered JS, breaking the report.
+          return /[",\\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+        };
+        const visible = presentationRows
+          .filter((r) => !_txnFilterText || String(r.transaction || '').toLowerCase().includes(_txnFilterText.toLowerCase()));
+        const sortKey = _txnSortState.column;
+        const dir = _txnSortState.direction === 'asc' ? 1 : -1;
+        visible.sort((a, b) => {
+          const va = a[sortKey], vb = b[sortKey];
+          if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * dir;
+          return String(va == null ? '' : va).localeCompare(String(vb == null ? '' : vb)) * dir;
+        });
+        const lines = [columns.map(csvEscape).join(',')];
+        for (const row of visible) {
+          lines.push(columns.map((c) => csvEscape(formatCellValue(row[c]))).join(','));
+        }
+        const blob = new Blob([lines.join('\\n')], { type: 'text/csv;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'transactions-' + (reportData.meta.runId || 'export') + '.csv';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      };
+
+      renderInner();
+    }
+
+    // Sortable variant of renderTable — adds clickable header attributes
+    // (\`th.sortable[data-col]\`) and an arrow indicator on the active column.
+    function renderSortableTable(rows, columns, sortState) {
+      const header = columns.map((c) => {
+        const isSorted = c === sortState.column;
+        const arrow = isSorted ? (sortState.direction === 'asc' ? '▲' : '▼') : '⇅';
+        return '<th class="sortable' + (isSorted ? ' sorted' : '') + '" data-col="' + escapeHtml(c) + '">'
+          + escapeHtml(c) + '<span class="sort-arrow">' + arrow + '</span></th>';
+      }).join('');
+      const body = rows.map((row) =>
+        '<tr>' + columns.map((c) => '<td>' + escapeHtml(formatCellValue(row[c])) + '</td>').join('') + '</tr>'
+      ).join('');
+      return '<table><thead><tr>' + header + '</tr></thead><tbody>' + body + '</tbody></table>';
     }
 
     function renderErrors() {
@@ -494,23 +1045,82 @@ export class RunReportGenerator {
       }
     }
 
+    // System tab chart instances kept module-scoped so re-renders clean up.
+    let systemChartInstances = [];
+    function destroySystemCharts() {
+      for (const c of systemChartInstances) { try { c.destroy(); } catch {} }
+      systemChartInstances = [];
+    }
+
     function renderSystem() {
+      destroySystemCharts();
       const agents = reportData.system?.agents || [];
       const snapshots = reportData.system?.snapshots || [];
       const agentsTable = agents.length ? renderTable(agents, ['host', 'pid', 'jobId', 'containerId']) : '<div class="empty">No agent identity metadata recorded.</div>';
-      const snapshotsTable = snapshots.length ? renderTable(snapshots, ['ts', 'cpuPercent', 'memoryPercent']) : '<div class="empty">No host monitoring snapshots captured for this run.</div>';
+      // Per-agent system series come from the timeseries artifact; the older
+      // snapshots array stays as a table fallback (and for backwards-compat
+      // with reports generated before the line chart shipped).
+      const systemSeries = reportData.timeseries?.series?.system || {};
+      const agentNames = Object.keys(systemSeries);
+      const hasSeries = agentNames.some((name) => (systemSeries[name] || []).length > 1);
+
       document.getElementById('panel-system').innerHTML = \`
+        <div class="chart-box" style="margin-bottom:18px">
+          <h3>Host Resource Usage Over Time</h3>
+          \${hasSeries
+            ? '<div class="chart-canvas-wrap" style="min-height:260px"><canvas id="chart-system-cpu-mem"></canvas></div>'
+            : '<div class="empty">No host monitoring data captured. Enable <code>runtime.monitoring.enabled</code> in your runtime settings to record per-bucket CPU/memory percent.</div>'
+          }
+        </div>
         <div class="split">
           <div class="card">
             <h3>Agents</h3>
             \${agentsTable}
           </div>
           <div class="card">
-            <h3>Host Snapshots</h3>
-            \${snapshotsTable}
+            <h3>Raw Host Snapshots</h3>
+            \${snapshots.length ? renderTable(snapshots, ['ts', 'cpuPercent', 'memoryPercent']) : '<div class="empty">No raw host snapshots recorded.</div>'}
           </div>
         </div>
       \`;
+
+      if (!hasSeries) return;
+
+      // Build a unified per-bucket label set across agents. In practice all
+      // agents share the same bucket grid (set by TimeseriesArtifactBuilder)
+      // so the first agent's labels are authoritative.
+      const firstName = agentNames.find((n) => (systemSeries[n] || []).length > 1) || agentNames[0];
+      const points = systemSeries[firstName] || [];
+      const range = getSelectedRange();
+      const filtered = filterSeriesByRange(points, range);
+      const labels = filtered.map((p) => fmtBucketTs(p.ts));
+
+      const datasets = [];
+      const palette = ['#005f73','#b91c1c','#0a9396','#f59e0b','#7c3aed','#15803d'];
+      agentNames.forEach((name, idx) => {
+        const pts = filterSeriesByRange(systemSeries[name] || [], range);
+        datasets.push({
+          label: name + ' — CPU %',
+          data: pts.map((p) => Number(p.cpuPercent || 0)),
+          borderColor: palette[(idx * 2) % palette.length],
+          backgroundColor: palette[(idx * 2) % palette.length] + '22',
+          borderWidth: 2, pointRadius: 0, pointHoverRadius: 4, tension: 0.2, spanGaps: true,
+        });
+        datasets.push({
+          label: name + ' — Memory %',
+          data: pts.map((p) => Number(p.memoryPercent || 0)),
+          borderColor: palette[(idx * 2 + 1) % palette.length],
+          backgroundColor: palette[(idx * 2 + 1) % palette.length] + '22',
+          borderWidth: 2, pointRadius: 0, pointHoverRadius: 4, tension: 0.2,
+          borderDash: [4, 4], spanGaps: true,
+        });
+      });
+
+      systemChartInstances.push(new Chart(document.getElementById('chart-system-cpu-mem'), {
+        type: 'line',
+        data: { labels, datasets },
+        options: lineOptions('%', { suggestedMax: 100 }, filtered),
+      }));
     }
 
     function renderMiniTable(rows, columns) {
@@ -545,21 +1155,125 @@ export class RunReportGenerator {
 
     // renderTransactionBars removed — replaced by Chart.js renderBarChart()
 
+    // ── Wave 2: global range as a broadcasted singleton ────────────
+    // Every range-aware tab listens on \`document\` for \`rangechange\` and
+    // re-renders its visible content. Pages that don't care (Warnings,
+    // raw event tables) just ignore the event. Initial state is the full
+    // run window; null means "reset to full run".
     function getSelectedRange() {
-      return window.__k6PerfRange || { from: reportData.meta.startTime, to: reportData.meta.endTime };
+      if (window.__k6PerfRange) return window.__k6PerfRange;
+      // Prefer the actual series bounds over meta.startTime/endTime.
+      // Meta times come from k6StartTime/k6EndTime at runtime; if they
+      // ever fall outside the parsed bucket window, filtering by them
+      // would silently drop every bucket and produce empty charts.
+      const ov = (reportData.timeseries && reportData.timeseries.series && reportData.timeseries.series.overview) || [];
+      if (ov.length > 0) return { from: ov[0].ts, to: ov[ov.length - 1].ts };
+      return { from: reportData.meta.startTime, to: reportData.meta.endTime };
     }
 
     function updateGlobalTimeRange(from, to) {
-      window.__k6PerfRange = {
-        from: from ? new Date(from).toISOString() : reportData.meta.startTime,
-        to: to ? new Date(to).toISOString() : reportData.meta.endTime
-      };
+      if (!from && !to) {
+        window.__k6PerfRange = null;
+      } else {
+        window.__k6PerfRange = {
+          from: from ? new Date(from).toISOString() : reportData.meta.startTime,
+          to: to ? new Date(to).toISOString() : reportData.meta.endTime
+        };
+      }
+      document.dispatchEvent(new CustomEvent('rangechange', { detail: getSelectedRange() }));
     }
 
     function hydrateTimeInputs(fromInput, toInput) {
       const range = getSelectedRange();
       fromInput.value = toLocalInputValue(range.from);
       toInput.value = toLocalInputValue(range.to);
+    }
+
+    // ── Wave 2: saved intervals (localStorage, runId-keyed) ─────────
+    // Allows users to bookmark time windows ("steady-state", "ramp-up",
+    // "spike at minute 12") inside the report itself. Persists across
+    // reloads, scoped per run so different runs' intervals don't mix.
+    const SAVED_INTERVALS_KEY = 'k6perf-intervals-' + reportData.meta.runId;
+
+    function loadSavedIntervals() {
+      try {
+        const raw = localStorage.getItem(SAVED_INTERVALS_KEY);
+        return raw ? JSON.parse(raw) : [];
+      } catch { return []; }
+    }
+
+    function persistSavedIntervals(list) {
+      try { localStorage.setItem(SAVED_INTERVALS_KEY, JSON.stringify(list)); } catch {}
+    }
+
+    function saveCurrentInterval(name) {
+      const list = loadSavedIntervals();
+      const r = getSelectedRange();
+      // Replace existing entry with the same name (idempotent re-save).
+      const without = list.filter((x) => x.name !== name);
+      without.push({ name, from: r.from, to: r.to });
+      persistSavedIntervals(without);
+      renderSavedIntervals();
+    }
+
+    function deleteSavedInterval(name) {
+      persistSavedIntervals(loadSavedIntervals().filter((x) => x.name !== name));
+      renderSavedIntervals();
+    }
+
+    function applySavedInterval(name) {
+      const found = loadSavedIntervals().find((x) => x.name === name);
+      if (!found) return;
+      updateGlobalTimeRange(found.from, found.to);
+      const fromInput = document.getElementById('gtb-from');
+      const toInput = document.getElementById('gtb-to');
+      fromInput.value = toLocalInputValue(found.from);
+      toInput.value = toLocalInputValue(found.to);
+    }
+
+    function renderSavedIntervals() {
+      const host = document.getElementById('gtb-saved-list');
+      const list = loadSavedIntervals();
+      if (list.length === 0) {
+        host.innerHTML = '<span class="subtle" style="font-size:12px">No saved intervals — name one and click Save.</span>';
+        return;
+      }
+      host.innerHTML = list.map((iv) =>
+        '<span class="saved-chip" title="' + escapeHtml(iv.from + ' → ' + iv.to) + '">' +
+          '<span data-action="apply" data-name="' + escapeHtml(iv.name) + '">' + escapeHtml(iv.name) + '</span>' +
+          '<button class="x" data-action="delete" data-name="' + escapeHtml(iv.name) + '" title="Delete">×</button>' +
+        '</span>'
+      ).join('');
+      // Event delegation — apply/delete dispatched from a single listener.
+      host.onclick = (e) => {
+        const t = e.target;
+        if (!t || !t.dataset) return;
+        const name = t.dataset.name || (t.parentElement && t.parentElement.dataset.name);
+        if (!name) return;
+        if (t.dataset.action === 'delete') deleteSavedInterval(name);
+        else if (t.dataset.action === 'apply' || t.classList.contains('saved-chip')) applySavedInterval(name);
+      };
+    }
+
+    function setupGlobalToolbar() {
+      const fromInput = document.getElementById('gtb-from');
+      const toInput = document.getElementById('gtb-to');
+      const nameInput = document.getElementById('gtb-name');
+      hydrateTimeInputs(fromInput, toInput);
+      document.getElementById('gtb-apply').onclick = () => {
+        updateGlobalTimeRange(fromInput.value, toInput.value);
+      };
+      document.getElementById('gtb-reset').onclick = () => {
+        updateGlobalTimeRange(null, null);
+        hydrateTimeInputs(fromInput, toInput);
+      };
+      document.getElementById('gtb-save').onclick = () => {
+        const name = nameInput.value.trim();
+        if (!name) return;
+        saveCurrentInterval(name);
+        nameInput.value = '';
+      };
+      renderSavedIntervals();
     }
 
     function toLocalInputValue(ts) {
@@ -582,6 +1296,7 @@ export class RunReportGenerator {
     }
 
     buildTabs();
+    setupGlobalToolbar();
     renderSummary();
     renderGraphs();
     renderTransactions();
@@ -589,6 +1304,21 @@ export class RunReportGenerator {
     renderWarnings();
     renderSnapshots();
     renderSystem();
+
+    // ── Wave 2: rangechange broadcast ─────────────────────────────
+    // Re-render every range-aware tab when the user applies a new
+    // window. Cheap because each render fully replaces its panel's
+    // innerHTML — we don't try to incrementally update. Tabs that
+    // ignore the range (Warnings, raw snapshot table) re-render
+    // identically.
+    document.addEventListener('rangechange', () => {
+      renderSummary();
+      renderGraphs();
+      renderTransactions();
+      renderErrors();
+      renderSnapshots();
+      renderSystem();
+    });
   </script>
 </body>
 </html>`;

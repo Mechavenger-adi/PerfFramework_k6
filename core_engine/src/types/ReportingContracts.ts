@@ -62,6 +62,29 @@ export interface CiSummary {
   };
 }
 
+/**
+ * A single time-series bucket point. Fields beyond `ts` are open-ended on
+ * purpose: the same shape is used for overview, per-transaction, and per-
+ * agent series, and the field set has expanded over time (Proposal 5 adds
+ * per-second `httpDurationP95`, `requestRate`, `httpFailedRate`, etc.; older
+ * runs may only carry the legacy `avg` / `p95` / `errorRate` keys). Renderers
+ * should treat any field as optional and fall back gracefully.
+ *
+ * Overview point keys (Wave 1):
+ *   requests, requestRate, httpDurationAvg, httpDurationP90, httpDurationP95,
+ *   httpDurationP99, httpDurationMin, httpDurationMax,
+ *   httpFailedCount, httpFailedRate, vus, vusMax, iterations,
+ *   iterationDurationAvg, iterationDurationP95, dataReceived, dataSent
+ *   (plus legacy: errorRate, avgDuration, p95Duration)
+ *
+ * Per-transaction point keys:
+ *   count, durationAvg, durationP90, durationP95, durationP99,
+ *   durationMin, durationMax, pass, fail
+ *   (plus legacy: avg, min, max, p90, p95, p99)
+ *
+ * Per-agent system point keys:
+ *   cpuPercent, memoryPercent, activeAgents
+ */
 export interface TimeSeriesPoint {
   ts: string;
   [key: string]: string | number | undefined;
@@ -71,6 +94,18 @@ export interface TimeSeriesFile {
   bucketSizeSeconds: number;
   startTime: string;
   endTime: string;
+  /**
+   * Run-wide totals derived from the streaming JSON output. Present when
+   * the parser found a usable `metrics-stream.json` (Proposal 5, Wave 1);
+   * absent on legacy runs that only have summary aggregates.
+   */
+  totals?: {
+    requests: number;
+    iterations: number;
+    httpFailures: number;
+    dataReceived: number;
+    dataSent: number;
+  };
   series: {
     overview: TimeSeriesPoint[];
     transactions: Record<string, TimeSeriesPoint[]>;
