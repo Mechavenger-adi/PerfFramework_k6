@@ -77,116 +77,6 @@ function getPhaseMetadata() {
         mode: 'unsupported',
     });
 }
-// ------------------------------------------------------------------
-// Instantaneous VU Target Interpolation
-// ------------------------------------------------------------------
-// Computes the exact target VU count RIGHT NOW by linearly interpolating
-// across all stages. Also tracks whether the current stage is ramping
-// DOWN (decreasing) so we only trigger endPhase during ramp-down, never
-// during ramp-up where a VU's ID might temporarily exceed the target.
-//
-// Uses Math.floor() instead of Math.ceil() because k6 starts removing
-// excess VUs as soon as the integer target drops. With ceil, our check
-// lags behind k6's removal by up to 1.5s — enough for k6 to kill VUs
-// before they get a chance to run endPhase.
-// ------------------------------------------------------------------
-/**
- * Compute the instantaneous target VU count and whether we're in a
- * decreasing stage.
- */
-function getInstantaneousState(phases) {
-    const elapsedMs = Date.now() - execution_1.default.scenario.startTime;
-    let previousVUs = Number(phases.startVUs || 0);
-    let previousEndMs = 0;
-    const timeline = phases.timeline;
-    const lastStageIdx = timeline.length - 1;
-    for (let i = 0; i < timeline.length; i += 1) {
-        const stage = timeline[i];
-        const stageEndMs = Number(stage.endMs || 0);
-        const stageVUs = Number(stage.vus || 0);
-        if (elapsedMs <= stageEndMs) {
-            // We are inside this stage — interpolate
-            const stageDuration = stageEndMs - previousEndMs;
-            const isDecreasing = stageVUs < previousVUs;
-            const isFinalRampDown = i === lastStageIdx && isDecreasing;
-            if (stageDuration <= 0) {
-                return { target: stageVUs, isDecreasing, isFinalRampDown };
-            }
-            const progress = (elapsedMs - previousEndMs) / stageDuration;
-            const target = previousVUs + progress * (stageVUs - previousVUs);
-            return { target, isDecreasing, isFinalRampDown };
-        }
-        previousVUs = stageVUs;
-        previousEndMs = stageEndMs;
-    }
-    // Past all stages — scenario ending
-    return { target: previousVUs, isDecreasing: true, isFinalRampDown: true };
-}
-/**
- * Determine whether this VU should transition to endPhase.
- *
- * Returns { beforeAction, afterAction } where:
- *   beforeAction: true → skip action, run endPhase immediately
- *   afterAction:  true → after current action completes, run endPhase
- *
- * Key design choices:
- *   - Uses Math.floor(target) so the check fires as soon as k6 starts
- *     removing VUs, not 1.5s later (which Math.ceil would cause).
- *   - Only fires during DECREASING stages to prevent false triggers
- *     during ramp-up when a new VU's ID momentarily exceeds the target.
- *   - k6 removes highest-numbered VUs first, so vuId > floor(target)
- *     correctly identifies which VUs should run endPhase.
- */
-function getEndSignal(phases) {
-    // --- Per-VU Iterations ---
-    if (phases.mode === 'per-vu-iterations') {
-        const totalIterations = Math.max(Number(phases.totalIterations || 1), 1);
-        const completedIterations = execution_1.default.vu.iterationInScenario;
-        const willCompleteAfterThisAction = completedIterations >= totalIterations - 1;
-        return { beforeAction: false, afterAction: willCompleteAfterThisAction };
-    }
-    // --- Shared Iterations ---
-    if (phases.mode === 'shared-iterations') {
-        const totalIterations = Math.max(Number(phases.totalIterations || 1), 1);
-        const vus = Math.max(Number(phases.vus || 1), 1);
-        const iterationsAssignedToThisVu = Math.max(Math.ceil((totalIterations - (execution_1.default.vu.idInInstance - 1)) / vus), 0);
-        if (iterationsAssignedToThisVu <= 0) {
-            return {
-                beforeAction: execution_1.default.vu.iterationInScenario === 0,
-                afterAction: false,
-            };
-        }
-        const completedIterations = execution_1.default.vu.iterationInScenario;
-        const willCompleteAfterThisAction = completedIterations >= iterationsAssignedToThisVu - 1;
-        return { beforeAction: false, afterAction: willCompleteAfterThisAction };
-    }
-    // --- Ramping VUs (handles load, spike, step, soak, stress, constant-vus) ---
-    if (phases.mode === 'ramping-vus' && Array.isArray(phases.timeline)) {
-        const { target, isDecreasing, isFinalRampDown } = getInstantaneousState(phases);
-        const vuId = execution_1.default.vu.idInInstance;
-        // Only trigger endPhase during DECREASING stages to prevent false triggers
-        // during ramp-up. Additionally, only mark the VU as permanently ended if
-        // this is the FINAL ramp-down — intermediate decreases in step-up or
-        // multi-spike tests must NOT permanently end the VU (it will ramp back up).
-        const shouldRunEndPhase = isDecreasing && vuId > target;
-        const shouldPermanentlyEnd = shouldRunEndPhase && isFinalRampDown;
-        return { beforeAction: shouldPermanentlyEnd, afterAction: shouldPermanentlyEnd };
-    }
-    // --- Arrival-Rate executors (constant-arrival-rate / ramping-arrival-rate) ---
-    // k6 controls the VU pool size for these executors — end detection is purely
-    // time-based.  Once elapsed time reaches the total scenario duration, any VU
-    // that is about to start a new action (beforeAction) or has just finished one
-    // (afterAction) will run endPhase instead.
-    if ((phases.mode === 'constant-arrival-rate' || phases.mode === 'ramping-arrival-rate') &&
-        Array.isArray(phases.timeline) &&
-        phases.timeline.length > 0) {
-        const totalDurationMs = phases.timeline[phases.timeline.length - 1].endMs;
-        const elapsedMs = Date.now() - execution_1.default.scenario.startTime;
-        const isDone = elapsedMs >= totalDurationMs;
-        return { beforeAction: isDone, afterAction: isDone };
-    }
-    return { beforeAction: false, afterAction: false };
-}
 function handlePhaseError(store, error, phaseName, runtime) {
     const behavior = runtime.errorBehavior || 'continue';
     const message = error && typeof error === 'object' && 'message' in error
@@ -231,6 +121,15 @@ function createJourneyLifecycleStore() {
     };
 }
 function thinktime(minOrFixed, max) {
+    // If this VU has entered its end window during the action phase, skip the
+    // sleep — think time is action work, and continuing to sleep here would eat
+    // into the gracefulRampDown budget the VU needs to reach endPhase() before k6
+    // force-kills it. Mirrors the transaction gate (which skips the transactions);
+    // without this, a long final transaction + leftover think times can overrun
+    // grace and drop the logout.
+    if (_currentPhase === 'action' && isEndDueBefore()) {
+        return;
+    }
     const runtime = getRuntimeMetadata();
     const thinkTime = runtime.thinkTime;
     if (thinkTime?.ignoreThinkTime) {
@@ -264,21 +163,15 @@ function thinktime(minOrFixed, max) {
 function getTransactionGate() {
     const runtime = getRuntimeMetadata();
     const onSkip = (name) => {
-        console.log(`[k6-perf][lifecycle] Ending — skipping remaining action transaction '${name}'`);
+        console.log(`[k6-perf][lifecycle] (VU ${execution_1.default.vu.idInInstance}, iter ${execution_1.default.vu.iterationInScenario}) `
+            + `Ending — skipping remaining action transaction '${name}'`);
     };
-    // Per-transaction gating applies ONLY to action-phase transactions, and ONLY
-    // under V2. V1 returns false so transaction() behaves exactly as before when
-    // the flag is off (V1 end-detection still runs at the iteration level inside
-    // runJourneyLifecycle).
-    if (isLifecycleV2Enabled()) {
-        return {
-            shouldSkipBeforeStart: _currentPhase === 'action' && isEndDueBefore(),
-            errorBehavior: runtime.errorBehavior || 'continue',
-            onSkip,
-        };
-    }
+    // Per-transaction gating applies ONLY to action-phase transactions: once this
+    // VU has entered its end window mid-action, skip starting any further action
+    // transactions so it reaches endPhase() promptly. init/end-phase transactions
+    // are never gated (the `_currentPhase === 'action'` guard).
     return {
-        shouldSkipBeforeStart: false,
+        shouldSkipBeforeStart: _currentPhase === 'action' && isEndDueBefore(),
         errorBehavior: runtime.errorBehavior || 'continue',
         onSkip,
     };
@@ -289,14 +182,6 @@ function getTransactionGate() {
 // as request.ts's __k6PerfCaptureSnapshotFromLastRequest snapshot hook.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 globalThis.__k6PerfTxnGate = getTransactionGate;
-// ── Lifecycle V2 (design_proposal.md) ─────────────────────────
-// Proactive, VU-driven end-detection. Gated behind K6_PERF_LIFECYCLE_V2 so the
-// default (V1) path is byte-for-byte unchanged until validated. Enable with the
-// environment variable K6_PERF_LIFECYCLE_V2=true (k6 inherits system env vars).
-function isLifecycleV2Enabled() {
-    const v = __ENV.K6_PERF_LIFECYCLE_V2;
-    return v === 'true' || v === '1';
-}
 // Per-VU plan cache. k6 instantiates the script module fresh per VU, so module
 // scope is per-VU state. isEnding() reads this for long in-action loops.
 let activeEndPlan = null;
@@ -309,23 +194,41 @@ function buildVuCurve(phases) {
     }
     return points;
 }
+/** Linearly interpolate the planned VU count at a given time offset on the curve. */
+function interpolateTarget(curve, offsetMs) {
+    if (offsetMs <= curve[0].tMs)
+        return curve[0].vus;
+    for (let i = 1; i < curve.length; i += 1) {
+        const a = curve[i - 1];
+        const b = curve[i];
+        if (offsetMs <= b.tMs) {
+            const span = b.tMs - a.tMs;
+            if (span <= 0)
+                return b.vus;
+            const p = (offsetMs - a.tMs) / span;
+            return a.vus + p * (b.vus - a.vus);
+        }
+    }
+    return curve[curve.length - 1].vus;
+}
 /**
- * Terminal-crossing deadline for a VU of id `vuId`.
+ * Terminal-crossing deadline for a VU whose handle "rank" is `rank` (its VU-count
+ * level — see computeEndPlan, where rank is derived from the curve value at the
+ * VU's onboarding time, which mirrors k6's handle index).
  *
- * Returns sup{ t : target(t) >= vuId - 0.5 } — the LAST time the curve is at or
- * above the (margin-shifted) threshold. After that instant the curve stays below
- * vuId forever, so the VU is never needed again and should log out. The -0.5
- * half-step makes the VU self-exit just BEFORE k6's integer removal, guaranteeing
- * the VU is still scheduled when endPhase runs.
+ * Returns sup{ t : target(t) >= rank } — the LAST time the curve is at or above
+ * that level. k6 culls the matching handle just after the curve drops below it, so
+ * this is the moment the VU is about to be removed; the lifecycle fires endPhase a
+ * safety margin BEFORE it (LIFECYCLE_END_SAFETY_MS) while the VU is still scheduled.
  *
  * Because we have the whole curve up front, this is correct for every ramping
  * shape: load, soak, stress, step-down, spike, and multi-spike (a VU only ends at
  * the dip after which it is never exceeded again — no premature logout of VUs k6
- * will reuse). Survivors that never cross (curve ends above the VU) get the total
+ * will reuse). Survivors that never cross (curve ends above the rank) get the total
  * duration → they log out at scenario end under gracefulStop.
  */
-function terminalDeadlineMs(curve, vuId) {
-    const threshold = vuId - 0.5;
+function terminalDeadlineMs(curve, rank) {
+    const threshold = rank;
     const totalMs = curve[curve.length - 1].tMs;
     let sup = -1;
     for (let i = 1; i < curve.length; i += 1) {
@@ -343,7 +246,7 @@ function terminalDeadlineMs(curve, vuId) {
         }
     }
     if (sup < 0) {
-        // Curve never reaches this VU's id (phantom/over-provisioned) — be conservative
+        // Curve never reaches this rank (phantom/over-provisioned) — be conservative
         // and never log out early; let scenario end + gracefulStop handle it.
         return totalMs;
     }
@@ -356,7 +259,20 @@ function computeEndPlan(phases) {
     // synthetic ramping-vus timeline) — terminal-crossing deadline.
     if (mode === 'ramping-vus' && Array.isArray(phases.timeline) && phases.timeline.length > 0) {
         const curve = buildVuCurve(phases);
-        const deadlineMs = execution_1.default.scenario.startTime + terminalDeadlineMs(curve, execution_1.default.vu.idInInstance);
+        // RANK BY ONBOARDING TIME, NOT idInInstance. k6 culls VUs by internal handle
+        // index (highest first), and handle index == onboarding order — but k6 does
+        // NOT expose it, and idInInstance is assigned from a shuffled VU pool so it
+        // does not match the cull order. The curve value at THIS VU's onboarding
+        // instant equals its handle index + 1, which we can observe. So we use that
+        // as the rank. (computeEndPlan runs on the VU's first iteration, so
+        // Date.now() here is effectively the onboarding time.)
+        //   - Distinct onboardings (startVUs:0 gradual ramp) → unique ranks → exact.
+        //   - Simultaneous onboardings (startVUs>0 / very steep ramp) → same rank →
+        //     that whole block logs out at its earliest cull (front-loaded), which is
+        //     safe (all log out before any of them is culled), just not gradual.
+        const onboardOffsetMs = Date.now() - execution_1.default.scenario.startTime;
+        const rank = Math.max(1, Math.round(interpolateTarget(curve, onboardOffsetMs)));
+        const deadlineMs = execution_1.default.scenario.startTime + terminalDeadlineMs(curve, rank);
         return { family: 'ramping', deadlineMs };
     }
     // Per-VU iterations — deterministic last-iteration exit.
@@ -426,11 +342,22 @@ function isEnding() {
     // bails out before k6 culls the VU.
     return Date.now() + LIFECYCLE_END_SAFETY_MS >= activeEndPlan.deadlineMs;
 }
-function runJourneyLifecycleV2(store, phaseFns) {
+/**
+ * Per-VU lifecycle shell. Runs initPhase once, then actionPhase per iteration,
+ * and proactively runs endPhase a margin BEFORE k6 culls the VU (deadline ranked
+ * by onboarding time so it matches k6's handle cull order). Covers every
+ * executor family via computeEndPlan: ramping (time deadline), count
+ * (per-vu/shared iterations), arrival (action-only), external (best-effort).
+ */
+function runJourneyLifecycle(store, phaseFns) {
     const runtime = getRuntimeMetadata();
     const phases = getPhaseMetadata();
     const state = store.state;
     if (state.terminated || state.ended || (0, transaction_js_1.isVuTerminated)()) {
+        // Park the VU for the rest of the scenario. Without this sleep, default()
+        // returns instantly and k6 immediately starts another iteration, tight-looping
+        // and inflating the iteration counter. k6 interrupts this sleep cleanly when
+        // the scenario ends.
         (0, k6_1.sleep)(86400);
         return;
     }
@@ -478,56 +405,6 @@ function runJourneyLifecycleV2(store, phaseFns) {
     }
     // (2) Post-action check — catches VUs that crossed their deadline DURING the action.
     if (isEndDueAfter() && phaseFns.endPhase) {
-        runSafely(store, 'end', phaseFns.endPhase, runtime);
-        state.ended = true;
-    }
-}
-function runJourneyLifecycle(store, phaseFns) {
-    if (isLifecycleV2Enabled()) {
-        runJourneyLifecycleV2(store, phaseFns);
-        return;
-    }
-    const runtime = getRuntimeMetadata();
-    const phases = getPhaseMetadata();
-    const state = store.state;
-    if (state.terminated || state.ended || (0, transaction_js_1.isVuTerminated)()) {
-        // Park the VU for the rest of the scenario. Without this sleep, default()
-        // returns instantly and k6 immediately starts another iteration, tight-looping
-        // at ~300+ iter/s and inflating the iteration counter to hundreds of thousands.
-        // k6 interrupts this sleep cleanly when the scenario ends.
-        (0, k6_1.sleep)(86400);
-        return;
-    }
-    if (!state.initialized) {
-        const initBehavior = runSafely(store, 'init', phaseFns.initPhase, runtime);
-        state.initialized = true;
-        if (initBehavior !== 'continue' || state.terminated) {
-            return;
-        }
-    }
-    // Check if this VU should transition to endPhase BEFORE running another
-    // action iteration. For ramping-vus this fires as soon as the interpolated
-    // target VU count drops below this VU's ID (during a decreasing stage).
-    const endSignal = getEndSignal(phases);
-    if (endSignal.beforeAction && phaseFns.endPhase) {
-        runSafely(store, 'end', phaseFns.endPhase, runtime);
-        state.ended = true;
-        return;
-    }
-    frameworkIterations.add(1);
-    const actionBehavior = runSafely(store, 'action', phaseFns.actionPhase, runtime);
-    if (actionBehavior !== 'continue' || state.terminated || (0, transaction_js_1.isVuTerminated)()) {
-        return;
-    }
-    if (runtime.pacingEnabled && Number(runtime.pacingSeconds || 0) > 0) {
-        (0, k6_1.sleep)(Number(runtime.pacingSeconds));
-    }
-    // Re-check end signal after action — the ramp-down may have started
-    // while the action phase was executing. This is critical: k6 will NOT
-    // call runJourneyLifecycle again for this VU if k6 has marked it for
-    // removal. So this is the last chance to run endPhase.
-    const postActionSignal = getEndSignal(phases);
-    if ((endSignal.afterAction || postActionSignal.afterAction) && phaseFns.endPhase) {
         runSafely(store, 'end', phaseFns.endPhase, runtime);
         state.ended = true;
     }

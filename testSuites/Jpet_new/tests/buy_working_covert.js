@@ -194,7 +194,7 @@ export function actionPhase(ctx) {
       regex = new RegExp('href="/products/[^"]+">(.*?)</a></strong>');
       match = (res_1.body || "").match(regex) || [];
       if (match) {
-        correlation_vars["correlation_0"] = trackCorrelation("correlation_0", trackCorrelation("correlation_0", match[1], "body"), "body");
+        correlation_vars["correlation_0"] = trackCorrelation("correlation_0", match[1], "body");
       }
     });
 
@@ -467,7 +467,7 @@ export function actionPhase(ctx) {
       regex = new RegExp("orderId=(.*?)&submitted");
       match = (res_1.headers["Location"] || "").match(regex) || [];
       if (match) {
-        correlation_vars["c_orderid"] = trackCorrelation("c_orderid", trackCorrelation("c_orderid", match[1], "body"), "body");
+        correlation_vars["c_orderid"] = trackCorrelation("c_orderid", match[1], "body");
       }
   
   

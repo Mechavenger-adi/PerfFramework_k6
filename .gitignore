@@ -23,3 +23,6 @@ node_modules/
 .DS_Store
 Thumbs.db
 .vscode/settings.json
+
+# Local reference copy of the k6 source — NOT part of the framework
+k6-master/

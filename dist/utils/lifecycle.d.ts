@@ -36,5 +36,12 @@ export declare function getTransactionGate(): TransactionGate;
  * Only meaningful for the ramping (time-deadline) family; returns false otherwise.
  */
 export declare function isEnding(): boolean;
+/**
+ * Per-VU lifecycle shell. Runs initPhase once, then actionPhase per iteration,
+ * and proactively runs endPhase a margin BEFORE k6 culls the VU (deadline ranked
+ * by onboarding time so it matches k6's handle cull order). Covers every
+ * executor family via computeEndPlan: ramping (time deadline), count
+ * (per-vu/shared iterations), arrival (action-only), external (best-effort).
+ */
 export declare function runJourneyLifecycle(store: JourneyLifecycleStore, phaseFns: PhaseFns): void;
 export {};

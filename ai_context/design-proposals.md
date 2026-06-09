@@ -187,16 +187,19 @@ Default recommendation: reject nested transactions to keep metrics, active-trans
 
 Proposal 1 must preserve or extend lifecycle correctness across all supported k6 executor modes and framework load-test shapes.
 
-#### Executor coverage matrix
+> **IMPLEMENTATION STATUS (2026-06-10): SHIPPED — and it is now the ONLY lifecycle.** The transaction gate (this proposal) is wired, and the lifecycle end-detection was rewritten to be **proactive and onboarding-time-ranked**. The earlier reactive detector and the temporary `K6_PERF_LIFECYCLE_V2` toggle have been **removed**. See the root `design_proposal.md` and `AGENT-CONTEXT.md` → "2026-06-10 — Lifecycle: proactive onboard-ranked endPhase is now the ONLY lifecycle". Key mechanism: a VU's logout deadline is ranked by the ramp-curve value at its **onboarding time** (which mirrors k6's hidden handle cull order, since `idInInstance` does not), and `endPhase` fires a 5s margin before k6 culls the VU. Validated: ramping-vus 6/6, per-vu-iterations 4/4, shared-iterations 4/4, constant-vus 4/4, arrival-rate action-only.
 
-| Executor mode | Lifecycle behavior requirement |
+#### Executor coverage matrix (as implemented)
+
+| Executor mode | Lifecycle behavior |
 |---|---|
-| `ramping-vus` | Use existing interpolated VU-target logic; only final ramp-down permanently ends the VU |
-| `constant-vus` | Convert to a duration-based synthetic final ramp-down buffer so `endPhase()` still runs |
-| `shared-iterations` | Run `endPhase()` after the last iteration assigned to that VU |
-| `per-vu-iterations` | Run `endPhase()` after the VU completes its configured final iteration |
-| `ramping-arrival-rate` | Define a time-window-based lifecycle gate so no new action transaction starts after the executor enters its final shutdown window, while in-flight transactions finish cleanly |
-| `constant-arrival-rate` | Define a duration-based shutdown window equivalent to `constant-vus`, but for arrival-rate scheduling |
+| `ramping-vus` | Per-VU deadline ranked by **onboarding time** (= k6 handle cull order); `endPhase` fires 5s before cull. ✅ |
+| `constant-vus` | Handled via the synthetic ramping envelope; all VUs run `endPhase` (front-loaded near end — §8 of `design_proposal.md` tracks making this fully native). ✅ |
+| `shared-iterations` | `endPhase` after the last iteration assigned to that VU (zero-work VUs end before any action). ✅ |
+| `per-vu-iterations` | `endPhase` after the VU completes its configured final iteration. ✅ |
+| `ramping-arrival-rate` | Open model — `actionPhase` only; `initPhase`/`endPhase` disabled with a one-time runtime notice (per-VU sessions don't map to a pooled-worker model). |
+| `constant-arrival-rate` | Same as ramping-arrival-rate — action-only, init/end disabled + notice. |
+| `externally-controlled` | Best-effort (no precomputable curve); `gracefulStop` is the net. |
 
 #### Load-test shape coverage
 

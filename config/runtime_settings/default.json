@@ -32,7 +32,7 @@
     "overrideExistingResults": false,
     "timeseries": {
       "enabled": true,
-      "bucketSizeSeconds": 10
+      "bucketSizeSeconds": 2
     }
   },
   "errors": {
