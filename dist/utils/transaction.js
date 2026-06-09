@@ -209,6 +209,26 @@ function transaction(name, fn) {
         throw new Error(`[k6-perf] Nested transaction detected: '${name}' called inside '${_activeTransaction}'. ` +
             `Nested transactions are not supported.`);
     }
+    // Lifecycle gate (design_proposal.md / Proposal 1 "Phase Scope Rules"):
+    // before starting an ACTION-phase transaction, ask lifecycle.ts whether this
+    // VU has entered its end window. If so, skip starting it so the VU reaches
+    // endPhase() promptly instead of grinding through the rest of the action.
+    // lifecycle owns the decision (C1); it's published on globalThis to avoid a
+    // module cycle. The gate is phase-scoped + V2-gated, so init/end-phase
+    // transactions and all V1 runs are never affected. No metric is touched
+    // because we return before startTransaction.
+    try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const gate = globalThis.__k6PerfTxnGate?.();
+        if (gate && gate.shouldSkipBeforeStart) {
+            try {
+                gate.onSkip?.(name);
+            }
+            catch { /* logging best-effort */ }
+            return;
+        }
+    }
+    catch { /* gate unavailable → proceed as normal (no skip) */ }
     const errorBehavior = getRuntimeErrorBehavior();
     _activeTransaction = name;
     try {

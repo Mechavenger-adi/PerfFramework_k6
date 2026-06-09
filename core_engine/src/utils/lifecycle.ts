@@ -291,6 +291,12 @@ function handlePhaseError(
   return behavior;
 }
 
+// Which lifecycle phase this VU is currently executing. Read by the
+// transaction gate so only ACTION-phase transactions are skippable when the
+// VU is ending — init/end-phase transactions always run (design_proposal.md
+// "Phase Scope Rules").
+let _currentPhase: 'init' | 'action' | 'end' | 'none' = 'none';
+
 function runSafely(
   store: JourneyLifecycleStore,
   phaseName: string,
@@ -301,11 +307,16 @@ function runSafely(
     return 'continue';
   }
 
+  _currentPhase = (phaseName === 'init' || phaseName === 'action' || phaseName === 'end')
+    ? phaseName
+    : 'none';
   try {
     phaseFn(store.ctx);
     return 'continue';
   } catch (error) {
     return handlePhaseError(store, error, phaseName, runtime);
+  } finally {
+    _currentPhase = 'none';
   }
 }
 
@@ -365,25 +376,34 @@ export interface TransactionGate {
 export function getTransactionGate(): TransactionGate {
   const runtime = getRuntimeMetadata();
   const onSkip = (name: string) => {
-    console.log(`[k6-perf][lifecycle] Skipping action transaction '${name}' — VU lifecycle ending`);
+    console.log(`[k6-perf][lifecycle] Ending — skipping remaining action transaction '${name}'`);
   };
 
+  // Per-transaction gating applies ONLY to action-phase transactions, and ONLY
+  // under V2. V1 returns false so transaction() behaves exactly as before when
+  // the flag is off (V1 end-detection still runs at the iteration level inside
+  // runJourneyLifecycle).
   if (isLifecycleV2Enabled()) {
     return {
-      shouldSkipBeforeStart: isEndDueBefore(),
+      shouldSkipBeforeStart: _currentPhase === 'action' && isEndDueBefore(),
       errorBehavior: runtime.errorBehavior || 'continue',
       onSkip,
     };
   }
 
-  const phases = getPhaseMetadata();
-  const endSignal = getEndSignal(phases);
   return {
-    shouldSkipBeforeStart: endSignal.beforeAction,
+    shouldSkipBeforeStart: false,
     errorBehavior: runtime.errorBehavior || 'continue',
     onSkip,
   };
 }
+
+// Publish the gate to globalThis so transaction.ts can consult it without a
+// static import of lifecycle.ts (which would create a module cycle — lifecycle
+// already imports isVuTerminated from transaction.ts). Same documented pattern
+// as request.ts's __k6PerfCaptureSnapshotFromLastRequest snapshot hook.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+(globalThis as any).__k6PerfTxnGate = getTransactionGate;
 
 // ── Lifecycle V2 (design_proposal.md) ─────────────────────────
 // Proactive, VU-driven end-detection. Gated behind K6_PERF_LIFECYCLE_V2 so the
@@ -505,18 +525,29 @@ function computeEndPlan(phases: PhaseMetadata): EndPlan {
   return { family: 'external' };
 }
 
+// Fire the time-deadline this many ms EARLY, so the VU logs out while it's
+// still scheduled rather than in the blind spot between iterations where k6
+// would cull it with no further default() call. The transaction gate handles
+// the case where the deadline passes mid-action; this margin handles the
+// idle-between-iterations case. ~5s per design discussion.
+const LIFECYCLE_END_SAFETY_MS = 5000;
+
 /** Should this VU end BEFORE running another action? */
 function isEndDueBefore(): boolean {
   if (!activeEndPlan) return false;
   if (activeEndPlan.endBeforeAction) return true;
-  if (activeEndPlan.deadlineMs !== undefined) return Date.now() >= activeEndPlan.deadlineMs;
+  if (activeEndPlan.deadlineMs !== undefined) {
+    return Date.now() + LIFECYCLE_END_SAFETY_MS >= activeEndPlan.deadlineMs;
+  }
   return false;
 }
 
 /** Should this VU end AFTER the action it just ran? */
 function isEndDueAfter(): boolean {
   if (!activeEndPlan) return false;
-  if (activeEndPlan.deadlineMs !== undefined) return Date.now() >= activeEndPlan.deadlineMs;
+  if (activeEndPlan.deadlineMs !== undefined) {
+    return Date.now() + LIFECYCLE_END_SAFETY_MS >= activeEndPlan.deadlineMs;
+  }
   if (activeEndPlan.lastIteration !== undefined) {
     return exec.vu.iterationInScenario >= activeEndPlan.lastIteration;
   }
@@ -533,11 +564,10 @@ function isEndDueAfter(): boolean {
  * Only meaningful for the ramping (time-deadline) family; returns false otherwise.
  */
 export function isEnding(): boolean {
-  return (
-    activeEndPlan !== null &&
-    activeEndPlan.deadlineMs !== undefined &&
-    Date.now() >= activeEndPlan.deadlineMs
-  );
+  if (activeEndPlan === null || activeEndPlan.deadlineMs === undefined) return false;
+  // Same early margin as the lifecycle checks, so a `while (!isEnding())` loop
+  // bails out before k6 culls the VU.
+  return Date.now() + LIFECYCLE_END_SAFETY_MS >= activeEndPlan.deadlineMs;
 }
 
 function runJourneyLifecycleV2(store: JourneyLifecycleStore, phaseFns: PhaseFns): void {
