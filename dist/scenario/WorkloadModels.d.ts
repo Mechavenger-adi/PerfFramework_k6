@@ -18,6 +18,8 @@ export interface K6ExecutorConfig {
     timeUnit?: string;
     preAllocatedVUs?: number;
     maxVUs?: number;
+    gracefulRampDown?: string;
+    gracefulStop?: string;
     exec?: string;
     tags?: Record<string, string>;
     env?: Record<string, string>;

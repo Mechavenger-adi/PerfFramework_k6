@@ -133,6 +133,11 @@
           "description": "Include the error summary table in the generated HTML report.",
           "default": true
         },
+        "overrideExistingResults": {
+          "type": "boolean",
+          "description": "When true, debug and load-test reports overwrite a single stable 'Run_latest' output folder each run instead of creating a new timestamped folder. Off by default so run history is preserved.",
+          "default": false
+        },
         "timeseries": {
           "type": "object",
           "description": "Bucketed timeseries data collection for interactive Chart.js graphs in RunReport.html. Produces time-bucketed response time trends, throughput, and error rate charts.",

@@ -26,6 +26,12 @@ export declare class RuntimeConfigManager {
     getTransactionStats(): string[];
     shouldIncludeTransactionTable(): boolean;
     shouldIncludeErrorTable(): boolean;
+    /**
+     * When true, reports overwrite a single stable `Run_latest` folder instead
+     * of creating a new timestamped folder per run. Defaults to false so run
+     * history is preserved.
+     */
+    shouldOverrideExistingResults(): boolean;
     isTimeseriesEnabled(): boolean;
     getTimeseriesBucketSizeSeconds(): number;
     /**

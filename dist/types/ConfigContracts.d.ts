@@ -64,6 +64,12 @@ export interface ReportingConfig {
     includeErrorTable: boolean;
     /** Timeseries config for unified HTML graphs */
     timeseries: TimeSeriesReportingConfig;
+    /**
+     * When true, debug and load-test reports overwrite a single stable output
+     * folder (`Run_latest`) each run instead of creating a new timestamped
+     * folder. Off by default so run history is preserved.
+     */
+    overrideExistingResults?: boolean;
 }
 export interface ErrorCaptureConfig {
     /** Capture snapshots for supported failures */

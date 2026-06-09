@@ -97,6 +97,7 @@ const RUNTIME_SETTINGS_SCHEMA_INLINE = {
         },
         includeTransactionTable: { type: 'boolean' },
         includeErrorTable: { type: 'boolean' },
+        overrideExistingResults: { type: 'boolean' },
         timeseries: {
           type: 'object',
           additionalProperties: false,

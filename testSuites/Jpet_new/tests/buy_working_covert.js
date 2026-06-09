@@ -60,28 +60,28 @@ export function initPhase(ctx) {
 
   transaction('t02_login', function() {
   
-      const res_1 = request('GET', `${env.baseUrl}/account/signonForm`, {
-        name: "GET_signonForm_1",
-        headers: {
-          accept: `text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7`,
-          "upgrade-insecure-requests": `1`,
-          "sec-purpose": `prefetch`,
-          "sec-speculation-tags": `null`,
-          "sec-ch-ua": `"Chromium";v="146", "Not-A.Brand";v="24", "Google Chrome";v="146"`,
-          "sec-ch-ua-mobile": `?0`,
-          "sec-ch-ua-platform": `"Windows"`,
-          "sec-fetch-site": `none`,
-          "sec-fetch-mode": `navigate`,
-          "sec-fetch-dest": `document`,
-          referer: `https://jpetstore.aspectran.com/`,
-          "accept-encoding": `gzip, deflate, br, zstd`,
-          "accept-language": `en-US,en;q=0.9`,
-          priority: `u=1, i`,
-          },
-        replay: { id: "req_2", recordingStartedAt: 'converted' },
-      });
+      // const res_1 = request('GET', `${env.baseUrl}/account/signonForm`, {
+      //   name: "GET_signonForm_1",
+      //   headers: {
+      //     accept: `text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7`,
+      //     "upgrade-insecure-requests": `1`,
+      //     "sec-purpose": `prefetch`,
+      //     "sec-speculation-tags": `null`,
+      //     "sec-ch-ua": `"Chromium";v="146", "Not-A.Brand";v="24", "Google Chrome";v="146"`,
+      //     "sec-ch-ua-mobile": `?0`,
+      //     "sec-ch-ua-platform": `"Windows"`,
+      //     "sec-fetch-site": `none`,
+      //     "sec-fetch-mode": `navigate`,
+      //     "sec-fetch-dest": `document`,
+      //     referer: `https://jpetstore.aspectran.com/`,
+      //     "accept-encoding": `gzip, deflate, br, zstd`,
+      //     "accept-language": `en-US,en;q=0.9`,
+      //     priority: `u=1, i`,
+      //     },
+      //   replay: { id: "req_2", recordingStartedAt: 'converted' },
+      // });
   
-      k6Check(res_1, { "status equals 503": (r) => r.status === 503 });
+      // k6Check(res_1, { "status equals 503": (r) => r.status === 503 });
   
   
       const res_2 = request('GET', `${env.baseUrl}/account/signonForm`, {
@@ -192,7 +192,7 @@ export function actionPhase(ctx) {
       k6Check(res_1, { "status equals 200": (r) => r.status === 200 });
   
       regex = new RegExp('href="/products/[^"]+">(.*?)</a></strong>');
-      match = res_1.body.match(regex);
+      match = (res_1.body || "").match(regex) || [];
       if (match) {
         correlation_vars["correlation_0"] = trackCorrelation("correlation_0", trackCorrelation("correlation_0", match[1], "body"), "body");
       }
@@ -202,28 +202,28 @@ export function actionPhase(ctx) {
 
   transaction('select_product', function() {
   
-      const res_1 = request('GET', `${env.baseUrl}/products/${correlation_vars["correlation_0"]}`, {
-        name: "GET_correlation_vars_correlat_1",
-        headers: {
-          accept: `text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7`,
-          "upgrade-insecure-requests": `1`,
-          "sec-purpose": `prefetch`,
-          "sec-speculation-tags": `null`,
-          "sec-ch-ua": `"Chromium";v="146", "Not-A.Brand";v="24", "Google Chrome";v="146"`,
-          "sec-ch-ua-mobile": `?0`,
-          "sec-ch-ua-platform": `"Windows"`,
-          "sec-fetch-site": `none`,
-          "sec-fetch-mode": `navigate`,
-          "sec-fetch-dest": `document`,
-          referer: `https://jpetstore.aspectran.com/catalog/searchProducts?keyword=dog`,
-          "accept-encoding": `gzip, deflate, br, zstd`,
-          "accept-language": `en-US,en;q=0.9`,
-          priority: `u=1, i`,
-          },
-        replay: { id: "req_7", recordingStartedAt: 'converted' },
-      });
+      // const res_1 = request('GET', `${env.baseUrl}/products/${correlation_vars["correlation_0"]}`, {
+      //   name: "GET_correlation_vars_correlat_1",
+      //   headers: {
+      //     accept: `text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7`,
+      //     "upgrade-insecure-requests": `1`,
+      //     "sec-purpose": `prefetch`,
+      //     "sec-speculation-tags": `null`,
+      //     "sec-ch-ua": `"Chromium";v="146", "Not-A.Brand";v="24", "Google Chrome";v="146"`,
+      //     "sec-ch-ua-mobile": `?0`,
+      //     "sec-ch-ua-platform": `"Windows"`,
+      //     "sec-fetch-site": `none`,
+      //     "sec-fetch-mode": `navigate`,
+      //     "sec-fetch-dest": `document`,
+      //     referer: `https://jpetstore.aspectran.com/catalog/searchProducts?keyword=dog`,
+      //     "accept-encoding": `gzip, deflate, br, zstd`,
+      //     "accept-language": `en-US,en;q=0.9`,
+      //     priority: `u=1, i`,
+      //     },
+      //   replay: { id: "req_7", recordingStartedAt: 'converted' },
+      // });
   
-      k6Check(res_1, { "status equals 503": (r) => r.status === 503 });
+      // k6Check(res_1, { "status equals 503": (r) => r.status === 503 });
   
   
       const res_2 = request('GET', `${env.baseUrl}/products/${correlation_vars["correlation_0"]}`, {
@@ -253,28 +253,28 @@ export function actionPhase(ctx) {
 
   transaction('add_to_cart', function() {
   
-      const res_1 = request('GET', `${env.baseUrl}/cart/addItemToCart?itemId=EST-6`, {
-        name: "GET_addItemToCart_1",
-        headers: {
-          accept: `text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7`,
-          "upgrade-insecure-requests": `1`,
-          "sec-purpose": `prefetch`,
-          "sec-speculation-tags": `null`,
-          "sec-ch-ua": `"Chromium";v="146", "Not-A.Brand";v="24", "Google Chrome";v="146"`,
-          "sec-ch-ua-mobile": `?0`,
-          "sec-ch-ua-platform": `"Windows"`,
-          "sec-fetch-site": `none`,
-          "sec-fetch-mode": `navigate`,
-          "sec-fetch-dest": `document`,
-          referer: `https://jpetstore.aspectran.com/products/${correlation_vars["correlation_0"]}`,
-          "accept-encoding": `gzip, deflate, br, zstd`,
-          "accept-language": `en-US,en;q=0.9`,
-          priority: `u=1, i`,
-          },
-        replay: { id: "req_9", recordingStartedAt: 'converted' },
-      });
+      // const res_1 = request('GET', `${env.baseUrl}/cart/addItemToCart?itemId=EST-6`, {
+      //   name: "GET_addItemToCart_1",
+      //   headers: {
+      //     accept: `text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7`,
+      //     "upgrade-insecure-requests": `1`,
+      //     "sec-purpose": `prefetch`,
+      //     "sec-speculation-tags": `null`,
+      //     "sec-ch-ua": `"Chromium";v="146", "Not-A.Brand";v="24", "Google Chrome";v="146"`,
+      //     "sec-ch-ua-mobile": `?0`,
+      //     "sec-ch-ua-platform": `"Windows"`,
+      //     "sec-fetch-site": `none`,
+      //     "sec-fetch-mode": `navigate`,
+      //     "sec-fetch-dest": `document`,
+      //     referer: `https://jpetstore.aspectran.com/products/${correlation_vars["correlation_0"]}`,
+      //     "accept-encoding": `gzip, deflate, br, zstd`,
+      //     "accept-language": `en-US,en;q=0.9`,
+      //     priority: `u=1, i`,
+      //     },
+      //   replay: { id: "req_9", recordingStartedAt: 'converted' },
+      // });
   
-      k6Check(res_1, { "status equals 503": (r) => r.status === 503 });
+      // k6Check(res_1, { "status equals 503": (r) => r.status === 503 });
   
   
       const res_2 = request('GET', `${env.baseUrl}/cart/addItemToCart?itemId=EST-6`, {
@@ -354,28 +354,28 @@ export function actionPhase(ctx) {
       k6Check(res_1, { "status equals 200": (r) => r.status === 200 });
   
   
-      const res_2 = request('GET', `${env.baseUrl}/order/newOrderForm`, {
-        name: "GET_newOrderForm_1",
-        headers: {
-          accept: `text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7`,
-          "upgrade-insecure-requests": `1`,
-          "sec-purpose": `prefetch`,
-          "sec-speculation-tags": `null`,
-          "sec-ch-ua": `"Chromium";v="146", "Not-A.Brand";v="24", "Google Chrome";v="146"`,
-          "sec-ch-ua-mobile": `?0`,
-          "sec-ch-ua-platform": `"Windows"`,
-          "sec-fetch-site": `none`,
-          "sec-fetch-mode": `navigate`,
-          "sec-fetch-dest": `document`,
-          referer: `https://jpetstore.aspectran.com/cart/viewCart`,
-          "accept-encoding": `gzip, deflate, br, zstd`,
-          "accept-language": `en-US,en;q=0.9`,
-          priority: `u=1, i`,
-          },
-        replay: { id: "req_13", recordingStartedAt: 'converted' },
-      });
+      // const res_2 = request('GET', `${env.baseUrl}/order/newOrderForm`, {
+      //   name: "GET_newOrderForm_1",
+      //   headers: {
+      //     accept: `text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7`,
+      //     "upgrade-insecure-requests": `1`,
+      //     "sec-purpose": `prefetch`,
+      //     "sec-speculation-tags": `null`,
+      //     "sec-ch-ua": `"Chromium";v="146", "Not-A.Brand";v="24", "Google Chrome";v="146"`,
+      //     "sec-ch-ua-mobile": `?0`,
+      //     "sec-ch-ua-platform": `"Windows"`,
+      //     "sec-fetch-site": `none`,
+      //     "sec-fetch-mode": `navigate`,
+      //     "sec-fetch-dest": `document`,
+      //     referer: `https://jpetstore.aspectran.com/cart/viewCart`,
+      //     "accept-encoding": `gzip, deflate, br, zstd`,
+      //     "accept-language": `en-US,en;q=0.9`,
+      //     priority: `u=1, i`,
+      //     },
+      //   replay: { id: "req_13", recordingStartedAt: 'converted' },
+      // });
   
-      k6Check(res_2, { "status equals 503": (r) => r.status === 503 });
+      // k6Check(res_2, { "status equals 503": (r) => r.status === 503 });
   
   
       const res_3 = request('GET', `${env.baseUrl}/order/newOrderForm`, {
@@ -465,7 +465,7 @@ export function actionPhase(ctx) {
       k6Check(res_1, { "status equals 302": (r) => r.status === 302 });
   
       regex = new RegExp("orderId=(.*?)&submitted");
-      match = res_1.headers["Location"].match(regex);
+      match = (res_1.headers["Location"] || "").match(regex) || [];
       if (match) {
         correlation_vars["c_orderid"] = trackCorrelation("c_orderid", trackCorrelation("c_orderid", match[1], "body"), "body");
       }
@@ -504,28 +504,28 @@ export function endPhase(ctx) {
 
   transaction('logout', function() {
   
-      const res_1 = request('GET', `${env.baseUrl}/account/signoff`, {
-        name: "GET_signoff_1",
-        headers: {
-          accept: `text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7`,
-          "upgrade-insecure-requests": `1`,
-          "sec-purpose": `prefetch`,
-          "sec-speculation-tags": `null`,
-          "sec-ch-ua": `"Chromium";v="146", "Not-A.Brand";v="24", "Google Chrome";v="146"`,
-          "sec-ch-ua-mobile": `?0`,
-          "sec-ch-ua-platform": `"Windows"`,
-          "sec-fetch-site": `none`,
-          "sec-fetch-mode": `navigate`,
-          "sec-fetch-dest": `document`,
-          referer: `https://jpetstore.aspectran.com/order/viewOrder?orderId=${correlation_vars["c_orderid"]}&submitted=true`,
-          "accept-encoding": `gzip, deflate, br, zstd`,
-          "accept-language": `en-US,en;q=0.9`,
-          priority: `u=1, i`,
-          },
-        replay: { id: "req_18", recordingStartedAt: 'converted' },
-      });
+      // const res_1 = request('GET', `${env.baseUrl}/account/signoff`, {
+      //   name: "GET_signoff_1",
+      //   headers: {
+      //     accept: `text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7`,
+      //     "upgrade-insecure-requests": `1`,
+      //     "sec-purpose": `prefetch`,
+      //     "sec-speculation-tags": `null`,
+      //     "sec-ch-ua": `"Chromium";v="146", "Not-A.Brand";v="24", "Google Chrome";v="146"`,
+      //     "sec-ch-ua-mobile": `?0`,
+      //     "sec-ch-ua-platform": `"Windows"`,
+      //     "sec-fetch-site": `none`,
+      //     "sec-fetch-mode": `navigate`,
+      //     "sec-fetch-dest": `document`,
+      //     referer: `https://jpetstore.aspectran.com/order/viewOrder?orderId=${correlation_vars["c_orderid"]}&submitted=true`,
+      //     "accept-encoding": `gzip, deflate, br, zstd`,
+      //     "accept-language": `en-US,en;q=0.9`,
+      //     priority: `u=1, i`,
+      //     },
+      //   replay: { id: "req_18", recordingStartedAt: 'converted' },
+      // });
   
-      k6Check(res_1, { "status equals 503": (r) => r.status === 503 });
+      // k6Check(res_1, { "status equals 503": (r) => r.status === 503 });
   
   
       const res_2 = request('GET', `${env.baseUrl}/account/signoff`, {

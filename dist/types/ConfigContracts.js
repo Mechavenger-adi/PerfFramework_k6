@@ -13,6 +13,7 @@ exports.FRAMEWORK_DEFAULTS = {
         transactionStats: ['count', 'pass', 'fail', 'avg', 'min', 'max', 'p(90)', 'p(95)'],
         includeTransactionTable: true,
         includeErrorTable: true,
+        overrideExistingResults: false,
         timeseries: {
             enabled: true,
             // Default 1-second granularity per Proposal 5. Users can raise this

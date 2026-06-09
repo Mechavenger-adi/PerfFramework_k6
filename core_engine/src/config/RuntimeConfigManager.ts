@@ -103,6 +103,17 @@ export class RuntimeConfigManager {
     return this.reportingConfig.includeErrorTable ?? FRAMEWORK_DEFAULTS.reporting.includeErrorTable;
   }
 
+  /**
+   * When true, reports overwrite a single stable `Run_latest` folder instead
+   * of creating a new timestamped folder per run. Defaults to false so run
+   * history is preserved.
+   */
+  shouldOverrideExistingResults(): boolean {
+    return this.reportingConfig.overrideExistingResults
+      ?? FRAMEWORK_DEFAULTS.reporting.overrideExistingResults
+      ?? false;
+  }
+
   isTimeseriesEnabled(): boolean {
     return this.timeseriesConfig.enabled ?? FRAMEWORK_DEFAULTS.reporting.timeseries.enabled;
   }

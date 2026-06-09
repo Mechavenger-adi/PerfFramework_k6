@@ -26,5 +26,15 @@ export interface TransactionGate {
     onSkip: (name: string) => void;
 }
 export declare function getTransactionGate(): TransactionGate;
+/**
+ * Script-facing: true once this VU has reached its logout deadline. Use it as the
+ * guard of a long action loop so the loop bails out near the deadline instead of
+ * overrunning it:
+ *
+ *   while (!isEnding()) { transaction('search', () => {...}); thinktime(); }
+ *
+ * Only meaningful for the ramping (time-deadline) family; returns false otherwise.
+ */
+export declare function isEnding(): boolean;
 export declare function runJourneyLifecycle(store: JourneyLifecycleStore, phaseFns: PhaseFns): void;
 export {};

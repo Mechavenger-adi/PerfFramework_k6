@@ -45,7 +45,7 @@ export { PathResolver } from './utils/PathResolver';
 export { endTransaction, getCurrentTransaction, initTransactions, isVuTerminated, k6Check, startTransaction, transaction } from './utils/transaction';
 export { request } from './utils/request';
 export type { CookieValue, HttpMethod, RequestBody, RequestOptions } from './utils/request';
-export { createJourneyLifecycleStore, getTransactionGate, runJourneyLifecycle, thinktime } from './utils/lifecycle';
+export { createJourneyLifecycleStore, getTransactionGate, isEnding, runJourneyLifecycle, thinktime } from './utils/lifecycle';
 export type { JourneyLifecycleStore, PhaseFns, TransactionGate } from './utils/lifecycle';
 export { logReplayExchange, logExchange, trackCorrelation, trackDataRow, trackParameter } from './utils/replayLogger';
 export { clearCookies, deleteCookie, getEnvContext, registerBaseUrl, registerFrameworkEnvironmentUrls, resolveFrameworkUrl, resolvePath } from './utils/session';

@@ -427,6 +427,19 @@ export class ScriptConverter {
         emitLine = emitLine.replace(/(?<![.\w])check\s*\(/g, 'k6Check(');
       }
 
+      // Make correlation extraction null-safe (LoadRunner continue-on-error):
+      // `match = SRC.match(regex);` → `match = (SRC || "").match(regex) || [];`
+      // so a missing body/header (SRC === undefined) no longer throws, and a
+      // no-match yields [] instead of null. `match[1]` is then `undefined` on a
+      // miss, which trackCorrelation turns into a `{NOTFOUND:name}` placeholder.
+      const corrMatchLine = emitLine.match(
+        /^(\s*)match\s*=\s*(.+)\.match\((.+)\)\s*;?\s*$/,
+      );
+      if (corrMatchLine) {
+        const [, ws, src, arg] = corrMatchLine;
+        emitLine = `${ws}match = (${src} || "").match(${arg}) || [];`;
+      }
+
       // Rewrite correlation_vars assignment to use trackCorrelation
       // Pattern: `correlation_vars["key"] = match[1];` → `correlation_vars["key"] = trackCorrelation("key", match[1], "body");`
       const corrSetMatch = emitLine.match(
@@ -434,7 +447,10 @@ export class ScriptConverter {
       );
       if (corrSetMatch) {
         const [, ws, corrName, corrExpr] = corrSetMatch;
-        emitLine = `${ws}correlation_vars["${corrName}"] = trackCorrelation("${corrName}", ${corrExpr}, "body");`;
+        // Don't double-wrap if a previous conversion already added trackCorrelation.
+        emitLine = /^trackCorrelation\s*\(/.test(corrExpr)
+          ? `${ws}correlation_vars["${corrName}"] = ${corrExpr};`
+          : `${ws}correlation_vars["${corrName}"] = trackCorrelation("${corrName}", ${corrExpr}, "body");`;
       }
 
       result.push(emitLine);

@@ -562,9 +562,16 @@ async function runPlanDebugMode(plan: TestPlan, resolvedConfig: ResolvedConfig, 
     ? path.resolve(process.cwd(), debugSettings.reportDir)
     : path.join(process.cwd(), 'results', 'debug');
   const safePlanName = plan.name.replace(/[^a-zA-Z0-9_]/g, '_');
-  const timestamp = new Date().toISOString().replace(/[-:.]/g, '_');
-  const runDir = path.join(baseDir, safePlanName, `Run_${timestamp}`);
+  const override = new RuntimeConfigManager(resolvedConfig.runtime).shouldOverrideExistingResults();
+  // Override → reuse a single stable folder (wiped each run); otherwise a fresh
+  // timestamped folder per run so debug history is preserved.
+  const runDir = override
+    ? path.join(baseDir, safePlanName, 'Run_latest')
+    : path.join(baseDir, safePlanName, `Run_${new Date().toISOString().replace(/[-:.]/g, '_')}`);
 
+  if (override && fs.existsSync(runDir)) {
+    fs.rmSync(runDir, { recursive: true, force: true });
+  }
   fs.mkdirSync(runDir, { recursive: true });
 
   const journeyCount = plan.user_journeys.length;
@@ -614,6 +621,7 @@ function runJourneyDebug(plan: TestPlan, journey: UserJourney, runDir: string, r
     teamEnvironments: resolvedConfig.environment.testSuites,
     errorBehavior: runtime.getErrorBehavior(),
     extraK6Args: passthroughArgs,
+    transactionStats: runtime.getTransactionStats(),
   });
 }
 
@@ -691,10 +699,15 @@ function prepareRunArtifacts(plan: TestPlan, resolvedConfig: ResolvedConfig): {
 } {
   const baseDir = resolvedConfig.secrets['K6_RESULTS_BASE_DIR'] || 'results';
   const safePlanName = plan.name.replace(/[^a-zA-Z0-9_]/g, '_');
-  const timestamp = new Date().toISOString().replace(/[-:.]/g, '_');
-  const runId = `Run_${timestamp}`;
+  const override = new RuntimeConfigManager(resolvedConfig.runtime).shouldOverrideExistingResults();
+  // With override on, reuse a single stable folder (wiped each run); otherwise
+  // create a fresh timestamped folder so run history is preserved.
+  const runId = override ? 'Run_latest' : `Run_${new Date().toISOString().replace(/[-:.]/g, '_')}`;
   const reportDir = path.join(process.cwd(), baseDir, safePlanName, runId);
 
+  if (override && fs.existsSync(reportDir)) {
+    fs.rmSync(reportDir, { recursive: true, force: true });
+  }
   fs.mkdirSync(reportDir, { recursive: true });
 
   return {

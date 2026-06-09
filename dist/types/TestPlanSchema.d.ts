@@ -33,6 +33,18 @@ export interface GlobalLoadProfile {
     preAllocatedVUs?: number;
     /** Maximum VUs the executor can scale to (arrival-rate and externally-controlled) */
     maxVUs?: number;
+    /**
+     * Graceful ramp-down window: time k6 waits for an in-flight iteration to finish
+     * before removing a VU during ramp-down (ramping-vus / ramping-arrival-rate).
+     * k6 duration string, e.g. '30s', '2m'. Defaults to k6's 30s when omitted.
+     */
+    gracefulRampDown?: string;
+    /**
+     * Graceful stop window: time k6 waits for in-flight iterations to finish at
+     * scenario end before forcibly stopping. k6 duration string, e.g. '30s'.
+     * Defaults to k6's 30s when omitted.
+     */
+    gracefulStop?: string;
 }
 export interface UserJourney {
     /** Unique name – used as the k6 scenario key */

@@ -114,5 +114,7 @@ function toK6ExecutorConfig(profile) {
         timeUnit: profile.timeUnit,
         preAllocatedVUs: profile.preAllocatedVUs,
         maxVUs: profile.maxVUs,
+        gracefulRampDown: profile.gracefulRampDown,
+        gracefulStop: profile.gracefulStop,
     };
 }

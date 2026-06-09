@@ -29,6 +29,7 @@
     ],
     "includeTransactionTable": true,
     "includeErrorTable": true,
+    "overrideExistingResults": false,
     "timeseries": {
       "enabled": true,
       "bucketSizeSeconds": 10

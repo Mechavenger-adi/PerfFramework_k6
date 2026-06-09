@@ -187,11 +187,13 @@ importCmd
     .command('postman <team> <script-name>')
     .description('Import a Postman v2.1 collection into a framework-shaped k6 script')
     .requiredOption('--file <path>', 'Path to a Postman v2.1 collection JSON file')
-    .option('--folder <name>', 'Only emit requests under this top-level folder (direct match)')
+    .option('--folder <path>', 'Only emit requests under this folder. Supports nested paths, e.g. "API/Auth" (includes the whole subtree)')
+    .option('--split-per-request', 'Emit one script per request (API) instead of a single combined script')
     .action(async (team, scriptName, opts) => {
     await (0, import_1.runImportPostman)(team, scriptName, {
         file: opts.file,
         folder: opts.folder,
+        splitPerRequest: opts.splitPerRequest === true,
     });
 });
 // ---------------------------------------------
@@ -529,8 +531,15 @@ async function runPlanDebugMode(plan, resolvedConfig, passthroughArgs = []) {
         ? path.resolve(process.cwd(), debugSettings.reportDir)
         : path.join(process.cwd(), 'results', 'debug');
     const safePlanName = plan.name.replace(/[^a-zA-Z0-9_]/g, '_');
-    const timestamp = new Date().toISOString().replace(/[-:.]/g, '_');
-    const runDir = path.join(baseDir, safePlanName, `Run_${timestamp}`);
+    const override = new RuntimeConfigManager_1.RuntimeConfigManager(resolvedConfig.runtime).shouldOverrideExistingResults();
+    // Override → reuse a single stable folder (wiped each run); otherwise a fresh
+    // timestamped folder per run so debug history is preserved.
+    const runDir = override
+        ? path.join(baseDir, safePlanName, 'Run_latest')
+        : path.join(baseDir, safePlanName, `Run_${new Date().toISOString().replace(/[-:.]/g, '_')}`);
+    if (override && fs.existsSync(runDir)) {
+        fs.rmSync(runDir, { recursive: true, force: true });
+    }
     fs.mkdirSync(runDir, { recursive: true });
     const journeyCount = plan.user_journeys.length;
     logger_1.Logger.pass(`Debug mode · ${journeyCount} journey(s) · ${debugSettings.vus ?? 1} VU(s) · ${debugSettings.iterations ?? 1} iteration(s) each`);
@@ -575,6 +584,7 @@ function runJourneyDebug(plan, journey, runDir, resolvedConfig, passthroughArgs 
         teamEnvironments: resolvedConfig.environment.testSuites,
         errorBehavior: runtime.getErrorBehavior(),
         extraK6Args: passthroughArgs,
+        transactionStats: runtime.getTransactionStats(),
     });
 }
 // Flags the framework always injects into the k6 command itself.
@@ -635,9 +645,14 @@ function toImportSpecifier(fromDir, targetPath) {
 function prepareRunArtifacts(plan, resolvedConfig) {
     const baseDir = resolvedConfig.secrets['K6_RESULTS_BASE_DIR'] || 'results';
     const safePlanName = plan.name.replace(/[^a-zA-Z0-9_]/g, '_');
-    const timestamp = new Date().toISOString().replace(/[-:.]/g, '_');
-    const runId = `Run_${timestamp}`;
+    const override = new RuntimeConfigManager_1.RuntimeConfigManager(resolvedConfig.runtime).shouldOverrideExistingResults();
+    // With override on, reuse a single stable folder (wiped each run); otherwise
+    // create a fresh timestamped folder so run history is preserved.
+    const runId = override ? 'Run_latest' : `Run_${new Date().toISOString().replace(/[-:.]/g, '_')}`;
     const reportDir = path.join(process.cwd(), baseDir, safePlanName, runId);
+    if (override && fs.existsSync(reportDir)) {
+        fs.rmSync(reportDir, { recursive: true, force: true });
+    }
     fs.mkdirSync(reportDir, { recursive: true });
     return {
         reportDir,
@@ -697,6 +712,12 @@ function buildRunEnvironment(plan, resolvedConfig, runId, safeReportDir, runMani
         K6_PERF_TEAM_ENVIRONMENTS: JSON.stringify(resolvedConfig.environment.testSuites || {}),
         ...(transactionNames.length > 0
             ? { K6_PERF_TRANSACTION_NAMES: JSON.stringify(transactionNames) }
+            : {}),
+        // Forward the V2 lifecycle flag from .env (EnvResolver uses dotenv.parse, so
+        // .env vars don't reach process.env on their own). Shell/CI env still works
+        // too, since PipelineRunner spreads process.env into the k6 child.
+        ...(resolvedConfig.secrets['K6_PERF_LIFECYCLE_V2']
+            ? { K6_PERF_LIFECYCLE_V2: resolvedConfig.secrets['K6_PERF_LIFECYCLE_V2'] }
             : {}),
     };
 }

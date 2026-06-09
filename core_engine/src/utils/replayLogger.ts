@@ -88,14 +88,61 @@ const iterationState: Record<string, number> = {};
 const _variableRegistry: Record<string, VariableRegistryEntry> = {};
 
 /**
+ * Best-effort: pull the first user-script frame (path:line[:col]) out of a fresh
+ * stack trace, skipping framework internals (dist/utils) and k6 runtime frames.
+ * Used to point a failed-correlation log at the exact extraction site.
+ */
+function callerScriptLocation(): string {
+  try {
+    const stack = new Error().stack;
+    if (!stack) return '';
+    for (const raw of stack.split(/\r?\n/)) {
+      const m = raw.match(/((?:file:\/\/)?[^\s()<>"']+):(\d+)(?::(\d+))?/);
+      if (!m) continue;
+      const p = m[1];
+      if (p.includes('/dist/utils/') || p.includes('\\dist\\utils\\')) continue;
+      if (p.includes('replayLogger') || p.startsWith('k6/') || p.includes('go.k6.io')) continue;
+      return m[3] ? `${p}:${m[2]}:${m[3]}` : `${p}:${m[2]}`;
+    }
+  } catch { /* ignore */ }
+  return '';
+}
+
+/**
  * Register a correlation variable at the point of extraction.
  * Call this right after a regex match or similar extraction.
  * Returns the value for inline use: correlation_vars["x"] = trackCorrelation("x", match[1], "body");
  */
 export function trackCorrelation(name: string, value: unknown, source?: string): unknown {
-  const v = value === undefined || value === null ? '' : String(value);
-  _variableRegistry[name] = { name, type: 'correlation', value: v, source: source || 'body' };
-  return value;
+  // LoadRunner-style continue-on-error: when an extraction produced no value
+  // (no regex match, or a missing body/header), substitute a visible
+  // placeholder instead of "" / undefined. The next request then runs with the
+  // placeholder (rather than crashing on a null match), the dependent check
+  // fails normally, and the VU keeps going. The placeholder is also what gets
+  // registered, so the replay log can locate it in the outgoing request.
+  const isEmpty = value === undefined || value === null || value === '';
+  const resolved = isEmpty ? `{NOTFOUND:${name}}` : value;
+  if (isEmpty) {
+    // Loud but non-fatal: make the failed extraction obvious in the console/run
+    // log, with VU / iteration / script location so it's actionable. We
+    // deliberately do NOT throw — throwing here would also fire on the
+    // auto-tracking Proxy path and duplicate the stop/continue decision the
+    // dependent k6Check already makes. In stop_* modes the failing check that
+    // consumes this placeholder still stops the run.
+    try {
+      let where = '';
+      try {
+        const vu = exec?.vu?.idInInstance;
+        const iter = exec?.vu?.iterationInScenario;
+        if (vu !== undefined) where += ` (VU ${vu}, iter ${iter}`;
+        const loc = callerScriptLocation();
+        where += loc ? `${vu !== undefined ? ', ' : ' ('}at ${loc})` : (vu !== undefined ? ')' : '');
+      } catch { /* context best-effort */ }
+      console.error(`[k6-perf] correlation "${name}" not found — substituting ${resolved}${where}`);
+    } catch { /* logging is best-effort */ }
+  }
+  _variableRegistry[name] = { name, type: 'correlation', value: String(resolved), source: source || 'body' };
+  return resolved;
 }
 
 /**

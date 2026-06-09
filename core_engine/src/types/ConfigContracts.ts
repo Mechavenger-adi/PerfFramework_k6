@@ -81,6 +81,12 @@ export interface ReportingConfig {
   includeErrorTable: boolean;
   /** Timeseries config for unified HTML graphs */
   timeseries: TimeSeriesReportingConfig;
+  /**
+   * When true, debug and load-test reports overwrite a single stable output
+   * folder (`Run_latest`) each run instead of creating a new timestamped
+   * folder. Off by default so run history is preserved.
+   */
+  overrideExistingResults?: boolean;
 }
 
 export interface ErrorCaptureConfig {
@@ -130,6 +136,7 @@ export const FRAMEWORK_DEFAULTS: RuntimeSettings = {
     transactionStats: ['count', 'pass', 'fail', 'avg', 'min', 'max', 'p(90)', 'p(95)'],
     includeTransactionTable: true,
     includeErrorTable: true,
+    overrideExistingResults: false,
     timeseries: {
       enabled: true,
       // Default 1-second granularity per Proposal 5. Users can raise this

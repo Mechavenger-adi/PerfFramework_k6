@@ -617,11 +617,14 @@ class HTMLDiffReporter {
       .metrics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
       .metrics-grid .metrics-card.full-width { grid-column: 1 / -1; }
       @media (max-width: 960px) { .metrics-grid { grid-template-columns: 1fr; } }
-      .metrics-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+      .metrics-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); overflow-x: auto; overflow-y: hidden; }
       .metrics-card h3 { font-size: 13px; font-weight: 700; color: var(--ink); padding: 12px 16px; margin: 0; background: var(--surface-alt); border-bottom: 1px solid var(--border); text-transform: uppercase; letter-spacing: 0.04em; }
-      .metrics-card table { margin: 0; font-size: 12px; }
+      /* auto layout + nowrap so metric names/values render on one line (the card
+         scrolls horizontally if needed) instead of breaking character-by-character */
+      .metrics-card table { margin: 0; font-size: 12px; table-layout: auto; min-width: 100%; }
       .metrics-card th { font-size: 10px; }
       .metrics-card td { font-family: var(--font-mono); font-size: 12px; }
+      .metrics-card th, .metrics-card td { white-space: nowrap; word-break: normal; overflow-wrap: normal; }
       .metrics-card td:not(:first-child) { text-align: right; font-variant-numeric: tabular-nums; }
       .metrics-card th:not(:first-child) { text-align: right; }
       .check-pass { color: var(--good); font-weight: 700; }
@@ -1920,15 +1923,22 @@ class HTMLDiffReporter {
             const rows = m.checks.map(c => `<tr><td>${this.escapeHtml(c.name)}</td><td class="${c.passed ? 'check-pass' : 'check-fail'}">${c.passed ? '✓ PASS' : '✗ FAIL'}</td></tr>`).join('');
             midRow.push(`<div class="metrics-card"><h3>Checks</h3><table class="m-sortable"><thead><tr><th class="sortable" data-col="0" data-type="string">Check</th><th class="sortable" style="width:90px" data-col="1" data-type="string">Status</th></tr></thead><tbody>${rows}</tbody></table></div>`);
         }
+        // Columns are driven by the resolved runtime stats (default min/avg/max/
+        // p90/p95, extended by reporting.transactionStats).
+        const cols = (m.statsColumns && m.statsColumns.length > 0)
+            ? m.statsColumns
+            : ['min', 'avg', 'max', 'p(90)', 'p(95)'];
+        // pass/fail come from a transaction's checks (_checkrate) and have no
+        // meaning for raw http_req_* timing metrics, so drop them from the HTTP
+        // table. Transactions keep the full column set.
+        const httpCols = cols.filter((c) => c !== 'pass' && c !== 'fail');
         // Row 2 right: HTTP Metrics
         if (m.http.length > 0) {
-            const rows = m.http.map(h => `<tr><td>${this.escapeHtml(h.name)}</td><td data-val="${this.parseMetricNum(h.avg)}">${h.avg}</td><td data-val="${this.parseMetricNum(h.min)}">${h.min}</td><td data-val="${this.parseMetricNum(h.med)}">${h.med}</td><td data-val="${this.parseMetricNum(h.max)}">${h.max}</td><td data-val="${this.parseMetricNum(h.p90)}">${h.p90}</td><td data-val="${this.parseMetricNum(h.p95)}">${h.p95}</td></tr>`).join('');
-            midRow.push(`<div class="metrics-card"><h3>HTTP Metrics</h3><table class="m-sortable"><thead><tr><th class="sortable" data-col="0" data-type="string">Metric</th><th class="sortable" data-col="1" data-type="num">Avg</th><th class="sortable" data-col="2" data-type="num">Min</th><th class="sortable" data-col="3" data-type="num">Med</th><th class="sortable" data-col="4" data-type="num">Max</th><th class="sortable" data-col="5" data-type="num">P90</th><th class="sortable" data-col="6" data-type="num">P95</th></tr></thead><tbody>${rows}</tbody></table></div>`);
+            midRow.push(this.renderMetricTable('HTTP Metrics', 'Metric', m.http, httpCols, false));
         }
         // Row 3: Transaction Timings (full width, many rows)
         if (m.transactions.length > 0) {
-            const rows = m.transactions.map(t => `<tr><td>${this.escapeHtml(t.name)}</td><td data-val="${this.parseMetricNum(t.avg)}">${t.avg}</td><td data-val="${this.parseMetricNum(t.min)}">${t.min}</td><td data-val="${this.parseMetricNum(t.med)}">${t.med}</td><td data-val="${this.parseMetricNum(t.max)}">${t.max}</td><td data-val="${this.parseMetricNum(t.p90)}">${t.p90}</td><td data-val="${this.parseMetricNum(t.p95)}">${t.p95}</td></tr>`).join('');
-            bottomRow.push(`<div class="metrics-card full-width"><h3>Transaction Timings</h3><table class="m-sortable"><thead><tr><th class="sortable" data-col="0" data-type="string">Transaction</th><th class="sortable" data-col="1" data-type="num">Avg</th><th class="sortable" data-col="2" data-type="num">Min</th><th class="sortable" data-col="3" data-type="num">Med</th><th class="sortable" data-col="4" data-type="num">Max</th><th class="sortable" data-col="5" data-type="num">P90</th><th class="sortable" data-col="6" data-type="num">P95</th></tr></thead><tbody>${rows}</tbody></table></div>`);
+            bottomRow.push(this.renderMetricTable('Transaction Timings', 'Transaction', m.transactions, cols, true));
         }
         const allCards = [...topRow, ...midRow, ...bottomRow];
         if (allCards.length === 0)
@@ -1937,6 +1947,40 @@ class HTMLDiffReporter {
         <h2>Performance Metrics</h2>
         <div class="metrics-grid">${allCards.join('\n')}</div>
       </section>`;
+    }
+    /** Render a sortable metric table with a name column plus one column per stat. */
+    static renderMetricTable(title, nameHeader, rows, cols, fullWidth) {
+        const headCells = [`<th class="sortable" data-col="0" data-type="string">${nameHeader}</th>`];
+        cols.forEach((stat, i) => {
+            headCells.push(`<th class="sortable" data-col="${i + 1}" data-type="num">${this.statHeaderLabel(stat)}</th>`);
+        });
+        const bodyRows = rows.map((r) => {
+            const cells = [`<td>${this.escapeHtml(r.name)}</td>`];
+            for (const stat of cols) {
+                const val = r.values[stat] ?? '-';
+                cells.push(`<td data-val="${this.parseMetricNum(val)}">${this.escapeHtml(val)}</td>`);
+            }
+            return `<tr>${cells.join('')}</tr>`;
+        }).join('');
+        const cls = fullWidth ? 'metrics-card full-width' : 'metrics-card';
+        return `<div class="${cls}"><h3>${title}</h3><table class="m-sortable"><thead><tr>${headCells.join('')}</tr></thead><tbody>${bodyRows}</tbody></table></div>`;
+    }
+    /** Human label for a stat id: avg→Avg, p(90)→P90, count→Count, etc. */
+    static statHeaderLabel(stat) {
+        const mp = stat.match(/^p\((\d+(?:\.\d+)?)\)$/);
+        if (mp)
+            return `P${mp[1]}`;
+        switch (stat) {
+            case 'avg': return 'Avg';
+            case 'min': return 'Min';
+            case 'med': return 'Med';
+            case 'max': return 'Max';
+            case 'count': return 'Count';
+            case 'pass': return 'Pass';
+            case 'fail': return 'Fail';
+            case 'std': return 'Std';
+            default: return stat.charAt(0).toUpperCase() + stat.slice(1);
+        }
     }
     static escapeHtml(value) {
         const str = typeof value === 'object' ? JSON.stringify(value) : String(value ?? '');
