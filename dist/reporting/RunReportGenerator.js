@@ -263,6 +263,12 @@ class RunReportGenerator {
       document.querySelectorAll('.tab-btn').forEach((btn) => btn.classList.remove('active'));
       document.getElementById('panel-' + id).classList.add('active');
       button.classList.add('active');
+      // Chart.js charts created while their panel was display:none get a 0x0
+      // canvas and render blank. Now that this panel is visible, rebuild its
+      // charts so they size to the real container. (Cheap; only the just-shown
+      // tab re-renders, and each render fully replaces its panel content.)
+      if (id === 'graphs') renderGraphs();
+      else if (id === 'system') renderSystem();
     }
 
     // Wave 3: deeper Summary tab. Sections (top → bottom):
@@ -414,9 +420,17 @@ class RunReportGenerator {
     // transaction checkrate. The legacy bar/donut charts are kept only as
     // a fallback when the stream file was unreadable.
     let graphChartInstances = [];
+    // Per-transaction charts are tracked separately: they re-render on their
+    // own (txn metric/filter change) without rebuilding the rest of the tab,
+    // so they need an independent lifecycle. Keeping them out of
+    // graphChartInstances also prevents the per-txn cleanup from accidentally
+    // destroying the overview / data / phase charts that precede them.
+    let perTxnChartInstances = [];
     function destroyGraphCharts() {
       for (const c of graphChartInstances) { try { c.destroy(); } catch {} }
       graphChartInstances = [];
+      for (const c of perTxnChartInstances) { try { c.destroy(); } catch {} }
+      perTxnChartInstances = [];
     }
 
     // Format helper: trim "2026-06-01T14:53:54.000Z" → "14:53:54". The bucket
@@ -775,13 +789,11 @@ class RunReportGenerator {
       phaseChart('chart-http-blocked',    'httpReqBlocked');
 
       function renderPerTransactionChart() {
-        // Drop any prior chart instances for the two per-txn canvases —
-        // their indices in graphChartInstances are 6+ (after the six
-        // overview charts). Cleanest is to slice them off and re-create.
-        for (let i = graphChartInstances.length - 1; i >= 6; i--) {
-          try { graphChartInstances[i].destroy(); } catch {}
-          graphChartInstances.splice(i, 1);
-        }
+        // Drop any prior per-txn chart instances and re-create. These live in
+        // their own array (perTxnChartInstances), so this never touches the
+        // overview / data / phase charts in graphChartInstances.
+        for (const c of perTxnChartInstances) { try { c.destroy(); } catch {} }
+        perTxnChartInstances = [];
 
         const metric = txnMetricSelect.value;
         const filterText = txnFilter.value.toLowerCase();
@@ -798,7 +810,7 @@ class RunReportGenerator {
         // All transactions share the same bucket grid by construction, so
         // any of their series works as the index→ts mapping for zoom.
         const zoomPoints = visibleNames.length > 0 ? filteredTxnSeries[visibleNames[0]] : null;
-        graphChartInstances.push(new Chart(document.getElementById('chart-per-txn-duration'), {
+        perTxnChartInstances.push(new Chart(document.getElementById('chart-per-txn-duration'), {
           type: 'line',
           data: { labels: baseLabels, datasets: durationDatasets },
           options: lineOptions('ms', {}, zoomPoints),
@@ -819,13 +831,27 @@ class RunReportGenerator {
           tension: 0.2,
           spanGaps: true,
         }));
-        graphChartInstances.push(new Chart(document.getElementById('chart-per-txn-pass'), {
+        perTxnChartInstances.push(new Chart(document.getElementById('chart-per-txn-pass'), {
           type: 'line',
           data: { labels: baseLabels, datasets: passDatasets },
           options: lineOptions('% pass', { suggestedMax: 100 }, zoomPoints),
         }));
       }
       renderPerTransactionChart();
+      // Charts created during the panel's initial grid layout can mis-measure
+      // their container: creating the early charts reflows the grid, so charts
+      // further down read a stale/unsettled height and stick at Chart.js's
+      // default 150px backing (they appear blank/squished). Force a resize once
+      // layout has settled so every canvas matches its real container. A double
+      // rAF guarantees we run after the browser's layout+paint for this frame.
+      if (typeof requestAnimationFrame === 'function') {
+        requestAnimationFrame(function () {
+          requestAnimationFrame(function () {
+            for (const c of graphChartInstances) { try { c.resize(); } catch {} }
+            for (const c of perTxnChartInstances) { try { c.resize(); } catch {} }
+          });
+        });
+      }
     }
 
     // Wave 2: Transactions tab gains search + sortable columns + CSV export.
