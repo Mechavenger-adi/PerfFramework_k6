@@ -40,6 +40,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.runGenerateByos = runGenerateByos;
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
+const ScriptGenerator_1 = require("../recording/ScriptGenerator");
 function runGenerateByos(teamName, scriptName, opts = {}) {
     const targetDir = path.join(process.cwd(), 'testSuites', teamName, 'tests');
     if (!fs.existsSync(targetDir)) {
@@ -50,12 +51,9 @@ function runGenerateByos(teamName, scriptName, opts = {}) {
         console.error(`[FAIL]  Script already exists at: ${scriptPath}`);
         process.exit(1);
     }
-    const template = `import { transaction, k6Check } from '../../../dist/utils/transaction.js';
-import { request } from '../../../dist/utils/request.js';
-import { createJourneyLifecycleStore, runJourneyLifecycle, thinktime } from '../../../dist/utils/lifecycle.js';
-import { clearCookies, getEnvContext } from '../../../dist/utils/session.js';
+    const template = `import { transaction, k6Check, request, createJourneyLifecycleStore, runJourneyLifecycle, thinktime, clearCookies, getEnvContext } from '${ScriptGenerator_1.SCRIPT_API_MODULE}';
 // Optional explicit trackers (Proxy on ctx.* auto-registers in most cases):
-// import { trackCorrelation, trackParameter, trackDataRow } from '../../../dist/utils/replayLogger.js';
+// import { trackCorrelation, trackParameter, trackDataRow } from '${ScriptGenerator_1.SCRIPT_API_MODULE}';
 
 const env = getEnvContext('${teamName}', { baseUrl: 'https://your-dev-environment.com/' });
 const __journeyLifecycleStore = createJourneyLifecycleStore();

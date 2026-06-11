@@ -1,5 +1,14 @@
 import { TransactionGroup } from './TransactionGrouper';
 
+/**
+ * Import specifier for the framework's VU-safe script API barrel (compiled
+ * `dist/index.js`), relative to a generated script at
+ * `testSuites/<suite>/tests/<name>.js`. Centralized here so the path — or a
+ * future bundled package name — changes in exactly one place. Older scripts
+ * that import the per-util `dist/utils/*.js` paths keep working unchanged.
+ */
+export const SCRIPT_API_MODULE = '../../../dist/index.js';
+
 export interface LifecycleSelection {
   initGroups: string[];
   endGroups: string[];
@@ -49,11 +58,7 @@ export class ScriptGenerator {
     teamName: string,
     options?: GenerateOptions,
   ): string {
-    let script = `import { transaction, k6Check } from '../../../dist/utils/transaction.js';\n`;
-    script += `import { request } from '../../../dist/utils/request.js';\n`;
-    script += `import { createJourneyLifecycleStore, runJourneyLifecycle, thinktime } from '../../../dist/utils/lifecycle.js';\n`;
-    script += `import { logReplayExchange, trackCorrelation, trackParameter } from '../../../dist/utils/replayLogger.js';\n`;
-    script += `import { clearCookies, getEnvContext } from '../../../dist/utils/session.js';\n`;
+    let script = `import { transaction, k6Check, request, createJourneyLifecycleStore, runJourneyLifecycle, thinktime, logReplayExchange, trackCorrelation, trackParameter, clearCookies, getEnvContext } from '${SCRIPT_API_MODULE}';\n`;
     if (options?.extraImports && options.extraImports.length > 0) {
       // De-dupe: skip any extraImport already present in the fixed imports above.
       const seen = new Set(script.split('\n'));

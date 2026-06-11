@@ -6,6 +6,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import { SCRIPT_API_MODULE } from '../recording/ScriptGenerator';
 
 export function runInit(projectDir: string = process.cwd()): void {
   console.log(`\n Initializing k6 Performance Framework project at: ${projectDir}\n`);
@@ -261,11 +262,7 @@ testuser003,P@ssw0rd3,testuser003@perf-test.local
   // -- Sample: browse journey script -------------
   writeIfNotExists(
     path.join(projectDir, 'testSuites/sample_team/tests/browse-journey.js'),
-    `import { transaction, k6Check } from '../../../dist/utils/transaction.js';
-import { request } from '../../../dist/utils/request.js';
-import { createJourneyLifecycleStore, runJourneyLifecycle, thinktime } from '../../../dist/utils/lifecycle.js';
-import { logReplayExchange, trackCorrelation, trackParameter } from '../../../dist/utils/replayLogger.js';
-import { clearCookies, getEnvContext } from '../../../dist/utils/session.js';
+    `import { transaction, k6Check, request, createJourneyLifecycleStore, runJourneyLifecycle, thinktime, logReplayExchange, trackCorrelation, trackParameter, clearCookies, getEnvContext } from '${SCRIPT_API_MODULE}';
 
 const env = getEnvContext('sample_team', { baseUrl: 'https://your-dev-environment.com/' });
 const __journeyLifecycleStore = createJourneyLifecycleStore();
@@ -303,11 +300,7 @@ export default function () {
   // -- Sample: checkout journey script -----------
   writeIfNotExists(
     path.join(projectDir, 'testSuites/sample_team/tests/checkout-journey.js'),
-    `import { transaction, k6Check } from '../../../dist/utils/transaction.js';
-import { request } from '../../../dist/utils/request.js';
-import { createJourneyLifecycleStore, runJourneyLifecycle, thinktime } from '../../../dist/utils/lifecycle.js';
-import { logReplayExchange, trackCorrelation, trackParameter } from '../../../dist/utils/replayLogger.js';
-import { clearCookies, getEnvContext } from '../../../dist/utils/session.js';
+    `import { transaction, k6Check, request, createJourneyLifecycleStore, runJourneyLifecycle, thinktime, logReplayExchange, trackCorrelation, trackParameter, clearCookies, getEnvContext } from '${SCRIPT_API_MODULE}';
 
 const env = getEnvContext('sample_team', { baseUrl: 'https://your-dev-environment.com/' });
 const __journeyLifecycleStore = createJourneyLifecycleStore();

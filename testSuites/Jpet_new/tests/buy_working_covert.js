@@ -1,9 +1,5 @@
 import { sleep } from 'k6';
-import { transaction, k6Check } from '../../../dist/utils/transaction.js';
-import { request } from '../../../dist/utils/request.js';
-import { trackCorrelation, trackParameter, trackDataRow } from '../../../dist/utils/replayLogger.js';
-import { createJourneyLifecycleStore, runJourneyLifecycle, thinktime } from '../../../dist/utils/lifecycle.js';
-import { clearCookies, getEnvContext } from '../../../dist/utils/session.js';
+import { transaction, k6Check, request, trackCorrelation, trackParameter, trackDataRow, createJourneyLifecycleStore, runJourneyLifecycle, thinktime, clearCookies, getEnvContext } from '../../../dist/index.js';
 import execution from "k6/execution";
 
 const env = getEnvContext('Jpet_new', { baseUrl: 'https://jpetstore.aspectran.com' });

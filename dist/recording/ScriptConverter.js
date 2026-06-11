@@ -456,12 +456,9 @@ class ScriptConverter {
     static buildImportBlock(source, _hasTransactionImport, _hasLogReplayExchange) {
         const lines = [];
         lines.push(`import { sleep } from 'k6';`);
-        lines.push(`import { transaction, k6Check } from '../../../dist/utils/transaction.js';`);
-        lines.push(`import { request } from '../../../dist/utils/request.js';`);
-        // trackCorrelation / trackParameter / trackDataRow still needed for correlation/data tracking
-        lines.push(`import { trackCorrelation, trackParameter, trackDataRow } from '../../../dist/utils/replayLogger.js';`);
-        lines.push(`import { createJourneyLifecycleStore, runJourneyLifecycle, thinktime } from '../../../dist/utils/lifecycle.js';`);
-        lines.push(`import { clearCookies, getEnvContext } from '../../../dist/utils/session.js';`);
+        // Single VU-safe barrel import (see SCRIPT_API_MODULE). Includes correlation/
+        // data tracking (trackCorrelation/trackParameter/trackDataRow) and lifecycle.
+        lines.push(`import { transaction, k6Check, request, trackCorrelation, trackParameter, trackDataRow, createJourneyLifecycleStore, runJourneyLifecycle, thinktime, clearCookies, getEnvContext } from '${ScriptGenerator_1.SCRIPT_API_MODULE}';`);
         // Preserve any other imports from the original source (CorrelationEngine, RuleProcessor, etc.)
         const srcLines = source.split('\n');
         for (const srcLine of srcLines) {
@@ -805,7 +802,9 @@ class ScriptConverter {
         // Normalize stale patterns before phase splitting
         let cleaned = source;
         cleaned = cleaned.replace(/^\s*variableEvents:\s*\[\],?\n/gm, '');
-        cleaned = cleaned.replace(/from\s+['"](\.\.\/)+(dist\/utils\/)/g, `from '../../../dist/utils/`);
+        // Normalize stale relative depths for both the legacy per-util imports and
+        // the consolidated barrel import to the canonical '../../../dist/...' depth.
+        cleaned = cleaned.replace(/from\s+['"](?:\.\.\/)+dist\/(utils\/|index\.js)/g, `from '../../../dist/$1`);
         const markerMatch = cleaned.match(/export\s+default\s+function\s*\(\s*\)\s*\{/);
         if (!markerMatch) {
             return cleaned;
@@ -822,7 +821,7 @@ class ScriptConverter {
         const statements = this.splitTopLevelStatements(defaultBody);
         const grouped = this.partitionLifecycleStatements(statements, lifecycle ?? { initGroups: [], endGroups: [] });
         if (!/createJourneyLifecycleStore/.test(beforeDefault)) {
-            beforeDefault += `\nimport { createJourneyLifecycleStore, runJourneyLifecycle } from '../../../dist/utils/lifecycle.js';\n`;
+            beforeDefault += `\nimport { createJourneyLifecycleStore, runJourneyLifecycle } from '${ScriptGenerator_1.SCRIPT_API_MODULE}';\n`;
         }
         // Strip any stale const env / registerBaseUrl declarations that will be re-emitted below.
         // This prevents duplicate declarations when applyPhaseContract is called on already

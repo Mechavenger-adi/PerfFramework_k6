@@ -5,6 +5,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import { SCRIPT_API_MODULE } from '../recording/ScriptGenerator';
 
 export function runGenerateByos(
   teamName: string,
@@ -25,12 +26,9 @@ export function runGenerateByos(
   }
 
 
-  const template = `import { transaction, k6Check } from '../../../dist/utils/transaction.js';
-import { request } from '../../../dist/utils/request.js';
-import { createJourneyLifecycleStore, runJourneyLifecycle, thinktime } from '../../../dist/utils/lifecycle.js';
-import { clearCookies, getEnvContext } from '../../../dist/utils/session.js';
+  const template = `import { transaction, k6Check, request, createJourneyLifecycleStore, runJourneyLifecycle, thinktime, clearCookies, getEnvContext } from '${SCRIPT_API_MODULE}';
 // Optional explicit trackers (Proxy on ctx.* auto-registers in most cases):
-// import { trackCorrelation, trackParameter, trackDataRow } from '../../../dist/utils/replayLogger.js';
+// import { trackCorrelation, trackParameter, trackDataRow } from '${SCRIPT_API_MODULE}';
 
 const env = getEnvContext('${teamName}', { baseUrl: 'https://your-dev-environment.com/' });
 const __journeyLifecycleStore = createJourneyLifecycleStore();

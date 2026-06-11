@@ -1,4 +1,12 @@
 import { TransactionGroup } from './TransactionGrouper';
+/**
+ * Import specifier for the framework's VU-safe script API barrel (compiled
+ * `dist/index.js`), relative to a generated script at
+ * `testSuites/<suite>/tests/<name>.js`. Centralized here so the path — or a
+ * future bundled package name — changes in exactly one place. Older scripts
+ * that import the per-util `dist/utils/*.js` paths keep working unchanged.
+ */
+export declare const SCRIPT_API_MODULE = "../../../dist/index.js";
 export interface LifecycleSelection {
     initGroups: string[];
     endGroups: string[];
