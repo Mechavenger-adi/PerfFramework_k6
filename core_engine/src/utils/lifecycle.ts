@@ -37,8 +37,13 @@ export interface PhaseFns {
 
 interface RuntimeMetadata {
   errorBehavior: string;
-  pacingEnabled: boolean;
-  pacingSeconds: number;
+  pacing?: {
+    enabled?: boolean;
+    mode?: string;
+    fixed?: number;
+    min?: number;
+    max?: number;
+  };
 }
 
 interface PhaseMetadata {
@@ -115,9 +120,33 @@ function parseJsonEnv<T>(name: string, fallback: T): T {
 function getRuntimeMetadata(): RuntimeMetadata {
   return parseJsonEnv('K6_PERF_RUNTIME_METADATA', {
     errorBehavior: 'continue',
-    pacingEnabled: false,
-    pacingSeconds: 0,
+    pacing: { enabled: false },
   });
+}
+
+/**
+ * Pacing: a sleep applied at the END of the action phase — i.e. BETWEEN action
+ * iterations — to control how often each VU starts a new iteration. Mirrors
+ * think time's fixed/random modes, but where think time spaces transactions
+ * WITHIN an action, pacing spaces the iterations themselves. Computed fresh each
+ * call so 'random' varies per iteration.
+ */
+function applyPacing(runtime: RuntimeMetadata): void {
+  const pacing = runtime.pacing;
+  if (!pacing || !pacing.enabled) return;
+
+  let seconds: number;
+  if (pacing.mode === 'random') {
+    const min = Number(pacing.min ?? 0);
+    const max = Number(pacing.max ?? 0);
+    seconds = max > min ? min + Math.random() * (max - min) : min;
+  } else {
+    seconds = Number(pacing.fixed ?? 0);
+  }
+
+  if (seconds > 0) {
+    sleep(seconds);
+  }
 }
 
 function getPhaseMetadata(): PhaseMetadata {
@@ -505,9 +534,7 @@ export function runJourneyLifecycle(store: JourneyLifecycleStore, phaseFns: Phas
   if (activeEndPlan && activeEndPlan.endDisabled) {
     frameworkIterations.add(1);
     runSafely(store, 'action', phaseFns.actionPhase, runtime);
-    if (runtime.pacingEnabled && Number(runtime.pacingSeconds || 0) > 0) {
-      sleep(Number(runtime.pacingSeconds));
-    }
+    applyPacing(runtime);
     return;
   }
 
@@ -524,12 +551,16 @@ export function runJourneyLifecycle(store: JourneyLifecycleStore, phaseFns: Phas
     return;
   }
 
-  if (runtime.pacingEnabled && Number(runtime.pacingSeconds || 0) > 0) {
-    sleep(Number(runtime.pacingSeconds));
+  // Pace between iterations — but skip it when this VU is about to end, so the
+  // pacing sleep doesn't eat into the gracefulRampDown budget the VU needs to
+  // reach endPhase() in time (same rationale as thinktime()'s end-window skip).
+  const endingAfter = isEndDueAfter();
+  if (!endingAfter) {
+    applyPacing(runtime);
   }
 
   // (2) Post-action check — catches VUs that crossed their deadline DURING the action.
-  if (isEndDueAfter() && phaseFns.endPhase) {
+  if (endingAfter && phaseFns.endPhase) {
     runSafely(store, 'end', phaseFns.endPhase, runtime);
     state.ended = true;
   }

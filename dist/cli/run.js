@@ -680,8 +680,12 @@ function buildScenarioRuntimeMetadata(plan, resolvedConfig, runId, safeReportDir
                 min: resolvedConfig.runtime.thinkTime.min,
                 max: resolvedConfig.runtime.thinkTime.max,
             },
-            pacingEnabled: runtime.isPacingEnabled(),
-            pacingSeconds: runtime.getPacingSeconds(),
+            pacing: runtime.getPacingRuntimeConfig(),
+            http: {
+                timeoutMs: runtime.getTimeoutMs(),
+                maxRedirects: runtime.getMaxRedirects(),
+                throwOnError: runtime.shouldThrowOnError(),
+            },
             reporting: {
                 transactionStats: runtime.getTransactionStats(),
                 includeTransactionTable: runtime.shouldIncludeTransactionTable(),

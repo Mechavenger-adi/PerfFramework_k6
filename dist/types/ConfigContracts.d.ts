@@ -17,6 +17,7 @@ export interface EnvironmentConfig {
 }
 export type ErrorBehavior = 'continue' | 'stop_iteration' | 'stop_vu' | 'abort_test';
 export type ThinkTimeMode = 'fixed' | 'random';
+export type PacingMode = 'fixed' | 'random';
 export interface ThinkTimeConfig {
     mode: ThinkTimeMode;
     /** Fixed think time in seconds (used when mode = 'fixed') */
@@ -27,9 +28,17 @@ export interface ThinkTimeConfig {
     max?: number;
 }
 export interface PacingConfig {
-    /** Enable pacing (iteration-based rate control) */
+    /** Enable pacing (a sleep applied between action iterations). */
     enabled: boolean;
-    /** Target duration between iteration starts in seconds */
+    /** How the pace duration is derived (default 'fixed'). Mirrors think time. */
+    mode?: PacingMode;
+    /** Fixed pace in seconds (used when mode = 'fixed'). */
+    fixed?: number;
+    /** Min seconds (used when mode = 'random'). */
+    min?: number;
+    /** Max seconds (used when mode = 'random'). */
+    max?: number;
+    /** @deprecated legacy fixed pace; still honored as a fallback for `fixed`. */
     targetIntervalSeconds?: number;
 }
 export interface HttpConfig {

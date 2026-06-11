@@ -107,7 +107,7 @@ function runInit(projectDir = process.cwd()) {
     writeIfNotExists(path.join(projectDir, 'config/runtime_settings/default.json'), JSON.stringify({
         $schema: '../schemas/runtime_settings.schema.json',
         thinkTime: { ignoreThinkTime: false, globalOverride: true, mode: 'fixed', fixed: 1 },
-        pacing: { enabled: false },
+        pacing: { enabled: false, mode: 'fixed', fixed: 5, min: 1, max: 5 },
         http: { timeoutSeconds: 60, maxRedirects: 10, throwOnError: false },
         errorBehavior: 'continue',
         reporting: {

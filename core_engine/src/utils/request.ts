@@ -196,6 +196,33 @@ function getSnapshotConfig(): SnapshotConfig {
 
 let _snapshotCount = 0;
 
+// ── HTTP defaults from runtime settings ────────────────────────
+// timeout / maxRedirects / throwOnError configured in runtime_settings are
+// injected into K6_PERF_RUNTIME_METADATA.http and applied as DEFAULTS here.
+// Per-call RequestOptions always win over these.
+
+interface HttpRuntimeConfig {
+  timeoutMs?: number;
+  maxRedirects?: number;
+  throwOnError?: boolean;
+}
+
+let _httpConfigCache: HttpRuntimeConfig | null | undefined;
+
+function getHttpRuntimeConfig(): HttpRuntimeConfig {
+  if (_httpConfigCache !== undefined) return _httpConfigCache ?? {};
+  try {
+    const raw = typeof __ENV !== 'undefined' ? __ENV.K6_PERF_RUNTIME_METADATA : undefined;
+    if (raw) {
+      const parsed = JSON.parse(raw) as { http?: HttpRuntimeConfig };
+      _httpConfigCache = parsed.http ?? null;
+      return _httpConfigCache ?? {};
+    }
+  } catch { /* silent */ }
+  _httpConfigCache = null;
+  return {};
+}
+
 // ── Header sanitization ───────────────────────────────────────
 
 const STRIP_HEADERS = new Set(['content-length', 'transfer-encoding', 'host']);
@@ -372,9 +399,13 @@ export function request(
 
   const cleanHeaders = sanitizeHeaders(options?.headers);
 
+  // Runtime-settings HTTP defaults (timeout / maxRedirects / throwOnError).
+  // Per-call options always take precedence over these.
+  const httpCfg = getHttpRuntimeConfig();
+
   const k6Params: Record<string, unknown> = {
     cookies: options?.cookies ?? {},
-    redirects: options?.redirects ?? 0,
+    redirects: options?.redirects ?? httpCfg.maxRedirects ?? 0,
     tags: {
       transaction,
       har_entry_id: harEntryId,
@@ -388,12 +419,16 @@ export function request(
   };
 
   if (cleanHeaders && Object.keys(cleanHeaders).length > 0) k6Params.headers = cleanHeaders;
+  // timeout: per-call wins, else runtime default (k6 takes ms as a number).
   if (options?.timeout !== undefined) k6Params.timeout = options.timeout;
+  else if (httpCfg.timeoutMs !== undefined) k6Params.timeout = httpCfg.timeoutMs;
   if (options?.auth !== undefined) k6Params.auth = options.auth;
   if (options?.responseType !== undefined) k6Params.responseType = options.responseType;
   if (options?.jar !== undefined) k6Params.jar = options.jar;
   if (options?.compression !== undefined) k6Params.compression = options.compression;
+  // throw: per-call wins, else runtime default (http.throwOnError).
   if (options?.throw !== undefined) k6Params.throw = options.throw;
+  else if (httpCfg.throwOnError !== undefined) k6Params.throw = httpCfg.throwOnError;
   if (options?.http2 !== undefined) k6Params.http2 = options.http2;
   if (options?.responseCallback !== undefined) k6Params.responseCallback = options.responseCallback;
 

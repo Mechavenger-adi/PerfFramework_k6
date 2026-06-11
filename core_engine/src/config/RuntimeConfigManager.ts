@@ -53,11 +53,34 @@ export class RuntimeConfigManager {
   }
 
   getPacingSeconds(): number {
-    return this.settings.pacing.targetIntervalSeconds ?? 0;
+    return this.settings.pacing.fixed ?? this.settings.pacing.targetIntervalSeconds ?? 0;
   }
 
   getPacingIntervalMs(): number {
-    return (this.settings.pacing.targetIntervalSeconds ?? 0) * 1000;
+    return this.getPacingSeconds() * 1000;
+  }
+
+  /**
+   * Normalized pacing config injected into the per-VU runtime metadata so each
+   * VU derives a fresh pace each iteration (important for 'random' mode, which
+   * must vary per iteration rather than being precomputed once). Falls back to
+   * the legacy `targetIntervalSeconds` for `fixed`.
+   */
+  getPacingRuntimeConfig(): {
+    enabled: boolean;
+    mode: 'fixed' | 'random';
+    fixed?: number;
+    min?: number;
+    max?: number;
+  } {
+    const p = this.settings.pacing;
+    return {
+      enabled: !!p.enabled,
+      mode: p.mode ?? 'fixed',
+      fixed: p.fixed ?? p.targetIntervalSeconds,
+      min: p.min,
+      max: p.max,
+    };
   }
 
   // ---------------------------------------------

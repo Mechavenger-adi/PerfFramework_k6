@@ -7,7 +7,11 @@
     "fixed": 5
   },
   "pacing": {
-    "enabled": false
+    "enabled": false,
+    "mode": "fixed",
+    "fixed": 5,
+    "min": 1,
+    "max": 5
   },
   "http": {
     "timeoutSeconds": 60,
@@ -47,7 +51,7 @@
     "enabled": true,
     "cpuWarningPercent": 80,
     "memoryWarningPercent": 80,
-    "sampleIntervalSeconds": 30
+    "sampleIntervalSeconds": 5
   },
   "debugMode": false
 }

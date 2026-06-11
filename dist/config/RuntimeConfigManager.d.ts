@@ -19,6 +19,19 @@ export declare class RuntimeConfigManager {
     isPacingEnabled(): boolean;
     getPacingSeconds(): number;
     getPacingIntervalMs(): number;
+    /**
+     * Normalized pacing config injected into the per-VU runtime metadata so each
+     * VU derives a fresh pace each iteration (important for 'random' mode, which
+     * must vary per iteration rather than being precomputed once). Falls back to
+     * the legacy `targetIntervalSeconds` for `fixed`.
+     */
+    getPacingRuntimeConfig(): {
+        enabled: boolean;
+        mode: 'fixed' | 'random';
+        fixed?: number;
+        min?: number;
+        max?: number;
+    };
     getTimeoutMs(): number;
     getMaxRedirects(): number;
     shouldThrowOnError(): boolean;

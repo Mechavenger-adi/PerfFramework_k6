@@ -87,7 +87,7 @@ export function runInit(projectDir: string = process.cwd()): void {
       {
         $schema: '../schemas/runtime_settings.schema.json',
         thinkTime: { ignoreThinkTime: false, globalOverride: true, mode: 'fixed', fixed: 1 },
-        pacing: { enabled: false },
+        pacing: { enabled: false, mode: 'fixed', fixed: 5, min: 1, max: 5 },
         http: { timeoutSeconds: 60, maxRedirects: 10, throwOnError: false },
         errorBehavior: 'continue',
         reporting: {

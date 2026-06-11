@@ -163,8 +163,7 @@ class ReplayRunner {
                         : {}),
                     K6_PERF_RUNTIME_METADATA: JSON.stringify({
                         errorBehavior: options.errorBehavior ?? 'continue',
-                        pacingEnabled: false,
-                        pacingSeconds: 0,
+                        pacing: { enabled: false },
                     }),
                 },
                 // stdout/stderr both inherited (default) so k6's animated progress bar

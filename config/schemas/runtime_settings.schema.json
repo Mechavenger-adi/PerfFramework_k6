@@ -60,20 +60,40 @@
     },
     "pacing": {
       "type": "object",
-      "description": "Iteration-level rate control. When enabled, the framework ensures each iteration takes at least 'targetIntervalSeconds' — adding sleep at the end if the iteration finishes early. This prevents VU 'bunching' under light load. Similar to LoadRunner Pacing.",
+      "description": "Inter-iteration pacing. When enabled, a sleep is applied at the END of each action phase (between iterations) to control how often a VU starts a new iteration. Mirrors think time's fixed/random modes — but think time spaces transactions within an action, whereas pacing spaces the iterations themselves. Skipped automatically when a VU is in its end window so it does not eat into gracefulRampDown.",
       "required": ["enabled"],
       "additionalProperties": false,
       "properties": {
         "enabled": {
           "type": "boolean",
-          "description": "Enable iteration pacing. When false, VUs start the next iteration immediately after the previous one completes.",
+          "description": "Enable inter-iteration pacing. When false, VUs start the next iteration immediately after the previous one completes.",
           "default": false
+        },
+        "mode": {
+          "type": "string",
+          "enum": ["fixed", "random"],
+          "description": "How the pace duration is derived. 'fixed' uses `fixed` seconds every iteration; 'random' picks a fresh value in [min, max] each iteration.",
+          "default": "fixed"
+        },
+        "fixed": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Pace in seconds applied between iterations when mode = 'fixed'. Example: 5 = sleep 5s after each iteration's action phase."
+        },
+        "min": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Minimum pace in seconds (mode = 'random')."
+        },
+        "max": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Maximum pace in seconds (mode = 'random')."
         },
         "targetIntervalSeconds": {
           "type": "number",
           "minimum": 0,
-          "description": "Target duration in seconds for one complete iteration (init → action → end). If the iteration finishes faster, the remaining time is added as a sleep. Example: 30 = each iteration takes at least 30 seconds.",
-          "default": 30
+          "description": "DEPRECATED: legacy fixed pace in seconds. Use `fixed` instead. Still honored as a fallback when `fixed` is absent."
         }
       }
     },

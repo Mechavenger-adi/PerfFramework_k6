@@ -41,12 +41,13 @@
     }
   ],
   "global_sla": {
-    "p99": 2000,
+    
+    "p90": 2000,
     "errorRate": 10
   },
   "journey_slas": {
     "buy_animal_14thmay": {
-      "p95": 1500,
+      "p95": 500,
       "errorRate": 5
     }
   },

@@ -102,6 +102,10 @@ const RUNTIME_SETTINGS_SCHEMA_INLINE = {
             additionalProperties: false,
             properties: {
                 enabled: { type: 'boolean' },
+                mode: { type: 'string', enum: ['fixed', 'random'] },
+                fixed: { type: 'number', minimum: 0 },
+                min: { type: 'number', minimum: 0 },
+                max: { type: 'number', minimum: 0 },
                 targetIntervalSeconds: { type: 'number', minimum: 0 },
             },
         },

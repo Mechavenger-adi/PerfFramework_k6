@@ -44,8 +44,18 @@ export interface ScenarioRuntimeMetadata {
             min?: number;
             max?: number;
         };
-        pacingEnabled: boolean;
-        pacingSeconds: number;
+        pacing: {
+            enabled: boolean;
+            mode: string;
+            fixed?: number;
+            min?: number;
+            max?: number;
+        };
+        http: {
+            timeoutMs: number;
+            maxRedirects: number;
+            throwOnError: boolean;
+        };
         reporting: {
             transactionStats: string[];
             includeTransactionTable: boolean;
