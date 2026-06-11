@@ -16,6 +16,8 @@ export declare class GatekeeperValidator {
      * Returns a result object — never throws; caller decides how to handle failures.
      */
     validate(config: ResolvedConfig, plan: TestPlan, dataRoot: string): GatekeeperResult;
+    /** Transaction names declared in a script via transaction()/startTransaction(). */
+    private extractTransactionNames;
     /**
      * Print the result to console in a human-readable format.
      * Returns the same result for chaining.

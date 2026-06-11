@@ -40,6 +40,12 @@ class ThresholdManager {
                 if (rules.length > 0) {
                     thresholds[txnName] = rules;
                 }
+                // errorRate maps to the per-transaction pass-rate metric `<name>_checkrate`
+                // (created in transaction.ts). checkrate is the PASS rate, so an errorRate
+                // budget of N% means the pass rate must stay above (1 - N/100).
+                if (sla.errorRate !== undefined) {
+                    thresholds[`${txnName}_checkrate`] = [`rate>${1 - sla.errorRate / 100}`];
+                }
             }
         }
         return thresholds;

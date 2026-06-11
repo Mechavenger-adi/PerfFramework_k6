@@ -158,11 +158,61 @@ class GatekeeperValidator {
                 }
             }
         }
+        // -- 9. SLA target validation --------------
+        // Fail fast on SLAs that target a journey/transaction that doesn't exist in
+        // this plan — otherwise the generated k6 threshold silently matches nothing
+        // (journey) or makes k6 error on an unknown metric (transaction).
+        const journeyNames = new Set((plan.user_journeys ?? []).map((j) => j.name));
+        if (plan.journey_slas) {
+            for (const target of Object.keys(plan.journey_slas)) {
+                if (!journeyNames.has(target)) {
+                    failures.push(`[SLA] journey_slas targets unknown journey '${target}'. Its threshold ` +
+                        `(http_req_duration{scenario:${target}}) would match no traffic. ` +
+                        `Defined journeys: ${[...journeyNames].join(', ') || '(none)'}.`);
+                }
+            }
+        }
+        if (plan.transaction_slas) {
+            const txnNames = new Set();
+            for (const journey of plan.user_journeys ?? []) {
+                const sp = journey.scriptPath;
+                if (!sp || !fs.existsSync(sp))
+                    continue;
+                for (const n of this.extractTransactionNames(fs.readFileSync(sp, 'utf-8'))) {
+                    txnNames.add(n);
+                }
+            }
+            for (const target of Object.keys(plan.transaction_slas)) {
+                if (!txnNames.has(target)) {
+                    failures.push(`[SLA] transaction_slas targets unknown transaction '${target}'. No ` +
+                        `transaction by that name was found in the journey scripts, so its ` +
+                        `threshold can never be evaluated. ` +
+                        `Known transactions: ${[...txnNames].join(', ') || '(none found)'}.`);
+                }
+            }
+        }
         return {
             passed: failures.length === 0,
             failures,
             warnings,
         };
+    }
+    /** Transaction names declared in a script via transaction()/startTransaction(). */
+    extractTransactionNames(source) {
+        const names = new Set();
+        const patterns = [
+            /transaction\(\s*(['"`])([^'"`]+)\1\s*,/g,
+            /startTransaction\(\s*(['"`])([^'"`]+)\1\s*\)/g,
+        ];
+        for (const re of patterns) {
+            let m;
+            while ((m = re.exec(source)) !== null) {
+                const n = m[2]?.trim();
+                if (n)
+                    names.add(n);
+            }
+        }
+        return [...names];
     }
     /**
      * Print the result to console in a human-readable format.

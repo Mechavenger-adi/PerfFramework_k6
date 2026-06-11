@@ -892,6 +892,27 @@ async function finalizeRunArtifacts(options) {
     if (k6Events.warnings.length > 0) {
         eventArtifacts.warnings.push(...k6Events.warnings);
     }
+    // Surface check/assertion failures on the console post-run — which check
+    // failed, on which request, and at which script line. The live console can
+    // race these out during fast runs (and the live table owns the terminal), so
+    // we always print a concise summary here after the run completes.
+    const checkFailures = k6Events.errors
+        .filter((e) => e.type === 'check_failed' || e.type === 'transaction_error');
+    if (checkFailures.length > 0) {
+        const MAX = 20;
+        logger_1.Logger.warn(`${checkFailures.length} check/assertion failure(s):`);
+        for (const e of checkFailures.slice(0, MAX)) {
+            const txn = e.transaction ? `[transaction:${e.transaction}] ` : '';
+            const where = e.vu !== undefined ? `(VU ${e.vu}, iter ${e.iteration}) ` : '';
+            const msg = String(e.message ?? 'failed');
+            const req = e.request ? ` ${e.request}` : '';
+            const loc = e.location ? `  at ${e.location}` : '';
+            logger_1.Logger.detail(`${txn}${where}${msg}${req}${loc}`);
+        }
+        if (checkFailures.length > MAX) {
+            logger_1.Logger.detail(`… and ${checkFailures.length - MAX} more (see the report's Errors tab / errors.ndjson)`);
+        }
+    }
     // Wave 3: also surface every breached threshold as an ERROR in addition to
     // the existing warning event. Reasoning: a breached SLA is a run-level
     // failure (already reflected in ciSummary.status === 'failed'), so users

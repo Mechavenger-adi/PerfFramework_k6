@@ -373,6 +373,22 @@ function k6Check(val, sets) {
         }
         catch { /* defensive: never let event emission throw */ }
         const failMsg = `check() failed: ${failingKeys.length > 0 ? failingKeys.join(', ') : 'unknown assertion'}`;
+        // Which request the check ran against (k6 Response.request) + the script
+        // location of THIS k6Check() call, so a failure points at a real file:line
+        // and the exact request — not just a metric count.
+        const location = extractScriptLocation(new Error().stack);
+        let reqInfo = '';
+        let statusInfo = '';
+        try {
+            const r = val?.request;
+            if (r && r.url)
+                reqInfo = ` on ${r.method || 'REQ'} ${r.url}`;
+            if (val && typeof val.status !== 'undefined')
+                statusInfo = ` (response status ${val.status})`;
+        }
+        catch { /* val may not be an HTTP response */ }
+        const vu = (typeof execution_1.default !== 'undefined' && execution_1.default.vu) ? execution_1.default.vu.idInInstance : undefined;
+        const iter = (typeof execution_1.default !== 'undefined' && execution_1.default.vu) ? execution_1.default.vu.iterationInScenario : undefined;
         try {
             console.log('[k6-perf][error-event] ' + JSON.stringify({
                 ts: new Date().toISOString(),
@@ -380,8 +396,10 @@ function k6Check(val, sets) {
                 transaction: txn || undefined,
                 message: failMsg,
                 failingChecks: failingKeys,
-                vu: typeof execution_1.default !== 'undefined' && execution_1.default.vu ? execution_1.default.vu.idInInstance : undefined,
-                iteration: typeof execution_1.default !== 'undefined' && execution_1.default.vu ? execution_1.default.vu.iterationInScenario : undefined,
+                request: reqInfo.trim() || undefined,
+                location: location || undefined,
+                vu,
+                iteration: iter,
             }));
         }
         catch { /* never let logging throw */ }
@@ -391,20 +409,26 @@ function k6Check(val, sets) {
                 hook('check_failed', failMsg);
         }
         catch { /* defensive: snapshot best-effort */ }
+        // Always surface the failure with full detail — every errorBehavior, INCLUDING
+        // 'continue': which check failed, on which request, and at which script line.
+        const checksStr = failingKeys.length > 0 ? failingKeys.map((k) => `'${k}'`).join(', ') : 'assertion';
+        const consequence = behavior === 'abort_test' ? ' → aborting test'
+            : behavior === 'stop_vu' ? ' → stopping this VU'
+                : behavior === 'stop_iteration' ? ' → ending iteration'
+                    : '';
+        console.error(`[k6-perf][check-failed] ${ctx} (VU ${vu}, iter ${iter}) check ${checksStr} failed`
+            + `${reqInfo}${statusInfo}${location ? `  at ${location}` : ''}${consequence}`);
         if (behavior === 'abort_test') {
-            console.error(`[k6-perf]${ctx} check() failed → aborting test`);
             execution_1.default.test.abort(`[k6-perf]${ctx} check() failed — aborting test`);
         }
         else if (behavior === 'stop_vu') {
-            console.error(`[k6-perf]${ctx} check() failed → stopping VU permanently`);
             _vuTerminated = true;
             // Don't throw — let the transaction end cleanly; lifecycle will skip future iterations.
         }
         else if (behavior === 'stop_iteration') {
-            console.error(`[k6-perf]${ctx} check() failed → stopping iteration`);
             throw new Error(`[k6-perf]${ctx} check() failed`);
         }
-        // 'continue' — return false, let caller decide
+        // 'continue' — already logged above; return false and let the caller decide.
     }
     return passed;
 }
