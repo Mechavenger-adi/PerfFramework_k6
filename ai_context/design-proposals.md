@@ -1000,3 +1000,121 @@ The `HAREntry[]` produced by the adapter is *synthetic* — `id`, `pageref`, `ti
 3. ✅ `cli/run.ts` — registered `import` parent command and `import curl` subcommand.
 4. ✅ Smoke test: realistic POST curl with JSON body + basic auth → framework-shaped script with hoisted env baseUrl, base64 Authorization header, default k6Check.
 5. ✅ Edge-case sweep: empty body (`-d ''`), JSON body, basic auth, multi-line `\` continuation, multi-curl file with `# name` comments, unsupported flags producing warnings (not crashes). One tokenizer bug found and fixed mid-implementation (empty quoted strings now flush as tokens).
+
+---
+
+## Proposal 6: Auto Headers — Persistent Per-VU Request Headers
+
+**Status:** ✅ IMPLEMENTED — `utils/autoHeaders.ts` (per-VU store), merged in `request.ts`, exported via `index.ts`. Verified on the wire (per-call override, one-shot consume, VU-lifetime persist, case-insensitive).
+**Affects:** new `utils/autoHeaders.ts`, `utils/request.ts`, `index.ts` (script-API barrel), optionally `ScriptGenerator.ts` / `ScriptConverter.ts`, docs
+
+### Problem
+
+LoadRunner's `web_add_auto_header()` lets a script register a header once so every subsequent request carries it automatically until it is replaced or removed. The framework has no equivalent — headers must be passed per `request()` call via `options.headers`, which is verbose and error-prone for cross-cutting headers (auth tokens, tenant ids, correlation headers).
+
+### Locked Decisions
+
+1. **VU-lifetime persistence.** An auto header persists for the VU's entire life — across all iterations and phases. There is **no per-iteration reset**. Removal is explicit only (`removeAutoHeader` / `clearAutoHeaders`).
+2. **Case-insensitive names.** `Content-Type` and `content-type` are the same header; the store normalizes keys so re-adding replaces rather than duplicates.
+3. **Per-call precedence.** A `headers` entry passed to a specific `request()` call overrides the auto header **for that call only** (explicit beats automatic). The auto header is unaffected for later calls.
+4. **One-shot sibling (optional).** `addHeaderOnce(name, value)` applies to the **next** `request()` only, then is consumed — parity with LoadRunner `web_add_header`. May ship with the same change or be deferred.
+
+### Script API (exported via the safe barrel `index.ts`)
+
+```js
+addAutoHeader(name, value)                 // add/replace (case-insensitive)
+addAutoHeaders({ Authorization: '…', 'X-Tenant': 't1' })
+removeAutoHeader(name)
+clearAutoHeaders()
+getAutoHeaders()                           // inspection / debug
+addHeaderOnce(name, value)                 // optional: next request only
+```
+
+```js
+export function initPhase(ctx) {
+  // after login → token:
+  addAutoHeader('Authorization', `Bearer ${ctx.correlation.token}`);
+}
+export function actionPhase() {
+  request('GET', `${env.baseUrl}/orders`);   // Authorization sent automatically
+}
+```
+
+### Mechanism
+
+- New **VU-safe** module `core_engine/src/utils/autoHeaders.ts` holding a **per-VU `Map`** (module scope is per-VU in k6 — same pattern as `_iterationRequestCount` in `request.ts`). Keys stored in a canonical (lower-cased) form for case-insensitive replace; original casing preserved for emission.
+- `request()` merges headers as **`{ ...autoHeaders, ...perCallHeaders }`** before `sanitizeHeaders()` (in `request.ts`, where `k6Params.headers` is built). One-shot headers are spliced in and cleared after the call.
+- Exported through `index.ts` so generated/converted scripts can call them. Generators do **not** need to emit anything new (additive runtime API).
+
+### Constraints / contracts
+
+- Per **C2**: `request.ts` imports `autoHeaders.ts` directly (with the explicit `.js` extension — k6 cannot resolve extensionless paths); no new cross-module globals.
+- Additive only — existing scripts and the replay/snapshot contracts are unaffected.
+
+### Edge cases
+
+- Empty/`undefined` value → treat as remove (define explicitly in impl).
+- `sanitizeHeaders()` still applies to the merged set (drops disallowed/unsafe headers).
+- Auto headers do **not** leak across VUs (per-VU module state).
+
+---
+
+## Proposal 7: Runtime Data Writer — Write Files During the Run
+
+**Status:** ✅ IMPLEMENTED (live tail, option B) — `utils/dataWriter.ts` (VU `writeData`), `execution/FileWriteSink.ts` (path-confined writer), `onMessage` tap added to `LiveConsoleLogStream.ts`, wired into the run (`run.ts`) and debug (`ReplayRunner.ts`) paths, exported via `index.ts`. Verified end-to-end: 4 VUs × 3 iters concurrently appended 12 ordered lines to one shared file; per-VU files; overwrite mode; base64 decode. No caps (per decision).
+**Affects:** new `utils/dataWriter.ts` (VU emit), new runner sink (`execution/FileWriteSink.ts`), `PipelineRunner` `onLine` wiring, `run.ts` + `ReplayRunner` integration, `index.ts` barrel, docs
+
+### Hard constraint (the thing this design works around)
+
+**k6 VUs cannot write to the filesystem.** The goja sandbox exposes no write API; `k6/experimental/fs` is **read-only**, and there is no per-VU teardown that can write. Therefore any "write data during the run" must send the data **out of the VU** over the stdout/log channel, and the **Node-side runner** performs the actual file write. This reuses the exact pattern already used by replay logging and snapshots (see **C4**).
+
+### Locked Decisions
+
+1. **Formats to start:** text / JSON / CSV. **Encoding option included** (`utf8` default, `base64` supported) — base64 keeps the design open to binary later without rework.
+2. **No caps.** No byte/line limits are enforced; volume is the user's responsibility. Document an advisory ("capture keys/ids, not full response bodies") but do not throttle or cap.
+3. **Mechanism:** log-channel via the existing `PipelineRunner.onLine` per-line hook. **No xk6 custom binary.**
+4. **Path:** relative paths resolve under the run's output directory (default); **absolute paths are written verbatim** to any user-chosen location. Missing files and parent directories are created automatically on first write.
+
+### Script API (exported via the safe barrel `index.ts`)
+
+```js
+writeData('created_ids.csv', `${orderId},${ts}\n`);                 // append a record
+writeData('payloads/u1.json', JSON.stringify(obj), { mode: 'overwrite' });
+writeData('blob.bin', bytesBase64, { encoding: 'base64' });          // future binary
+// opts: { mode?: 'append' | 'overwrite', encoding?: 'utf8' | 'base64', perVU?: boolean }
+```
+
+### Wire format
+
+Each `writeData` call emits **one tagged line** to stdout:
+
+```
+__K6PERF_FILE__{"f":"created_ids.csv","m":"a","e":"utf8","d":"<payload>"}
+```
+
+### Capture channel (verified)
+
+A VU's only output is `console.log`, and k6 routes it through its **logger → stderr / `--log-output file=`**, **never stdout**. Therefore `PipelineRunner.onLine` (a stdout hook) **cannot** see VU data. Capture must read the **k6 log file** the framework already produces via `--log-output file=` (the same file `ReplayRunner` parses post-run). Lines arrive in logfmt: `time="…" level=info msg="<the console.log string>" source=console` — the sink extracts the `msg="…"` payload, then the `__K6PERF_FILE__{…}` tag inside it.
+
+### Mechanism
+
+- **VU side** (`dataWriter.ts`): serialize the call to one tagged line and `console.log` it. Multi-line/CSV payloads are JSON-escaped into the single `d` field.
+- **Runner side** (`FileWriteSink`): consumes the k6 log file, extracts `msg`, parses `__K6PERF_FILE__` lines, resolves the path (relative → run output dir, absolute → verbatim), creates missing dirs/file, and appends/overwrites. `base64` → decode to bytes before writing. A **single consumer serializes** all VUs' appends → ordered, non-corrupt writes to a shared file; `perVU: true` routes to a per-VU filename for full parallelism.
+- **Timing fork (decide before build):**
+  - **(A) Post-run flush** — parse the completed log file after k6 exits and write all data files. Simplest, reuses `ReplayRunner`'s existing log parsing, fully handles concurrent VUs; files appear when the run ends.
+  - **(B) Live tail** — incrementally read the log file as k6 writes it, so files materialize during the run. More runner work (incremental reader + partial-line handling + flush on close); does not disturb the stderr progress bar.
+- Wired into **both** the `run` (load) and `debug` paths so it is not debug-only.
+
+### Constraints / contracts
+
+- Reuse the existing `onLine` / `--log-output` pipeline — do **not** invent a parallel output transport (**C4** spirit).
+- VU-safe module only, exported via `index.ts` (the safe barrel).
+
+### Risks (no enforced caps, per decision)
+
+- High RPS + large payloads through stdout will bloat logs and cost throughput — advisory only, documented; not capped.
+- Interleaving across VUs is handled by the single consumer (or `perVU` files).
+
+### Alternative (deferred)
+
+`xk6-file` gives **true in-VU streaming writes** but requires a **custom k6 binary** (build + distribute). Revisit only if the log-channel volume becomes a bottleneck; the log-channel approach ships with zero special binary and reuses existing infra.

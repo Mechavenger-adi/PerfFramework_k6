@@ -5,6 +5,7 @@ import { PipelineRunner } from '../execution/PipelineRunner';
 import { ScenarioBuilder } from '../scenario/ScenarioBuilder';
 import { Logger } from '../utils/logger';
 import { startLiveConsoleLogStream } from '../utils/LiveConsoleLogStream';
+import { FileWriteSink } from '../execution/FileWriteSink';
 import { createSpinner } from '../utils/ProgressBar';
 import { DiffChecker, DiffResult } from './DiffChecker';
 import { TaggedExchangeLogEntry } from './ExchangeLog';
@@ -158,7 +159,8 @@ export class ReplayRunner {
     // Live tailer pretty-prints script console.log/warn/error and k6 framework
     // errors in real time while k6 is running. Replaces the previous post-run
     // recap so output appears LIVE instead of dumping at the end of the run.
-    const liveConsole = startLiveConsoleLogStream(logOutputPath);
+    const fileWriteSink = new FileWriteSink(outputDir);
+    const liveConsole = startLiveConsoleLogStream(logOutputPath, (m) => fileWriteSink.consume(m));
     let runResult;
     try {
       runResult = await PipelineRunner.executeAsync({
@@ -204,6 +206,11 @@ export class ReplayRunner {
       });
     } finally {
       liveConsole.stop();
+      // Reconcile any writeData lines the live tail missed (fast runs flush last).
+      fileWriteSink.flushFromLog(logOutputPath);
+      if (fileWriteSink.fileCount > 0) {
+        Logger.detail(`Data files written (writeData): ${fileWriteSink.fileCount} file(s), ${fileWriteSink.writeCount} write(s)`);
+      }
     }
     Logger.info(`\nk6 execution complete.\n`);
 

@@ -25,7 +25,15 @@ import { Logger } from './logger';
 
 const LIVE_CONSOLE_POLL_MS = 250;
 
-export function startLiveConsoleLogStream(runLogPath: string): { stop: () => void } {
+/**
+ * @param onMessage optional tap invoked with every extracted console message
+ *   (before display). Return true to mark the message consumed — it will then
+ *   be suppressed from the live display (used by FileWriteSink for writeData()).
+ */
+export function startLiveConsoleLogStream(
+  runLogPath: string,
+  onMessage?: (msg: string) => boolean,
+): { stop: () => void } {
   let offset = 0;
   let stopped = false;
   let carry = ''; // partial line buffer between ticks
@@ -41,8 +49,11 @@ export function startLiveConsoleLogStream(runLogPath: string): { stop: () => voi
     } catch {
       msg = levelMatch[2].replace(/\\"/g, '"');
     }
+    // Sink tap (e.g. writeData → FileWriteSink). Consumed messages are IPC, not
+    // user-facing, so suppress them from the display.
+    if (onMessage && onMessage(msg)) return;
     // Drop framework IPC noise — these are parsed elsewhere.
-    if (msg.includes('[replay-log]') || msg.includes('[snapshot-event]')) return;
+    if (msg.includes('[replay-log]') || msg.includes('[snapshot-event]') || msg.startsWith('__K6PERF_FILE__')) return;
 
     const isConsole = line.includes('source=console');
     // Show script console output (any level) and k6's own errors/warnings.

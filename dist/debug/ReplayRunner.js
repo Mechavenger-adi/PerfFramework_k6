@@ -41,6 +41,7 @@ const PipelineRunner_1 = require("../execution/PipelineRunner");
 const ScenarioBuilder_1 = require("../scenario/ScenarioBuilder");
 const logger_1 = require("../utils/logger");
 const LiveConsoleLogStream_1 = require("../utils/LiveConsoleLogStream");
+const FileWriteSink_1 = require("../execution/FileWriteSink");
 const ProgressBar_1 = require("../utils/ProgressBar");
 const DiffChecker_1 = require("./DiffChecker");
 const HTMLDiffReporter_1 = require("./HTMLDiffReporter");
@@ -130,7 +131,8 @@ class ReplayRunner {
         // Live tailer pretty-prints script console.log/warn/error and k6 framework
         // errors in real time while k6 is running. Replaces the previous post-run
         // recap so output appears LIVE instead of dumping at the end of the run.
-        const liveConsole = (0, LiveConsoleLogStream_1.startLiveConsoleLogStream)(logOutputPath);
+        const fileWriteSink = new FileWriteSink_1.FileWriteSink(outputDir);
+        const liveConsole = (0, LiveConsoleLogStream_1.startLiveConsoleLogStream)(logOutputPath, (m) => fileWriteSink.consume(m));
         let runResult;
         try {
             runResult = await PipelineRunner_1.PipelineRunner.executeAsync({
@@ -175,6 +177,11 @@ class ReplayRunner {
         }
         finally {
             liveConsole.stop();
+            // Reconcile any writeData lines the live tail missed (fast runs flush last).
+            fileWriteSink.flushFromLog(logOutputPath);
+            if (fileWriteSink.fileCount > 0) {
+                logger_1.Logger.detail(`Data files written (writeData): ${fileWriteSink.fileCount} file(s), ${fileWriteSink.writeCount} write(s)`);
+            }
         }
         logger_1.Logger.info(`\nk6 execution complete.\n`);
         const extractSpinner = (0, ProgressBar_1.createSpinner)('Extracting replay entries');

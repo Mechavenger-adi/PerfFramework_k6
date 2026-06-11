@@ -14,6 +14,7 @@ import { RecordingLogResolver } from '../debug/RecordingLogResolver';
 import { ReplayRunner } from '../debug/ReplayRunner';
 import { HostMonitor, HostSnapshot } from '../execution/HostMonitor';
 import { ParallelExecutionManager } from '../execution/ParallelExecutionManager';
+import { FileWriteSink } from '../execution/FileWriteSink';
 import { PipelineRunner } from '../execution/PipelineRunner';
 import { ScenarioBuilder } from '../scenario/ScenarioBuilder';
 import { ArtifactWriter } from '../reporting/ArtifactWriter';
@@ -503,7 +504,10 @@ program
     // Pretty-print script console.log/warn/error and k6 framework errors in
     // real time as k6 writes them to the run log file. Replaces the previous
     // post-run summary panel so output appears LIVE, not after the run.
-    const liveConsole = startLiveConsoleLogStream(runLogPath);
+    // FileWriteSink consumes writeData() lines from the same live log stream and
+    // writes them under the run output dir as the test runs (Proposal 7).
+    const fileWriteSink = new FileWriteSink(reportDir);
+    const liveConsole = startLiveConsoleLogStream(runLogPath, (m) => fileWriteSink.consume(m));
     try {
       // No onLine → stdio is fully inherited → k6's live progress bar renders correctly.
       // Snapshot events are captured via --log-output file=... and parsed post-run.
@@ -519,6 +523,11 @@ program
     } finally {
       liveConsole.stop();
       if (liveDisplay) liveDisplay.stop();
+      // Reconcile any writeData lines the live tail missed (fast runs flush last).
+      fileWriteSink.flushFromLog(runLogPath);
+      if (fileWriteSink.fileCount > 0) {
+        Logger.detail(`Data files written (writeData): ${fileWriteSink.fileCount} file(s), ${fileWriteSink.writeCount} write(s)`);
+      }
       // Parse and persist snapshots from the mirrored log file
       parseAndFlushSnapshots(runLogPath, reportDir);
       await hostSampler.stop();

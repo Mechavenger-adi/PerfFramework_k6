@@ -15,7 +15,7 @@
  *   const id = generate.uuid();
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.generate = exports.logReplayExchange = exports.logExchange = exports.trackDataRow = exports.trackParameter = exports.trackCorrelation = exports.resolvePath = exports.resolveFrameworkUrl = exports.registerFrameworkEnvironmentUrls = exports.registerBaseUrl = exports.getEnvContext = exports.deleteCookie = exports.clearCookies = exports.getTransactionGate = exports.isEnding = exports.thinktime = exports.runJourneyLifecycle = exports.createJourneyLifecycleStore = exports.isVuTerminated = exports.initTransactions = exports.getCurrentTransaction = exports.endTransaction = exports.startTransaction = exports.k6Check = exports.transaction = exports.request = void 0;
+exports.generate = exports.writeData = exports.addHeaderOnce = exports.getAutoHeaders = exports.clearAutoHeaders = exports.removeAutoHeader = exports.addAutoHeaders = exports.addAutoHeader = exports.logReplayExchange = exports.logExchange = exports.trackDataRow = exports.trackParameter = exports.trackCorrelation = exports.resolvePath = exports.resolveFrameworkUrl = exports.registerFrameworkEnvironmentUrls = exports.registerBaseUrl = exports.getEnvContext = exports.deleteCookie = exports.clearCookies = exports.getTransactionGate = exports.isEnding = exports.thinktime = exports.runJourneyLifecycle = exports.createJourneyLifecycleStore = exports.isVuTerminated = exports.initTransactions = exports.getCurrentTransaction = exports.endTransaction = exports.startTransaction = exports.k6Check = exports.transaction = exports.request = void 0;
 // NOTE: relative specifiers MUST keep the explicit `.js` extension — k6 cannot
 // resolve extensionless module paths at runtime (unlike Node). This matches the
 // convention used throughout core_engine/src/utils.
@@ -54,6 +54,17 @@ Object.defineProperty(exports, "trackParameter", { enumerable: true, get: functi
 Object.defineProperty(exports, "trackDataRow", { enumerable: true, get: function () { return replayLogger_js_1.trackDataRow; } });
 Object.defineProperty(exports, "logExchange", { enumerable: true, get: function () { return replayLogger_js_1.logExchange; } });
 Object.defineProperty(exports, "logReplayExchange", { enumerable: true, get: function () { return replayLogger_js_1.logReplayExchange; } });
+// -- Auto headers (persist per-VU; applied to every subsequent request) ----
+var autoHeaders_js_1 = require("./utils/autoHeaders.js");
+Object.defineProperty(exports, "addAutoHeader", { enumerable: true, get: function () { return autoHeaders_js_1.addAutoHeader; } });
+Object.defineProperty(exports, "addAutoHeaders", { enumerable: true, get: function () { return autoHeaders_js_1.addAutoHeaders; } });
+Object.defineProperty(exports, "removeAutoHeader", { enumerable: true, get: function () { return autoHeaders_js_1.removeAutoHeader; } });
+Object.defineProperty(exports, "clearAutoHeaders", { enumerable: true, get: function () { return autoHeaders_js_1.clearAutoHeaders; } });
+Object.defineProperty(exports, "getAutoHeaders", { enumerable: true, get: function () { return autoHeaders_js_1.getAutoHeaders; } });
+Object.defineProperty(exports, "addHeaderOnce", { enumerable: true, get: function () { return autoHeaders_js_1.addHeaderOnce; } });
+// -- Runtime data writer (write files during the run; all VUs concurrently) -
+var dataWriter_js_1 = require("./utils/dataWriter.js");
+Object.defineProperty(exports, "writeData", { enumerable: true, get: function () { return dataWriter_js_1.writeData; } });
 // -- Dynamic value generators -------------------
 // Re-export DynamicValueFactory (data/) under the `generate` name so scripts
 // call generate.uuid(), generate.randomEmail('qa'), … via its static methods.

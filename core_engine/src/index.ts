@@ -64,6 +64,20 @@ export {
   logReplayExchange,
 } from './utils/replayLogger.js';
 
+// -- Auto headers (persist per-VU; applied to every subsequent request) ----
+export {
+  addAutoHeader,
+  addAutoHeaders,
+  removeAutoHeader,
+  clearAutoHeaders,
+  getAutoHeaders,
+  addHeaderOnce,
+} from './utils/autoHeaders.js';
+
+// -- Runtime data writer (write files during the run; all VUs concurrently) -
+export { writeData } from './utils/dataWriter.js';
+export type { WriteDataOptions } from './utils/dataWriter.js';
+
 // -- Dynamic value generators -------------------
 // Re-export DynamicValueFactory (data/) under the `generate` name so scripts
 // call generate.uuid(), generate.randomEmail('qa'), … via its static methods.

@@ -5,6 +5,7 @@ import exec from 'k6/execution';
 import { resolvePath, registerBaseUrl } from './session.js';
 import { getCurrentTransaction } from './transaction.js';
 import { logExchange } from './replayLogger.js';
+import { mergeRequestHeaders } from './autoHeaders.js';
 
 declare const __ENV: Record<string, string | undefined>;
 
@@ -397,7 +398,9 @@ export function request(
   const harEntryId = options?.replay?.id || (options?.replay as any)?.harEntryId || nextRequestId();
   const recordingStartedAt = options?.replay?.recordingStartedAt || new Date().toISOString();
 
-  const cleanHeaders = sanitizeHeaders(options?.headers);
+  // Merge persistent auto headers + one-shot header with the per-call headers
+  // (per-call wins, case-insensitive) before sanitizing. See utils/autoHeaders.
+  const cleanHeaders = sanitizeHeaders(mergeRequestHeaders(options?.headers));
 
   // Runtime-settings HTTP defaults (timeout / maxRedirects / throwOnError).
   // Per-call options always take precedence over these.

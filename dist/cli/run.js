@@ -48,6 +48,7 @@ const RecordingLogResolver_1 = require("../debug/RecordingLogResolver");
 const ReplayRunner_1 = require("../debug/ReplayRunner");
 const HostMonitor_1 = require("../execution/HostMonitor");
 const ParallelExecutionManager_1 = require("../execution/ParallelExecutionManager");
+const FileWriteSink_1 = require("../execution/FileWriteSink");
 const PipelineRunner_1 = require("../execution/PipelineRunner");
 const ArtifactWriter_1 = require("../reporting/ArtifactWriter");
 const EventArtifactBuilder_1 = require("../reporting/EventArtifactBuilder");
@@ -475,7 +476,10 @@ program
     // Pretty-print script console.log/warn/error and k6 framework errors in
     // real time as k6 writes them to the run log file. Replaces the previous
     // post-run summary panel so output appears LIVE, not after the run.
-    const liveConsole = (0, LiveConsoleLogStream_1.startLiveConsoleLogStream)(runLogPath);
+    // FileWriteSink consumes writeData() lines from the same live log stream and
+    // writes them under the run output dir as the test runs (Proposal 7).
+    const fileWriteSink = new FileWriteSink_1.FileWriteSink(reportDir);
+    const liveConsole = (0, LiveConsoleLogStream_1.startLiveConsoleLogStream)(runLogPath, (m) => fileWriteSink.consume(m));
     try {
         // No onLine → stdio is fully inherited → k6's live progress bar renders correctly.
         // Snapshot events are captured via --log-output file=... and parsed post-run.
@@ -493,6 +497,11 @@ program
         liveConsole.stop();
         if (liveDisplay)
             liveDisplay.stop();
+        // Reconcile any writeData lines the live tail missed (fast runs flush last).
+        fileWriteSink.flushFromLog(runLogPath);
+        if (fileWriteSink.fileCount > 0) {
+            logger_1.Logger.detail(`Data files written (writeData): ${fileWriteSink.fileCount} file(s), ${fileWriteSink.writeCount} write(s)`);
+        }
         // Parse and persist snapshots from the mirrored log file
         parseAndFlushSnapshots(runLogPath, reportDir);
         await hostSampler.stop();
