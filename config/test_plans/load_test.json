@@ -41,12 +41,12 @@
     }
   ],
   "global_sla": {
-    
+
     "p90": 2000,
     "errorRate": 10
   },
   "journey_slas": {
-    "buy_animal_14thmay": {
+    "buy_working_covert": {
       "p95": 500,
       "errorRate": 5
     }

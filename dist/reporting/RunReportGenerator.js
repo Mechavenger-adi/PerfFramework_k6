@@ -12,64 +12,92 @@ class RunReportGenerator {
   <title>Run Report - ${this.escapeHtml(bundle.meta.plan)}</title>
   <style>
     :root {
-      --bg: #f3f0e8;
-      --panel: #fffdf8;
-      --ink: #1d2731;
-      --muted: #66717d;
-      --accent: #005f73;
-      --accent-soft: #dff3f4;
-      --border: #d5ddd9;
+      --bg: #f4f6fa;
+      --bg-2: #eceff5;
+      --panel: #ffffff;
+      --ink: #14202b;
+      --muted: #6a7585;
+      --accent: #0e7490;
+      --accent-2: #0891b2;
+      --accent-soft: #e0f2fe;
+      --border: #e5e8ef;
+      --border-soft: #eef1f6;
       --warn: #c2410c;
-      --error: #b91c1c;
-      --ok: #15803d;
+      --error: #dc2626;
+      --ok: #16a34a;
+      --shadow: 0 1px 2px rgba(16,24,40,.04), 0 10px 28px rgba(16,24,40,.06);
+      --radius: 16px;
     }
     * { box-sizing: border-box; }
     body {
       margin: 0;
-      font-family: "Segoe UI", Tahoma, sans-serif;
-      background: linear-gradient(180deg, #f3f0e8 0%, #eef5f2 100%);
+      font-family: "Inter", "Segoe UI", Tahoma, system-ui, sans-serif;
+      background: var(--bg);
       color: var(--ink);
+      -webkit-font-smoothing: antialiased;
     }
-    .shell { max-width: 1400px; margin: 0 auto; padding: 24px; }
+    .shell { max-width: 1340px; margin: 0 auto; padding: 28px 20px 64px; }
     .hero {
-      background: radial-gradient(circle at top left, #e2f3eb, #fffdf8 45%, #eef5f2 100%);
+      background: var(--panel);
       border: 1px solid var(--border);
-      border-radius: 18px;
-      padding: 24px;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.06);
+      border-radius: var(--radius);
+      padding: 24px 26px;
+      box-shadow: var(--shadow);
     }
-    .hero h1 { margin: 0 0 8px; font-size: 32px; }
-    .meta { color: var(--muted); display: flex; gap: 16px; flex-wrap: wrap; }
+    .hero h1 { margin: 0 0 10px; font-size: 26px; font-weight: 700; letter-spacing: -.01em; }
+    .meta { color: var(--muted); display: flex; gap: 18px; flex-wrap: wrap; font-size: 13px; }
     .status {
-      display: inline-block; padding: 6px 12px; border-radius: 999px; font-weight: 700;
-      background: var(--accent-soft); color: var(--accent); margin-bottom: 12px;
+      display: inline-flex; align-items: center; padding: 5px 12px; border-radius: 999px; font-weight: 700; font-size: 12px;
+      background: var(--accent-soft); color: var(--accent); margin-bottom: 12px; text-transform: uppercase; letter-spacing: .05em;
     }
-    .status.failed { background: #fde2e2; color: var(--error); }
-    .status.passed { background: #def7e5; color: var(--ok); }
-    .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 20px 0 16px; }
+    .status.failed { background: #fee2e2; color: var(--error); }
+    .status.passed { background: #dcfce7; color: var(--ok); }
+    .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin: 22px 0 16px; }
     .tab-btn {
-      border: 1px solid var(--border); background: var(--panel); color: var(--ink);
-      padding: 10px 14px; border-radius: 999px; cursor: pointer; font-weight: 600;
+      border: 1px solid transparent; background: transparent; color: var(--muted);
+      padding: 9px 16px; border-radius: 10px; cursor: pointer; font-weight: 600; font-size: 14px;
+      transition: background .15s ease, color .15s ease;
     }
-    .tab-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
+    .tab-btn:hover { background: var(--bg-2); color: var(--ink); }
+    .tab-btn.active { background: var(--accent); color: white; border-color: var(--accent); box-shadow: var(--shadow); }
     .tab-panel {
-      display: none; background: rgba(255,255,255,0.82); backdrop-filter: blur(6px);
-      border: 1px solid var(--border); border-radius: 18px; padding: 20px; box-shadow: 0 12px 36px rgba(0,0,0,0.05);
+      display: none; background: var(--panel);
+      border: 1px solid var(--border); border-radius: var(--radius); padding: 22px; box-shadow: var(--shadow);
     }
     .tab-panel.active { display: block; }
-    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 20px; }
-    .card { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 14px; }
-    .card h3 { margin: 0 0 6px; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
-    .card strong { font-size: 24px; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; margin-bottom: 22px; }
+    .card {
+      background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px;
+      box-shadow: var(--shadow); transition: transform .15s ease, box-shadow .15s ease;
+    }
+    .card:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(16,24,40,.10); }
+    .card h3 { margin: 0 0 8px; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .07em; font-weight: 600; }
+    .card strong { font-size: 26px; font-weight: 700; letter-spacing: -.02em; color: var(--ink); }
     .toolbar { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
     input, select {
-      border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; background: white;
+      border: 1px solid var(--border); border-radius: 10px; padding: 9px 12px; background: #fff; color: var(--ink);
+      font: inherit; font-size: 13px;
     }
-    table { width: 100%; border-collapse: separate; border-spacing: 0; }
-    th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); }
-    th { background: #edf4f3; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; }
-    tr:hover td { background: #f7fbfb; }
+    input:focus, select:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
+    .table-scroll {
+      width: 100%; overflow-x: auto; border: 1px solid var(--border); border-radius: 12px;
+      -webkit-overflow-scrolling: touch;
+    }
+    table { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 640px; }
+    th, td { padding: 11px 14px; text-align: left; border-bottom: 1px solid var(--border-soft); font-size: 13px; white-space: nowrap; }
+    thead th {
+      position: sticky; top: 0; z-index: 1; background: #f7f9fc; color: var(--muted);
+      font-size: 11px; text-transform: uppercase; letter-spacing: .05em; font-weight: 700;
+    }
+    tbody tr:nth-child(even) td { background: #fbfcfe; }
+    tbody tr:hover td { background: var(--accent-soft); }
+    tbody tr:last-child td { border-bottom: none; }
     .split { display: grid; grid-template-columns: 1.5fr 1fr; gap: 18px; }
+    @media (max-width: 640px) {
+      .shell { padding: 16px 12px 48px; }
+      .hero h1 { font-size: 22px; }
+      .tab-panel { padding: 14px; }
+    }
     .placeholder {
       min-height: 260px; border: 1px dashed var(--border); border-radius: 16px; padding: 18px;
       background: linear-gradient(180deg, rgba(255,255,255,.75), rgba(240,246,244,.9));
@@ -325,7 +353,7 @@ class RunReportGenerator {
       const breachedCount = thresholds.length - passedCount;
       const thresholdTableHtml = thresholds.length === 0
         ? '<div class="empty">No thresholds configured for this run.</div>'
-        : '<table><thead><tr><th>Metric</th><th>Rule</th><th>Status</th></tr></thead><tbody>'
+        : '<div class="table-scroll"><table><thead><tr><th>Metric</th><th>Rule</th><th>Status</th></tr></thead><tbody>'
           + thresholds.map((t) =>
               '<tr>'
               + '<td>' + escapeHtml(t.metric) + '</td>'
@@ -336,7 +364,7 @@ class RunReportGenerator {
               + '</td>'
               + '</tr>'
             ).join('')
-          + '</tbody></table>';
+          + '</tbody></table></div>';
 
       // Runtime snapshot — just the most-asked-about knobs. Pretty JSON
       // beneath so users can copy/paste exact values if they need to.
@@ -860,24 +888,86 @@ class RunReportGenerator {
     const _txnSortState = { column: 'count', direction: 'desc' };
     let _txnFilterText = '';
 
+    // Stats that CAN be recomputed exactly (or, for p90/95/99, approximately)
+    // from the per-second transaction buckets when a sub-range is selected.
+    const _txnDerivable = new Set(['transaction', 'count', 'pass', 'fail', 'errorPct', 'avg', 'min', 'max', 'p(90)', 'p(95)', 'p(99)']);
+
+    // Transaction rows for the active time window. With no sub-range selected we
+    // return the exact precomputed full-run aggregates. With a sub-range, we
+    // recompute from the per-transaction timeseries buckets: count/pass/fail/
+    // errorPct/avg/min/max are exact; p(90)/p(95)/p(99) are count-weighted
+    // approximations (buckets only store those three); std and other percentiles
+    // aren't recoverable per-window and render as "—".
+    function txnRowsForRange() {
+      const full = reportData.transactions.transactions || [];
+      const txnSeries = (reportData.timeseries && reportData.timeseries.series && reportData.timeseries.series.transactions) || {};
+      if (!window.__k6PerfRange || Object.keys(txnSeries).length === 0) {
+        return { rows: full, approx: false };
+      }
+      const range = getSelectedRange();
+      const estByName = {};
+      full.forEach((r) => { estByName[String(r.transaction)] = r.estimated === true; });
+      const out = [];
+      for (const name of Object.keys(txnSeries)) {
+        const buckets = filterSeriesByRange(txnSeries[name] || [], range);
+        let count = 0, pass = 0, fail = 0, avgW = 0, p90W = 0, p95W = 0, p99W = 0, min = Infinity, max = 0;
+        for (const b of buckets) {
+          const c = Number(b.count || 0);
+          if (c <= 0) continue;
+          count += c; pass += Number(b.pass || 0); fail += Number(b.fail || 0);
+          avgW += Number(b.durationAvg || 0) * c;
+          p90W += Number(b.durationP90 || 0) * c;
+          p95W += Number(b.durationP95 || 0) * c;
+          p99W += Number(b.durationP99 || 0) * c;
+          const bMin = Number(b.durationMin || 0);
+          if (bMin > 0) min = Math.min(min, bMin);
+          max = Math.max(max, Number(b.durationMax || 0));
+        }
+        if (count === 0) continue; // no activity in this window — drop the row
+        out.push({
+          transaction: name, estimated: estByName[name] === true,
+          count: count, pass: pass, fail: fail,
+          errorPct: count > 0 ? (fail / count) * 100 : 0,
+          avg: avgW / count, min: min === Infinity ? 0 : min, max: max,
+          'p(90)': p90W / count, 'p(95)': p95W / count, 'p(99)': p99W / count,
+        });
+      }
+      return { rows: out, approx: true };
+    }
+
     function renderTransactions() {
-      const rows = reportData.transactions.transactions;
       const host = document.getElementById('panel-transactions');
+      const __src = txnRowsForRange();
+      const __approx = __src.approx;
+      let rows = __src.rows;
       if (!rows.length) {
-        host.innerHTML = '<div class="empty">No transaction metrics were captured for this run.</div>';
+        host.innerHTML = '<div class="empty">No transaction activity in the selected window.</div>';
         return;
       }
+      const columns = ['transaction', 'count', 'pass', 'fail', 'errorPct', ...reportData.config.transactionStats.filter((stat) => !['count', 'pass', 'fail'].includes(stat))];
+
+      // For a recomputed sub-range, columns we couldn't derive from per-second
+      // buckets (std, med, percentiles other than p90/p95/p99) render as "—".
+      if (__approx) {
+        rows = rows.map(function(r) {
+          const copy = Object.assign({}, r);
+          for (const c of columns) {
+            if (!_txnDerivable.has(c) && (copy[c] === undefined || copy[c] === null)) copy[c] = '—';
+          }
+          return copy;
+        });
+      }
+
       const presentationRows = rows.map(function(row) {
         if (row.estimated === true) {
           return Object.assign({}, row, { transaction: String(row.transaction || '') + ' ≈' });
         }
         return row;
       });
-      const columns = ['transaction', 'count', 'pass', 'fail', 'errorPct', ...reportData.config.transactionStats.filter((stat) => !['count', 'pass', 'fail'].includes(stat))];
 
       // Banner for estimated rows (Proposal 3 fallback).
       const estimated = rows.filter(function(r) { return r.estimated === true; });
-      const banner = estimated.length > 0
+      const estimatedBanner = estimated.length > 0
         ? '<div class="notice notice-warn" style="margin-bottom:12px;padding:10px 14px;border-left:4px solid #f59e0b;background:#fef3c7;color:#78350f;border-radius:4px;font-size:13px;line-height:1.5">'
             + '<strong>Approximate pass/fail (' + estimated.length + ' transaction' + (estimated.length === 1 ? '' : 's') + ', marked with ≈).</strong> '
             + 'Pass/fail for these rows was derived from native k6 <code>check()</code> aggregates because the per-iteration <code>&lt;name&gt;_checkrate</code> Rate metric was not present. '
@@ -885,6 +975,14 @@ class RunReportGenerator {
             + 'For exact per-iteration counts, run scripts that go through the framework <code>transaction()</code> + <code>k6Check()</code> wrappers.'
           + '</div>'
         : '';
+      // Banner when the table reflects a selected sub-window (recomputed stats).
+      const rangeBanner = __approx
+        ? '<div class="notice" style="margin-bottom:12px;padding:10px 14px;border-left:4px solid #0891b2;background:#e0f2fe;color:#0c4a6e;border-radius:4px;font-size:13px;line-height:1.5">'
+            + '<strong>Showing the selected time window.</strong> '
+            + 'Count, error %, avg, min and max are exact; <code>p(90)/p(95)/p(99)</code> are approximated from per-second buckets; std and other percentiles are not available per-window (shown as “—”). Reset the range for full-fidelity stats.'
+          + '</div>'
+        : '';
+      const banner = rangeBanner + estimatedBanner;
 
       // Filter toolbar: free-text substring match on the transaction name +
       // CSV export of the currently-visible rows (post-filter, post-sort).
@@ -993,7 +1091,7 @@ class RunReportGenerator {
       const body = rows.map((row) =>
         '<tr>' + columns.map((c) => '<td>' + escapeHtml(formatCellValue(row[c])) + '</td>').join('') + '</tr>'
       ).join('');
-      return '<table><thead><tr>' + header + '</tr></thead><tbody>' + body + '</tbody></table>';
+      return '<div class="table-scroll"><table><thead><tr>' + header + '</tr></thead><tbody>' + body + '</tbody></table></div>';
     }
 
     function renderErrors() {
@@ -1025,7 +1123,7 @@ class RunReportGenerator {
           '<td>' + (hasSnap ? '<button class="view-btn" onclick="showSnapshotDetail(' + snapIdx + ')">View Request</button>' : '') + '</td>' +
           '</tr>';
       }).join('');
-      document.getElementById('panel-errors').innerHTML = '<table><thead>' + header + '</thead><tbody>' + body + '</tbody></table>';
+      document.getElementById('panel-errors').innerHTML = '<div class="table-scroll"><table><thead>' + header + '</thead><tbody>' + body + '</tbody></table></div>';
     }
 
     function renderWarnings() {
@@ -1053,7 +1151,7 @@ class RunReportGenerator {
           '<td><button class="view-btn" onclick="showSnapshotDetail(' + index + ')">View</button></td>' +
           '</tr>';
       }).join('');
-      document.getElementById('panel-snapshots').innerHTML = '<table><thead>' + header + '</thead><tbody>' + body + '</tbody></table>';
+      document.getElementById('panel-snapshots').innerHTML = '<div class="table-scroll"><table><thead>' + header + '</thead><tbody>' + body + '</tbody></table></div>';
     }
 
     function showSnapshotDetail(index) {
@@ -1164,7 +1262,7 @@ class RunReportGenerator {
     function renderTable(rows, columns) {
       const header = columns.map((column) => '<th>' + escapeHtml(column) + '</th>').join('');
       const body = rows.map((row) => '<tr>' + columns.map((column) => '<td>' + escapeHtml(formatCellValue(row[column])) + '</td>').join('') + '</tr>').join('');
-      return '<table><thead><tr>' + header + '</tr></thead><tbody>' + body + '</tbody></table>';
+      return '<div class="table-scroll"><table><thead><tr>' + header + '</tr></thead><tbody>' + body + '</tbody></table></div>';
     }
 
     function renderOverviewCards(point) {
