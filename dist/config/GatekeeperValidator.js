@@ -66,16 +66,45 @@ class GatekeeperValidator {
         if (!plan.user_journeys || plan.user_journeys.length === 0) {
             failures.push('[TestPlan] No user_journeys defined. At least one journey is required.');
         }
+        // -- 2b. Duplicate journey names within the plan ------------------------
+        // k6 keys scenarios by journey name, so two journeys sharing a name would
+        // collide (one silently overwrites the other). Fail with the same guidance
+        // we give for ambiguous file resolution.
+        const seenJourneyNames = new Map();
+        for (const journey of plan.user_journeys ?? []) {
+            seenJourneyNames.set(journey.name, (seenJourneyNames.get(journey.name) ?? 0) + 1);
+        }
+        for (const [name, count] of seenJourneyNames) {
+            if (count > 1) {
+                failures.push(`[Journey:${name}] Defined ${count} times in this plan — journey names must be unique ` +
+                    `(k6 keys each scenario by name, so duplicates overwrite each other). ` +
+                    `Suggestion: rename one of the journeys (and/or its script file), or give each a distinct relative scriptPath.`);
+            }
+        }
         // -- 3. Journey script files exist ---------
         for (let i = 0; i < (plan.user_journeys?.length ?? 0); i++) {
             const journey = plan.user_journeys[i];
-            const resolvedPath = PathResolver_1.PathResolver.resolve(journey.scriptPath);
-            if (!resolvedPath) {
+            const scriptResolution = PathResolver_1.PathResolver.resolveDetailed(journey.scriptPath);
+            if (scriptResolution.status === 'ambiguous') {
+                // Same filename lives under more than one team/folder. Picking one
+                // silently would run the wrong test, so we stop and tell the user how
+                // to disambiguate.
+                const rel = (p) => path.relative(process.cwd(), p).replace(/\\/g, '/');
+                failures.push(`[Journey:${journey.name}] Script name "${journey.scriptPath}" is ambiguous — ` +
+                    `${scriptResolution.candidates.length} files with this name exist across teams:\n` +
+                    scriptResolution.candidates.map((c) => `      • ${rel(c)}`).join('\n') + '\n' +
+                    `      Cause: the test plan referenced a bare filename, and the same file ` +
+                    `name appears in more than one team folder, so the framework cannot tell which one to run.\n` +
+                    `      Suggestion: either set scriptPath to a relative/exact path that points at the intended ` +
+                    `file (e.g. "${rel(scriptResolution.candidates[0])}"), or rename one of the files so the name is unique.`);
+                continue;
+            }
+            if (scriptResolution.status === 'not_found') {
                 failures.push(`[Journey:${journey.name}] Script file not found: ${journey.scriptPath}`);
             }
             else {
                 // Update the path to absolute so execution passes
-                journey.scriptPath = resolvedPath;
+                journey.scriptPath = scriptResolution.path;
             }
             if (!debugEnabled) {
                 continue;

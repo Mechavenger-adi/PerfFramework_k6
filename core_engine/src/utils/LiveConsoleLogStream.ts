@@ -17,7 +17,9 @@
  *   - lines with `level=error|warn` (any src)  → k6 framework errors/warnings
  *   - everything else (k6 internal info/debug) → suppressed
  *   - framework IPC channels                   → always suppressed
- *     (`[replay-log]`, `[snapshot-event]` — parsed by their own collectors)
+ *     (`[replay-log]`, `[snapshot-event]`, `[error-event]`, `[warning-event]`
+ *      — parsed by their own collectors; the human-readable error/warn line is
+ *      emitted separately so a failure shows up once, not twice)
  */
 
 import * as fs from 'fs';
@@ -52,8 +54,18 @@ export function startLiveConsoleLogStream(
     // Sink tap (e.g. writeData → FileWriteSink). Consumed messages are IPC, not
     // user-facing, so suppress them from the display.
     if (onMessage && onMessage(msg)) return;
-    // Drop framework IPC noise — these are parsed elsewhere.
-    if (msg.includes('[replay-log]') || msg.includes('[snapshot-event]') || msg.startsWith('__K6PERF_FILE__')) return;
+    // Drop framework IPC noise — these are parsed elsewhere and are NOT meant
+    // for the user. `[error-event]` / `[warning-event]` are the machine-readable
+    // JSON twins of the human-readable `[k6-perf][check-failed]` /
+    // `[k6-perf][transaction:...] ERROR:` lines; dropping them here means a
+    // failed check surfaces exactly ONCE (the readable error), not twice.
+    if (
+      msg.includes('[replay-log]') ||
+      msg.includes('[snapshot-event]') ||
+      msg.includes('[error-event]') ||
+      msg.includes('[warning-event]') ||
+      msg.startsWith('__K6PERF_FILE__')
+    ) return;
 
     const isConsole = line.includes('source=console');
     // Show script console output (any level) and k6's own errors/warnings.

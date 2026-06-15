@@ -42,7 +42,15 @@ export class EventArtifactBuilder {
     const errors = this.collectCheckFailureEvents(options, agent);
     const warnings = this.collectThresholdWarningEvents(options, agent);
 
-    if (options.runStatus !== 0) {
+    // Exit code 99 is k6's dedicated signal for "one or more thresholds
+    // failed" — the test ran to completion and only the SLA was breached.
+    // Those breaches are already reported in full by the threshold table /
+    // summary, so emitting a synthetic `execution_failed` error for code 99
+    // would double-count and pollute the Errors tab with a context-less row.
+    // We therefore skip it and only surface genuine execution failures
+    // (codes >=100: script exceptions, config/parse errors, process crashes),
+    // which mean the run itself did not work and the data may be partial.
+    if (options.runStatus !== 0 && options.runStatus !== 99) {
       errors.push(ErrorRuntime.buildErrorEvent({
         runId: options.runId,
         plan: options.planName,
@@ -55,11 +63,11 @@ export class EventArtifactBuilder {
         phase: 'unknown',
         behavior: options.errorBehavior,
         agent,
-      }, 'execution_failed', `k6 execution finished with non-zero exit code ${options.runStatus}`, {
+      }, 'execution_failed', `k6 execution failed with exit code ${options.runStatus}`, {
         cause: {
           kind: 'process_exit',
           code: `EXIT_${options.runStatus}`,
-          detail: 'The k6 process exited with a non-zero status.',
+          detail: 'The k6 process exited with a non-zero status, indicating the run itself failed (not a threshold breach). Reported metrics may be incomplete.',
         },
       }));
     }
@@ -92,7 +100,9 @@ export class EventArtifactBuilder {
           journey: options.journeyName,
           scenario: options.journeyName,
           transaction,
-          requestName: check.name,
+          // No request context is available from k6's aggregate check data, so
+          // requestName is left unset — putting the check name in the report's
+          // "Request" column was misleading. The check name stays in the message.
           vu: null,
           iteration: null,
           phase: 'unknown',

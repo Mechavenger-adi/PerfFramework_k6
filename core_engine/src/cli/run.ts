@@ -481,6 +481,20 @@ program
       extraArgs.push('--out', `influxdb=${influxUrl}`);
     }
 
+    // Execution provenance for the report's "How this test was invoked" panel.
+    // Captures the three pieces the framework assembles to drive k6: the exact
+    // CLI command, the generated combined entry script (re-exports each
+    // journey's default under its scenario exec name + handleSummary), and the
+    // resolved k6 options/scenarios passed via --config. Lets users see how the
+    // test plan was translated into a real k6 invocation. `--config` path mirrors
+    // what PipelineRunner writes under .k6-temp.
+    const optionsFileNameForReport = `resolved-options-${runId.replace(/[^a-zA-Z0-9_]/g, '_')}.json`;
+    const executionDetails = {
+      command: ['k6 run', entryScriptPath, '--config', path.join('.k6-temp', optionsFileNameForReport), ...extraArgs].join(' '),
+      entryScript: entryCode,
+      options: k6Options,
+    };
+
     const hostSnapshots: HostSnapshot[] = [];
     if (resolvedConfig.runtime.monitoring.enabled) {
       hostSnapshots.push(await HostMonitor.captureSnapshot());
@@ -551,6 +565,7 @@ program
       k6StartTime,
       k6EndTime,
       transactionNames: txnNamesForLive,
+      execution: executionDetails,
     });
 
     Logger.pass('Unified report artifacts generated');
@@ -631,6 +646,11 @@ function runJourneyDebug(plan: TestPlan, journey: UserJourney, runDir: string, r
     errorBehavior: runtime.getErrorBehavior(),
     extraK6Args: passthroughArgs,
     transactionStats: runtime.getTransactionStats(),
+    // Forward the FULL runtime block so debug honors the same http (timeout /
+    // redirects / throwOnError), thinkTime, pacing and snapshot settings as a
+    // load run. Without this, debug ran with redirects off / no timeout and
+    // could pass scripts that fail under load (see redirect-following parity).
+    runtimeMetadata: buildRuntimeMetadataBlock(resolvedConfig),
   });
 }
 
@@ -727,13 +747,59 @@ function prepareRunArtifacts(plan: TestPlan, resolvedConfig: ResolvedConfig): {
   };
 }
 
+/**
+ * Build the `runtime` block injected into K6_PERF_RUNTIME_METADATA — the single
+ * source of truth the in-script runtime (request.ts / lifecycle.ts /
+ * transaction.ts) reads for errorBehavior, thinkTime, pacing, http
+ * (timeout/redirects/throwOnError), reporting and snapshot config.
+ *
+ * Shared by the load path (buildScenarioRuntimeMetadata) AND the debug path
+ * (runJourneyDebug) so debug honors EXACTLY the same runtime settings as load.
+ * That parity is intentional: debug exists to validate script behavior and
+ * shake out load-test scenarios, so it must follow redirects, time out, pace
+ * and think-time identically to load — otherwise a script can pass in debug and
+ * fail under load purely because debug used different HTTP semantics.
+ */
+function buildRuntimeMetadataBlock(resolvedConfig: ResolvedConfig): ScenarioRuntimeMetadata['runtime'] {
+  const runtime = new RuntimeConfigManager(resolvedConfig.runtime);
+  return {
+    errorBehavior: runtime.getErrorBehavior(),
+    thinkTime: {
+      mode: resolvedConfig.runtime.thinkTime.mode,
+      fixed: resolvedConfig.runtime.thinkTime.fixed,
+      min: resolvedConfig.runtime.thinkTime.min,
+      max: resolvedConfig.runtime.thinkTime.max,
+    },
+    pacing: runtime.getPacingRuntimeConfig(),
+    http: {
+      timeoutMs: runtime.getTimeoutMs(),
+      maxRedirects: runtime.getMaxRedirects(),
+      throwOnError: runtime.shouldThrowOnError(),
+    },
+    reporting: {
+      transactionStats: runtime.getTransactionStats(),
+      includeTransactionTable: runtime.shouldIncludeTransactionTable(),
+      includeErrorTable: runtime.shouldIncludeErrorTable(),
+      timeseriesEnabled: runtime.isTimeseriesEnabled(),
+      timeseriesBucketSizeSeconds: runtime.getTimeseriesBucketSizeSeconds(),
+    },
+    errors: {
+      captureSnapshotOnFailure: runtime.shouldCaptureSnapshotOnFailure(),
+      maxSnapshotsPerRun: runtime.getMaxSnapshotsPerRun(),
+      includeRequestHeaders: runtime.shouldIncludeRequestHeadersInSnapshots(),
+      includeRequestBody: runtime.shouldIncludeRequestBodyInSnapshots(),
+      includeResponseHeaders: runtime.shouldIncludeResponseHeadersInSnapshots(),
+      includeResponseBody: runtime.shouldIncludeResponseBodyInSnapshots(),
+    },
+  };
+}
+
 function buildScenarioRuntimeMetadata(
   plan: TestPlan,
   resolvedConfig: ResolvedConfig,
   runId: string,
   safeReportDir: string,
 ): ScenarioRuntimeMetadata {
-  const runtime = new RuntimeConfigManager(resolvedConfig.runtime);
   const journeyTransactionNames = extractJourneyTransactionNames(plan);
 
   return {
@@ -744,36 +810,7 @@ function buildScenarioRuntimeMetadata(
     reportDir: safeReportDir,
     generatedAt: new Date().toISOString(),
     journeyTransactionNames,
-    runtime: {
-      errorBehavior: runtime.getErrorBehavior(),
-      thinkTime: {
-        mode: resolvedConfig.runtime.thinkTime.mode,
-        fixed: resolvedConfig.runtime.thinkTime.fixed,
-        min: resolvedConfig.runtime.thinkTime.min,
-        max: resolvedConfig.runtime.thinkTime.max,
-      },
-      pacing: runtime.getPacingRuntimeConfig(),
-      http: {
-        timeoutMs: runtime.getTimeoutMs(),
-        maxRedirects: runtime.getMaxRedirects(),
-        throwOnError: runtime.shouldThrowOnError(),
-      },
-      reporting: {
-        transactionStats: runtime.getTransactionStats(),
-        includeTransactionTable: runtime.shouldIncludeTransactionTable(),
-        includeErrorTable: runtime.shouldIncludeErrorTable(),
-        timeseriesEnabled: runtime.isTimeseriesEnabled(),
-        timeseriesBucketSizeSeconds: runtime.getTimeseriesBucketSizeSeconds(),
-      },
-      errors: {
-        captureSnapshotOnFailure: runtime.shouldCaptureSnapshotOnFailure(),
-        maxSnapshotsPerRun: runtime.getMaxSnapshotsPerRun(),
-        includeRequestHeaders: runtime.shouldIncludeRequestHeadersInSnapshots(),
-        includeRequestBody: runtime.shouldIncludeRequestBodyInSnapshots(),
-        includeResponseHeaders: runtime.shouldIncludeResponseHeadersInSnapshots(),
-        includeResponseBody: runtime.shouldIncludeResponseBodyInSnapshots(),
-      },
-    },
+    runtime: buildRuntimeMetadataBlock(resolvedConfig),
   };
 }
 
@@ -898,6 +935,23 @@ function writeRunManifest(
   fs.writeFileSync(runManifestPath, JSON.stringify(manifest, null, 2), 'utf-8');
 }
 
+/**
+ * Extract percentile numbers from a transactionStats list (e.g. ["avg","p(90)",
+ * "p(99)"] → [90, 99]). Used to tell the timeseries parser which percentile
+ * lines the report should plot. p90 is always added by the parser.
+ */
+function percentilesFromStats(stats: string[]): number[] {
+  const out = new Set<number>();
+  for (const s of stats) {
+    const m = /^p\(?(\d+(?:\.\d+)?)\)?$/i.exec(String(s).trim());
+    if (m) {
+      const n = Number(m[1]);
+      if (Number.isFinite(n) && n > 0 && n < 100) out.add(n);
+    }
+  }
+  return [...out].sort((a, b) => a - b);
+}
+
 async function finalizeRunArtifacts(options: {
   runId: string;
   reportDir: string;
@@ -913,6 +967,12 @@ async function finalizeRunArtifacts(options: {
    * Counter/Rate metric points from unrelated user-defined metrics.
    */
   transactionNames?: string[];
+  /**
+   * Execution provenance (k6 command, generated entry script, resolved
+   * options/scenarios) surfaced in the report so users can see how the test
+   * plan was turned into a real k6 invocation. Optional — older callers omit it.
+   */
+  execution?: { command: string; entryScript: string; options: unknown };
 }): Promise<{
   runReportHtml: string;
   transactionMetricsJson: string;
@@ -1026,6 +1086,15 @@ async function finalizeRunArtifacts(options: {
   // Warnings tabs.
   const runLogPath = path.join(options.reportDir, 'k6-run.log');
   const k6Events = extractK6PerfEvents(runLogPath);
+  // `check_failed` events are per-occurrence and carry the request + script
+  // location; they supersede the aggregate `assertion_failed` rows derived from
+  // k6's check summary. When present, drop the aggregates so the same failures
+  // aren't listed twice (once detailed, once summarized).
+  if (k6Events.errors.some((e) => e.type === 'check_failed')) {
+    const errs = eventArtifacts.errors as unknown as Array<Record<string, unknown>>;
+    (eventArtifacts as unknown as { errors: Array<Record<string, unknown>> }).errors =
+      errs.filter((e) => e.type !== 'assertion_failed');
+  }
   if (k6Events.errors.length > 0) {
     // Cast loosely — these payloads were produced by the k6 side and may have
     // arbitrary extras (failingChecks[], message, etc.). The reporting bundle
@@ -1131,6 +1200,10 @@ async function finalizeRunArtifacts(options: {
     // Transaction manifest from the same env var the runtime auto-init uses,
     // so the parser knows which custom-named metrics are transactions.
     transactionNames: options.transactionNames,
+    // Percentiles to plot on the duration graphs — taken from the configured
+    // reporting.transactionStats so adding e.g. p(50) makes it appear in the
+    // charts. p90 is always included by the parser.
+    percentiles: percentilesFromStats(runtime.getTransactionStats()),
   });
 
   ArtifactWriter.writeJson(transactionMetricsPath, transactionMetrics);
@@ -1154,11 +1227,30 @@ async function finalizeRunArtifacts(options: {
   // every metric's `thresholds` block from handleSummary.json. `ok === true`
   // (or `boolean === false` in --summary-export style) means the threshold
   // held; otherwise it breached.
-  const thresholdRows: Array<{ metric: string; rule: string; ok: boolean }> = [];
+  // Storytelling enrichment (#12): parse each rule into its stat key,
+  // comparison operator and limit, then look up the actual observed value
+  // from the same metric's `values` block. Lets the report show
+  // "Expected p(95) < 500ms · Actual 781ms · exceeded by 1.56×" instead of a
+  // bare pass/fail pill. Stat keys map 1:1 to k6's value keys (avg, med,
+  // min, max, p(90), p(95), p(99), rate, count, …).
+  const thresholdRows: Array<{
+    metric: string;
+    rule: string;
+    ok: boolean;
+    stat?: string;
+    op?: string;
+    limit?: number;
+    actual?: number;
+  }> = [];
   for (const [metricName, m] of Object.entries(summaryMetricsAny)) {
     for (const [rule, res] of Object.entries(m.thresholds ?? {})) {
       const breached = typeof res === 'boolean' ? res : res?.ok === false;
-      thresholdRows.push({ metric: metricName, rule, ok: !breached });
+      const parsed = /^\s*([a-zA-Z()0-9_]+)\s*(<=|>=|<|>|===|==|!=)\s*([\d.]+)\s*$/.exec(rule);
+      const stat = parsed ? parsed[1] : undefined;
+      const op = parsed ? parsed[2] : undefined;
+      const limit = parsed ? Number(parsed[3]) : undefined;
+      const actual = stat && m.values && typeof m.values[stat] === 'number' ? m.values[stat] : undefined;
+      thresholdRows.push({ metric: metricName, rule, ok: !breached, stat, op, limit, actual });
     }
   }
 
@@ -1229,6 +1321,7 @@ async function finalizeRunArtifacts(options: {
       runtimeSnapshot,
       thresholds: thresholdRows,
       totals,
+      ...(options.execution ? { execution: options.execution } : {}),
     },
     transactions: transactionMetrics,
     timeseries,
@@ -1417,7 +1510,14 @@ interface LiveTxnStats {
 function pct(values: number[], p: number): string {
   if (!values.length) return '-';
   const sorted = [...values].sort((a, b) => a - b);
-  return String(Math.round(sorted[Math.max(0, Math.ceil(p * sorted.length) - 1)]));
+  const n = sorted.length;
+  if (n === 1) return String(Math.round(sorted[0]));
+  // Linear interpolation — matches k6's TrendSink.P and the report's percentiles.
+  const idx = p * (n - 1);
+  const lo = Math.floor(idx);
+  const hi = Math.ceil(idx);
+  const val = lo === hi ? sorted[lo] : sorted[lo] + (sorted[hi] - sorted[lo]) * (idx - lo);
+  return String(Math.round(val));
 }
 
 function startLiveTransactionDisplay(

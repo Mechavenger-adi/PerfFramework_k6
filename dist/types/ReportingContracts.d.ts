@@ -82,7 +82,7 @@ export interface CiSummary {
  */
 export interface TimeSeriesPoint {
     ts: string;
-    [key: string]: string | number | undefined;
+    [key: string]: string | number | number[] | undefined;
 }
 export interface TimeSeriesFile {
     bucketSizeSeconds: number;

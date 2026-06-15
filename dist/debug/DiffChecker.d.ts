@@ -17,6 +17,10 @@ export interface SideSnapshot {
     method?: string;
     url?: string;
     status?: number;
+    /** k6 transport-error reason when status is 0 (timeout / reset / refused). */
+    error?: string;
+    /** k6 numeric error code paired with `error`. */
+    errorCode?: number;
     requestHeaders: {
         name: string;
         value: string;

@@ -136,11 +136,15 @@ function getRuntimeErrorBehavior(): string {
   return 'continue';
 }
 
-function applyErrorBehaviorForStatus(method: string, url: string, status: number): void {
+function applyErrorBehaviorForStatus(method: string, url: string, status: number, error?: string): void {
   const behavior = getRuntimeErrorBehavior();
   if (behavior === 'continue') return;
 
-  const msg = `HTTP ${status} on ${method} ${url}`;
+  // status 0 = no HTTP response at all (timeout / reset / refused). Surface k6's
+  // reason instead of a meaningless "HTTP 0" so stop_* modes report WHY.
+  const msg = status === 0
+    ? `Transport error on ${method} ${url}${error ? ` (${error})` : ' (no response)'}`
+    : `HTTP ${status} on ${method} ${url}`;
 
   if (behavior === 'abort_test') {
     exec.test.abort(`[k6-perf] ${msg}`);
@@ -474,8 +478,11 @@ export function request(
   recordRequestContextForSnapshot(method, resolvedUrl, options, res);
   emitSnapshotEvent(method, resolvedUrl, options, res);
 
-  if (res && res.status >= 400) {
-    applyErrorBehaviorForStatus(method, resolvedUrl, res.status);
+  // Treat a status-0 transport failure (timeout / reset / refused) as an error
+  // too — previously only status >= 400 was gated, so a request that never got
+  // a response slipped past error behavior entirely.
+  if (res && (res.status === 0 || res.status >= 400)) {
+    applyErrorBehaviorForStatus(method, resolvedUrl, res.status, res.error);
   }
 
   if (__ENV.K6_PERF_DEBUG) {

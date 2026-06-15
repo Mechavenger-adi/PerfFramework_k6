@@ -28,7 +28,15 @@ class TimeseriesRuntime {
         const bucketMap = this.transactions.get(transaction) ?? new Map();
         const existing = bucketMap.get(bucket) ?? { ts: bucket };
         for (const [key, value] of Object.entries(values)) {
-            existing[key] = (existing[key] ?? 0) + value;
+            if (Array.isArray(value)) {
+                // Raw sample arrays (e.g. durations) are concatenated, not summed, when
+                // multiple source buckets fall into the same runtime bucket.
+                const prev = existing[key] ?? [];
+                existing[key] = prev.concat(value);
+            }
+            else {
+                existing[key] = (existing[key] ?? 0) + value;
+            }
         }
         bucketMap.set(bucket, existing);
         this.transactions.set(transaction, bucketMap);

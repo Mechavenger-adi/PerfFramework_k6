@@ -9,7 +9,7 @@ export declare class TimeseriesRuntime {
     constructor(bucketSizeSeconds: number, startTime: string);
     private bucketTs;
     addOverviewPoint(ts: string, values: Record<string, number>): void;
-    addTransactionPoint(transaction: string, ts: string, values: Record<string, number>): void;
+    addTransactionPoint(transaction: string, ts: string, values: Record<string, number | number[]>): void;
     addSystemPoint(agent: string, ts: string, values: Record<string, number>): void;
     addEvent(ts: string, type: string, severity: 'error' | 'warning', transaction?: string): void;
     build(endTime: string): TimeSeriesFile;

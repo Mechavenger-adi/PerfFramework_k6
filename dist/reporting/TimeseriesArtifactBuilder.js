@@ -25,6 +25,7 @@ class TimeseriesArtifactBuilder {
             ? await TimeseriesStreamParser_1.TimeseriesStreamParser.parseFile(options.metricsStreamPath, {
                 bucketSizeSeconds: options.bucketSizeSeconds,
                 transactionNames: options.transactionNames,
+                percentiles: options.percentiles,
             }).catch(() => null)
             : null;
         if (parsed) {
@@ -32,13 +33,18 @@ class TimeseriesArtifactBuilder {
             // hand it to the runtime as a single point. The runtime's per-key
             // sum-on-insert is a no-op when called once per (key, ts).
             for (const b of parsed.overview) {
+                // Spread the configured duration percentiles into flat per-series keys
+                // (httpDurationP90, httpDurationP50, …) so the report can pull each
+                // percentile line by name. Driven by reporting.transactionStats.
+                const pctKeys = {};
+                for (const [k, v] of Object.entries(b.httpDurationPct))
+                    pctKeys['httpDurationP' + k] = v;
+                for (const [k, v] of Object.entries(b.iterationDurationPct))
+                    pctKeys['iterationDurationP' + k] = v;
                 runtime.addOverviewPoint(b.ts, {
                     requests: b.requests,
                     requestRate: b.requestRate,
                     httpDurationAvg: b.httpDurationAvg,
-                    httpDurationP90: b.httpDurationP90,
-                    httpDurationP95: b.httpDurationP95,
-                    httpDurationP99: b.httpDurationP99,
                     httpDurationMin: b.httpDurationMin,
                     httpDurationMax: b.httpDurationMax,
                     httpFailedCount: b.httpFailedCount,
@@ -47,11 +53,9 @@ class TimeseriesArtifactBuilder {
                     vusMax: b.vusMax,
                     iterations: b.iterations,
                     iterationDurationAvg: b.iterationDurationAvg,
-                    iterationDurationP90: b.iterationDurationP90,
-                    iterationDurationP95: b.iterationDurationP95,
-                    iterationDurationP99: b.iterationDurationP99,
                     dataReceived: b.dataReceived,
                     dataSent: b.dataSent,
+                    ...pctKeys,
                     // HTTP request-timing breakdown — six phases × four percentile
                     // aggregates each. Flattened with prefixed keys so each lives in
                     // its own TimeSeriesPoint slot and chart renderers can pull a
@@ -86,28 +90,29 @@ class TimeseriesArtifactBuilder {
                     // to the richer fields above.
                     errorRate: b.httpFailedRate,
                     avgDuration: b.httpDurationAvg,
-                    p95Duration: b.httpDurationP95,
+                    p95Duration: b.httpDurationPct['95'] ?? b.httpDurationPct['90'] ?? b.httpDurationAvg,
                 });
             }
             for (const [name, buckets] of Object.entries(parsed.transactions)) {
                 for (const b of buckets) {
+                    // Flatten the configured percentiles into durationP90, durationP50, …
+                    const pctKeys = {};
+                    for (const [k, v] of Object.entries(b.durationPct))
+                        pctKeys['durationP' + k] = v;
                     runtime.addTransactionPoint(name, b.ts, {
                         count: b.count,
                         durationAvg: b.durationAvg,
-                        durationP90: b.durationP90,
-                        durationP95: b.durationP95,
-                        durationP99: b.durationP99,
                         durationMin: b.durationMin,
                         durationMax: b.durationMax,
                         pass: b.pass,
                         fail: b.fail,
+                        // Raw samples for EXACT sub-range stats in the report (no approximation).
+                        durations: b.durations ?? [],
                         // Compatibility keys for older renderers / tests.
                         avg: b.durationAvg,
                         min: b.durationMin,
                         max: b.durationMax,
-                        p90: b.durationP90,
-                        p95: b.durationP95,
-                        p99: b.durationP99,
+                        ...pctKeys,
                     });
                 }
             }

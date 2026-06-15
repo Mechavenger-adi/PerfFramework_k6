@@ -11,6 +11,13 @@ export interface DebugReplayOptions {
     teamEnvironments?: Record<string, unknown>;
     /** Error behavior for the debug run (continue | stop_iteration | stop_vu | abort_test). Defaults to 'continue'. */
     errorBehavior?: string;
+    /**
+     * Full runtime block (http / thinkTime / pacing / reporting / errors) to
+     * inject verbatim as K6_PERF_RUNTIME_METADATA so the debug run honors the
+     * SAME runtime settings as a load run. When omitted, debug falls back to a
+     * minimal `{ errorBehavior, pacing:{enabled:false} }` for standalone use.
+     */
+    runtimeMetadata?: Record<string, unknown>;
     /** Extra CLI flags forwarded verbatim to k6 (e.g. ['--http-debug=full', '--verbose']). */
     extraK6Args?: string[];
     /**

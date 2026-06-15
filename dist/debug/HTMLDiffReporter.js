@@ -38,1254 +38,1574 @@ const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 class HTMLDiffReporter {
     static generateReport(results, outPath, options) {
-        const groupedByIteration = this.groupByIteration(results);
-        const iterationKeys = Array.from(groupedByIteration.keys()).sort((a, b) => a - b);
-        const overallScore = this.average(results.map((result) => result.matchScore));
-        const k6Errors = options?.k6Errors ?? [];
-        const k6Metrics = options?.k6Metrics;
-        const consoleLogs = options?.consoleLogs ?? [];
-        const iterationSummaryRows = iterationKeys
-            .map((iteration) => this.renderIterationSummaryRow(groupedByIteration.get(iteration)))
-            .join('\n');
-        const iterationSections = iterationKeys
-            .map((iteration, index) => {
-            const summary = groupedByIteration.get(iteration);
-            return this.renderIterationSection(summary, index === 0);
-        })
-            .join('\n');
+        const payload = this.buildPayload(results, options);
+        // Embed the report data once and let the browser render all views from it.
+        // This keeps the HTML self-contained while making the UI behave like a small app.
+        const serialized = JSON.stringify(payload)
+            .replace(/</g, '\\u003c')
+            .replace(/\u2028/g, '\\u2028')
+            .replace(/\u2029/g, '\\u2029');
         const html = `<!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Replay Insights</title>
-    <style>
-      html { scroll-behavior: smooth; }
-      :root {
-        --bg: #f8fafc;
-        --surface: #ffffff;
-        --surface-alt: #f1f5f9;
-        --ink: #0f172a;
-        --muted: #64748b;
-        --border: #e2e8f0;
-        --good: #16a34a;
-        --warn: #d97706;
-        --bad: #dc2626;
-        --accent: #2563eb;
-        --radius: 12px;
-        --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.05);
-        --shadow-lg: 0 4px 12px rgba(0,0,0,0.08), 0 20px 48px rgba(0,0,0,0.08);
-        --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-        --font-mono: 'SF Mono', 'Cascadia Code', 'Fira Code', Consolas, monospace;
-        --highlight: #fef08a;
-      }
-      * { box-sizing: border-box; margin: 0; }
-      body {
-        padding: 24px;
-        background: var(--bg);
-        color: var(--ink);
-        font-family: var(--font);
-        font-size: 14px;
-        line-height: 1.6;
-        -webkit-font-smoothing: antialiased;
-        overflow-x: hidden;
-      }
-      .shell { max-width: 1440px; margin: 0 auto; overflow-x: clip; }
-      .hero, .section-card, .transaction, .request-card {
-        background: var(--surface);
-        border: 1px solid var(--border);
-        border-radius: var(--radius);
-        box-shadow: var(--shadow);
-      }
-      .hero {
-        padding: 32px;
-        background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
-        color: #f8fafc;
-        border: none;
-      }
-      .hero h1 { margin: 0 0 4px; font-size: 24px; font-weight: 700; letter-spacing: -0.02em; }
-      .hero .muted { color: #94a3b8; }
-      .sticky-bar {
-        position: sticky;
-        top: 0;
-        z-index: 100;
-        background: rgba(255,255,255,0.88);
-        backdrop-filter: blur(16px) saturate(180%);
-        -webkit-backdrop-filter: blur(16px) saturate(180%);
-        border-bottom: 1px solid var(--border);
-        padding: 10px 24px;
-        margin: 0 -24px 20px;
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        flex-wrap: wrap;
-        transition: box-shadow 0.3s ease;
-      }
-      .sticky-bar.scrolled { box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
-      .sticky-left { display: flex; align-items: center; gap: 8px; font-size: 13px; }
-      .sticky-left label { font-weight: 600; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
-      .sticky-left select, .search-input {
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        padding: 6px 12px;
-        background: var(--surface);
-        color: var(--ink);
-        font-family: var(--font);
-        font-size: 13px;
-        cursor: pointer;
-        outline: none;
-        transition: border-color 0.2s, box-shadow 0.2s;
-      }
-      .sticky-left select:focus, .search-input:focus {
-        border-color: var(--accent);
-        box-shadow: 0 0 0 3px rgba(37,99,235,0.12);
-      }
-      .search-group {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        margin-left: auto;
-        position: relative;
-      }
-      .search-input {
-        width: 260px;
-        padding-left: 32px;
-        cursor: text;
-      }
-      .search-icon {
-        position: absolute;
-        left: 10px;
-        top: 50%;
-        transform: translateY(-50%);
-        color: var(--muted);
-        font-size: 14px;
-        pointer-events: none;
-      }
-      .search-scope {
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        padding: 6px 8px;
-        background: var(--surface);
-        color: var(--ink);
-        font-family: var(--font);
-        font-size: 12px;
-        cursor: pointer;
-        outline: none;
-      }
-      .search-badge {
-        font-size: 11px;
-        font-weight: 600;
-        padding: 3px 8px;
-        border-radius: 999px;
-        background: var(--accent);
-        color: white;
-        min-width: 20px;
-        text-align: center;
-      }
-      .search-badge.zero { background: var(--muted); }
-      .search-clear {
-        background: none;
-        border: none;
-        cursor: pointer;
-        color: var(--muted);
-        font-size: 16px;
-        padding: 2px 6px;
-        border-radius: 4px;
-        line-height: 1;
-      }
-      .search-clear:hover { background: var(--surface-alt); color: var(--ink); }
-      mark { background: var(--highlight); color: inherit; border-radius: 2px; padding: 0 1px; transition: background 0.15s; }
-      mark.current { background: #f97316; color: white; border-radius: 3px; padding: 0 2px; }
-      .search-hidden { display: none !important; }
-      .search-nav {
-        background: var(--surface);
-        border: 1px solid var(--border);
-        border-radius: 6px;
-        padding: 3px 8px;
-        cursor: pointer;
-        font-size: 14px;
-        font-family: var(--font);
-        color: var(--muted);
-        line-height: 1;
-        transition: all 0.15s;
-      }
-      .search-nav:hover { background: var(--surface-alt); color: var(--ink); }
-      .search-nav:disabled { opacity: 0.3; cursor: default; }
-      .search-pos { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; min-width: 40px; text-align: center; }
-      .clickable-row { cursor: pointer; }
-      .clickable-row:hover { background: #dbeafe !important; }
-      .clickable-cell { color: var(--accent); cursor: pointer; font-weight: 500; }
-      .clickable-cell:hover { text-decoration: underline; }
-      .sticky-right { display: flex; align-items: center; gap: 8px; }
-      .sticky-score {
-        padding: 4px 14px;
-        border-radius: 999px;
-        font-weight: 700;
-        font-size: 13px;
-        color: white;
-      }
-      .btn-top {
-        background: var(--surface);
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        padding: 5px 12px;
-        cursor: pointer;
-        font-size: 12px;
-        font-family: var(--font);
-        color: var(--muted);
-        font-weight: 600;
-        transition: all 0.2s;
-      }
-      .btn-top:hover { background: var(--surface-alt); color: var(--ink); }
-      .stats {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-        gap: 12px;
-        margin-top: 20px;
-      }
-      .stat {
-        background: rgba(255,255,255,0.08);
-        border: 1px solid rgba(255,255,255,0.1);
-        border-radius: 10px;
-        padding: 16px;
-        transition: transform 0.2s, background 0.2s;
-      }
-      .stat:hover { transform: translateY(-2px); background: rgba(255,255,255,0.12); }
-      .hero .label {
-        color: #94a3b8;
-        font-size: 11px;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        font-weight: 500;
-      }
-      .hero .value {
-        display: block;
-        margin-top: 4px;
-        font-size: 28px;
-        font-weight: 700;
-        letter-spacing: -0.02em;
-        color: #f8fafc;
-      }
-      .iter-stat .label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 500; }
-      .iter-stat .value { display: block; margin-top: 4px; font-size: 26px; font-weight: 700; letter-spacing: -0.02em; }
-      .iter-stat {
-        background: var(--surface);
-        border: 1px solid var(--border);
-        border-radius: 10px;
-        padding: 16px;
-        transition: transform 0.2s, box-shadow 0.2s;
-      }
-      .iter-stat:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
-      .section-card {
-        margin-top: 16px;
-        padding: 24px;
-        overflow: hidden;
-      }
-      .section-card h2 { font-size: 16px; font-weight: 700; letter-spacing: -0.01em; }
-      .iteration-panel { display: none; margin-top: 16px; }
-      .iteration-panel.active { display: block; animation: fadeIn 0.25s ease; }
-      @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(6px); }
-        to { opacity: 1; transform: translateY(0); }
-      }
-      .warning {
-        margin-top: 12px;
-        padding: 10px 14px;
-        background: #fef9c3;
-        border: 1px solid #fde047;
-        border-radius: 8px;
-        color: #854d0e;
-        font-size: 13px;
-      }
-      .summary-grid {
-        display: grid;
-        grid-template-columns: 1.2fr 1fr;
-        gap: 18px;
-        margin-top: 18px;
-      }
-      .summary-grid.single {
-        grid-template-columns: 1fr;
-      }
-      table {
-        width: 100%;
-        border-collapse: separate;
-        border-spacing: 0;
-        margin-top: 12px;
-        font-size: 13px;
-        table-layout: fixed;
-        max-width: 100%;
-      }
-      th, td {
-        border-bottom: 1px solid var(--border);
-        border-right: 1px solid var(--border);
-        padding: 9px 12px;
-        text-align: left;
-        vertical-align: top;
-      }
-      th:first-child, td:first-child { border-left: 1px solid var(--border); }
-      thead tr:first-child th { border-top: 1px solid var(--border); }
-      thead tr:first-child th:first-child { border-top-left-radius: 8px; }
-      thead tr:first-child th:last-child { border-top-right-radius: 8px; }
-      tbody tr:last-child td:first-child { border-bottom-left-radius: 8px; }
-      tbody tr:last-child td:last-child { border-bottom-right-radius: 8px; }
-      td { overflow-wrap: break-word; word-wrap: break-word; word-break: break-word; white-space: normal; transition: background 0.1s; }
-      th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; position: relative; background: linear-gradient(to bottom, var(--surface-alt), #e8ecf1); border-bottom: 2px solid var(--border); white-space: nowrap; }
-      .col-resize { position: absolute; right: -2px; top: 0; bottom: 0; width: 5px; cursor: col-resize; background: transparent; z-index: 2; }
-      .col-resize:hover, .col-resize.active { background: var(--accent); opacity: 0.5; }
-      body.resizing, body.resizing * { cursor: col-resize !important; user-select: none !important; }
-      tbody tr:nth-child(even) td { background: rgba(241,245,249,0.5); }
-      tbody tr:hover td { background: #dbeafe; }
-      th.sortable { cursor: pointer; position: relative; padding-right: 20px; }
-      th.sortable:hover { background: #dbeafe; color: var(--accent); }
-      th.sortable::after { content: '⇅'; position: absolute; right: 4px; top: 50%; transform: translateY(-50%); font-size: 10px; color: var(--muted); opacity: 0.5; }
-      th.sortable.sort-asc::after { content: '▲'; opacity: 1; color: var(--accent); }
-      th.sortable.sort-desc::after { content: '▼'; opacity: 1; color: var(--accent); }
-      .transaction {
-        margin-top: 16px;
-        overflow: hidden;
-      }
-      .transaction-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 16px;
-        padding: 16px 20px;
-        border-bottom: 1px solid var(--border);
-        background: var(--surface-alt);
-        list-style: none;
-        transition: background 0.15s;
-      }
-      .transaction-header:hover { background: #e2e8f0; }
-      .transaction-header::-webkit-details-marker {
-        display: none;
-      }
-      .transaction-title {
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-      }
-      .transaction-header h2 {
-        margin: 0;
-        font-size: 15px;
-        font-weight: 600;
-      }
-      .transaction-toggle {
-        white-space: nowrap;
-        color: var(--accent);
-        font-size: 12px;
-        font-weight: 600;
-      }
-      .request-card {
-        margin: 12px 16px 16px;
-        padding: 20px;
-        border-left: 3px solid var(--border);
-        transition: box-shadow 0.2s;
-        overflow: clip;
-        position: relative;
-      }
-      .request-card:hover { box-shadow: var(--shadow-lg); }
-      .request-card.score-good { border-left-color: var(--good); }
-      .request-card.score-warn { border-left-color: var(--warn); }
-      .request-card.score-bad { border-left-color: var(--bad); }
-      .request-card-sticky {
-        position: sticky;
-        top: 52px;
-        z-index: 50;
-        background: var(--surface);
-        margin: -20px -20px 0;
-        padding: 14px 20px 12px;
-        border-bottom: 1px solid var(--border);
-        transition: box-shadow 0.2s;
-      }
-      .request-card-sticky.stuck { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
-      .request-header {
-        display: flex;
-        justify-content: space-between;
-        gap: 12px;
-        align-items: flex-start;
-        flex-wrap: wrap;
-      }
-      .request-header h3 { font-size: 14px; font-weight: 600; }
-      .request-meta {
-        color: var(--muted);
-        margin-top: 6px;
-        font-size: 13px;
-        word-break: break-all;
-      }
-      .score {
-        padding: 4px 12px;
-        border-radius: 8px;
-        color: white;
-        font-weight: 700;
-        min-width: 56px;
-        text-align: center;
-        font-size: 13px;
-      }
-      .good { background: var(--good); color: white; }
-      .warn { background: var(--warn); color: white; }
-      .bad { background: var(--bad); color: white; }
-      .chips {
-        display: flex;
-        gap: 8px;
-        flex-wrap: wrap;
-        margin-top: 12px;
-      }
-      .chip {
-        border-radius: 6px;
-        padding: 4px 10px;
-        border: 1px solid var(--border);
-        background: var(--surface-alt);
-        font-size: 12px;
-        color: var(--ink);
-        font-weight: 500;
-      }
-      .grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 16px;
-        margin-top: 16px;
-      }
-      .grid > * { min-width: 0; }
-      .panel {
-        background: var(--surface-alt);
-        border: 1px solid var(--border);
-        border-radius: var(--radius);
-        padding: 16px;
-        overflow-x: auto;
-        overflow-y: hidden;
-        max-width: 100%;
-      }
-      .panel h4 { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 8px; }
-      .body-section {
-        margin-top: 16px;
-        background: var(--surface-alt);
-        border: 1px solid var(--border);
-        border-radius: var(--radius);
-        padding: 16px;
-        overflow: clip;
-        max-width: 100%;
-      }
-      .body-section details {
-        margin-top: 0;
-        border-top: 0;
-        padding-top: 0;
-      }
-      .body-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 14px;
-        margin-top: 12px;
-      }
-      .body-grid > * { min-width: 0;
-      }
-      .body-pane { position: relative; }
-      pre {
-        margin: 10px 0 0;
-        white-space: pre-wrap;
-        word-break: break-word;
-        background: #f8fafc;
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        padding: 12px;
-        font-size: 12px;
-        line-height: 1.5;
-        font-family: var(--font-mono);
-        max-height: 400px;
-        overflow: auto;
-      }
-      details {
-        margin-top: 14px;
-        border-top: 1px dashed var(--border);
-        padding-top: 12px;
-      }
-      summary {
-        cursor: pointer;
-        font-weight: bold;
-        padding: 2px 0;
-        user-select: none;
-        transition: color 0.2s;
-      }
-      summary:hover { color: var(--accent); }
-      .muted { color: var(--muted); }
-      .empty { color: var(--muted); font-style: italic; }
-      .tag-list { margin-top: 12px; }
-      .tag-list code {
-        display: inline-block;
-        margin-right: 6px;
-        margin-bottom: 4px;
-        padding: 3px 8px;
-        border-radius: 6px;
-        background: #eff6ff;
-        border: 1px solid #bfdbfe;
-        font-family: var(--font-mono);
-        font-size: 12px;
-      }
-      .chip.good {
-        color: #166534;
-        background: #dcfce7;
-        border-color: #86efac;
-      }
-      .chip.warn {
-        color: #92400e;
-        background: #fef3c7;
-        border-color: #fde68a;
-      }
-      .chip.bad {
-        color: #991b1b;
-        background: #fee2e2;
-        border-color: #fca5a5;
-      }
-      .body-preview {
-        max-height: 120px;
-        overflow: auto;
-        font-size: 12px;
-        white-space: pre-wrap;
-        word-break: break-all;
-        background: #f8fafc;
-        padding: 8px;
-        border-radius: 6px;
-        margin: 4px 0 0;
-        font-family: var(--font-mono);
-      }
-      .redirect-warning {
-        background: #fef9c3;
-        border-left: 3px solid #eab308;
-        padding: 8px 12px;
-        margin-bottom: 8px;
-        font-size: 13px;
-        border-radius: 4px;
-        color: #854d0e;
-      }
-      /* View mode toggle */
-      .mode-toggle-group { display: flex; align-items: center; gap: 6px; }
-      .mode-toggle { position: relative; display: inline-block; width: 36px; height: 20px; flex-shrink: 0; }
-      .mode-toggle input { opacity: 0; width: 0; height: 0; }
-      .toggle-slider {
-        position: absolute; cursor: pointer; inset: 0;
-        background: var(--border); border-radius: 20px; transition: background 0.2s;
-      }
-      .toggle-slider::before {
-        content: ''; position: absolute; height: 14px; width: 14px; left: 3px; bottom: 3px;
-        background: white; border-radius: 50%; transition: transform 0.2s;
-      }
-      .mode-toggle input:checked + .toggle-slider { background: var(--accent); }
-      .mode-toggle input:checked + .toggle-slider::before { transform: translateX(16px); }
-      .mode-label { font-size: 12px; font-weight: 600; color: var(--muted); white-space: nowrap; }
-      /* Decoded/raw display */
-      .decoded { word-break: break-all; }
-      .raw { word-break: break-all; display: none; }
-      .body-raw { display: none; }
-      /* Request summary table */
-      .req-summary-table { table-layout: fixed; }
-      .req-summary-table th:nth-child(1) { width: 5%; }
-      .req-summary-table th:nth-child(2) { width: 15%; }
-      .req-summary-table th:nth-child(3) { width: 7%; }
-      .req-summary-table th:nth-child(4) { width: 41%; }
-      .req-summary-table th:nth-child(5) { width: 7%; }
-      .req-summary-table th:nth-child(6) { width: 10%; }
-      .req-summary-table th:nth-child(7) { width: 15%; }
-      .req-summary-table td:nth-child(2),
-      .req-summary-table td:nth-child(7) { max-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      .req-summary-table td:nth-child(4) { max-width: 0; word-break: break-all; overflow-wrap: break-word; white-space: normal; }
-      .req-summary-table td:nth-child(4) .raw { display: none; }
-      /* Status code colors */
-      .status-2xx { color: var(--good); font-weight: 600; }
-      .status-3xx { color: var(--accent); font-weight: 600; }
-      .status-4xx { color: var(--warn); font-weight: 600; }
-      .status-5xx { color: var(--bad); font-weight: 600; }
-      /* Raw mode overrides */
-      .shell.raw-mode .decoded { display: none; }
-      .shell.raw-mode .raw { display: inline; }
-      .shell.raw-mode pre.raw, .shell.raw-mode pre.body-raw { display: block; }
-      .shell.raw-mode pre.decoded, .shell.raw-mode pre.body-formatted { display: none; }
-      .shell.raw-mode .req-summary-table td:nth-child(2),
-      .shell.raw-mode .req-summary-table td:nth-child(7) { white-space: normal; overflow: visible; max-width: none; }
-      .shell.raw-mode .req-summary-table td:nth-child(4) { white-space: normal; overflow: visible; max-width: none; }
-      .shell.raw-mode .req-summary-table td:nth-child(4) .decoded { display: none; }
-      .shell.raw-mode .req-summary-table td:nth-child(4) .raw { display: inline; white-space: normal; overflow-wrap: break-word; }
-      .shell.raw-mode .body-formatted { display: none; }
-      .shell.raw-mode .body-raw { display: block; }
-      .error-panel { background: #fef2f2; border: 1px solid var(--bad); border-radius: var(--radius); padding: 16px 20px; margin-bottom: 20px; }
-      .error-panel h2 { color: var(--bad); font-size: 16px; margin: 0 0 10px; display: flex; align-items: center; gap: 8px; }
-      .error-panel h2::before { content: '⚠'; font-size: 18px; }
-      .error-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
-      .error-item { background: #fff; border: 1px solid #fecaca; border-radius: 6px; padding: 8px 12px; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; color: #991b1b; word-break: break-word; white-space: pre-wrap; }
-      /* Performance metrics section */
-      .metrics-section { margin-top: 16px; margin-bottom: 20px; }
-      .metrics-section h2 { font-size: 16px; font-weight: 700; margin: 0 0 14px; display: flex; align-items: center; gap: 8px; }
-      .metrics-section h2::before { content: '⚡'; font-size: 16px; }
-      .metrics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-      .metrics-grid .metrics-card.full-width { grid-column: 1 / -1; }
-      @media (max-width: 960px) { .metrics-grid { grid-template-columns: 1fr; } }
-      .metrics-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); overflow-x: auto; overflow-y: hidden; }
-      .metrics-card h3 { font-size: 13px; font-weight: 700; color: var(--ink); padding: 12px 16px; margin: 0; background: var(--surface-alt); border-bottom: 1px solid var(--border); text-transform: uppercase; letter-spacing: 0.04em; }
-      /* auto layout + nowrap so metric names/values render on one line (the card
-         scrolls horizontally if needed) instead of breaking character-by-character */
-      .metrics-card table { margin: 0; font-size: 12px; table-layout: auto; min-width: 100%; }
-      .metrics-card th { font-size: 10px; }
-      .metrics-card td { font-family: var(--font-mono); font-size: 12px; }
-      .metrics-card th, .metrics-card td { white-space: nowrap; word-break: normal; overflow-wrap: normal; }
-      .metrics-card td:not(:first-child) { text-align: right; font-variant-numeric: tabular-nums; }
-      .metrics-card th:not(:first-child) { text-align: right; }
-      .check-pass { color: var(--good); font-weight: 700; }
-      .check-fail { color: var(--bad); font-weight: 700; }
-      .check-pass::before { content: ''; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--good); margin-right: 6px; vertical-align: middle; }
-      .check-fail::before { content: ''; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--bad); margin-right: 6px; vertical-align: middle; }
-      .metric-kv { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 16px; }
-      .metric-kv-item { background: var(--surface-alt); border: 1px solid var(--border); border-radius: 8px; padding: 8px 14px; flex: 1; min-width: 120px; }
-      .metric-kv-item .mk-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 600; }
-      .metric-kv-item .mk-value { display: block; margin-top: 2px; font-size: 16px; font-weight: 700; font-family: var(--font-mono); color: var(--ink); }
-      .body-pane > .pane-header { display: flex; align-items: center; }
-      .body-pane > .pane-header > .pane-label { flex: 1; }
-      /* Section search */
-      .section-search-btn {
-        background: var(--surface-alt); border: 1px solid var(--border); cursor: pointer;
-        color: var(--muted); font-size: 13px; width: 26px; height: 26px;
-        display: inline-flex; align-items: center; justify-content: center;
-        border-radius: 6px; transition: all 0.2s; flex-shrink: 0;
-      }
-      .section-search-btn:hover { background: var(--accent); color: #fff; border-color: var(--accent); box-shadow: 0 1px 4px rgba(0,0,0,0.12); }
-      .section-search-btn svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-      .section-search-bar {
-        display: none; align-items: center; gap: 6px;
-        padding: 6px 10px; margin-top: 8px;
-        background: var(--surface); border: 1px solid var(--border);
-        border-radius: 8px; font-size: 12px;
-      }
-      .section-search-bar.open { display: flex; flex-wrap: wrap; }
-      .section-search-bar input {
-        border: 1px solid var(--border); border-radius: 6px;
-        padding: 4px 8px; font-size: 12px; font-family: var(--font);
-        outline: none; min-width: 140px; flex: 1;
-      }
-      .section-search-bar input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(37,99,235,0.12); }
-      .section-search-bar .ss-badge {
-        font-size: 10px; font-weight: 600; padding: 2px 6px;
-        border-radius: 999px; background: var(--accent); color: white;
-        min-width: 16px; text-align: center;
-      }
-      .section-search-bar .ss-badge.zero { background: var(--muted); }
-      .section-search-bar button {
-        background: var(--surface-alt); border: 1px solid var(--border);
-        border-radius: 4px; padding: 2px 6px; cursor: pointer;
-        font-size: 12px; color: var(--muted); line-height: 1; transition: all 0.15s;
-      }
-      .section-search-bar button:hover { background: var(--border); color: var(--ink); }
-      .section-search-bar button:disabled { opacity: 0.3; cursor: default; }
-      .body-section summary { display: flex; align-items: center; }
-      .ss-sync-group { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; font-weight: normal; }
-      .ss-sync-group label { font-size: 11px; color: var(--muted); cursor: pointer; user-select: none; }
-      .ss-sync-toggle { width: 28px; height: 16px; position: relative; display: inline-block; vertical-align: middle; }
-      .ss-sync-toggle input { opacity: 0; width: 0; height: 0; }
-      .ss-sync-toggle .ss-slider {
-        position: absolute; cursor: pointer; inset: 0;
-        background: var(--border); border-radius: 16px; transition: background 0.2s;
-      }
-      .ss-sync-toggle .ss-slider::before {
-        content: ''; position: absolute; height: 12px; width: 12px; left: 2px; bottom: 2px;
-        background: white; border-radius: 50%; transition: transform 0.2s;
-      }
-      .ss-sync-toggle input:checked + .ss-slider { background: var(--accent); }
-      .ss-sync-toggle input:checked + .ss-slider::before { transform: translateX(12px); }
-      @media (max-width: 960px) {
-        body { padding: 12px; }
-        .summary-grid, .grid, .body-grid { grid-template-columns: 1fr; }
-        .sticky-bar { flex-direction: column; align-items: stretch; margin: 0 -12px 16px; padding: 10px 12px; gap: 8px; }
-        .search-group { margin-left: 0; }
-        .search-input { width: 100%; }
-        .hero { padding: 20px; border-radius: var(--radius); }
-        .hero h1 { font-size: 20px; }
-      }
-    </style>
-  </head>
-  <body>
-    <div class="shell">
-      <section class="hero">
-        <h1>Replay Insights</h1>
-        <p class="muted">Iteration-aware replay debugging with request diffs, request timings, and captured variable values.</p>
-        <div class="stats">
-          <div class="stat">
-            <span class="label">Overall Score</span>
-            <span class="value">${overallScore}%</span>
-          </div>
-          <div class="stat">
-            <span class="label">Iterations</span>
-            <span class="value">${iterationKeys.length}</span>
-          </div>
-          <div class="stat">
-            <span class="label">Requests Compared</span>
-            <span class="value">${results.length}</span>
-          </div>
-          <div class="stat">
-            <span class="label">Warnings</span>
-            <span class="value">${this.countWarnings(results)}</span>
-          </div>
-        </div>
-      </section>
-
-      ${k6Errors.length > 0 ? `
-      <section class="error-panel">
-        <h2>k6 Runtime Errors (${k6Errors.length})</h2>
-        <ul class="error-list">
-          ${k6Errors.map(e => `<li class="error-item">${this.escapeHtml(e)}</li>`).join('\n          ')}
-        </ul>
-      </section>
-      ` : ''}
-
-      ${consoleLogs.length > 0 ? `
-      <section class="error-panel" style="border-color:#0ea5e9;background:#f0f9ff;">
-        <h2 style="color:#0369a1;">Script Console Output (${consoleLogs.length} lines)</h2>
-        <ul class="error-list" style="font-family:var(--font-mono);font-size:12px;">
-          ${consoleLogs.map(l => `<li class="error-item" style="color:#0c4a6e;">${this.escapeHtml(l)}</li>`).join('\n          ')}
-        </ul>
-      </section>
-      ` : ''}
-
-      ${k6Metrics ? this.renderMetricsSection(k6Metrics) : ''}
-
-      <div class="sticky-bar" id="sticky-bar">
-        <div class="sticky-left">
-          <label for="iteration-select">Iteration</label>
-          <select id="iteration-select" onchange="window.showIteration(this.value)">
-            ${iterationKeys.map((iteration) => `<option value="${iteration}">Iteration ${iteration}</option>`).join('')}
-          </select>
-        </div>
-        <div class="search-group">
-          <span class="search-icon">&#128269;</span>
-          <input type="text" class="search-input" id="search-input" placeholder="Search URLs, bodies, headers\u2026" autocomplete="off" />
-          <select class="search-scope" id="search-scope" title="Search scope">
-            <option value="all">All</option>
-            <option value="url">URL</option>
-            <option value="request-body">Request Body</option>
-            <option value="response-body">Response Body</option>
-            <option value="headers">Headers</option>
-          </select>
-          <span class="search-badge zero" id="search-count" style="display:none">0</span>
-          <button class="search-nav" id="search-prev" style="display:none" title="Previous match (Shift+Enter)">&#9650;</button>
-          <span class="search-pos" id="search-pos" style="display:none"></span>
-          <button class="search-nav" id="search-next" style="display:none" title="Next match (Enter)">&#9660;</button>
-          <button class="search-clear" id="search-clear" style="display:none" title="Clear search">&times;</button>
-        </div>
-        <div class="sticky-right">
-          <div class="mode-toggle-group">
-            <label class="mode-toggle"><input type="checkbox" id="mode-toggle" checked /><span class="toggle-slider"></span></label>
-            <span class="mode-label">Decoded</span>
-          </div>
-          <span class="sticky-score ${this.scoreClass(overallScore)}">${overallScore}%</span>
-          <button class="btn-top" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">&#8593; Top</button>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Debug Replay Console</title>
+  <style>
+    :root {
+      --bg: #f7f8fb;
+      --bg-2: #eef1f7;
+      --panel: #ffffff;
+      --panel-2: #fafbfd;
+      --ink: #1b2735;
+      --muted: #6b7888;
+      --border: #e8ebf2;
+      --border-soft: #f1f4f8;
+      --accent: #0e7490;
+      --accent-2: #0891b2;
+      --accent-soft: #e6f4f9;
+      --good: #15803d;
+      --warn: #b45309;
+      --bad: #dc2626;
+      --shadow: 0 1px 2px rgba(16,24,40,.03), 0 6px 22px rgba(16,24,40,.05);
+      --shadow-lg: 0 2px 6px rgba(16,24,40,.04), 0 18px 50px rgba(16,24,40,.09);
+      --radius: 16px;
+      --radius-sm: 11px;
+      --mono: "SF Mono", "Cascadia Code", "Fira Code", Consolas, monospace;
+      --sans: "Inter", "Segoe UI", Tahoma, system-ui, sans-serif;
+    }
+    [data-theme="dark"] {
+      --bg: #0f141a;
+      --bg-2: #18212c;
+      --panel: #151d27;
+      --panel-2: #111822;
+      --ink: #e7edf5;
+      --muted: #9aa8b7;
+      --border: #2a3644;
+      --border-soft: #202a36;
+      --accent: #22d3ee;
+      --accent-2: #38bdf8;
+      --accent-soft: #113642;
+      --good: #34d399;
+      --warn: #fbbf24;
+      --bad: #f87171;
+      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 12px 32px rgba(0,0,0,.45);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: var(--sans);
+      font-size: 14px;
+      line-height: 1.5;
+      letter-spacing: -.003em;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+    button, input, select { font: inherit; }
+    button { color: inherit; }
+    /* Collapsed icon rail by default; hover-expands as an overlay so the main
+       content never reflows (mirrors the custom report's sidebar). */
+    .app { display: flex; min-height: 100vh; padding-left: 64px; }
+    .sidebar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 100vh;
+      width: 64px;
+      z-index: 40;
+      background: var(--panel);
+      border-right: 1px solid var(--border);
+      padding: 16px 8px;
+      overflow-x: hidden;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      transition: width .16s ease, box-shadow .16s ease;
+    }
+    .sidebar:hover, .sidebar:focus-within { width: 236px; box-shadow: 14px 0 44px rgba(16,24,40,.14); }
+    [data-theme="dark"] .sidebar:hover, [data-theme="dark"] .sidebar:focus-within { box-shadow: 14px 0 44px rgba(0,0,0,.55); }
+    .brand {
+      padding: 6px 8px 12px;
+      border-bottom: 1px solid var(--border-soft);
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      white-space: nowrap;
+    }
+    .brand-mark { flex: 0 0 30px; text-align: center; font-size: 22px; line-height: 1; }
+    .brand-text { min-width: 0; opacity: 0; transition: opacity .12s ease; }
+    .sidebar:hover .brand-text, .sidebar:focus-within .brand-text { opacity: 1; }
+    .brand-title { font-size: 17px; font-weight: 700; letter-spacing: -.01em; }
+    .brand-subtitle { color: var(--muted); font-size: 12px; margin-top: 2px; }
+    .nav { display: flex; flex-direction: column; gap: 2px; }
+    .nav button {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--muted);
+      padding: 10px 11px;
+      border-radius: 9px;
+      cursor: pointer;
+      text-align: left;
+      font-weight: 650;
+      white-space: nowrap;
+      overflow: hidden;
+    }
+    .nav button:hover { background: var(--bg-2); color: var(--ink); }
+    .nav button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .nav-ico { flex: 0 0 24px; text-align: center; font-size: 16px; }
+    .nav-lbl { flex: 1 1 auto; min-width: 0; overflow: hidden; opacity: 0; transition: opacity .12s ease; }
+    .nav-count {
+      min-width: 24px;
+      text-align: center;
+      border-radius: 999px;
+      padding: 1px 7px;
+      background: var(--bg-2);
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      opacity: 0;
+      transition: opacity .12s ease;
+    }
+    .sidebar:hover .nav-lbl, .sidebar:focus-within .nav-lbl,
+    .sidebar:hover .nav-count, .sidebar:focus-within .nav-count { opacity: 1; }
+    .nav button.active .nav-count { background: rgba(255,255,255,.18); color: #fff; }
+    .sidebar-foot {
+      margin-top: auto;
+      border-top: 1px solid var(--border-soft);
+      padding: 10px 4px 0;
+      display: grid;
+      gap: 8px;
+    }
+    .sidebar-foot .btn { display: flex; align-items: center; gap: 10px; overflow: hidden; white-space: nowrap; }
+    .main {
+      flex: 1 1 auto;
+      min-width: 0;
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 32px 36px 88px;
+      width: 100%;
+    }
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      background: color-mix(in srgb, var(--bg) 82%, transparent);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--border-soft);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 13px 14px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+    /* Direct children only — the search box and the two selects. Scoped with a
+       child combinator so it does NOT match the checkbox nested inside each
+       .toggle label (that broad match inflated every checkbox into a 38px
+       padded box, making the toggle chips taller/bulkier than the rest of the
+       row). */
+    .topbar > input, .topbar > select {
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      background: var(--panel);
+      color: var(--ink);
+      padding: 8px 10px;
+      min-height: 38px;
+      outline: none;
+    }
+    .topbar > input:focus, .topbar > select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+    }
+    .search { flex: 1 1 280px; min-width: 220px; }
+    .control-group { display: inline-flex; gap: 8px; align-items: center; color: var(--muted); font-size: 12px; font-weight: 700; }
+    .toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      border-radius: 9px;
+      padding: 7px 9px;
+      cursor: pointer;
+      min-height: 38px;
+    }
+    .toggle input { accent-color: var(--accent); }
+    .btn {
+      border: 1px solid var(--border);
+      background: var(--panel);
+      border-radius: 9px;
+      padding: 8px 11px;
+      cursor: pointer;
+      font-weight: 700;
+      min-height: 38px;
+    }
+    .btn:hover { border-color: var(--accent); color: var(--accent); }
+    .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .hero {
+      border: 1px solid var(--border-soft);
+      background: var(--panel);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 28px 30px;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      gap: 28px;
+      flex-wrap: wrap;
+    }
+    .hero-main { flex: 1 1 360px; min-width: 0; }
+    .eyebrow { color: var(--muted); text-transform: uppercase; letter-spacing: .12em; font-size: 11px; font-weight: 700; }
+    h1, h2, h3 { margin: 0; letter-spacing: -.02em; }
+    h1 { font-size: 28px; font-weight: 700; margin-top: 8px; }
+    .hero-meta { margin-top: 12px; color: var(--muted); display: flex; gap: 18px; flex-wrap: wrap; font-size: 13px; }
+    .health {
+      min-width: 164px;
+      text-align: center;
+      border-left: 1px solid var(--border-soft);
+      padding: 6px 22px;
+    }
+    .health-num { font-size: 46px; font-weight: 750; line-height: 1; letter-spacing: -.03em; }
+    .health-label { color: var(--muted); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; margin-top: 6px; }
+    .status-banner {
+      border: 1px solid var(--border-soft);
+      border-left-width: 4px;
+      border-radius: var(--radius);
+      background: var(--panel);
+      padding: 18px 22px;
+      box-shadow: var(--shadow);
+      margin-bottom: 24px;
+    }
+    .status-banner.passed { border-left-color: var(--good); }
+    .status-banner.drift { border-left-color: var(--warn); }
+    .status-banner.broken { border-left-color: var(--bad); }
+    .status-title { font-size: 16px; font-weight: 700; letter-spacing: .01em; }
+    .status-banner.passed .status-title { color: var(--good); }
+    .status-banner.drift .status-title { color: var(--warn); }
+    .status-banner.broken .status-title { color: var(--bad); }
+    .status-text { color: var(--muted); margin-top: 6px; line-height: 1.55; }
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(192px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .card, .panel {
+      border: 1px solid var(--border-soft);
+      background: var(--panel);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      min-width: 0;
+    }
+    .card { padding: 18px 20px; transition: box-shadow .16s ease, transform .16s ease; }
+    .card:hover { box-shadow: var(--shadow-lg); transform: translateY(-1px); }
+    .card-label { color: var(--muted); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; }
+    .card-value { display: block; margin-top: 10px; font-size: 27px; font-weight: 700; letter-spacing: -.02em; }
+    .panel { margin-bottom: 24px; overflow: hidden; }
+    .panel-head {
+      padding: 18px 20px;
+      border-bottom: 1px solid var(--border-soft);
+      background: transparent;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .panel-title { font-size: 15px; font-weight: 700; letter-spacing: -.01em; }
+    .panel-subtitle { color: var(--muted); font-size: 12px; margin-top: 3px; }
+    .panel-body { padding: 20px; }
+    .split {
+      display: grid;
+      grid-template-columns: minmax(0, 1.35fr) minmax(320px, .65fr);
+      gap: 18px;
+      align-items: start;
+    }
+    .table-scroll { width: 100%; overflow: auto; max-height: 72vh; }
+    table { border-collapse: separate; border-spacing: 0; width: 100%; min-width: 760px; }
+    th, td {
+      border-bottom: 1px solid var(--border-soft);
+      padding: 13px 16px;
+      text-align: left;
+      vertical-align: top;
+      white-space: nowrap;
+      font-size: 13px;
+    }
+    th {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      background: var(--panel-2);
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .07em;
+      font-weight: 600;
+    }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr:nth-child(even) td { background: color-mix(in srgb, var(--panel-2) 50%, transparent); }
+    tbody tr:hover td { background: var(--accent-soft); }
+    td.wrap { white-space: normal; word-break: break-word; min-width: 260px; }
+    td.mono, pre, code { font-family: var(--mono); }
+    .row-action { cursor: pointer; }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      padding: 2px 9px;
+      font-size: 11px;
+      font-weight: 700;
+      border: 1px solid var(--border);
+      background: var(--panel-2);
+      color: var(--ink);
+      white-space: nowrap;
+    }
+    .pill.good { color: var(--good); background: color-mix(in srgb, var(--good) 12%, var(--panel)); border-color: color-mix(in srgb, var(--good) 30%, var(--border)); }
+    .pill.warn { color: var(--warn); background: color-mix(in srgb, var(--warn) 12%, var(--panel)); border-color: color-mix(in srgb, var(--warn) 30%, var(--border)); }
+    .pill.bad { color: var(--bad); background: color-mix(in srgb, var(--bad) 10%, var(--panel)); border-color: color-mix(in srgb, var(--bad) 30%, var(--border)); }
+    .pill.accent { color: var(--accent); background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); }
+    .score { font-weight: 700; font-variant-numeric: tabular-nums; }
+    .score.good { color: var(--good); }
+    .score.warn { color: var(--warn); }
+    .score.bad { color: var(--bad); }
+    .status-2xx { color: var(--good); font-weight: 700; }
+    .status-3xx { color: var(--accent); font-weight: 700; }
+    .status-4xx { color: var(--warn); font-weight: 700; }
+    .status-5xx { color: var(--bad); font-weight: 700; }
+    .issue-list { display: flex; flex-wrap: wrap; gap: 5px; }
+    .insights { margin: 0; padding-left: 18px; color: var(--ink); line-height: 1.55; }
+    .insights li { margin: 7px 0; }
+    .empty { color: var(--muted); font-style: italic; padding: 12px 0; }
+    .kvs { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+    .kv {
+      border: 1px solid var(--border);
+      background: var(--panel-2);
+      border-radius: 10px;
+      padding: 10px 12px;
+      min-width: 0;
+    }
+    .kv-label { color: var(--muted); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+    .kv-value { margin-top: 4px; word-break: break-word; }
+    pre {
+      margin: 0;
+      background: #101820;
+      color: #d7e3ee;
+      border-radius: 10px;
+      padding: 12px;
+      max-height: 54vh;
+      overflow: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      line-height: 1.5;
+      font-size: 12px;
+    }
+    [data-theme="dark"] pre { background: #0a1017; color: #dce7ef; }
+    .body-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .body-pane { min-width: 0; }
+    .body-pane h4 { margin: 0 0 8px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; font-size: 11px; }
+    .diff-line { display: block; margin: 0 -4px; padding: 0 4px; border-radius: 4px; }
+    .diff-line.changed { background: rgba(220, 38, 38, .22); }
+    /* Foldable JSON tree — each object/array node collapses independently. */
+    .jt-wrap {
+      background: #101820; color: #d7e3ee; border-radius: 10px; padding: 12px;
+      max-height: 54vh; overflow: auto; font-family: var(--mono); font-size: 12px;
+      line-height: 1.55; white-space: normal; word-break: break-word;
+    }
+    [data-theme="dark"] .jt-wrap { background: #0a1017; color: #dce7ef; }
+    .jt-node { display: inline; }
+    .jt-kids { display: block; padding-left: 16px; border-left: 1px solid rgba(255,255,255,.09); margin-left: 1px; }
+    .jt-row { display: block; }
+    .jt-row.changed { background: rgba(220, 38, 38, .26); border-radius: 4px; margin: 0 -3px; padding: 0 3px; }
+    .jt-key { color: #7dd3fc; }
+    .jt-str { color: #a5d6a7; }
+    .jt-num { color: #fca5a5; }
+    .jt-bool { color: #fcd34d; }
+    .jt-null { color: #94a3b8; }
+    .jt-empty { color: #9aa8b7; }
+    .jt-tog, .jt-stub { cursor: pointer; user-select: none; }
+    .jt-tog::before { content: '▾'; display: inline-block; width: 12px; color: #7891a5; }
+    .jt-stub::before { content: '▸'; display: inline-block; width: 12px; color: #7891a5; }
+    .jt-stub { display: none; color: #9aa8b7; }
+    .jt-node.collapsed > .jt-tog, .jt-node.collapsed > .jt-kids, .jt-node.collapsed > .jt-close { display: none; }
+    .jt-node.collapsed > .jt-stub { display: inline; }
+    .drawer-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, .45);
+      z-index: 50;
+      display: none;
+      justify-content: flex-end;
+    }
+    .drawer-overlay.open { display: flex; }
+    .drawer {
+      position: relative;
+      width: min(980px, 94vw);
+      height: 100vh;
+      background: var(--panel);
+      border-left: 1px solid var(--border);
+      box-shadow: -24px 0 72px rgba(0,0,0,.28);
+      display: flex;
+      flex-direction: column;
+      transform: translateX(28px);
+      animation: slideIn .18s ease forwards;
+    }
+    @keyframes slideIn { to { transform: translateX(0); } }
+    /* Left-edge grip: drag to resize the panel width, double-click to reset. */
+    .drawer-resizer {
+      position: absolute; left: -3px; top: 0; width: 9px; height: 100%;
+      cursor: ew-resize; z-index: 6; touch-action: none;
+    }
+    .drawer-resizer::after {
+      content: ''; position: absolute; left: 3px; top: 0; width: 3px; height: 100%;
+      background: transparent; transition: background .12s ease;
+    }
+    .drawer-resizer:hover::after, .drawer-resizer.dragging::after { background: color-mix(in srgb, var(--accent) 55%, transparent); }
+    /* Header / tabs / controls never shrink; only the body scrolls. Without the
+       fixed flex-basis, a tall body compressed these rows and clipped the
+       active tab (it appeared hidden behind the controls strip). */
+    .drawer-head, .drawer-tabs, .drawer-controls { flex: 0 0 auto; }
+    .drawer-body { flex: 1 1 auto; min-height: 0; }
+    .drawer-head {
+      padding: 16px 18px;
+      border-bottom: 1px solid var(--border);
+      background: var(--panel-2);
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+    }
+    .drawer-title { font-size: 16px; font-weight: 700; word-break: break-word; }
+    .drawer-meta { color: var(--muted); font-size: 12px; margin-top: 4px; word-break: break-all; }
+    .drawer-tabs {
+      display: flex;
+      gap: 4px;
+      overflow-x: auto;
+      border-bottom: 1px solid var(--border);
+      padding: 8px 12px;
+      background: var(--panel);
+    }
+    .drawer-tabs button {
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--muted);
+      border-radius: 8px;
+      padding: 7px 10px;
+      cursor: pointer;
+      font-weight: 750;
+      white-space: nowrap;
+    }
+    .drawer-tabs button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .drawer-body { padding: 16px 18px 28px; overflow-y: auto; }
+    .mini-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+    .copy-ok { color: var(--good); font-size: 12px; font-weight: 700; align-self: center; }
+    .dense table th, .dense table td { padding: 7px 9px; font-size: 12px; }
+    .dense .card { padding: 11px 12px; }
+    .dense .panel-body { padding: 12px; }
+    /* Drawer control strip (iteration switcher, body search, scroll-sync) */
+    .drawer-controls {
+      display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+      padding: 9px 12px; border-bottom: 1px solid var(--border); background: var(--panel);
+    }
+    .drawer-controls .ctl-label { color: var(--muted); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+    /* Direct children only (iteration select + body-search input) — must NOT
+       match the checkbox nested in the .toggle "Sync scroll" chip, or it gets
+       inflated into a padded box like the rest. */
+    .drawer-controls > select, .drawer-controls > input {
+      border: 1px solid var(--border); border-radius: 8px; background: var(--panel);
+      color: var(--ink); padding: 6px 9px; min-height: 34px; outline: none;
+    }
+    .drawer-controls > select:focus, .drawer-controls > input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
+    .drawer-controls .body-search { flex: 1 1 200px; min-width: 160px; }
+    /* Match the drawer's smaller 34px control height (the global .toggle is 38px,
+       which left the Sync-scroll chip taller than its select/input neighbors). */
+    .drawer-controls .toggle { min-height: 34px; padding: 6px 9px; }
+    .req-id { font-family: var(--mono); font-size: 11px; }
+    mark { background: #fde68a; color: #1a1a1a; border-radius: 2px; padding: 0 1px; }
+    [data-theme="dark"] mark { background: #b45309; color: #fff; }
+    /* Collapsible raw-JSON / log blocks */
+    details.raw-block { border: 1px solid var(--border); border-radius: 10px; background: var(--panel-2); margin-top: 10px; overflow: hidden; }
+    details.raw-block > summary {
+      cursor: pointer; padding: 10px 13px; font-weight: 750; color: var(--ink);
+      list-style: none; user-select: none; display: flex; align-items: center; gap: 8px;
+    }
+    details.raw-block > summary::-webkit-details-marker { display: none; }
+    details.raw-block > summary::before { content: '▸'; color: var(--muted); font-size: 12px; }
+    details.raw-block[open] > summary::before { content: '▾'; }
+    details.raw-block > summary .raw-meta { color: var(--muted); font-weight: 600; font-size: 12px; margin-left: auto; }
+    details.raw-block > pre { margin: 0 12px 12px; }
+    /* Info badge + pure-CSS hover/focus tooltip (matches the custom report). */
+    .info {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 15px; height: 15px; flex: 0 0 15px; border-radius: 50%;
+      border: 1px solid var(--border); color: var(--muted);
+      font-size: 10px; font-weight: 700; font-style: normal; font-family: Georgia, 'Times New Roman', serif;
+      line-height: 1; cursor: help; margin-left: 7px; vertical-align: middle;
+      position: relative; text-transform: none; letter-spacing: 0; user-select: none;
+    }
+    .info:hover, .info:focus { color: var(--accent); border-color: var(--accent); outline: none; }
+    .info::after {
+      content: attr(data-tip);
+      position: absolute; top: 150%; left: 50%; transform: translateX(-50%);
+      background: var(--ink); color: var(--panel); padding: 9px 11px; border-radius: 8px;
+      font-size: 12px; font-weight: 400; font-style: normal; font-family: var(--sans);
+      line-height: 1.45; letter-spacing: normal; text-transform: none; text-align: left;
+      width: max-content; max-width: 280px; white-space: normal;
+      opacity: 0; visibility: hidden; transition: opacity .12s ease;
+      z-index: 100; box-shadow: var(--shadow); pointer-events: none;
+    }
+    .info::before {
+      content: ''; position: absolute; top: calc(150% - 6px); left: 50%; transform: translateX(-50%);
+      border: 6px solid transparent; border-bottom-color: var(--ink);
+      opacity: 0; visibility: hidden; transition: opacity .12s ease; z-index: 100; pointer-events: none;
+    }
+    .info:hover::after, .info:focus::after, .info:hover::before, .info:focus::before { opacity: 1; visibility: visible; }
+    .panel-title .info { margin-left: 8px; }
+    @media (max-width: 980px) {
+      .app { flex-direction: column; padding-left: 0; }
+      .sidebar { position: static; height: auto; width: auto; flex: none; border-right: none; border-bottom: 1px solid var(--border); overflow: visible; }
+      .sidebar:hover, .sidebar:focus-within { width: auto; box-shadow: none; }
+      .nav { flex-direction: row; flex-wrap: wrap; }
+      .nav-lbl, .nav-count, .brand-text { opacity: 1; }
+      .main { padding: 14px 12px 48px; }
+      .health { border-left: none; border-top: 1px solid var(--border); width: 100%; padding-top: 14px; }
+      .split, .body-grid { grid-template-columns: 1fr; }
+      .topbar { top: 0; border-radius: 0; margin-left: -12px; margin-right: -12px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app" id="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <span class="brand-mark">&#128300;</span>
+        <div class="brand-text">
+          <div class="brand-title">Debug Replay Console</div>
+          <div class="brand-subtitle">k6 Perf diagnostics</div>
         </div>
       </div>
+      <nav class="nav" id="nav"></nav>
+      <div class="sidebar-foot">
+        <button class="btn theme-toggle" id="theme-toggle" type="button" title="Toggle light / dark"><span class="nav-ico">&#127769;</span><span class="nav-lbl">Dark</span></button>
+      </div>
+    </aside>
+    <main class="main">
+      <div class="topbar">
+        <input class="search" id="search-input" type="search" placeholder="Search URL, transaction, headers, body, variables" autocomplete="off" />
+        <select id="iteration-select" title="Iteration"></select>
+        <select id="filter-select" title="Filter">
+          <option value="all">All requests</option>
+          <option value="issues">Only issues</option>
+          <option value="bad-score">Score below 90</option>
+          <option value="missing">Missing in replay</option>
+          <option value="extra">Replay only</option>
+          <option value="status">Status mismatch</option>
+          <option value="body">Body mismatch</option>
+          <option value="headers">Header mismatch</option>
+          <option value="slow">Slowest 10</option>
+        </select>
+        <label class="toggle"><input type="checkbox" id="diff-only-toggle" /> Diff rows only</label>
+        <label class="toggle"><input type="checkbox" id="raw-toggle" /> Raw values</label>
+        <label class="toggle"><input type="checkbox" id="density-toggle" /> Dense</label>
+      </div>
+      <section id="hero"></section>
+      <section id="content"></section>
+    </main>
+  </div>
+  <div class="drawer-overlay" id="drawer-overlay"></div>
 
-      <section class="section-card">
-        <h2>All Iterations Summary</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>Iteration</th>
-              <th>Requests</th>
-              <th>Matched</th>
-              <th>Missing</th>
-              <th>Extra</th>
-              <th>Avg Match Score</th>
-              <th>Total Request Time</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${iterationSummaryRows}
-          </tbody>
-        </table>
-      </section>
+  <script>
+    (function() {
+      var DATA = ${serialized};
+      var state = {
+        section: 'overview',
+        iteration: 'all',
+        filter: 'all',
+        search: '',
+        diffOnly: false,
+        raw: false,
+        dense: false,
+        drawerId: null,
+        drawerTab: 'summary',
+        scrollSync: true,
+        bodySearch: '',
+        drawerWidth: null
+      };
 
-      ${iterationSections}
-    </div>
-    <script>
-      (function() {
-        var searchInput = document.getElementById('search-input');
-        var searchScope = document.getElementById('search-scope');
-        var searchCount = document.getElementById('search-count');
-        var searchClear = document.getElementById('search-clear');
-        var searchPrev = document.getElementById('search-prev');
-        var searchNext = document.getElementById('search-next');
-        var searchPos = document.getElementById('search-pos');
-        var stickyBar = document.getElementById('sticky-bar');
-        var debounceTimer = null;
-        var currentIdx = -1;
-        var allMarks = [];
+      var navItems = [
+        ['overview', 'Overview', '\\uD83C\\uDFE0'],
+        ['iterations', 'Iterations', '\\uD83D\\uDD01'],
+        ['transactions', 'Transactions', '\\uD83E\\uDDE9'],
+        ['requests', 'Requests', '\\uD83C\\uDF10'],
+        ['variables', 'Variables', '\\uD83D\\uDD11'],
+        ['runtime', 'Runtime', '\\uD83D\\uDDA5\\uFE0F'],
+        ['performance', 'Performance', '\\uD83D\\uDCC8']
+      ];
 
-        window.showIteration = function(iteration) {
-          document.querySelectorAll('.iteration-panel').forEach(function(panel) {
-            panel.classList.toggle('active', panel.getAttribute('data-iteration') === String(iteration));
+      var el = {
+        app: document.getElementById('app'),
+        nav: document.getElementById('nav'),
+        hero: document.getElementById('hero'),
+        content: document.getElementById('content'),
+        drawer: document.getElementById('drawer-overlay'),
+        search: document.getElementById('search-input'),
+        iteration: document.getElementById('iteration-select'),
+        filter: document.getElementById('filter-select'),
+        diffOnly: document.getElementById('diff-only-toggle'),
+        raw: document.getElementById('raw-toggle'),
+        dense: document.getElementById('density-toggle'),
+        theme: document.getElementById('theme-toggle')
+      };
+
+      // Request ids are generated client-side so table rows and drawer actions
+      // can address requests even when the original HAR entry id is duplicated.
+      var requestIds = new Map();
+      (DATA.results || []).forEach(function(r, i) {
+        requestIds.set(r, 'req-' + i);
+      });
+
+      function esc(value) {
+        return String(value == null ? '' : value)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
+
+      // Small "i" badge with a hover/focus tooltip (pure CSS, no JS needed).
+      function infoTip(tip) {
+        return '<span class="info" tabindex="0" data-tip="' + esc(tip) + '" aria-label="' + esc(tip) + '">i</span>';
+      }
+
+      function decodeText(value) {
+        var text = String(value == null ? '' : value);
+        if (state.raw) return text;
+        try { return decodeURIComponent(text); } catch (e) { return text; }
+      }
+
+      function formatBody(body) {
+        var text = decodeText(body == null || body === '' ? '(empty)' : body);
+        var trimmed = text.trim();
+        if (!trimmed || trimmed === '(empty)' || trimmed.indexOf('[binary:') === 0) return text;
+        if ((trimmed[0] === '{' || trimmed[0] === '[')) {
+          try { return JSON.stringify(JSON.parse(trimmed), null, 2); } catch (e) {}
+        }
+        if (/^[\\w%.+~-]+=/.test(trimmed) && trimmed.indexOf('&') >= 0 && trimmed.indexOf('{') < 0) {
+          try {
+            var params = new URLSearchParams(trimmed);
+            var lines = [];
+            params.forEach(function(v, k) { lines.push(k + ' = ' + v); });
+            if (lines.length) return lines.join('\\n');
+          } catch (e) {}
+        }
+        return text;
+      }
+
+      function scoreClass(score) {
+        if (score >= 90) return 'good';
+        if (score >= 70) return 'warn';
+        return 'bad';
+      }
+
+      function statusClass(status) {
+        // status 0 is a real transport failure (timeout / reset / refused),
+        // NOT "no data" — style it as an error so it can't be skimmed past.
+        if (status === 0) return 'status-5xx';
+        if (!status) return '';
+        if (status >= 200 && status < 300) return 'status-2xx';
+        if (status >= 300 && status < 400) return 'status-3xx';
+        if (status >= 400 && status < 500) return 'status-4xx';
+        if (status >= 500) return 'status-5xx';
+        return '';
+      }
+
+      // The status to SHOW for a request: prefer the replayed side even when it
+      // is 0. A bare "replayed.status OR recorded.status" hid transport failures
+      // because 0 is falsy and fell through to the recorded code (e.g. 200),
+      // making a timed-out request look like it succeeded.
+      function effectiveStatusSide(r) {
+        if (r.replayed && r.replayed.status !== undefined && r.replayed.status !== null) return r.replayed;
+        if (r.recorded && r.recorded.status !== undefined && r.recorded.status !== null) return r.recorded;
+        return r.replayed || r.recorded || {};
+      }
+
+      // Display text for a status: the code, or for a status-0 transport failure
+      // the k6 reason (e.g. "0 · request timeout") so the user sees WHY.
+      function statusDisplay(side) {
+        side = side || {};
+        var s = side.status;
+        if (s === 0) return '0 · ' + (side.error ? String(side.error) : 'no response');
+        return (s == null ? '-' : s);
+      }
+
+      function requestId(r) {
+        return requestIds.get(r);
+      }
+
+      function methodOf(r) {
+        return (r.replayed && r.replayed.method) || (r.recorded && r.recorded.method) || '-';
+      }
+
+      function urlOf(r) {
+        return (r.replayed && r.replayed.url) || (r.recorded && r.recorded.url) || '-';
+      }
+
+      function shortUrl(url) {
+        try {
+          var u = new URL(String(url));
+          return u.pathname + (u.search || '');
+        } catch (e) {
+          return String(url || '-');
+        }
+      }
+
+      function comparisonLabel(type) {
+        if (type === 'missing_in_replay') return 'Missing';
+        if (type === 'extra_in_replay') return 'Replay only';
+        return 'Matched';
+      }
+
+      function headerMismatchCount(diffs) {
+        return (diffs || []).filter(function(d) { return d.status !== 'match'; }).length;
+      }
+
+      function hasStatusMismatch(r) {
+        return r.statusMatch === false && r.comparisonType === 'matched';
+      }
+
+      function hasBodyMismatch(r) {
+        return Boolean((r.requestBody && !r.requestBody.match) || (r.responseBody && !r.responseBody.match));
+      }
+
+      function hasHeaderMismatch(r) {
+        return headerMismatchCount(r.requestHeaderDiffs) > 0 || headerMismatchCount(r.responseHeaderDiffs) > 0;
+      }
+
+      function hasIssue(r) {
+        return r.matchScore < 90 || r.comparisonType !== 'matched' || hasStatusMismatch(r) || hasBodyMismatch(r) || hasHeaderMismatch(r) || (r.warnings || []).length > 0;
+      }
+
+      function issueBadges(r) {
+        var badges = [];
+        if (r.comparisonType === 'missing_in_replay') badges.push(['Missing', 'bad']);
+        if (r.comparisonType === 'extra_in_replay') badges.push(['Replay only', 'warn']);
+        if (hasStatusMismatch(r)) badges.push(['Status', 'bad']);
+        if (r.requestBody && !r.requestBody.match) badges.push(['Req body', 'warn']);
+        if (r.responseBody && !r.responseBody.match) badges.push(['Resp body', 'warn']);
+        if (headerMismatchCount(r.requestHeaderDiffs) > 0) badges.push(['Req headers', 'warn']);
+        if (headerMismatchCount(r.responseHeaderDiffs) > 0) badges.push(['Resp headers', 'warn']);
+        if ((r.warnings || []).length > 0) badges.push(['Warning', 'accent']);
+        if (badges.length === 0) badges.push(['Clean', 'good']);
+        return badges.map(function(b) { return '<span class="pill ' + b[1] + '">' + esc(b[0]) + '</span>'; }).join('');
+      }
+
+      function allResults() {
+        return (DATA.results || []).slice();
+      }
+
+      function byIteration(list) {
+        if (state.iteration === 'all') return list;
+        return list.filter(function(r) { return String(r.iteration) === String(state.iteration); });
+      }
+
+      function matchesSearch(r) {
+        var q = state.search.trim().toLowerCase();
+        if (!q) return true;
+        var parts = [
+          r.harEntryId,
+          r.transactionName,
+          methodOf(r),
+          urlOf(r),
+          r.comparisonType,
+          r.recorded && r.recorded.requestBody,
+          r.recorded && r.recorded.responseBody,
+          r.replayed && r.replayed.requestBody,
+          r.replayed && r.replayed.responseBody
+        ];
+        (r.variableEvents || []).forEach(function(v) {
+          parts.push(v.name, v.type, v.action, v.value, v.source);
+        });
+        (r.requestHeaderDiffs || []).forEach(function(h) {
+          parts.push(h.name, h.recordedValue, h.replayedValue, h.status);
+        });
+        (r.responseHeaderDiffs || []).forEach(function(h) {
+          parts.push(h.name, h.recordedValue, h.replayedValue, h.status);
+        });
+        return parts.some(function(p) { return String(p == null ? '' : p).toLowerCase().indexOf(q) >= 0; });
+      }
+
+      function visibleResults() {
+        var list = byIteration(allResults()).filter(matchesSearch);
+        if (state.diffOnly) list = list.filter(hasIssue);
+        if (state.filter === 'issues') list = list.filter(hasIssue);
+        if (state.filter === 'bad-score') list = list.filter(function(r) { return r.matchScore < 90; });
+        if (state.filter === 'missing') list = list.filter(function(r) { return r.comparisonType === 'missing_in_replay'; });
+        if (state.filter === 'extra') list = list.filter(function(r) { return r.comparisonType === 'extra_in_replay'; });
+        if (state.filter === 'status') list = list.filter(hasStatusMismatch);
+        if (state.filter === 'body') list = list.filter(hasBodyMismatch);
+        if (state.filter === 'headers') list = list.filter(hasHeaderMismatch);
+        if (state.filter === 'slow') {
+          list = list.sort(function(a, b) { return (b.durationMs || 0) - (a.durationMs || 0); }).slice(0, 10);
+        }
+        return list;
+      }
+
+      function average(values) {
+        if (!values.length) return 0;
+        return Math.round(values.reduce(function(sum, v) { return sum + Number(v || 0); }, 0) / values.length);
+      }
+
+      function formatDuration(ms) {
+        if (ms == null) return '-';
+        return Math.round(ms) + ' ms';
+      }
+
+      function groupBy(list, getter) {
+        return list.reduce(function(map, item) {
+          var key = getter(item) || 'Ungrouped';
+          if (!map[key]) map[key] = [];
+          map[key].push(item);
+          return map;
+        }, {});
+      }
+
+      function statusText() {
+        if (DATA.summary.status === 'passed') return ['Replay Passed', 'The replay matches the recording closely enough for this debug run.'];
+        if (DATA.summary.status === 'broken') return ['Replay Broken', 'Critical replay drift was detected. Start with missing, replay-only, and status-mismatch requests.'];
+        return ['Replay Drift Detected', 'The replay completed, but one or more requests differ from the recording. Use the triage table to isolate the cause.'];
+      }
+
+      function renderHero() {
+        var s = statusText();
+        el.hero.innerHTML =
+          '<div class="hero">' +
+            '<div class="hero-main">' +
+              '<div class="eyebrow">Debug replay diagnostics</div>' +
+              '<h1>Debug Replay Console</h1>' +
+              '<div class="hero-meta">' +
+                '<span>Generated ' + esc(new Date(DATA.generatedAt).toLocaleString()) + '</span>' +
+                '<span>' + esc(DATA.summary.totalRequests) + ' requests</span>' +
+                '<span>' + esc(DATA.summary.iterations.length) + ' iteration(s)</span>' +
+                '<span>Worst transaction: ' + esc(DATA.summary.worstTransaction || '-') + '</span>' +
+              '</div>' +
+            '</div>' +
+            '<div class="health">' +
+              '<div class="health-num score ' + scoreClass(DATA.summary.overallScore) + '">' + esc(DATA.summary.overallScore) + '%</div>' +
+              '<div class="health-label">Match score</div>' +
+            '</div>' +
+          '</div>' +
+          '<div class="status-banner ' + esc(DATA.summary.status) + '">' +
+            '<div class="status-title">' + esc(s[0]) + '</div>' +
+            '<div class="status-text">' + esc(s[1]) + '</div>' +
+          '</div>';
+      }
+
+      function summaryCards() {
+        var cards = [
+          ['Requests', DATA.summary.totalRequests],
+          ['Warnings', DATA.summary.warningCount],
+          ['Missing', DATA.summary.missingCount],
+          ['Replay only', DATA.summary.replayOnlyCount],
+          ['Mismatched', DATA.summary.mismatchCount],
+          ['Runtime errors', (DATA.k6Errors || []).length]
+        ];
+        return '<div class="cards">' + cards.map(function(c) {
+          return '<div class="card"><span class="card-label">' + esc(c[0]) + '</span><strong class="card-value">' + esc(c[1]) + '</strong></div>';
+        }).join('') + '</div>';
+      }
+
+      function buildInsights() {
+        var list = [];
+        if ((DATA.k6Errors || []).length > 0) list.push('Runtime errors were captured. Review the Runtime section before chasing payload differences.');
+        if (DATA.summary.missingCount > 0) list.push(DATA.summary.missingCount + ' recorded request(s) did not appear during replay.');
+        if (DATA.summary.replayOnlyCount > 0) list.push(DATA.summary.replayOnlyCount + ' replay-only request(s) appeared. Check redirects, resource fetches, and conditional logic.');
+        var statusCount = allResults().filter(hasStatusMismatch).length;
+        if (statusCount > 0) list.push(statusCount + ' request(s) returned a different status code.');
+        var bodyCount = allResults().filter(hasBodyMismatch).length;
+        if (bodyCount > 0) list.push(bodyCount + ' request(s) have request or response body drift.');
+        var headerCount = allResults().filter(hasHeaderMismatch).length;
+        if (headerCount > 0) list.push(headerCount + ' request(s) have header drift. Cookies, auth headers, and correlation values are good first suspects.');
+        if (list.length === 0) list.push('No major drift patterns were detected in this replay.');
+        return list;
+      }
+
+      function renderOverview() {
+        var worst = allResults().filter(hasIssue).sort(function(a, b) { return a.matchScore - b.matchScore; }).slice(0, 8);
+        el.content.innerHTML =
+          summaryCards() +
+          '<div class="split">' +
+            '<section class="panel">' +
+              '<div class="panel-head"><div><div class="panel-title">Root Cause Hints' + infoTip('Auto-generated drift hints from the replay diff — start here.') + '</div><div class="panel-subtitle">Generated from the replay diff surface</div></div></div>' +
+              '<div class="panel-body"><ul class="insights">' + buildInsights().map(function(i) { return '<li>' + esc(i) + '</li>'; }).join('') + '</ul></div>' +
+            '</section>' +
+            '<section class="panel">' +
+              '<div class="panel-head"><div><div class="panel-title">Current View' + infoTip('Active iteration, filter and search context.') + '</div><div class="panel-subtitle">' + esc(visibleResults().length) + ' visible request(s)</div></div></div>' +
+              '<div class="panel-body"><div class="kvs">' +
+                '<div class="kv"><div class="kv-label">Iteration</div><div class="kv-value">' + esc(state.iteration === 'all' ? 'All' : state.iteration) + '</div></div>' +
+                '<div class="kv"><div class="kv-label">Filter</div><div class="kv-value">' + esc(state.filter) + '</div></div>' +
+                '<div class="kv"><div class="kv-label">Search</div><div class="kv-value">' + esc(state.search || '-') + '</div></div>' +
+              '</div></div>' +
+            '</section>' +
+          '</div>' +
+          renderRequestTable(worst, 'Highest Risk Requests', 'Open any row to inspect the complete recorded vs replayed exchange.', 'Lowest-scoring requests with issues — the most likely culprits.');
+      }
+
+      function renderIterations() {
+        var groups = groupBy(allResults(), function(r) { return String(r.iteration); });
+        var rows = Object.keys(groups).sort(function(a, b) { return Number(a) - Number(b); }).map(function(k) {
+          var items = groups[k];
+          var missing = items.filter(function(r) { return r.comparisonType === 'missing_in_replay'; }).length;
+          var extra = items.filter(function(r) { return r.comparisonType === 'extra_in_replay'; }).length;
+          var issues = items.filter(hasIssue).length;
+          var duration = items.reduce(function(sum, r) { return sum + (r.durationMs || 0); }, 0);
+          return '<tr class="row-action" data-iteration-open="' + esc(k) + '">' +
+            '<td class="mono">' + esc(k) + '</td>' +
+            '<td>' + esc(items.length) + '</td>' +
+            '<td>' + esc(issues) + '</td>' +
+            '<td>' + esc(missing) + '</td>' +
+            '<td>' + esc(extra) + '</td>' +
+            '<td><span class="score ' + scoreClass(average(items.map(function(r) { return r.matchScore; }))) + '">' + average(items.map(function(r) { return r.matchScore; })) + '%</span></td>' +
+            '<td>' + esc(formatDuration(duration)) + '</td>' +
+          '</tr>';
+        }).join('');
+        el.content.innerHTML = '<section class="panel"><div class="panel-head"><div><div class="panel-title">Iterations' + infoTip('Per-iteration roll-up of requests, issues and score. Click a row to filter.') + '</div><div class="panel-subtitle">Click an iteration to filter the console.</div></div></div><div class="table-scroll"><table><thead><tr><th>Iteration</th><th>Requests</th><th>Issues</th><th>Missing</th><th>Replay only</th><th>Avg score</th><th>Total time</th></tr></thead><tbody>' + rows + '</tbody></table></div></section>';
+      }
+
+      function renderTransactions() {
+        var groups = groupBy(visibleResults(), function(r) { return r.transactionName || 'Ungrouped'; });
+        var rows = Object.keys(groups).sort().map(function(name) {
+          var items = groups[name];
+          var worst = items.reduce(function(min, r) { return Math.min(min, r.matchScore); }, 100);
+          var duration = items.reduce(function(sum, r) { return sum + (r.durationMs || 0); }, 0);
+          return '<tr class="row-action" data-search-transaction="' + esc(name) + '">' +
+            '<td class="wrap">' + esc(name) + '</td>' +
+            '<td>' + esc(items.length) + '</td>' +
+            '<td>' + esc(items.filter(hasIssue).length) + '</td>' +
+            '<td><span class="score ' + scoreClass(average(items.map(function(r) { return r.matchScore; }))) + '">' + average(items.map(function(r) { return r.matchScore; })) + '%</span></td>' +
+            '<td><span class="score ' + scoreClass(worst) + '">' + worst + '%</span></td>' +
+            '<td>' + esc(formatDuration(duration)) + '</td>' +
+          '</tr>';
+        }).join('');
+        el.content.innerHTML = '<section class="panel"><div class="panel-head"><div><div class="panel-title">Transactions' + infoTip('Requests grouped by transaction for quick blast-radius analysis.') + '</div><div class="panel-subtitle">Aggregated by transaction name for quick blast-radius analysis.</div></div></div><div class="table-scroll"><table><thead><tr><th>Transaction</th><th>Requests</th><th>Issues</th><th>Avg score</th><th>Worst</th><th>Total time</th></tr></thead><tbody>' + (rows || '<tr><td colspan="6" class="empty">No transactions match the current view.</td></tr>') + '</tbody></table></div></section>';
+      }
+
+      function renderRequests() {
+        el.content.innerHTML = renderRequestTable(visibleResults(), 'Request Triage', 'Filtered, searchable replay exchange list. Click a row to open the inspector.', 'Every replayed request; filter/search and click a row to inspect.');
+      }
+
+      function renderRequestTable(list, title, subtitle, tip) {
+        var rows = list.map(function(r) {
+          var side = effectiveStatusSide(r);
+          return '<tr class="row-action" data-open="' + esc(requestId(r)) + '">' +
+            '<td class="mono">' + esc(r.requestSequence == null ? '-' : r.requestSequence) + '</td>' +
+            '<td class="mono req-id">' + esc(r.harEntryId || '-') + '</td>' +
+            '<td class="wrap">' + esc(r.transactionName || 'Ungrouped') + '</td>' +
+            '<td>' + esc(methodOf(r)) + '</td>' +
+            '<td class="wrap" title="' + esc(decodeText(urlOf(r))) + '">' + esc(shortUrl(decodeText(urlOf(r)))) + '</td>' +
+            '<td class="' + statusClass(side.status) + '">' + esc(statusDisplay(side)) + '</td>' +
+            '<td><span class="score ' + scoreClass(r.matchScore) + '">' + esc(r.matchScore) + '%</span></td>' +
+            '<td>' + esc(formatDuration(r.durationMs)) + '</td>' +
+            '<td><span class="pill ' + (r.comparisonType === 'matched' ? 'good' : r.comparisonType === 'missing_in_replay' ? 'bad' : 'warn') + '">' + esc(comparisonLabel(r.comparisonType)) + '</span></td>' +
+            '<td><div class="issue-list">' + issueBadges(r) + '</div></td>' +
+          '</tr>';
+        }).join('');
+        return '<section class="panel"><div class="panel-head"><div><div class="panel-title">' + esc(title) + (tip ? infoTip(tip) : '') + '</div><div class="panel-subtitle">' + esc(subtitle) + ' ' + esc(list.length) + ' row(s).</div></div></div><div class="table-scroll"><table><thead><tr><th>#</th><th>Request ID</th><th>Transaction</th><th>Method</th><th>URL path</th><th>Status</th><th>Score</th><th>Duration</th><th>State</th><th>Issues</th></tr></thead><tbody>' + (rows || '<tr><td colspan="10" class="empty">No requests match the current view.</td></tr>') + '</tbody></table></div></section>';
+      }
+
+      function renderVariables() {
+        var latest = {};
+        visibleResults().forEach(function(r) {
+          (r.variableEvents || []).forEach(function(v) {
+            latest[v.name] = {
+              name: v.name,
+              type: v.type,
+              action: v.action,
+              value: v.value,
+              source: v.source,
+              transactionName: r.transactionName,
+              requestSequence: r.requestSequence
+            };
           });
-          document.getElementById('iteration-select').value = String(iteration);
-          if (searchInput.value.trim()) doSearch();
-        };
+        });
+        var rows = Object.keys(latest).sort().map(function(k) {
+          var v = latest[k];
+          return '<tr><td>' + esc(v.name) + '</td><td>' + esc(v.type) + '</td><td>' + esc(v.action) + '</td><td class="wrap mono">' + esc(decodeText(v.value)) + '</td><td class="wrap">' + esc(v.source || '-') + '</td><td class="wrap">' + esc(v.transactionName || '-') + '</td><td>' + esc(v.requestSequence == null ? '-' : v.requestSequence) + '</td></tr>';
+        }).join('');
+        el.content.innerHTML = '<section class="panel"><div class="panel-head"><div><div class="panel-title">Variables' + infoTip('Latest parameter & correlation values captured during replay.') + '</div><div class="panel-subtitle">Latest parameter and correlation values visible in the current filter context.</div></div></div><div class="table-scroll"><table><thead><tr><th>Name</th><th>Type</th><th>Action</th><th>Value</th><th>Source</th><th>Last transaction</th><th>Request #</th></tr></thead><tbody>' + (rows || '<tr><td colspan="7" class="empty">No variable events match the current view.</td></tr>') + '</tbody></table></div></section>';
+      }
 
-        window.scrollToElement = function(id) {
-          var el = document.getElementById(id);
-          if (!el) return;
-          var details = el.closest('details');
-          if (details && !details.open) details.open = true;
-          var parentDetails = el.querySelector('details');
-          if (parentDetails && !parentDetails.open) parentDetails.open = true;
-          setTimeout(function() {
-            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            el.style.outline = '2px solid var(--accent)';
-            el.style.outlineOffset = '4px';
-            el.style.borderRadius = 'var(--radius)';
-            setTimeout(function() { el.style.outline = 'none'; }, 2000);
-          }, 50);
-        };
+      function renderRuntime() {
+        var errors = (DATA.k6Errors || []).map(function(e) { return '<pre>' + esc(e) + '</pre>'; }).join('<br />');
+        // Console output can be huge — collapse it into a single expandable block.
+        var logBlocks = (DATA.consoleLogs || []).length
+          ? '<details class="raw-block" open><summary>Console output<span class="raw-meta">' + esc((DATA.consoleLogs || []).length) + ' line(s)</span></summary><pre>' + esc((DATA.consoleLogs || []).join('\\n')) + '</pre></details>'
+          : '<p class="empty">No script console output captured.</p>';
+        el.content.innerHTML =
+          '<section class="panel"><div class="panel-head"><div><div class="panel-title">Runtime Errors' + infoTip('k6 runtime errors during replay — fix these before chasing diffs.') + '</div><div class="panel-subtitle">' + esc((DATA.k6Errors || []).length) + ' captured error(s)</div></div></div><div class="panel-body">' + (errors || '<p class="empty">No k6 runtime errors captured.</p>') + '</div></section>' +
+          '<section class="panel"><div class="panel-head"><div><div class="panel-title">Console Output' + infoTip('console.log/warn/error captured from the replay script.') + '</div><div class="panel-subtitle">' + esc((DATA.consoleLogs || []).length) + ' captured line(s)</div></div></div><div class="panel-body">' + logBlocks + '</div></section>';
+      }
 
-        function escapeRegex(s) { return s.replace(/[.*+?^\${}()|[\\]\\\\]/g, '\\\\$&'); }
+      function renderPerformance() {
+        var m = DATA.k6Metrics;
+        if (!m) {
+          el.content.innerHTML = '<section class="panel"><div class="panel-head"><div><div class="panel-title">Performance</div></div></div><div class="panel-body"><p class="empty">No performance metrics were embedded in this debug report.</p></div></section>';
+          return;
+        }
+        var overview = [
+          ['Total requests', m.httpSummary && m.httpSummary.reqs],
+          ['Failed percent', m.httpSummary && m.httpSummary.failedPct],
+          ['Iterations', m.execution && m.execution.iterations],
+          ['VUs', m.execution && m.execution.vus],
+          ['Data received', m.network && m.network.received],
+          ['Data sent', m.network && m.network.sent]
+        ].filter(function(x) { return x[1]; });
+        el.content.innerHTML =
+          '<div class="cards">' + overview.map(function(c) { return '<div class="card"><span class="card-label">' + esc(c[0]) + '</span><strong class="card-value">' + esc(c[1]) + '</strong></div>'; }).join('') + '</div>' +
+          metricTable('Checks', 'Check', (m.checks || []).map(function(c) { return { name: c.name, values: { Status: c.passed ? 'PASS' : 'FAIL' } }; }), ['Status'], 'Pass/fail result of each k6 check during the debug run.') +
+          metricTable('HTTP Metrics', 'Metric', m.http || [], (m.statsColumns || ['min', 'avg', 'max', 'p(90)', 'p(95)']).filter(function(c) { return c !== 'pass' && c !== 'fail'; }), 'k6 HTTP timing metrics for the debug run.') +
+          metricTable('Transaction Timings', 'Transaction', m.transactions || [], m.statsColumns || ['min', 'avg', 'max', 'p(90)', 'p(95)'], 'Per-transaction response-time stats for the debug run.');
+      }
 
-        function clearHighlights(root) {
-          root.querySelectorAll('mark').forEach(function(m) {
-            var parent = m.parentNode;
-            parent.replaceChild(document.createTextNode(m.textContent), m);
-            parent.normalize();
+      function metricTable(title, firstHeader, rows, columns, tip) {
+        if (!rows || rows.length === 0) return '';
+        var body = rows.map(function(r) {
+          return '<tr><td class="wrap">' + esc(r.name) + '</td>' + columns.map(function(c) { return '<td class="mono">' + esc((r.values && (r.values[c] != null ? r.values[c] : r.values[String(c)])) || '-') + '</td>'; }).join('') + '</tr>';
+        }).join('');
+        return '<section class="panel"><div class="panel-head"><div><div class="panel-title">' + esc(title) + (tip ? infoTip(tip) : '') + '</div></div></div><div class="table-scroll"><table><thead><tr><th>' + esc(firstHeader) + '</th>' + columns.map(function(c) { return '<th>' + esc(c) + '</th>'; }).join('') + '</tr></thead><tbody>' + body + '</tbody></table></div></section>';
+      }
+
+      function findRequestById(id) {
+        var found = null;
+        requestIds.forEach(function(v, k) { if (v === id) found = k; });
+        return found;
+      }
+
+      function openDrawer(id) {
+        state.drawerId = id;
+        state.drawerTab = 'summary';
+        renderDrawer();
+      }
+
+      function closeDrawer() {
+        state.drawerId = null;
+        el.drawer.classList.remove('open');
+        el.drawer.innerHTML = '';
+      }
+
+      // The "same" request across iterations is identified by its HAR entry id
+      // (falling back to transaction + sequence). Lets the drawer offer an
+      // iteration switcher so users can compare one request across iterations.
+      function requestKey(r) {
+        return r.harEntryId || ((r.transactionName || '') + '#' + (r.requestSequence == null ? '' : r.requestSequence));
+      }
+
+      function iterationsForRequest(r) {
+        var key = requestKey(r);
+        return allResults()
+          .filter(function(x) { return requestKey(x) === key; })
+          .sort(function(a, b) { return Number(a.iteration) - Number(b.iteration); });
+      }
+
+      function drawerControls(r) {
+        var peers = iterationsForRequest(r);
+        var iterSelect = '';
+        if (peers.length > 1) {
+          iterSelect =
+            '<span class="ctl-label">Iteration</span>' +
+            '<select id="drawer-iteration">' + peers.map(function(p) {
+              return '<option value="' + esc(requestId(p)) + '"' + (p === r ? ' selected' : '') + '>Iteration ' + esc(p.iteration) + '</option>';
+            }).join('') + '</select>';
+        } else {
+          iterSelect = '<span class="ctl-label">Iteration ' + esc(r.iteration) + '</span>';
+        }
+        var bodyTools = '';
+        if (state.drawerTab === 'bodies') {
+          bodyTools =
+            '<input class="body-search" id="body-search" type="search" placeholder="Search in bodies" value="' + esc(state.bodySearch) + '" autocomplete="off" />' +
+            '<label class="toggle"><input type="checkbox" id="scroll-sync"' + (state.scrollSync ? ' checked' : '') + ' /> Sync scroll</label>';
+        }
+        return '<div class="drawer-controls">' + iterSelect + bodyTools + '</div>';
+      }
+
+      function renderDrawer() {
+        var r = findRequestById(state.drawerId);
+        if (!r) return closeDrawer();
+        var tabs = ['summary', 'bodies', 'headers', 'cookies', 'variables', 'raw'];
+        el.drawer.classList.add('open');
+        // Re-apply a user-chosen width (innerHTML wipes inline styles each render).
+        var widthStyle = state.drawerWidth ? ' style="width:' + state.drawerWidth + 'px"' : '';
+        el.drawer.innerHTML =
+          '<aside class="drawer" role="dialog" aria-modal="true"' + widthStyle + '>' +
+            '<div class="drawer-resizer" title="Drag to resize · double-click to reset"></div>' +
+            '<div class="drawer-head">' +
+              '<div><div class="drawer-title">Request #' + esc(r.requestSequence == null ? '-' : r.requestSequence) + ' - ' + esc(r.transactionName || 'Ungrouped') + '</div>' +
+                '<div class="drawer-meta"><span class="pill accent req-id">' + esc(r.harEntryId || 'no-id') + '</span> ' + esc(methodOf(r)) + ' ' + esc(decodeText(urlOf(r))) + '</div></div>' +
+              '<button class="btn" type="button" data-close>Close</button>' +
+            '</div>' +
+            '<div class="drawer-tabs">' + tabs.map(function(t) { return '<button type="button" data-tab="' + esc(t) + '" class="' + (state.drawerTab === t ? 'active' : '') + '">' + esc(t.charAt(0).toUpperCase() + t.slice(1)) + '</button>'; }).join('') + '</div>' +
+            drawerControls(r) +
+            '<div class="drawer-body">' + drawerTabContent(r) + '</div>' +
+          '</aside>';
+        bindDrawerInteractions();
+      }
+
+      // Wire up the iteration switcher, body search and scroll-sync after the
+      // drawer DOM is in place (innerHTML wipes any prior listeners).
+      function bindDrawerInteractions() {
+        bindDrawerResizer();
+        var iterSel = document.getElementById('drawer-iteration');
+        if (iterSel) {
+          iterSel.addEventListener('change', function() { state.drawerId = this.value; renderDrawer(); });
+        }
+        var bodySearch = document.getElementById('body-search');
+        if (bodySearch) {
+          bodySearch.addEventListener('input', function() {
+            state.bodySearch = this.value;
+            var r = findRequestById(state.drawerId);
+            var body = el.drawer.querySelector('.drawer-body');
+            if (r && body) { body.innerHTML = drawerBodies(r); bindScrollSync(); scrollToFirstMark(); }
           });
         }
-
-        function highlightText(node, regex) {
-          var count = 0;
-          var walk = document.createTreeWalker(node, NodeFilter.SHOW_TEXT, null, false);
-          var textNodes = [];
-          while (walk.nextNode()) textNodes.push(walk.currentNode);
-          textNodes.forEach(function(tn) {
-            if (tn.parentNode.tagName === 'SCRIPT' || tn.parentNode.tagName === 'STYLE' || tn.parentNode.tagName === 'MARK') return;
-            var val = tn.nodeValue;
-            if (!regex.test(val)) return;
-            regex.lastIndex = 0;
-            var frag = document.createDocumentFragment();
-            var lastIdx = 0;
-            var match;
-            while ((match = regex.exec(val)) !== null) {
-              if (match.index > lastIdx) frag.appendChild(document.createTextNode(val.slice(lastIdx, match.index)));
-              var mark = document.createElement('mark');
-              mark.textContent = match[0];
-              frag.appendChild(mark);
-              count++;
-              lastIdx = regex.lastIndex;
-              if (!regex.global) break;
-            }
-            if (lastIdx < val.length) frag.appendChild(document.createTextNode(val.slice(lastIdx)));
-            tn.parentNode.replaceChild(frag, tn);
-          });
-          return count;
+        var syncToggle = document.getElementById('scroll-sync');
+        if (syncToggle) {
+          syncToggle.addEventListener('change', function() { state.scrollSync = this.checked; bindScrollSync(); });
         }
+        if (state.drawerTab === 'bodies') { bindScrollSync(); scrollToFirstMark(); }
+      }
 
-        function getScopeSelector(scope) {
-          switch (scope) {
-            case 'url': return '.request-meta';
-            case 'request-body': return '.body-section:first-of-type';
-            case 'response-body': return '.body-section:last-of-type';
-            case 'headers': return '.panel';
-            default: return null;
+      // Drag the left-edge grip to resize the drawer; double-click resets to the
+      // default width. The chosen width is held in state.drawerWidth so it
+      // survives the innerHTML re-renders (tab switches, iteration changes).
+      function bindDrawerResizer() {
+        var aside = el.drawer.querySelector('.drawer');
+        var grip = el.drawer.querySelector('.drawer-resizer');
+        if (!aside || !grip) return;
+        grip.addEventListener('mousedown', function(e) {
+          e.preventDefault();
+          var startX = e.clientX;
+          var startW = aside.getBoundingClientRect().width;
+          grip.classList.add('dragging');
+          document.body.style.userSelect = 'none';
+          function onMove(ev) {
+            // Drawer is anchored to the right edge, so dragging LEFT widens it.
+            var w = startW + (startX - ev.clientX);
+            w = Math.max(380, Math.min(window.innerWidth * 0.98, w));
+            aside.style.width = w + 'px';
+            state.drawerWidth = Math.round(w);
           }
-        }
-
-        function showSearchControls(show) {
-          var d = show ? 'inline-block' : 'none';
-          searchCount.style.display = d;
-          searchClear.style.display = d;
-          searchPrev.style.display = d;
-          searchNext.style.display = d;
-          searchPos.style.display = d;
-        }
-
-        function updatePosition() {
-          if (allMarks.length === 0) {
-            searchPos.textContent = '';
-            searchPrev.disabled = true;
-            searchNext.disabled = true;
-            return;
+          function onUp() {
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onUp);
+            grip.classList.remove('dragging');
+            document.body.style.userSelect = '';
           }
-          searchPos.textContent = (currentIdx + 1) + '/' + allMarks.length;
-          searchPrev.disabled = allMarks.length <= 1;
-          searchNext.disabled = allMarks.length <= 1;
-        }
-
-        function goToMark(idx) {
-          if (allMarks.length === 0) return;
-          if (allMarks[currentIdx]) allMarks[currentIdx].classList.remove('current');
-          currentIdx = ((idx % allMarks.length) + allMarks.length) % allMarks.length;
-          var m = allMarks[currentIdx];
-          m.classList.add('current');
-          var parentDetails = m.closest('details');
-          while (parentDetails) {
-            if (!parentDetails.open) parentDetails.open = true;
-            parentDetails = parentDetails.parentElement ? parentDetails.parentElement.closest('details') : null;
-          }
-          m.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          updatePosition();
-        }
-
-        function doSearch() {
-          var query = searchInput.value.trim();
-          var activePanel = document.querySelector('.iteration-panel.active');
-          if (!activePanel) return;
-          var cards = activePanel.querySelectorAll('.request-card');
-          clearHighlights(activePanel);
-          cards.forEach(function(c) { c.classList.remove('search-hidden'); });
-          allMarks = [];
-          currentIdx = -1;
-
-          if (!query) {
-            showSearchControls(false);
-            return;
-          }
-
-          var scope = searchScope.value;
-          var scopeSel = getScopeSelector(scope);
-          var totalMatches = 0;
-
-          cards.forEach(function(card) {
-            var target = scopeSel ? card.querySelectorAll(scopeSel) : [card];
-            var cardMatches = 0;
-            for (var i = 0; i < target.length; i++) {
-              cardMatches += highlightText(target[i], new RegExp(escapeRegex(query), 'gi'));
-            }
-            if (cardMatches > 0) {
-              totalMatches += cardMatches;
-            } else {
-              card.classList.add('search-hidden');
-            }
-          });
-
-          allMarks = Array.from(activePanel.querySelectorAll('mark'));
-          searchCount.textContent = totalMatches + ' match' + (totalMatches !== 1 ? 'es' : '');
-          searchCount.className = 'search-badge' + (totalMatches === 0 ? ' zero' : '');
-          showSearchControls(true);
-
-          if (allMarks.length > 0) goToMark(0);
-          else updatePosition();
-        }
-
-        searchInput.addEventListener('input', function() {
-          clearTimeout(debounceTimer);
-          debounceTimer = setTimeout(doSearch, 200);
+          document.addEventListener('mousemove', onMove);
+          document.addEventListener('mouseup', onUp);
         });
-        searchScope.addEventListener('change', function() { if (searchInput.value.trim()) doSearch(); });
-        searchClear.addEventListener('click', function() {
-          searchInput.value = '';
-          doSearch();
-          searchInput.focus();
+        grip.addEventListener('dblclick', function() {
+          state.drawerWidth = null;
+          aside.style.width = '';
         });
-        searchPrev.addEventListener('click', function() { goToMark(currentIdx - 1); });
-        searchNext.addEventListener('click', function() { goToMark(currentIdx + 1); });
-        searchInput.addEventListener('keydown', function(e) {
-          if (e.key === 'Escape') { searchInput.value = ''; doSearch(); return; }
-          if (e.key === 'Enter') {
-            e.preventDefault();
-            if (allMarks.length === 0) return;
-            if (e.shiftKey) goToMark(currentIdx - 1);
-            else goToMark(currentIdx + 1);
-          }
-        });
-        document.addEventListener('keydown', function(e) {
-          if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
-            e.preventDefault();
-            searchInput.focus();
-            searchInput.select();
-          }
-        });
+      }
 
-        window.showIteration(${iterationKeys[0] ?? 1});
-        window.addEventListener('scroll', function() {
-          if (stickyBar) stickyBar.classList.toggle('scrolled', window.scrollY > 80);
-        });
-
-        var modeToggle = document.getElementById('mode-toggle');
-        var shellEl = document.querySelector('.shell');
-        modeToggle.addEventListener('change', function() {
-          shellEl.classList.toggle('raw-mode', !this.checked);
-        });
-
-        // Column resize
-        function initTableResize(table) {
-          if (table.dataset.resizeInit) return;
-          table.dataset.resizeInit = '1';
-          var ths = table.querySelectorAll('thead th');
-          if (ths.length === 0) return;
-          // Capture natural widths before switching to fixed layout
-          var widths = [];
-          ths.forEach(function(th) { widths.push(th.offsetWidth); });
-          if (widths[0] === 0) return; // not visible yet
-          table.style.tableLayout = 'fixed';
-          ths.forEach(function(th, i) { th.style.width = widths[i] + 'px'; });
-          ths.forEach(function(th, i) {
-            if (i === ths.length - 1) return;
-            var handle = document.createElement('div');
-            handle.className = 'col-resize';
-            th.appendChild(handle);
-            handle.addEventListener('mousedown', function(e) {
-              e.preventDefault();
-              var startX = e.pageX;
-              var startW = th.offsetWidth;
-              var nextTh = ths[i + 1];
-              var nextW = nextTh ? nextTh.offsetWidth : 0;
-              document.body.classList.add('resizing');
-              handle.classList.add('active');
-              function onMove(ev) {
-                var dx = ev.pageX - startX;
-                var newW = Math.max(60, startW + dx);
-                var newNextW = nextTh ? Math.max(60, nextW - dx) : 0;
-                if (nextTh && (newNextW <= 60 || newW <= 60)) return;
-                th.style.width = newW + 'px';
-                if (nextTh) nextTh.style.width = newNextW + 'px';
-              }
-              function onUp() {
-                document.removeEventListener('mousemove', onMove);
-                document.removeEventListener('mouseup', onUp);
-                document.body.classList.remove('resizing');
-                handle.classList.remove('active');
-              }
-              document.addEventListener('mousemove', onMove);
-              document.addEventListener('mouseup', onUp);
+      // Keep the recorded/replayed body panes scrolling together (by ratio so
+      // panes of different lengths stay aligned).
+      function bindScrollSync() {
+        var panes = el.drawer.querySelectorAll('.body-grid pre, .body-grid .jt-wrap');
+        panes.forEach(function(pre) {
+          pre.onscroll = null;
+          if (!state.scrollSync) return;
+          pre.onscroll = function() {
+            if (pre._syncing) return;
+            var ratio = pre.scrollHeight > pre.clientHeight ? pre.scrollTop / (pre.scrollHeight - pre.clientHeight) : 0;
+            panes.forEach(function(other) {
+              if (other === pre) return;
+              other._syncing = true;
+              other.scrollTop = ratio * (other.scrollHeight - other.clientHeight);
+              requestAnimationFrame(function() { other._syncing = false; });
             });
-          });
+          };
+        });
+      }
+
+      function scrollToFirstMark() {
+        var mark = el.drawer.querySelector('.drawer-body mark');
+        if (mark && mark.scrollIntoView) mark.scrollIntoView({ block: 'center' });
+      }
+
+      function drawerTabContent(r) {
+        if (state.drawerTab === 'summary') return drawerSummary(r);
+        if (state.drawerTab === 'bodies') return drawerBodies(r);
+        if (state.drawerTab === 'headers') return drawerHeaders(r);
+        if (state.drawerTab === 'cookies') return drawerCookies(r);
+        if (state.drawerTab === 'variables') return drawerVariables(r);
+        return drawerRaw(r);
+      }
+
+      function drawerSummary(r) {
+        var statusSide = effectiveStatusSide(r);
+        return '<div class="mini-actions">' +
+            '<button class="btn" data-copy="' + esc(decodeText(urlOf(r))) + '">Copy URL</button>' +
+            '<button class="btn" data-copy="' + esc(JSON.stringify(r, null, 2)) + '">Copy exchange JSON</button>' +
+            '<span class="copy-ok" id="copy-status"></span>' +
+          '</div>' +
+          '<div class="cards">' +
+            '<div class="card"><span class="card-label">Request ID</span><strong class="card-value req-id" style="font-size:15px">' + esc(r.harEntryId || '-') + '</strong></div>' +
+            '<div class="card"><span class="card-label">Iteration</span><strong class="card-value">' + esc(r.iteration == null ? '-' : r.iteration) + '</strong></div>' +
+            '<div class="card"><span class="card-label">Score</span><strong class="card-value score ' + scoreClass(r.matchScore) + '">' + esc(r.matchScore) + '%</strong></div>' +
+            '<div class="card"><span class="card-label">State</span><strong class="card-value">' + esc(comparisonLabel(r.comparisonType)) + '</strong></div>' +
+            '<div class="card"><span class="card-label">Status</span><strong class="card-value ' + statusClass(statusSide.status) + '">' + esc(statusDisplay(statusSide)) + '</strong></div>' +
+            '<div class="card"><span class="card-label">Duration</span><strong class="card-value">' + esc(formatDuration(r.durationMs)) + '</strong></div>' +
+          '</div>' +
+          '<section class="panel"><div class="panel-head"><div><div class="panel-title">Issues</div></div></div><div class="panel-body"><div class="issue-list">' + issueBadges(r) + '</div>' + warningsHtml(r) + '</div></section>' +
+          '<section class="panel"><div class="panel-head"><div><div class="panel-title">Recorded vs Replayed</div></div></div><div class="panel-body"><div class="kvs">' +
+            snapshotKv('Recorded', r.recorded) + snapshotKv('Replayed', r.replayed) +
+          '</div></div></section>';
+      }
+
+      function snapshotKv(label, snap) {
+        snap = snap || {};
+        return '<div class="kv"><div class="kv-label">' + esc(label) + '</div>' +
+          '<div class="kv-value"><b>Method:</b> ' + esc(snap.method || '-') + '</div>' +
+          '<div class="kv-value"><b>Status:</b> <span class="' + statusClass(snap.status) + '">' + esc(statusDisplay(snap)) + '</span></div>' +
+          '<div class="kv-value"><b>URL:</b> ' + esc(decodeText(snap.url || '-')) + '</div>' +
+          '<div class="kv-value"><b>Headers:</b> ' + esc((snap.requestHeaders || []).length) + ' request / ' + esc((snap.responseHeaders || []).length) + ' response</div>' +
+        '</div>';
+      }
+
+      function warningsHtml(r) {
+        var warnings = r.warnings || [];
+        if (!warnings.length) return '';
+        return '<ul class="insights">' + warnings.map(function(w) { return '<li>' + esc(w) + '</li>'; }).join('') + '</ul>';
+      }
+
+      function drawerBodies(r) {
+        return '<section class="panel"><div class="panel-head"><div><div class="panel-title">Request Body</div><div class="panel-subtitle">' + esc(r.requestBody && r.requestBody.summary || '') + '</div></div></div><div class="panel-body">' + bodyPair(r.recorded && r.recorded.requestBody, r.replayed && r.replayed.requestBody) + '</div></section>' +
+          '<section class="panel"><div class="panel-head"><div><div class="panel-title">Response Body</div><div class="panel-subtitle">' + esc(r.responseBody && r.responseBody.summary || '') + '</div></div></div><div class="panel-body">' + bodyPair(r.recorded && r.recorded.responseBody, r.replayed && r.replayed.responseBody) + '</div></section>';
+      }
+
+      function bodyPair(left, right) {
+        // When either side is JSON, render a foldable tree so deeply nested
+        // payloads can be collapsed node-by-node. Changed leaves are highlighted
+        // against the opposite side. Non-JSON bodies keep the line-diff view.
+        var lp = tryParseJson(left);
+        var rp = tryParseJson(right);
+        if (lp.ok || rp.ok) {
+          var leftPane = lp.ok
+            ? '<div class="jt-wrap">' + jsonTree(lp.value, rp.ok ? rp.value : undefined, rp.ok) + '</div>'
+            : '<pre>' + highlightTerm(esc(formatBody(left))) + '</pre>';
+          var rightPane = rp.ok
+            ? '<div class="jt-wrap">' + jsonTree(rp.value, lp.ok ? lp.value : undefined, lp.ok) + '</div>'
+            : '<pre>' + highlightTerm(esc(formatBody(right))) + '</pre>';
+          return '<div class="body-grid"><div class="body-pane"><h4>Recorded</h4>' + leftPane + '</div><div class="body-pane"><h4>Replayed</h4>' + rightPane + '</div></div>';
         }
-        // Init visible tables
-        document.querySelectorAll('table').forEach(function(t) { initTableResize(t); });
-        // Init tables inside details when opened
-        document.addEventListener('toggle', function(e) {
-          if (e.target.tagName === 'DETAILS' && e.target.open) {
-            e.target.querySelectorAll('table').forEach(function(t) { initTableResize(t); });
+        var l = formatBody(left);
+        var r = formatBody(right);
+        return '<div class="body-grid"><div class="body-pane"><h4>Recorded</h4><pre>' + diffLines(l, r, 0) + '</pre></div><div class="body-pane"><h4>Replayed</h4><pre>' + diffLines(l, r, 1) + '</pre></div></div>';
+      }
+
+      // Case-insensitive highlight of the body-search term. Works on already-
+      // escaped text (the search term is escaped too) and avoids regex so the
+      // outer template literal stays simple.
+      function highlightTerm(escaped) {
+        var term = esc((state.bodySearch || '').trim());
+        if (!term) return escaped;
+        var lower = escaped.toLowerCase();
+        var t = term.toLowerCase();
+        var out = '';
+        var idx = 0;
+        var pos;
+        while ((pos = lower.indexOf(t, idx)) >= 0) {
+          out += escaped.slice(idx, pos) + '<mark>' + escaped.slice(pos, pos + term.length) + '</mark>';
+          idx = pos + term.length;
+        }
+        return out + escaped.slice(idx);
+      }
+
+      // Parse a body into a JS value when it looks like JSON (raw or URL-encoded).
+      function tryParseJson(body) {
+        var raw = String(body == null ? '' : body).trim();
+        var candidates = [raw];
+        try { candidates.push(decodeURIComponent(raw)); } catch (e) {}
+        for (var i = 0; i < candidates.length; i++) {
+          var t = candidates[i];
+          if (t && (t.charAt(0) === '{' || t.charAt(0) === '[')) {
+            try { return { ok: true, value: JSON.parse(t) }; } catch (e) {}
           }
-        }, true);
-
-        // ── Section-scoped search with scroll sync ──
-        function ssClearHighlights(container) {
-          container.querySelectorAll('mark.ss-mark').forEach(function(m) {
-            var p = m.parentNode;
-            p.replaceChild(document.createTextNode(m.textContent), m);
-            p.normalize();
-          });
         }
+        return { ok: false };
+      }
 
-        function ssHighlight(node, regex) {
-          var count = 0;
-          var walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT, null, false);
-          var nodes = [];
-          while (walker.nextNode()) nodes.push(walker.currentNode);
-          nodes.forEach(function(tn) {
-            if (tn.parentNode.tagName === 'SCRIPT' || tn.parentNode.tagName === 'STYLE' || tn.parentNode.closest('.section-search-bar')) return;
-            if (tn.parentNode.tagName === 'MARK') return;
-            var val = tn.nodeValue;
-            if (!regex.test(val)) return;
-            regex.lastIndex = 0;
-            var frag = document.createDocumentFragment();
-            var last = 0, match;
-            while ((match = regex.exec(val)) !== null) {
-              if (match.index > last) frag.appendChild(document.createTextNode(val.slice(last, match.index)));
-              var mk = document.createElement('mark');
-              mk.className = 'ss-mark';
-              mk.textContent = match[0];
-              frag.appendChild(mk);
-              count++;
-              last = regex.lastIndex;
-              if (!regex.global) break;
+      function jtPrim(v) {
+        var cls, text;
+        if (v === null) { cls = 'jt-null'; text = 'null'; }
+        else if (typeof v === 'number') { cls = 'jt-num'; text = String(v); }
+        else if (typeof v === 'boolean') { cls = 'jt-bool'; text = String(v); }
+        else { cls = 'jt-str'; text = JSON.stringify(String(v)); }
+        return '<span class="' + cls + '">' + highlightTerm(esc(text)) + '</span>';
+      }
+
+      function jtDiffers(a, b) {
+        try { return JSON.stringify(a) !== JSON.stringify(b); } catch (e) { return true; }
+      }
+
+      // Recursive collapsible JSON renderer. \`other\` (optional) is the matching
+      // value from the opposite snapshot so changed leaves can be highlighted.
+      function jsonTree(value, other, hasOther) {
+        if (value === null || typeof value !== 'object') return jtPrim(value);
+        var isArr = Array.isArray(value);
+        var open = isArr ? '[' : '{';
+        var close = isArr ? ']' : '}';
+        var keys = isArr ? value.map(function(_, i) { return i; }) : Object.keys(value);
+        if (keys.length === 0) return '<span class="jt-empty">' + open + close + '</span>';
+        var otherIsObj = hasOther && other !== null && typeof other === 'object';
+        var rows = keys.map(function(k, idx) {
+          var child = value[k];
+          var childPresentInOther = otherIsObj && (isArr ? k < (other.length || 0) : Object.prototype.hasOwnProperty.call(other, k));
+          var otherChild = childPresentInOther ? other[k] : undefined;
+          var comma = idx < keys.length - 1 ? ',' : '';
+          var keyHtml = isArr ? '' : '<span class="jt-key">' + highlightTerm(esc(JSON.stringify(String(k)))) + '</span>: ';
+          var isObj = child !== null && typeof child === 'object';
+          var changed = '';
+          if (hasOther) {
+            if (!childPresentInOther) changed = ' changed';
+            else if (!isObj && jtDiffers(child, otherChild)) changed = ' changed';
+          }
+          return '<span class="jt-row' + changed + '">' + keyHtml + jsonTree(child, otherChild, childPresentInOther) + comma + '</span>';
+        }).join('');
+        return '<span class="jt-node">' +
+            '<span class="jt-tog">' + open + '</span>' +
+            '<span class="jt-stub">' + open + '\\u2026' + close + '</span>' +
+            '<span class="jt-kids">' + rows + '</span>' +
+            '<span class="jt-close">' + close + '</span>' +
+          '</span>';
+      }
+
+      // Lightweight line comparison gives users a visual cue without shipping a diff library.
+      function diffLines(left, right, side) {
+        var a = String(left || '').split(/\\r?\\n/);
+        var b = String(right || '').split(/\\r?\\n/);
+        var max = Math.max(a.length, b.length);
+        var out = [];
+        for (var i = 0; i < max; i++) {
+          var line = side === 0 ? (a[i] || '') : (b[i] || '');
+          var changed = (a[i] || '') !== (b[i] || '');
+          out.push('<span class="diff-line ' + (changed ? 'changed' : '') + '">' + highlightTerm(esc(line || ' ')) + '</span>');
+        }
+        return out.join('');
+      }
+
+      function drawerHeaders(r) {
+        return '<section class="panel"><div class="panel-head"><div><div class="panel-title">Request Headers</div></div></div><div class="table-scroll">' + diffTable(r.requestHeaderDiffs || [], 'Header') + '</div></section>' +
+          '<section class="panel"><div class="panel-head"><div><div class="panel-title">Response Headers</div></div></div><div class="table-scroll">' + diffTable(r.responseHeaderDiffs || [], 'Header') + '</div></section>';
+      }
+
+      function diffTable(rows, label) {
+        var visible = state.diffOnly ? rows.filter(function(d) { return d.status !== 'match'; }) : rows;
+        var body = visible.map(function(d) {
+          var cls = d.status === 'match' ? 'good' : d.status === 'mismatch' ? 'bad' : 'warn';
+          return '<tr><td class="wrap">' + esc(d.name) + '</td><td class="wrap mono">' + esc(decodeText(d.recordedValue || '')) + '</td><td class="wrap mono">' + esc(decodeText(d.replayedValue || '')) + '</td><td><span class="pill ' + cls + '">' + esc(d.status) + '</span></td></tr>';
+        }).join('');
+        return '<table><thead><tr><th>' + esc(label) + '</th><th>Recorded</th><th>Replayed</th><th>Status</th></tr></thead><tbody>' + (body || '<tr><td colspan="4" class="empty">No rows to show.</td></tr>') + '</tbody></table>';
+      }
+
+      function drawerCookies(r) {
+        return '<section class="panel"><div class="panel-head"><div><div class="panel-title">Request Cookies</div></div></div><div class="table-scroll">' + cookieDiffTable((r.recorded && r.recorded.requestCookies) || [], (r.replayed && r.replayed.requestCookies) || []) + '</div></section>' +
+          '<section class="panel"><div class="panel-head"><div><div class="panel-title">Response Cookies</div></div></div><div class="table-scroll">' + cookieDiffTable((r.recorded && r.recorded.responseCookies) || [], (r.replayed && r.replayed.responseCookies) || []) + '</div></section>';
+      }
+
+      function cookieDiffTable(recorded, replayed) {
+        var names = {};
+        recorded.forEach(function(c) { names[c.name] = true; });
+        replayed.forEach(function(c) { names[c.name] = true; });
+        var rows = Object.keys(names).sort().map(function(name) {
+          var rec = recorded.find(function(c) { return c.name === name; });
+          var rep = replayed.find(function(c) { return c.name === name; });
+          var rv = rec ? rec.value : '';
+          var pv = rep ? rep.value : '';
+          var status = !rec ? 'extra_in_replay' : !rep ? 'missing_in_replay' : rv === pv ? 'match' : 'mismatch';
+          if (state.diffOnly && status === 'match') return '';
+          var cls = status === 'match' ? 'good' : status === 'mismatch' ? 'bad' : 'warn';
+          return '<tr><td>' + esc(name) + '</td><td class="wrap mono">' + esc(rv) + '</td><td class="wrap mono">' + esc(pv) + '</td><td><span class="pill ' + cls + '">' + esc(status) + '</span></td></tr>';
+        }).join('');
+        return '<table><thead><tr><th>Cookie</th><th>Recorded</th><th>Replayed</th><th>Status</th></tr></thead><tbody>' + (rows || '<tr><td colspan="4" class="empty">No cookies to show.</td></tr>') + '</tbody></table>';
+      }
+
+      function drawerVariables(r) {
+        var rows = (r.variableEvents || []).map(function(v) {
+          return '<tr><td>' + esc(v.name) + '</td><td>' + esc(v.type) + '</td><td>' + esc(v.action) + '</td><td class="wrap mono">' + esc(decodeText(v.value)) + '</td><td class="wrap">' + esc(v.source || '-') + '</td></tr>';
+        }).join('');
+        return '<section class="panel"><div class="panel-head"><div><div class="panel-title">Request Variables</div></div></div><div class="table-scroll"><table><thead><tr><th>Name</th><th>Type</th><th>Action</th><th>Value</th><th>Source</th></tr></thead><tbody>' + (rows || '<tr><td colspan="5" class="empty">No variables captured for this request.</td></tr>') + '</tbody></table></div></section>';
+      }
+
+      // Collapsible raw-JSON block so large dumps don't dominate the panel.
+      function rawBlock(title, obj, open) {
+        var json = JSON.stringify(obj, null, 2);
+        return '<details class="raw-block"' + (open ? ' open' : '') + '><summary>' + esc(title) +
+          '<span class="raw-meta">' + esc(json.length.toLocaleString()) + ' chars</span></summary><div class="jt-wrap">' + jsonTree(obj) + '</div></details>';
+      }
+
+      function drawerRaw(r) {
+        return '<div class="mini-actions"><button class="btn" data-copy="' + esc(JSON.stringify(r, null, 2)) + '">Copy raw JSON</button><span class="copy-ok" id="copy-status"></span></div>' +
+          rawBlock('Full exchange JSON', r, true) +
+          rawBlock('Recorded snapshot', r.recorded || {}, false) +
+          rawBlock('Replayed snapshot', r.replayed || {}, false);
+      }
+
+      function renderNav() {
+        var counts = {
+          overview: DATA.summary.totalRequests,
+          iterations: DATA.summary.iterations.length,
+          transactions: Object.keys(groupBy(visibleResults(), function(r) { return r.transactionName || 'Ungrouped'; })).length,
+          requests: visibleResults().length,
+          variables: visibleResults().reduce(function(sum, r) { return sum + (r.variableEvents || []).length; }, 0),
+          runtime: (DATA.k6Errors || []).length + (DATA.consoleLogs || []).length,
+          performance: DATA.k6Metrics ? 1 : 0
+        };
+        el.nav.innerHTML = navItems.map(function(item) {
+          return '<button type="button" data-section="' + item[0] + '" title="' + esc(item[1]) + '" class="' + (state.section === item[0] ? 'active' : '') + '"><span class="nav-ico">' + item[2] + '</span><span class="nav-lbl">' + esc(item[1]) + '</span><span class="nav-count">' + esc(counts[item[0]] || 0) + '</span></button>';
+        }).join('');
+      }
+
+      function render() {
+        el.app.classList.toggle('dense', state.dense);
+        renderNav();
+        renderHero();
+        if (state.section === 'overview') renderOverview();
+        if (state.section === 'iterations') renderIterations();
+        if (state.section === 'transactions') renderTransactions();
+        if (state.section === 'requests') renderRequests();
+        if (state.section === 'variables') renderVariables();
+        if (state.section === 'runtime') renderRuntime();
+        if (state.section === 'performance') renderPerformance();
+      }
+
+      function currentDebugTheme() {
+        return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+      }
+      // Apply a theme AND sync the toggle's icon + label so the button always
+      // reflects the action it performs (mirrors the custom report): in light
+      // mode it shows a moon + "Dark"; in dark mode a sun + "Light".
+      function applyDebugTheme(theme) {
+        document.documentElement.setAttribute('data-theme', theme);
+        try { localStorage.setItem('debug-report-theme', theme); } catch (e) {}
+        if (el.theme) {
+          var ico = theme === 'dark' ? '&#9728;&#65039;' : '&#127769;'; // ☀️ : 🌙
+          var lbl = theme === 'dark' ? 'Light' : 'Dark';
+          el.theme.innerHTML = '<span class="nav-ico">' + ico + '</span><span class="nav-lbl">' + lbl + '</span>';
+        }
+      }
+
+      function initControls() {
+        el.iteration.innerHTML = '<option value="all">All iterations</option>' + (DATA.summary.iterations || []).map(function(i) { return '<option value="' + esc(i) + '">Iteration ' + esc(i) + '</option>'; }).join('');
+        el.search.addEventListener('input', function() { state.search = this.value; render(); });
+        el.iteration.addEventListener('change', function() { state.iteration = this.value; render(); });
+        el.filter.addEventListener('change', function() { state.filter = this.value; render(); });
+        el.diffOnly.addEventListener('change', function() { state.diffOnly = this.checked; if (state.drawerId) renderDrawer(); render(); });
+        el.raw.addEventListener('change', function() { state.raw = this.checked; if (state.drawerId) renderDrawer(); render(); });
+        el.dense.addEventListener('change', function() { state.dense = this.checked; render(); });
+        el.theme.addEventListener('click', function() {
+          applyDebugTheme(currentDebugTheme() === 'dark' ? 'light' : 'dark');
+        });
+        // Apply the saved theme (default light) so the toggle's icon/label start
+        // in sync with the active mode instead of a static moon.
+        var savedTheme = 'light';
+        try { savedTheme = localStorage.getItem('debug-report-theme') || 'light'; } catch (e) {}
+        applyDebugTheme(savedTheme);
+      }
+
+      document.addEventListener('click', function(e) {
+        var jtToggle = e.target.closest('.jt-tog, .jt-stub');
+        if (jtToggle) {
+          var node = jtToggle.closest('.jt-node');
+          if (node) node.classList.toggle('collapsed');
+          return;
+        }
+        var sectionBtn = e.target.closest('[data-section]');
+        if (sectionBtn) {
+          state.section = sectionBtn.getAttribute('data-section');
+          render();
+          return;
+        }
+        var openRow = e.target.closest('[data-open]');
+        if (openRow) {
+          openDrawer(openRow.getAttribute('data-open'));
+          return;
+        }
+        var iterRow = e.target.closest('[data-iteration-open]');
+        if (iterRow) {
+          state.iteration = iterRow.getAttribute('data-iteration-open');
+          el.iteration.value = state.iteration;
+          state.section = 'requests';
+          render();
+          return;
+        }
+        var txnRow = e.target.closest('[data-search-transaction]');
+        if (txnRow) {
+          state.search = txnRow.getAttribute('data-search-transaction');
+          el.search.value = state.search;
+          state.section = 'requests';
+          render();
+          return;
+        }
+        if (e.target.closest('[data-close]') || e.target === el.drawer) {
+          closeDrawer();
+          return;
+        }
+        var tab = e.target.closest('[data-tab]');
+        if (tab) {
+          state.drawerTab = tab.getAttribute('data-tab');
+          renderDrawer();
+          return;
+        }
+        var copy = e.target.closest('[data-copy]');
+        if (copy) {
+          var text = copy.getAttribute('data-copy') || '';
+          var done = function() {
+            var status = document.getElementById('copy-status');
+            if (status) {
+              status.textContent = 'Copied';
+              setTimeout(function() { status.textContent = ''; }, 1300);
             }
-            if (last < val.length) frag.appendChild(document.createTextNode(val.slice(last)));
-            tn.parentNode.replaceChild(frag, tn);
-          });
-          return count;
-        }
-
-        function ssGetPre(pane) {
-          var pre = pane.querySelector('pre.body-formatted');
-          if (pre && pre.offsetParent === null) pre = pane.querySelector('pre.body-raw');
-          return pre || pane.querySelector('pre');
-        }
-
-        function ssGetSiblingPane(pane) {
-          var grid = pane.closest('.body-grid');
-          if (!grid) return null;
-          var panes = grid.querySelectorAll('.body-pane');
-          for (var i = 0; i < panes.length; i++) {
-            if (panes[i] !== pane) return panes[i];
-          }
-          return null;
-        }
-
-        function ssIsSyncEnabled(pane) {
-          var section = pane.closest('.body-section');
-          if (!section) return false;
-          var check = section.querySelector('.scroll-sync-check');
-          return check && check.checked;
-        }
-
-        function ssDoSearch(bar) {
-          var pane = bar.closest('.body-pane');
-          var input = bar.querySelector('input');
-          var badge = bar.querySelector('.ss-badge');
-          var prev = bar.querySelector('.ss-prev');
-          var next = bar.querySelector('.ss-next');
-          var pos = bar.querySelector('.ss-pos');
-          var query = input.value.trim();
-
-          ssClearHighlights(pane);
-          bar._marks = [];
-          bar._idx = -1;
-
-          if (!query) {
-            badge.textContent = '0';
-            badge.className = 'ss-badge zero';
-            pos.textContent = '';
-            prev.disabled = true;
-            next.disabled = true;
-            return;
-          }
-
-          var pre = ssGetPre(pane);
-          if (pre) {
-            ssHighlight(pre, new RegExp(escapeRegex(query), 'gi'));
-          }
-
-          bar._marks = Array.from(pane.querySelectorAll('mark.ss-mark'));
-          var cnt = bar._marks.length;
-          badge.textContent = cnt;
-          badge.className = 'ss-badge' + (cnt === 0 ? ' zero' : '');
-          prev.disabled = cnt <= 1;
-          next.disabled = cnt <= 1;
-
-          if (cnt > 0) {
-            ssGoTo(bar, 0);
+          };
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(done).catch(done);
           } else {
-            pos.textContent = '';
+            var ta = document.createElement('textarea');
+            ta.value = text;
+            document.body.appendChild(ta);
+            ta.select();
+            try { document.execCommand('copy'); } catch (err) {}
+            document.body.removeChild(ta);
+            done();
           }
         }
+      });
 
-        function ssGoTo(bar, idx) {
-          var marks = bar._marks || [];
-          if (marks.length === 0) return;
-          if (marks[bar._idx]) marks[bar._idx].classList.remove('current');
-          bar._idx = ((idx % marks.length) + marks.length) % marks.length;
-          var m = marks[bar._idx];
-          m.classList.add('current');
-          var pre = m.closest('pre');
-          if (pre) {
-            var preRect = pre.getBoundingClientRect();
-            var markRect = m.getBoundingClientRect();
-            pre.scrollTop += markRect.top - preRect.top - preRect.height / 2 + markRect.height / 2;
-          }
-          bar.querySelector('.ss-pos').textContent = (bar._idx + 1) + '/' + marks.length;
-
-          // Scroll sync: if section-level toggle enabled, sync sibling pane
-          var pane = bar.closest('.body-pane');
-          if (ssIsSyncEnabled(pane) && pre) {
-            var siblingPane = ssGetSiblingPane(pane);
-            if (siblingPane) {
-              var sibPre = ssGetPre(siblingPane);
-              if (sibPre && pre.scrollHeight > pre.clientHeight) {
-                var ratio = pre.scrollTop / (pre.scrollHeight - pre.clientHeight);
-                sibPre.scrollTop = ratio * (sibPre.scrollHeight - sibPre.clientHeight);
-              }
-            }
-          }
+      document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && state.drawerId) closeDrawer();
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
+          e.preventDefault();
+          el.search.focus();
+          el.search.select();
         }
+      });
 
-        window.openSectionSearch = function(btn) {
-          var pane = btn.closest('.body-pane');
-          if (!pane) return;
-          var bar = pane.querySelector('.section-search-bar');
-          if (!bar) return;
-          bar.classList.toggle('open');
-          if (bar.classList.contains('open')) {
-            var inp = bar.querySelector('input');
-            inp.focus();
-            inp.select();
-          } else {
-            ssClearHighlights(pane);
-            bar._marks = [];
-            bar._idx = -1;
-          }
-        };
-
-        // Bind all section search bars
-        document.querySelectorAll('.section-search-bar').forEach(function(bar) {
-          var input = bar.querySelector('input');
-          var timer = null;
-          input.addEventListener('input', function() {
-            clearTimeout(timer);
-            timer = setTimeout(function() { ssDoSearch(bar); }, 200);
-          });
-          input.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') {
-              bar.classList.remove('open');
-              ssClearHighlights(bar.closest('.body-pane'));
-              bar._marks = []; bar._idx = -1;
-              return;
-            }
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              if (!(bar._marks || []).length) return;
-              if (e.shiftKey) ssGoTo(bar, (bar._idx || 0) - 1);
-              else ssGoTo(bar, (bar._idx || 0) + 1);
-            }
-          });
-          bar.querySelector('.ss-prev').addEventListener('click', function() { ssGoTo(bar, (bar._idx || 0) - 1); });
-          bar.querySelector('.ss-next').addEventListener('click', function() { ssGoTo(bar, (bar._idx || 0) + 1); });
-          bar.querySelector('.ss-close').addEventListener('click', function() {
-            bar.classList.remove('open');
-            ssClearHighlights(bar.closest('.body-pane'));
-            bar._marks = []; bar._idx = -1;
-          });
-        });
-
-        // Section-level scroll sync: bind pre scroll events per body-section
-        document.querySelectorAll('.body-section').forEach(function(section) {
-          var panes = section.querySelectorAll('.body-pane');
-          panes.forEach(function(pane) {
-            var pre = ssGetPre(pane);
-            if (!pre) return;
-            pre.addEventListener('scroll', function() {
-              if (!ssIsSyncEnabled(pane)) return;
-              var sib = ssGetSiblingPane(pane);
-              if (!sib) return;
-              var sibPre = ssGetPre(sib);
-              if (!sibPre || pre.scrollHeight <= pre.clientHeight) return;
-              var r = pre.scrollTop / (pre.scrollHeight - pre.clientHeight);
-              sibPre.scrollTop = r * (sibPre.scrollHeight - sibPre.clientHeight);
-            });
-          });
-        });
-      })();
-
-      // ── Metrics table sorting ──
-      (function() {
-        document.querySelectorAll('table.m-sortable th.sortable').forEach(function(th) {
-          th.addEventListener('click', function() {
-            var table = th.closest('table');
-            var tbody = table.querySelector('tbody');
-            var colIdx = parseInt(th.dataset.col, 10);
-            var type = th.dataset.type || 'string';
-            var isAsc = th.classList.contains('sort-asc');
-            // Clear sort classes on sibling headers
-            table.querySelectorAll('th.sortable').forEach(function(h) {
-              h.classList.remove('sort-asc', 'sort-desc');
-            });
-            var dir = isAsc ? -1 : 1;
-            th.classList.add(dir === 1 ? 'sort-asc' : 'sort-desc');
-            var rows = Array.from(tbody.querySelectorAll('tr'));
-            rows.sort(function(a, b) {
-              var cellA = a.children[colIdx];
-              var cellB = b.children[colIdx];
-              if (type === 'num') {
-                var nA = parseFloat(cellA.dataset.val || cellA.textContent.replace(/[^0-9.\-]/g, '')) || 0;
-                var nB = parseFloat(cellB.dataset.val || cellB.textContent.replace(/[^0-9.\-]/g, '')) || 0;
-                return (nA - nB) * dir;
-              }
-              var sA = cellA.textContent.trim().toLowerCase();
-              var sB = cellB.textContent.trim().toLowerCase();
-              return sA < sB ? -dir : sA > sB ? dir : 0;
-            });
-            rows.forEach(function(row) { tbody.appendChild(row); });
-          });
-        });
-      })();
-    </script>
-  </body>
+      initControls();
+      render();
+    })();
+  </script>
+</body>
 </html>`;
         const absPath = path.resolve(process.cwd(), outPath);
         const dir = path.dirname(absPath);
@@ -1293,576 +1613,67 @@ class HTMLDiffReporter {
             fs.mkdirSync(dir, { recursive: true });
         fs.writeFileSync(absPath, html, 'utf-8');
     }
-    static renderIterationSummaryRow(summary) {
-        const matched = summary.items.filter((item) => item.comparisonType === 'matched').length;
-        const missing = summary.items.filter((item) => item.comparisonType === 'missing_in_replay').length;
-        const extra = summary.items.filter((item) => item.comparisonType === 'extra_in_replay').length;
-        const totalDuration = summary.items.reduce((sum, item) => sum + (item.durationMs ?? 0), 0);
-        return `<tr>
-      <td>Iteration ${summary.iteration}</td>
-      <td>${summary.items.length}</td>
-      <td>${matched}</td>
-      <td>${missing}</td>
-      <td>${extra}</td>
-      <td>${this.average(summary.items.map((item) => item.matchScore))}%</td>
-      <td>${this.formatDuration(totalDuration)}</td>
-    </tr>`;
+    static buildPayload(results, options) {
+        const iterations = Array.from(new Set(results.map((result) => result.iteration))).sort((a, b) => a - b);
+        const overallScore = this.average(results.map((result) => result.matchScore));
+        const missingCount = results.filter((result) => result.comparisonType === 'missing_in_replay').length;
+        const replayOnlyCount = results.filter((result) => result.comparisonType === 'extra_in_replay').length;
+        const mismatchCount = results.filter((result) => this.hasMismatch(result)).length;
+        const worstTransaction = this.findWorstTransaction(results);
+        const k6Errors = options?.k6Errors ?? [];
+        return {
+            generatedAt: new Date().toISOString(),
+            summary: {
+                overallScore,
+                totalRequests: results.length,
+                iterations,
+                warningCount: this.countWarnings(results),
+                missingCount,
+                replayOnlyCount,
+                mismatchCount,
+                worstTransaction,
+                status: this.resolveStatus(overallScore, missingCount, replayOnlyCount, mismatchCount, k6Errors.length),
+            },
+            results,
+            k6Errors,
+            consoleLogs: options?.consoleLogs ?? [],
+            k6Metrics: options?.k6Metrics,
+        };
     }
-    static renderIterationSection(summary, active) {
-        const warnings = summary.warnings.map((warning) => `<div class="warning">${this.escapeHtml(warning)}</div>`).join('');
-        const globalVariables = this.renderGlobalVariables(summary.items);
-        const transactionSummary = this.renderTransactionSummaryTable(summary.items);
-        const requestSummary = this.renderRequestSummaryTable(summary.items);
-        const transactionSections = this.renderTransactions(summary.items);
-        return `<section class="iteration-panel ${active ? 'active' : ''}" data-iteration="${summary.iteration}">
-      <section class="section-card">
-        <h2>Iteration ${summary.iteration}</h2>
-        ${warnings}
-        <div class="stats">
-          <div class="iter-stat">
-            <span class="label">Avg Match Score</span>
-            <span class="value">${this.average(summary.items.map((item) => item.matchScore))}%</span>
-          </div>
-          <div class="iter-stat">
-            <span class="label">Request Count</span>
-            <span class="value">${summary.items.length}</span>
-          </div>
-          <div class="iter-stat">
-            <span class="label">Total Request Time</span>
-            <span class="value">${this.formatDuration(summary.items.reduce((sum, item) => sum + (item.durationMs ?? 0), 0))}</span>
-          </div>
-          <div class="iter-stat">
-            <span class="label">Replay Only</span>
-            <span class="value">${summary.items.filter((item) => item.comparisonType === 'extra_in_replay').length}</span>
-          </div>
-        </div>
-      </section>
-
-      <section class="section-card">
-        <details open>
-          <summary>Global Variables</summary>
-          ${globalVariables}
-        </details>
-      </section>
-
-      <section class="section-card">
-        <div class="summary-grid single">
-          <div>
-            <h2>Transaction Timing Summary</h2>
-            ${transactionSummary}
-          </div>
-          <div>
-            <details>
-              <summary>Request Timing Summary</summary>
-              ${requestSummary}
-            </details>
-          </div>
-        </div>
-      </section>
-
-      ${transactionSections}
-    </section>`;
+    static hasMismatch(result) {
+        return (result.matchScore < 90 ||
+            result.comparisonType !== 'matched' ||
+            !result.statusMatch ||
+            !result.requestBody.match ||
+            !result.responseBody.match ||
+            result.requestHeaderDiffs.some((diff) => diff.status !== 'match') ||
+            result.responseHeaderDiffs.some((diff) => diff.status !== 'match'));
     }
-    static renderTransactions(results) {
-        const grouped = results.reduce((acc, result) => {
+    static resolveStatus(overallScore, missingCount, replayOnlyCount, mismatchCount, errorCount) {
+        if (errorCount > 0 || missingCount > 0 || overallScore < 70)
+            return 'broken';
+        if (replayOnlyCount > 0 || mismatchCount > 0 || overallScore < 95)
+            return 'drift';
+        return 'passed';
+    }
+    static findWorstTransaction(results) {
+        const byTransaction = new Map();
+        results.forEach((result) => {
             const key = result.transactionName || 'Ungrouped';
-            acc[key] ?? (acc[key] = []);
-            acc[key].push(result);
-            return acc;
-        }, {});
-        return Object.entries(grouped)
-            .map(([transaction, items]) => {
-            const totalDuration = items.reduce((sum, item) => sum + (item.durationMs ?? 0), 0);
-            const requestCards = items
-                .sort((a, b) => (a.requestSequence ?? 99999) - (b.requestSequence ?? 99999))
-                .map((item) => this.renderRequestCard(item))
-                .join('\n');
-            const txnId = `txn-${items[0]?.iteration ?? 0}-${this.sanitizeId(transaction)}`;
-            return `<section class="transaction" id="${txnId}">
-          <details>
-            <summary class="transaction-header">
-              <span class="transaction-title">
-                <h2>${this.escapeHtml(transaction)}</h2>
-                <span class="muted">${items.length} request(s), total replay time ${this.formatDuration(totalDuration)}</span>
-              </span>
-              <span class="transaction-toggle">Expand / Collapse</span>
-            </summary>
-            ${requestCards}
-          </details>
-        </section>`;
-        })
-            .join('\n');
-    }
-    static renderRequestCard(result) {
-        const scoreClass = this.scoreClass(result.matchScore);
-        const comparisonLabel = result.comparisonType === 'matched'
-            ? 'Matched'
-            : result.comparisonType === 'missing_in_replay'
-                ? 'Missing In Replay'
-                : 'Replay Only';
-        const requestHeaderSummary = this.headerSummary(result.requestHeaderDiffs);
-        const responseHeaderSummary = this.headerSummary(result.responseHeaderDiffs);
-        const tags = result.tags
-            ? `<div class="tag-list">${Object.entries(result.tags).map(([key, value]) => `<code>${this.escapeHtml(key)}=${this.escapeHtml(value)}</code>`).join('')}</div>`
-            : '';
-        const requestVariables = this.renderRequestVariables(result.variableEvents);
-        const reqId = `req-${result.iteration}-${result.requestSequence ?? 0}`;
-        return `<article class="request-card score-${this.scoreClass(result.matchScore)}" id="${reqId}">
-      <div class="request-card-sticky">
-        <div class="request-header">
-          <div>
-            <h3>${this.escapeHtml(result.harEntryId)}</h3>
-            <div class="request-meta">
-              Request #${result.requestSequence ?? '-'} | ${this.escapeHtml(result.replayed.method || result.recorded.method || '-')}
-              ${this.renderUrl(result.replayed.url || result.recorded.url || '-')}
-            </div>
-          </div>
-          <div class="score ${scoreClass}">${result.matchScore}%</div>
-        </div>
-        <div class="chips">
-          <span class="chip">${comparisonLabel}</span>
-          <span class="chip">VU ${result.vu ?? '-'}</span>
-          <span class="chip">Duration ${this.formatDuration(result.durationMs)}</span>
-          <span class="chip ${requestHeaderSummary.className}">Request headers ${requestHeaderSummary.label}</span>
-          <span class="chip ${responseHeaderSummary.className}">Response headers ${responseHeaderSummary.label}</span>
-          <span class="chip ${this.statusCodeClass(result.replayed.status ?? result.recorded.status)}">${result.replayed.status ?? result.recorded.status ?? '-'}</span>
-        </div>
-        ${tags}
-      </div>
-      <div class="grid">
-        <section class="panel">
-          <h4>Recorded</h4>
-          ${this.renderSnapshot(result.recorded, result.comparisonType === 'extra_in_replay')}
-        </section>
-        <section class="panel">
-          <h4>Replayed</h4>
-          ${this.renderSnapshot(result.replayed, false)}
-        </section>
-      </div>
-      ${this.renderBodyComparison('Request Body', result.requestBody.summary, result.recorded.requestBody, result.replayed.requestBody, result.comparisonType === 'extra_in_replay', this.isBodyMethod(result.recorded.method || result.replayed.method))}
-      ${this.renderBodyComparison('Response Body', result.responseBody.summary, result.recorded.responseBody, result.replayed.responseBody, result.comparisonType === 'extra_in_replay', false, this.detectRedirect(result))}
-      <section class="body-section">
-        <details>
-          <summary>Headers</summary>
-          <section class="body-section" style="margin-top:12px">
-            <details>
-              <summary>Request Headers</summary>
-              <div class="body-grid">
-                <div>
-                  <div class="muted">Recorded</div>
-                  ${this.renderHeaderList(result.recorded.requestHeaders)}
-                </div>
-                <div>
-                  <div class="muted">Replayed</div>
-                  ${this.renderHeaderList(result.replayed.requestHeaders)}
-                </div>
-              </div>
-            </details>
-          </section>
-          <section class="body-section" style="margin-top:12px">
-            <details>
-              <summary>Response Headers</summary>
-              <div class="body-grid">
-                <div>
-                  <div class="muted">Recorded</div>
-                  ${this.renderHeaderList(result.recorded.responseHeaders)}
-                </div>
-                <div>
-                  <div class="muted">Replayed</div>
-                  ${this.renderHeaderList(result.replayed.responseHeaders)}
-                </div>
-              </div>
-            </details>
-          </section>
-        </details>
-      </section>
-      <section class="body-section">
-        <details>
-          <summary>Cookies</summary>
-          <section class="body-section" style="margin-top:12px">
-            <details>
-              <summary>Request Cookies</summary>
-              <div class="body-grid">
-                <div>
-                  <div class="muted">Recorded</div>
-                  ${this.renderCookieList(result.recorded.requestCookies)}
-                </div>
-                <div>
-                  <div class="muted">Replayed</div>
-                  ${this.renderCookieList(result.replayed.requestCookies)}
-                </div>
-              </div>
-            </details>
-          </section>
-          <section class="body-section" style="margin-top:12px">
-            <details>
-              <summary>Response Cookies</summary>
-              <div class="body-grid">
-                <div>
-                  <div class="muted">Recorded</div>
-                  ${this.renderCookieList(result.recorded.responseCookies)}
-                </div>
-                <div>
-                  <div class="muted">Replayed</div>
-                  ${this.renderCookieList(result.replayed.responseCookies)}
-                </div>
-              </div>
-            </details>
-          </section>
-        </details>
-      </section>
-      <section class="body-section">
-        <details>
-          <summary>Variables</summary>
-          ${requestVariables}
-        </details>
-      </section>
-    </article>`;
-    }
-    static renderTransactionSummaryTable(results) {
-        const iteration = results[0]?.iteration ?? 0;
-        const transactionMap = results.reduce((acc, result) => {
-            const entry = acc.get(result.transactionName) ?? { count: 0, duration: 0, avgScore: [] };
-            entry.count += 1;
-            entry.duration += result.durationMs ?? 0;
-            entry.avgScore.push(result.matchScore);
-            acc.set(result.transactionName, entry);
-            return acc;
-        }, new Map());
-        const rows = Array.from(transactionMap.entries()).map(([transaction, stats]) => {
-            const txnId = `txn-${iteration}-${this.sanitizeId(transaction)}`;
-            return `<tr class="clickable-row" onclick="window.scrollToElement('${txnId}')">
-      <td class="clickable-cell">${this.escapeHtml(transaction)}</td>
-      <td>${stats.count}</td>
-      <td>${this.formatDuration(stats.duration)}</td>
-      <td>${this.average(stats.avgScore)}%</td>
-    </tr>`;
-        }).join('\n');
-        return `<table>
-      <thead>
-        <tr>
-          <th>Transaction</th>
-          <th>Requests</th>
-          <th>Total Time</th>
-          <th>Avg Match Score</th>
-        </tr>
-      </thead>
-      <tbody>${rows || '<tr><td colspan="4" class="empty">No transaction data.</td></tr>'}</tbody>
-    </table>`;
-    }
-    static renderRequestSummaryTable(results) {
-        const iteration = results[0]?.iteration ?? 0;
-        const rows = results
-            .sort((a, b) => (a.requestSequence ?? 99999) - (b.requestSequence ?? 99999))
-            .map((result) => {
-            const reqId = `req-${iteration}-${result.requestSequence ?? 0}`;
-            const status = result.replayed.status ?? result.recorded.status;
-            const url = result.replayed.url || result.recorded.url || '-';
-            return `<tr class="clickable-row" onclick="window.scrollToElement('${reqId}')">
-        <td class="clickable-cell">${result.requestSequence ?? '-'}</td>
-        <td title="${this.escapeHtml(result.transactionName)}">${this.escapeHtml(result.transactionName)}</td>
-        <td>${this.escapeHtml(result.replayed.method || result.recorded.method || '-')}</td>
-        <td title="${this.escapeHtml(url)}">${this.renderUrl(url)}</td>
-        <td class="${this.statusCodeClass(status)}">${status ?? '-'}</td>
-        <td>${this.formatDuration(result.durationMs)}</td>
-        <td title="${this.escapeHtml(result.comparisonType)}">${this.escapeHtml(result.comparisonType)}</td>
-      </tr>`;
-        })
-            .join('\n');
-        return `<table class="req-summary-table">
-      <thead>
-        <tr>
-          <th>#</th>
-          <th>Transaction</th>
-          <th>Method</th>
-          <th>URL</th>
-          <th>Status</th>
-          <th>Duration</th>
-          <th>State</th>
-        </tr>
-      </thead>
-      <tbody>${rows || '<tr><td colspan="7" class="empty">No request data.</td></tr>'}</tbody>
-    </table>`;
-    }
-    static renderGlobalVariables(results) {
-        const latestValues = new Map();
-        results.forEach((result) => {
-            result.variableEvents.forEach((event) => {
-                latestValues.set(event.name, {
-                    ...event,
-                    requestSequence: result.requestSequence,
-                    transactionName: result.transactionName,
-                });
-            });
+            const scores = byTransaction.get(key) ?? [];
+            scores.push(result.matchScore);
+            byTransaction.set(key, scores);
         });
-        if (latestValues.size === 0) {
-            return '<p class="empty">No parameterization or correlation variables were captured for this iteration.</p>';
-        }
-        const rows = Array.from(latestValues.values())
-            .sort((a, b) => a.name.localeCompare(b.name))
-            .map((event) => `<tr>
-        <td>${this.escapeHtml(event.name)}</td>
-        <td>${this.escapeHtml(event.type)}</td>
-        <td>${this.escapeHtml(event.value)}</td>
-        <td>${this.escapeHtml(event.source || '-')}</td>
-        <td>${this.escapeHtml(event.transactionName || '-')}</td>
-        <td>${event.requestSequence ?? '-'}</td>
-      </tr>`)
-            .join('\n');
-        return `<table>
-      <thead>
-        <tr>
-          <th>Name</th>
-          <th>Type</th>
-          <th>Value</th>
-          <th>Source</th>
-          <th>Last Request Transaction</th>
-          <th>Last Request #</th>
-        </tr>
-      </thead>
-      <tbody>${rows}</tbody>
-    </table>`;
-    }
-    static renderRequestVariables(variableEvents) {
-        if (!variableEvents.length) {
-            return '<p class="empty">No request variables were captured for this request.</p>';
-        }
-        const rows = variableEvents
-            .map((event) => `<tr>
-        <td>${this.escapeHtml(event.name)}</td>
-        <td>${this.escapeHtml(event.type)}</td>
-        <td>${this.escapeHtml(event.action)}</td>
-        <td>${this.escapeHtml(event.value)}</td>
-        <td>${this.escapeHtml(event.source || '-')}</td>
-      </tr>`)
-            .join('\n');
-        return `<table>
-      <thead>
-        <tr>
-          <th>Name</th>
-          <th>Type</th>
-          <th>Action</th>
-          <th>Value</th>
-          <th>Source</th>
-        </tr>
-      </thead>
-      <tbody>${rows}</tbody>
-    </table>`;
-    }
-    static renderSnapshot(snapshot, noData) {
-        if (noData || (!snapshot.method && !snapshot.url && snapshot.status === undefined)) {
-            return '<p class="empty">No data</p>';
-        }
-        return `<table>
-      <tbody>
-        <tr><th>Method</th><td>${this.escapeHtml(snapshot.method || '-')}</td></tr>
-        <tr><th>URL</th><td>${this.renderUrl(snapshot.url || '-')}</td></tr>
-        <tr><th>Status</th><td>${snapshot.status ?? '-'}</td></tr>
-        <tr><th>Req Headers</th><td>${snapshot.requestHeaders.length}</td></tr>
-        <tr><th>Resp Headers</th><td>${snapshot.responseHeaders.length}</td></tr>
-        <tr><th>Req Cookies</th><td>${(snapshot.requestCookies ?? []).length}</td></tr>
-        <tr><th>Resp Cookies</th><td>${(snapshot.responseCookies ?? []).length}</td></tr>
-      </tbody>
-    </table>`;
-    }
-    static renderHeaderTable(diffs) {
-        if (diffs.length === 0) {
-            return '<p class="empty">No headers to compare.</p>';
-        }
-        const rows = diffs.map((diff) => `<tr>
-      <td>${this.escapeHtml(diff.name)}</td>
-      <td><span class="decoded">${this.escapeHtml(this.decodeText(diff.recordedValue || ''))}</span><span class="raw">${this.escapeHtml(diff.recordedValue || '')}</span></td>
-      <td><span class="decoded">${this.escapeHtml(this.decodeText(diff.replayedValue || ''))}</span><span class="raw">${this.escapeHtml(diff.replayedValue || '')}</span></td>
-      <td>${this.escapeHtml(diff.status)}</td>
-    </tr>`).join('\n');
-        return `<table>
-      <thead>
-        <tr>
-          <th>Header</th>
-          <th>Recorded</th>
-          <th>Replayed</th>
-          <th>Status</th>
-        </tr>
-      </thead>
-      <tbody>${rows}</tbody>
-    </table>`;
-    }
-    static renderHeaderList(headers) {
-        if (!headers || headers.length === 0) {
-            return '<p class="empty">No headers.</p>';
-        }
-        const rows = headers.map(h => `<tr>
-      <td>${this.escapeHtml(h.name)}</td>
-      <td><span class="decoded">${this.escapeHtml(this.decodeText(h.value))}</span><span class="raw">${this.escapeHtml(h.value)}</span></td>
-    </tr>`).join('\n');
-        return `<table>
-      <thead><tr><th>Header</th><th>Value</th></tr></thead>
-      <tbody>${rows}</tbody>
-    </table>`;
-    }
-    static renderCookieList(cookies) {
-        const list = cookies ?? [];
-        if (list.length === 0) {
-            return '<p class="empty">No cookies.</p>';
-        }
-        const rows = list.map(c => `<tr>
-      <td>${this.escapeHtml(c.name)}</td>
-      <td>${this.escapeHtml(c.value)}</td>
-    </tr>`).join('\n');
-        return `<table>
-      <thead><tr><th>Cookie</th><th>Value</th></tr></thead>
-      <tbody>${rows}</tbody>
-    </table>`;
-    }
-    static renderCookieTable(replayedCookies, recordedCookies) {
-        const replayed = replayedCookies ?? [];
-        const recorded = recordedCookies ?? [];
-        if (replayed.length === 0 && recorded.length === 0) {
-            return '<p class="empty">No cookies.</p>';
-        }
-        const replayedMap = new Map(replayed.map(c => [c.name, c.value]));
-        const recordedMap = new Map(recorded.map(c => [c.name, c.value]));
-        const allNames = new Set([...replayedMap.keys(), ...recordedMap.keys()]);
-        const rows = Array.from(allNames).sort().map(name => {
-            const rec = recordedMap.get(name) ?? '';
-            const rep = replayedMap.get(name) ?? '';
-            const status = !recordedMap.has(name) ? 'extra_in_replay'
-                : !replayedMap.has(name) ? 'missing_in_replay'
-                    : rec === rep ? 'match' : 'mismatch';
-            return `<tr>
-        <td>${this.escapeHtml(name)}</td>
-        <td>${this.escapeHtml(rec)}</td>
-        <td>${this.escapeHtml(rep)}</td>
-        <td>${this.escapeHtml(status)}</td>
-      </tr>`;
-        }).join('\n');
-        return `<table>
-      <thead>
-        <tr>
-          <th>Cookie</th>
-          <th>Recorded</th>
-          <th>Replayed</th>
-          <th>Status</th>
-        </tr>
-      </thead>
-      <tbody>${rows}</tbody>
-    </table>`;
-    }
-    static renderBodyComparison(title, summary, recordedBody, replayedBody, recordedMissing, autoExpand, redirectWarning) {
-        const emptyLabel = /request body/i.test(title) ? 'No request body' : 'No response body';
-        const openAttr = autoExpand ? ' open' : '';
-        const warningHtml = redirectWarning
-            ? `<div class="redirect-warning">${this.escapeHtml(redirectWarning)}</div>`
-            : '';
-        return `<section class="body-section">
-      <details${openAttr}>
-        <summary>${this.escapeHtml(title)}
-          <span class="ss-sync-group">
-            <label class="ss-sync-toggle"><input type="checkbox" class="scroll-sync-check" /><span class="ss-slider"></span></label>
-            <label>Scroll sync</label>
-          </span>
-        </summary>
-        ${warningHtml}
-        <div class="muted">${this.escapeHtml(summary)}</div>
-        <div class="body-grid">
-          <div class="body-pane">
-            <div class="muted pane-header"><span class="pane-label">Recorded</span><button class="section-search-btn" title="Search this panel" onclick="window.openSectionSearch(this)"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/></svg></button></div>
-            <div class="section-search-bar">
-              <input type="text" placeholder="Search\u2026" autocomplete="off" />
-              <span class="ss-badge zero">0</span>
-              <button class="ss-prev" title="Previous" disabled>&#9650;</button>
-              <span class="ss-pos"></span>
-              <button class="ss-next" title="Next" disabled>&#9660;</button>
-              <button class="ss-close" title="Close">&times;</button>
-            </div>
-            <pre class="body-formatted">${this.escapeHtml(this.formatBody(recordedMissing ? 'No data' : (recordedBody ?? emptyLabel)))}</pre>
-            <pre class="body-raw">${this.escapeHtml(recordedMissing ? 'No data' : (recordedBody ?? emptyLabel))}</pre>
-          </div>
-          <div class="body-pane">
-            <div class="muted pane-header"><span class="pane-label">Replayed</span><button class="section-search-btn" title="Search this panel" onclick="window.openSectionSearch(this)"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/></svg></button></div>
-            <div class="section-search-bar">
-              <input type="text" placeholder="Search\u2026" autocomplete="off" />
-              <span class="ss-badge zero">0</span>
-              <button class="ss-prev" title="Previous" disabled>&#9650;</button>
-              <span class="ss-pos"></span>
-              <button class="ss-next" title="Next" disabled>&#9660;</button>
-              <button class="ss-close" title="Close">&times;</button>
-            </div>
-            <pre class="body-formatted">${this.escapeHtml(this.formatBody(replayedBody ?? emptyLabel))}</pre>
-            <pre class="body-raw">${this.escapeHtml(replayedBody ?? emptyLabel)}</pre>
-          </div>
-        </div>
-      </details>
-    </section>`;
-    }
-    static renderUrl(url) {
-        const urlStr = typeof url === 'object' ? (url && typeof url.toString === 'function' && url.toString() !== '[object Object]' ? url.toString() : JSON.stringify(url)) : String(url ?? '');
-        if (!urlStr || urlStr === '-')
-            return this.escapeHtml(urlStr);
-        const escaped = this.escapeHtml(urlStr);
-        const decoded = this.escapeHtml(this.decodeText(urlStr));
-        return `<span class="decoded">${decoded}</span><span class="raw">${escaped}</span>`;
-    }
-    static decodeText(value) {
-        const str = String(value ?? '');
-        try {
-            return decodeURIComponent(str);
-        }
-        catch {
-            return str;
-        }
-    }
-    static formatBody(body) {
-        if (!body || body === 'No data' || body === 'No request body' || body === 'No response body')
-            return body;
-        // URL-encoded form data
-        if (/^[\w%.+~-]+=/.test(body) && body.includes('&') && !body.includes('{')) {
-            try {
-                const params = new URLSearchParams(body);
-                return Array.from(params.entries()).map(([k, v]) => `${decodeURIComponent(k)} = ${decodeURIComponent(v)}`).join('\n');
+        let worstName = '';
+        let worstScore = Number.POSITIVE_INFINITY;
+        byTransaction.forEach((scores, name) => {
+            const score = this.average(scores);
+            if (score < worstScore) {
+                worstScore = score;
+                worstName = name;
             }
-            catch { /* fall through */ }
-        }
-        // JSON
-        const trimmed = body.trim();
-        if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
-            try {
-                return JSON.stringify(JSON.parse(trimmed), null, 2);
-            }
-            catch { /* fall through */ }
-        }
-        return body;
-    }
-    static groupByIteration(results) {
-        const grouped = new Map();
-        results.forEach((result) => {
-            const existing = grouped.get(result.iteration) ?? {
-                iteration: result.iteration,
-                warnings: [],
-                items: [],
-            };
-            existing.items.push(result);
-            result.warnings.forEach((warning) => {
-                if (!existing.warnings.includes(warning)) {
-                    existing.warnings.push(warning);
-                }
-            });
-            grouped.set(result.iteration, existing);
         });
-        return grouped;
-    }
-    static headerSummary(diffs) {
-        const mismatches = diffs.filter((diff) => diff.status !== 'match').length;
-        if (mismatches === 0)
-            return { label: 'match', className: 'good' };
-        if (mismatches <= 2)
-            return { label: `${mismatches} diff`, className: 'warn' };
-        return { label: `${mismatches} diff`, className: 'bad' };
-    }
-    static formatDuration(durationMs) {
-        if (durationMs === undefined || durationMs === null)
-            return '-';
-        return `${Math.round(durationMs)} ms`;
+        return worstName;
     }
     static average(values) {
         if (values.length === 0)
@@ -1872,159 +1683,5 @@ class HTMLDiffReporter {
     static countWarnings(results) {
         return new Set(results.flatMap((result) => result.warnings)).size;
     }
-    static scoreClass(score) {
-        if (score >= 90)
-            return 'good';
-        if (score >= 70)
-            return 'warn';
-        return 'bad';
-    }
-    static statusCodeClass(status) {
-        if (!status)
-            return '';
-        if (status >= 200 && status < 300)
-            return 'status-2xx';
-        if (status >= 300 && status < 400)
-            return 'status-3xx';
-        if (status >= 400 && status < 500)
-            return 'status-4xx';
-        if (status >= 500)
-            return 'status-5xx';
-        return '';
-    }
-    static formatHeaders(headers) {
-        if (!headers.length)
-            return '(none)';
-        return headers.map((header) => `${header.name}: ${header.value}`).join('\n');
-    }
-    static renderMetricsSection(m) {
-        const topRow = [];
-        const midRow = [];
-        const bottomRow = [];
-        // Row 1: Execution Summary (full width, overview KV tiles)
-        const kvItems = [];
-        if (m.httpSummary.reqs)
-            kvItems.push(`<div class="metric-kv-item"><span class="mk-label">Total Requests</span><span class="mk-value">${this.escapeHtml(m.httpSummary.reqs)}</span></div>`);
-        if (m.httpSummary.failedPct)
-            kvItems.push(`<div class="metric-kv-item"><span class="mk-label">Failed %</span><span class="mk-value">${this.escapeHtml(m.httpSummary.failedPct)}</span></div>`);
-        if (m.execution.iterations)
-            kvItems.push(`<div class="metric-kv-item"><span class="mk-label">Iterations</span><span class="mk-value">${this.escapeHtml(m.execution.iterations)}</span></div>`);
-        if (m.execution.vus)
-            kvItems.push(`<div class="metric-kv-item"><span class="mk-label">VUs</span><span class="mk-value">${this.escapeHtml(m.execution.vus)}</span></div>`);
-        if (m.network.received)
-            kvItems.push(`<div class="metric-kv-item"><span class="mk-label">Data Received</span><span class="mk-value">${this.escapeHtml(m.network.received)}</span></div>`);
-        if (m.network.sent)
-            kvItems.push(`<div class="metric-kv-item"><span class="mk-label">Data Sent</span><span class="mk-value">${this.escapeHtml(m.network.sent)}</span></div>`);
-        if (kvItems.length > 0) {
-            topRow.push(`<div class="metrics-card full-width"><h3>Execution Summary</h3><div class="metric-kv">${kvItems.join('')}</div></div>`);
-        }
-        // Row 2 left: Checks (narrow)
-        if (m.checks.length > 0) {
-            const rows = m.checks.map(c => `<tr><td>${this.escapeHtml(c.name)}</td><td class="${c.passed ? 'check-pass' : 'check-fail'}">${c.passed ? '✓ PASS' : '✗ FAIL'}</td></tr>`).join('');
-            midRow.push(`<div class="metrics-card"><h3>Checks</h3><table class="m-sortable"><thead><tr><th class="sortable" data-col="0" data-type="string">Check</th><th class="sortable" style="width:90px" data-col="1" data-type="string">Status</th></tr></thead><tbody>${rows}</tbody></table></div>`);
-        }
-        // Columns are driven by the resolved runtime stats (default min/avg/max/
-        // p90/p95, extended by reporting.transactionStats).
-        const cols = (m.statsColumns && m.statsColumns.length > 0)
-            ? m.statsColumns
-            : ['min', 'avg', 'max', 'p(90)', 'p(95)'];
-        // pass/fail come from a transaction's checks (_checkrate) and have no
-        // meaning for raw http_req_* timing metrics, so drop them from the HTTP
-        // table. Transactions keep the full column set.
-        const httpCols = cols.filter((c) => c !== 'pass' && c !== 'fail');
-        // Row 2 right: HTTP Metrics
-        if (m.http.length > 0) {
-            midRow.push(this.renderMetricTable('HTTP Metrics', 'Metric', m.http, httpCols, false));
-        }
-        // Row 3: Transaction Timings (full width, many rows)
-        if (m.transactions.length > 0) {
-            bottomRow.push(this.renderMetricTable('Transaction Timings', 'Transaction', m.transactions, cols, true));
-        }
-        const allCards = [...topRow, ...midRow, ...bottomRow];
-        if (allCards.length === 0)
-            return '';
-        return `<section class="metrics-section section-card" style="padding:24px">
-        <h2>Performance Metrics</h2>
-        <div class="metrics-grid">${allCards.join('\n')}</div>
-      </section>`;
-    }
-    /** Render a sortable metric table with a name column plus one column per stat. */
-    static renderMetricTable(title, nameHeader, rows, cols, fullWidth) {
-        const headCells = [`<th class="sortable" data-col="0" data-type="string">${nameHeader}</th>`];
-        cols.forEach((stat, i) => {
-            headCells.push(`<th class="sortable" data-col="${i + 1}" data-type="num">${this.statHeaderLabel(stat)}</th>`);
-        });
-        const bodyRows = rows.map((r) => {
-            const cells = [`<td>${this.escapeHtml(r.name)}</td>`];
-            for (const stat of cols) {
-                const val = r.values[stat] ?? '-';
-                cells.push(`<td data-val="${this.parseMetricNum(val)}">${this.escapeHtml(val)}</td>`);
-            }
-            return `<tr>${cells.join('')}</tr>`;
-        }).join('');
-        const cls = fullWidth ? 'metrics-card full-width' : 'metrics-card';
-        return `<div class="${cls}"><h3>${title}</h3><table class="m-sortable"><thead><tr>${headCells.join('')}</tr></thead><tbody>${bodyRows}</tbody></table></div>`;
-    }
-    /** Human label for a stat id: avg→Avg, p(90)→P90, count→Count, etc. */
-    static statHeaderLabel(stat) {
-        const mp = stat.match(/^p\((\d+(?:\.\d+)?)\)$/);
-        if (mp)
-            return `P${mp[1]}`;
-        switch (stat) {
-            case 'avg': return 'Avg';
-            case 'min': return 'Min';
-            case 'med': return 'Med';
-            case 'max': return 'Max';
-            case 'count': return 'Count';
-            case 'pass': return 'Pass';
-            case 'fail': return 'Fail';
-            case 'std': return 'Std';
-            default: return stat.charAt(0).toUpperCase() + stat.slice(1);
-        }
-    }
-    static escapeHtml(value) {
-        const str = typeof value === 'object' ? JSON.stringify(value) : String(value ?? '');
-        return str
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
-    }
-    /** Extract pure numeric value from metric strings like "147.69ms", "12.05s", "545" for sorting */
-    static parseMetricNum(val) {
-        const n = parseFloat(String(val ?? '').replace(/[^0-9.\-]/g, ''));
-        return isNaN(n) ? '0' : String(n);
-    }
-    static sanitizeId(value) {
-        return String(value ?? '').replace(/[^a-zA-Z0-9_-]/g, '_').toLowerCase();
-    }
-    static isBodyMethod(method) {
-        if (!method)
-            return false;
-        return ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method.toUpperCase());
-    }
-    static bodyPreview(body, method) {
-        if (!body)
-            return null;
-        if (method && !this.isBodyMethod(method) && body.length > 500)
-            return null;
-        if (body.length <= this.BODY_PREVIEW_MAX)
-            return body;
-        return body.slice(0, this.BODY_PREVIEW_MAX) + '…';
-    }
-    static detectRedirect(result) {
-        const recordedStatus = result.recorded.status;
-        const replayedStatus = result.replayed.status;
-        if (recordedStatus !== undefined &&
-            this.REDIRECT_STATUSES.has(recordedStatus) &&
-            replayedStatus !== undefined &&
-            !this.REDIRECT_STATUSES.has(replayedStatus)) {
-            return `Recording returned ${recordedStatus} redirect. k6 follows redirects by default, so the replayed response (${replayedStatus}) is the final destination response. Body and status differences are expected.`;
-        }
-        return undefined;
-    }
 }
 exports.HTMLDiffReporter = HTMLDiffReporter;
-HTMLDiffReporter.REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
-HTMLDiffReporter.BODY_PREVIEW_MAX = 200;

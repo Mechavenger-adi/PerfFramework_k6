@@ -25,6 +25,10 @@ export interface HAREntry {
         expression?: string;
     };
     status: number;
+    /** Transport-error reason when status is 0 (k6 timeout / reset / refused). */
+    error?: string;
+    /** k6 numeric error code paired with `error`. */
+    errorCode?: number;
     responseHeaders: {
         name: string;
         value: string;

@@ -20,6 +20,10 @@ export interface SideSnapshot {
   method?: string;
   url?: string;
   status?: number;
+  /** k6 transport-error reason when status is 0 (timeout / reset / refused). */
+  error?: string;
+  /** k6 numeric error code paired with `error`. */
+  errorCode?: number;
   requestHeaders: { name: string; value: string }[];
   responseHeaders: { name: string; value: string }[];
   requestBody?: string;
@@ -259,6 +263,8 @@ export class DiffChecker {
         method: replay.method,
         url: replay.url,
         status: replay.status,
+        error: replay.error,
+        errorCode: replay.errorCode,
         requestHeaders: replay.headers ?? [],
         responseHeaders: replay.responseHeaders ?? [],
         requestBody: replay.postData?.text,
@@ -512,6 +518,8 @@ export class DiffChecker {
             }
           : undefined,
         status: entry.response?.status,
+        error: entry.response?.error,
+        errorCode: entry.response?.errorCode,
         responseHeaders: entry.response?.headers ?? [],
         responseBody: entry.response?.body !== undefined
           ? {
@@ -600,6 +608,8 @@ export class DiffChecker {
         method: replay.har.method,
         url: replay.har.url,
         status: replay.har.status,
+        error: replay.har.error,
+        errorCode: replay.har.errorCode,
         requestHeaders: replay.har.headers ?? [],
         responseHeaders: replay.har.responseHeaders ?? [],
         requestBody: replay.har.postData?.text,

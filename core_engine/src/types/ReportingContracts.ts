@@ -87,7 +87,9 @@ export interface CiSummary {
  */
 export interface TimeSeriesPoint {
   ts: string;
-  [key: string]: string | number | undefined;
+  // number[] carries raw per-bucket samples (e.g. transaction `durations`) used
+  // by the report to compute exact stats for an arbitrary selected window.
+  [key: string]: string | number | number[] | undefined;
 }
 
 export interface TimeSeriesFile {

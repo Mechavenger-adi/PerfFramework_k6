@@ -15,7 +15,7 @@
   },
   "http": {
     "timeoutSeconds": 60,
-    "maxRedirects": 10,
+    "maxRedirects": 0,
     "throwOnError": true
   },
   "errorBehavior": "continue",

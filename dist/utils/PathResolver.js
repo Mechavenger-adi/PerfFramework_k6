@@ -43,42 +43,62 @@ const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 class PathResolver {
     /**
-     * Resolves a script path name.
-     * 1. If it's an exact file that exists, returns the absolute path.
-     * 2. If it's just a filename (e.g. `browse-journey.js`), deeply searches `testSuites` for a match.
+     * Resolve a script path, distinguishing "not found" from "ambiguous".
+     *
+     * Resolution order:
+     * 1. Treat `targetPath` as an explicit path (absolute, or relative to the
+     *    current working directory). If it points at an existing file, use it —
+     *    this is how users disambiguate duplicate filenames.
+     * 2. Otherwise treat it as a bare filename and deep-search `searchRoot`.
+     *    Collect EVERY match: one → resolved, none → not_found, many → ambiguous.
      *
      * @param targetPath The path or filename to resolve.
      * @param searchRoot The root directory to search in, defaults to 'testSuites'.
-     * @returns The resolved absolute path, or null if not found.
      */
-    static resolve(targetPath, searchRoot = 'testSuites') {
+    static resolveDetailed(targetPath, searchRoot = 'testSuites') {
+        // 1. Explicit path (absolute or relative to cwd) that points at a real file.
         const directAbsPath = path.resolve(process.cwd(), targetPath);
         if (fs.existsSync(directAbsPath) && fs.statSync(directAbsPath).isFile()) {
-            return directAbsPath;
+            return { status: 'resolved', path: directAbsPath, viaExactPath: true };
         }
-        // Dynamic search fallback
+        // 2. Bare-filename deep search across the suite root.
         const rootAbsDir = path.resolve(process.cwd(), searchRoot);
         if (!fs.existsSync(rootAbsDir)) {
-            return null;
+            return { status: 'not_found' };
         }
-        const foundPath = this.recursiveSearch(rootAbsDir, path.basename(targetPath));
-        return foundPath;
+        const matches = this.collectMatches(rootAbsDir, path.basename(targetPath));
+        if (matches.length === 0)
+            return { status: 'not_found' };
+        if (matches.length === 1)
+            return { status: 'resolved', path: matches[0] };
+        return { status: 'ambiguous', candidates: matches.sort() };
     }
-    static recursiveSearch(dir, targetFile) {
-        const files = fs.readdirSync(dir);
-        for (const file of files) {
-            const fullPath = path.join(dir, file);
-            const stat = fs.statSync(fullPath);
-            if (stat.isDirectory()) {
-                const found = this.recursiveSearch(fullPath, targetFile);
-                if (found)
-                    return found;
+    /**
+     * Back-compatible convenience wrapper. Returns the absolute path for a unique
+     * match, or `null` for both "not found" and "ambiguous" — it deliberately
+     * does NOT silently pick one of several matches.
+     */
+    static resolve(targetPath, searchRoot = 'testSuites') {
+        const result = this.resolveDetailed(targetPath, searchRoot);
+        return result.status === 'resolved' ? result.path : null;
+    }
+    /** Collect ALL files under `dir` (recursively) whose name equals `targetFile`. */
+    static collectMatches(dir, targetFile) {
+        const out = [];
+        const walk = (current) => {
+            for (const entry of fs.readdirSync(current)) {
+                const fullPath = path.join(current, entry);
+                const stat = fs.statSync(fullPath);
+                if (stat.isDirectory()) {
+                    walk(fullPath);
+                }
+                else if (entry === targetFile) {
+                    out.push(fullPath);
+                }
             }
-            else if (file === targetFile) {
-                return fullPath;
-            }
-        }
-        return null;
+        };
+        walk(dir);
+        return out;
     }
 }
 exports.PathResolver = PathResolver;

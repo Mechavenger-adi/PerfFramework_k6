@@ -163,10 +163,21 @@ class ReplayRunner {
                     ...(options.teamEnvironments
                         ? { K6_PERF_TEAM_ENVIRONMENTS: JSON.stringify(options.teamEnvironments) }
                         : {}),
-                    K6_PERF_RUNTIME_METADATA: JSON.stringify({
-                        errorBehavior: options.errorBehavior ?? 'continue',
-                        pacing: { enabled: false },
-                    }),
+                    // Honor the full resolved runtime settings when provided (debug ==
+                    // load parity: same http/redirects/timeout/thinkTime/pacing). The
+                    // explicit errorBehavior still wins so the debug-specific override is
+                    // respected. Falls back to the minimal block for standalone callers.
+                    K6_PERF_RUNTIME_METADATA: JSON.stringify(options.runtimeMetadata
+                        ? {
+                            ...options.runtimeMetadata,
+                            errorBehavior: options.errorBehavior
+                                ?? options.runtimeMetadata.errorBehavior
+                                ?? 'continue',
+                        }
+                        : {
+                            errorBehavior: options.errorBehavior ?? 'continue',
+                            pacing: { enabled: false },
+                        }),
                 },
                 // stdout/stderr both inherited (default) so k6's animated progress bar
                 // renders in place. The summary is read from `summaryExportPath`, not
@@ -686,11 +697,15 @@ class ReplayRunner {
             catch {
                 msg = consoleMatch[2].replace(/\\"/g, '"');
             }
-            // Skip only the framework's internal IPC channels — replay-log entries
-            // and snapshot-event payloads are parsed elsewhere and are noise here.
-            // We DO surface `[k6-perf][transaction:...] ERROR:` lines (and other
-            // framework error context) because those are essential debug info.
-            if (msg.includes('[replay-log]') || msg.includes('[snapshot-event]'))
+            // Skip only the framework's internal IPC channels — replay-log entries,
+            // snapshot-event payloads, and the machine-readable error/warning-event
+            // JSON twins are parsed elsewhere and are noise here. We DO surface the
+            // human-readable `[k6-perf][check-failed]` / `[k6-perf][transaction:...]
+            // ERROR:` lines (essential debug info) — so each failure appears once.
+            if (msg.includes('[replay-log]') ||
+                msg.includes('[snapshot-event]') ||
+                msg.includes('[error-event]') ||
+                msg.includes('[warning-event]'))
                 return;
             const level = consoleMatch[1].toUpperCase();
             logs.push(`[${level}] ${msg}`);

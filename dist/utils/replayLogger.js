@@ -78,6 +78,14 @@ function trackCorrelation(name, value, source) {
             }
             catch { /* context best-effort */ }
             console.error(`[k6-perf] correlation "${name}" not found — substituting ${resolved}${where}`);
+            // Surface as a structured warning so it lands in the report's Warnings tab
+            // (extractK6PerfEvents parses the [k6-perf][warning-event] marker).
+            console.log('[k6-perf][warning-event] ' + JSON.stringify({
+                ts: new Date().toISOString(),
+                type: 'correlation_not_found',
+                name: name,
+                message: `Correlation "${name}" not found — substituted ${String(resolved)}${where}`,
+            }));
         }
         catch { /* logging is best-effort */ }
     }
@@ -348,6 +356,12 @@ function logReplayExchange(meta, requestInfo, response) {
                 ?? (response?.body instanceof ArrayBuffer || (typeof SharedArrayBuffer !== 'undefined' && response?.body instanceof SharedArrayBuffer)
                     ? '[binary response]'
                     : (response?.body ?? undefined)),
+            // Carry k6's transport-error reason when the request never got a real HTTP
+            // response (status 0 — timeout / connection reset / refused, common on the
+            // last request as the test ramps down). Only set when meaningful so clean
+            // responses stay untouched.
+            ...(response?.error ? { error: response.error } : {}),
+            ...(response?.error_code ? { errorCode: response.error_code } : {}),
         },
     };
     console.log('[k6-perf][replay-log] ' + JSON.stringify(entry));

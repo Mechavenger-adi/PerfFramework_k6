@@ -26,12 +26,19 @@ export class TimeseriesRuntime {
     this.overview.set(bucket, existing);
   }
 
-  addTransactionPoint(transaction: string, ts: string, values: Record<string, number>): void {
+  addTransactionPoint(transaction: string, ts: string, values: Record<string, number | number[]>): void {
     const bucket = this.bucketTs(ts);
     const bucketMap = this.transactions.get(transaction) ?? new Map<string, TimeSeriesPoint>();
     const existing = bucketMap.get(bucket) ?? { ts: bucket };
     for (const [key, value] of Object.entries(values)) {
-      existing[key] = ((existing[key] as number | undefined) ?? 0) + value;
+      if (Array.isArray(value)) {
+        // Raw sample arrays (e.g. durations) are concatenated, not summed, when
+        // multiple source buckets fall into the same runtime bucket.
+        const prev = (existing[key] as number[] | undefined) ?? [];
+        existing[key] = prev.concat(value);
+      } else {
+        existing[key] = ((existing[key] as number | undefined) ?? 0) + value;
+      }
     }
     bucketMap.set(bucket, existing);
     this.transactions.set(transaction, bucketMap);

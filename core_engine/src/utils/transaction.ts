@@ -383,13 +383,14 @@ export function k6Check(
     // location of THIS k6Check() call, so a failure points at a real file:line
     // and the exact request — not just a metric count.
     const location = extractScriptLocation(new Error().stack);
-    let reqInfo = '';
+    let reqDesc = '';
     let statusInfo = '';
     try {
       const r = (val as any)?.request;
-      if (r && r.url) reqInfo = ` on ${r.method || 'REQ'} ${r.url}`;
+      if (r && r.url) reqDesc = `${r.method || 'REQ'} ${r.url}`;
       if (val && typeof (val as any).status !== 'undefined') statusInfo = ` (response status ${(val as any).status})`;
     } catch { /* val may not be an HTTP response */ }
+    const reqInfo = reqDesc ? ` on ${reqDesc}` : '';
     const vu = (typeof exec !== 'undefined' && exec.vu) ? exec.vu.idInInstance : undefined;
     const iter = (typeof exec !== 'undefined' && exec.vu) ? exec.vu.iterationInScenario : undefined;
 
@@ -400,7 +401,7 @@ export function k6Check(
         transaction: txn || undefined,
         message: failMsg,
         failingChecks: failingKeys,
-        request: reqInfo.trim() || undefined,
+        request: reqDesc || undefined,
         location: location || undefined,
         vu,
         iteration: iter,

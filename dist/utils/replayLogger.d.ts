@@ -42,6 +42,11 @@ interface K6Response {
     request?: {
         headers?: Record<string, string | string[]>;
     };
+    /** k6 sets these on a transport failure (timeout / reset / refused) where
+     * status comes back as 0. Captured so the report can show WHY instead of a
+     * bare, easy-to-miss "0". */
+    error?: string;
+    error_code?: number;
 }
 interface RequestDefinition {
     id: string;

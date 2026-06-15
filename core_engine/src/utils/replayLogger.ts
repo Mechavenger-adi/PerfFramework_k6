@@ -60,6 +60,11 @@ interface K6Response {
   timings?: { duration?: number };
   cookies?: Record<string, Array<{ value: string }>>;
   request?: { headers?: Record<string, string | string[]> };
+  /** k6 sets these on a transport failure (timeout / reset / refused) where
+   * status comes back as 0. Captured so the report can show WHY instead of a
+   * bare, easy-to-miss "0". */
+  error?: string;
+  error_code?: number;
 }
 
 interface RequestDefinition {
@@ -139,6 +144,14 @@ export function trackCorrelation(name: string, value: unknown, source?: string):
         where += loc ? `${vu !== undefined ? ', ' : ' ('}at ${loc})` : (vu !== undefined ? ')' : '');
       } catch { /* context best-effort */ }
       console.error(`[k6-perf] correlation "${name}" not found — substituting ${resolved}${where}`);
+      // Surface as a structured warning so it lands in the report's Warnings tab
+      // (extractK6PerfEvents parses the [k6-perf][warning-event] marker).
+      console.log('[k6-perf][warning-event] ' + JSON.stringify({
+        ts: new Date().toISOString(),
+        type: 'correlation_not_found',
+        name: name,
+        message: `Correlation "${name}" not found — substituted ${String(resolved)}${where}`,
+      }));
     } catch { /* logging is best-effort */ }
   }
   _variableRegistry[name] = { name, type: 'correlation', value: String(resolved), source: source || 'body' };
@@ -446,6 +459,12 @@ export function logReplayExchange(
         ?? ((response?.body as unknown) instanceof ArrayBuffer || (typeof SharedArrayBuffer !== 'undefined' && (response?.body as unknown) instanceof SharedArrayBuffer)
           ? '[binary response]'
           : (response?.body ?? undefined)),
+      // Carry k6's transport-error reason when the request never got a real HTTP
+      // response (status 0 — timeout / connection reset / refused, common on the
+      // last request as the test ramps down). Only set when meaningful so clean
+      // responses stay untouched.
+      ...(response?.error ? { error: response.error } : {}),
+      ...(response?.error_code ? { errorCode: response.error_code } : {}),
     },
   };
 

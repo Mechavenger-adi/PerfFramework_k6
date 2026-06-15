@@ -35,6 +35,13 @@ interface BuildTimeseriesArtifactOptions {
      * tag on `http_req_duration` samples as a fallback.
      */
     transactionNames?: string[];
+    /**
+     * Percentiles (numbers, e.g. [50, 90, 95, 99]) the report should plot,
+     * derived from the run's reporting.transactionStats. Forwarded to the parser
+     * so each duration bucket carries exactly these percentiles (p90 always
+     * included). Optional — defaults to [90, 95, 99].
+     */
+    percentiles?: number[];
 }
 export declare class TimeseriesArtifactBuilder {
     static build(options: BuildTimeseriesArtifactOptions): Promise<TimeSeriesFile>;

@@ -141,6 +141,8 @@ class DiffChecker {
                 method: replay.method,
                 url: replay.url,
                 status: replay.status,
+                error: replay.error,
+                errorCode: replay.errorCode,
                 requestHeaders: replay.headers ?? [],
                 responseHeaders: replay.responseHeaders ?? [],
                 requestBody: replay.postData?.text,
@@ -360,6 +362,8 @@ class DiffChecker {
                     }
                     : undefined,
                 status: entry.response?.status,
+                error: entry.response?.error,
+                errorCode: entry.response?.errorCode,
                 responseHeaders: entry.response?.headers ?? [],
                 responseBody: entry.response?.body !== undefined
                     ? {
@@ -438,6 +442,8 @@ class DiffChecker {
                 method: replay.har.method,
                 url: replay.har.url,
                 status: replay.har.status,
+                error: replay.har.error,
+                errorCode: replay.har.errorCode,
                 requestHeaders: replay.har.headers ?? [],
                 responseHeaders: replay.har.responseHeaders ?? [],
                 requestBody: replay.har.postData?.text,
