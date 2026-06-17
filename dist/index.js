@@ -15,7 +15,7 @@
  *   const id = generate.uuid();
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.generate = exports.writeData = exports.addHeaderOnce = exports.getAutoHeaders = exports.clearAutoHeaders = exports.removeAutoHeader = exports.addAutoHeaders = exports.addAutoHeader = exports.logReplayExchange = exports.logExchange = exports.trackDataRow = exports.trackParameter = exports.trackCorrelation = exports.resolvePath = exports.resolveFrameworkUrl = exports.registerFrameworkEnvironmentUrls = exports.registerBaseUrl = exports.getEnvContext = exports.deleteCookie = exports.clearCookies = exports.getTransactionGate = exports.isEnding = exports.thinktime = exports.runJourneyLifecycle = exports.createJourneyLifecycleStore = exports.isVuTerminated = exports.initTransactions = exports.getCurrentTransaction = exports.endTransaction = exports.startTransaction = exports.k6Check = exports.transaction = exports.request = void 0;
+exports.generate = exports.writeData = exports.addHeaderOnce = exports.getAutoHeaders = exports.clearAutoHeaders = exports.removeAutoHeader = exports.addAutoHeaders = exports.addAutoHeader = exports.extractBoundary = exports.extractCookie = exports.extractHeader = exports.extractRegex = exports.extractJson = exports.logReplayExchange = exports.logExchange = exports.trackDataRow = exports.trackParameter = exports.trackCorrelation = exports.resolvePath = exports.resolveFrameworkUrl = exports.registerFrameworkEnvironmentUrls = exports.registerBaseUrl = exports.getEnvContext = exports.deleteCookie = exports.clearCookies = exports.getTransactionGate = exports.isEnding = exports.thinktime = exports.runJourneyLifecycle = exports.createJourneyLifecycleStore = exports.isVuTerminated = exports.initTransactions = exports.getCurrentTransaction = exports.endTransaction = exports.startTransaction = exports.k6Check = exports.transaction = exports.request = void 0;
 // NOTE: relative specifiers MUST keep the explicit `.js` extension — k6 cannot
 // resolve extensionless module paths at runtime (unlike Node). This matches the
 // convention used throughout core_engine/src/utils.
@@ -54,6 +54,15 @@ Object.defineProperty(exports, "trackParameter", { enumerable: true, get: functi
 Object.defineProperty(exports, "trackDataRow", { enumerable: true, get: function () { return replayLogger_js_1.trackDataRow; } });
 Object.defineProperty(exports, "logExchange", { enumerable: true, get: function () { return replayLogger_js_1.logExchange; } });
 Object.defineProperty(exports, "logReplayExchange", { enumerable: true, get: function () { return replayLogger_js_1.logReplayExchange; } });
+// -- Correlation extractors (runtime, VU-safe) --
+// Pull dynamic values out of a response; pair with trackCorrelation() so a miss
+// degrades to a visible {NOTFOUND:name} placeholder. Emitted by auto-correlation.
+var extract_js_1 = require("./utils/extract.js");
+Object.defineProperty(exports, "extractJson", { enumerable: true, get: function () { return extract_js_1.extractJson; } });
+Object.defineProperty(exports, "extractRegex", { enumerable: true, get: function () { return extract_js_1.extractRegex; } });
+Object.defineProperty(exports, "extractHeader", { enumerable: true, get: function () { return extract_js_1.extractHeader; } });
+Object.defineProperty(exports, "extractCookie", { enumerable: true, get: function () { return extract_js_1.extractCookie; } });
+Object.defineProperty(exports, "extractBoundary", { enumerable: true, get: function () { return extract_js_1.extractBoundary; } });
 // -- Auto headers (persist per-VU; applied to every subsequent request) ----
 var autoHeaders_js_1 = require("./utils/autoHeaders.js");
 Object.defineProperty(exports, "addAutoHeader", { enumerable: true, get: function () { return autoHeaders_js_1.addAutoHeader; } });

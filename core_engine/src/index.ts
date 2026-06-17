@@ -64,6 +64,18 @@ export {
   logReplayExchange,
 } from './utils/replayLogger.js';
 
+// -- Correlation extractors (runtime, VU-safe) --
+// Pull dynamic values out of a response; pair with trackCorrelation() so a miss
+// degrades to a visible {NOTFOUND:name} placeholder. Emitted by auto-correlation.
+export {
+  extractJson,
+  extractRegex,
+  extractHeader,
+  extractCookie,
+  extractBoundary,
+} from './utils/extract.js';
+export type { ExtractableResponse } from './utils/extract.js';
+
 // -- Auto headers (persist per-VU; applied to every subsequent request) ----
 export {
   addAutoHeader,

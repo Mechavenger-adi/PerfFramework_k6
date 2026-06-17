@@ -4,7 +4,7 @@ import { sleep } from 'k6';
 import exec from 'k6/execution';
 // @ts-ignore - K6 runtime module
 import { Counter } from 'k6/metrics';
-import { isVuTerminated } from './transaction.js';
+import { isVuTerminated, isJsRuntimeError } from './transaction.js';
 import { trackCorrelation, trackParameter } from './replayLogger.js';
 
 declare const __ENV: Record<string, string | undefined>;
@@ -165,6 +165,21 @@ function handlePhaseError(
   const message = error && typeof error === 'object' && 'message' in error
     ? (error as Error).message
     : String(error);
+
+  // A genuine JavaScript runtime error (ReferenceError, TypeError, …) raised
+  // OUTSIDE a transaction() (e.g. directly in init/end phase code) is a script
+  // bug that recurs every iteration — abort the test regardless of errorBehavior
+  // (continue included), same as inside transaction().
+  if (isJsRuntimeError(error)) {
+    const errName = (error as Error).name;
+    console.error(
+      `[k6-perf][${phaseName}] FATAL ${errName}: ${message}\n` +
+      `  → aborting test: a JavaScript runtime error is a script bug, not subject to errorBehavior (was '${behavior}')`,
+    );
+    exec.test.abort(`[k6-perf][${phaseName}] ${errName}: ${message}`);
+    return 'abort_test';
+  }
+
   console.error(`[k6-perf][${phaseName}] ${message}`);
 
   if (behavior === 'stop_vu') {

@@ -153,8 +153,16 @@ export function runInit(projectDir: string = process.cwd()): void {
           },
         ],
         global_sla: {
-          p95: 3000,
-          errorRate: 1,
+          // Request-level: HTTP transport thresholds (http_req_duration / http_req_failed).
+          request: {
+            p95: 3000,
+            errorRate: 1,
+          },
+          // Transaction-level: default applied to EVERY transaction, overridable
+          // per transaction (and per percentile) via transaction_slas.
+          transaction: {
+            p90: 2000,
+          },
         },
       },
       null,

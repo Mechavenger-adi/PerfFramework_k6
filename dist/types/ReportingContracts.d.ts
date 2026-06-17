@@ -3,33 +3,18 @@ export interface TransactionMetricRow {
     journey: string;
     transaction: string;
     count: number;
-    pass: number;
-    fail: number;
+    pass?: number;
+    fail?: number;
     errorPct?: number;
     avg?: number;
     min?: number;
     max?: number;
-    /**
-     * True when pass/fail were derived from raw k6 check aggregates (legacy
-     * fallback) instead of the per-iteration `<name>_checkrate` Rate metric.
-     * Estimates can both under-count (failures span multiple checks) and
-     * over-count (a single check runs more than once per iteration); they are
-     * shown only when no Rate metric is available. See Proposal 3 in
-     * `ai_context/design-proposals.md`.
-     */
-    estimated?: boolean;
     [stat: string]: string | number | boolean | undefined;
 }
 export interface TransactionMetricsFile {
     runId: string;
     stats: string[];
     transactions: TransactionMetricRow[];
-    /**
-     * True when at least one row in `transactions` was produced via the legacy
-     * aggregation fallback (`estimated: true`). Lets downstream consumers emit
-     * a single run-level warning without iterating the row list.
-     */
-    hasEstimatedRows?: boolean;
 }
 export interface CiTransactionSummary {
     name: string;
@@ -103,6 +88,13 @@ export interface TimeSeriesFile {
     series: {
         overview: TimeSeriesPoint[];
         transactions: Record<string, TimeSeriesPoint[]>;
+        /**
+         * Per-request series keyed by request name (k6 `name` tag). Each point carries
+         * count/failed/durations plus method/transaction/url metadata so the report's
+         * Top Requests table can be recomputed exactly for any selected time window.
+         * Optional for back-compat with artifacts produced before per-request series.
+         */
+        requests?: Record<string, TimeSeriesPoint[]>;
         system: Record<string, TimeSeriesPoint[]>;
         events: Array<{
             ts: string;

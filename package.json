@@ -39,6 +39,7 @@
     "generate": "tsx core_engine/src/cli/run.ts generate",
     "generate:byos": "tsx core_engine/src/cli/run.ts generate-byos",
     "convert": "tsx core_engine/src/cli/run.ts convert",
+    "correlate": "tsx core_engine/src/cli/run.ts correlate",
     "import": "tsx core_engine/src/cli/run.ts import",
     "import:curl": "tsx core_engine/src/cli/run.ts import curl",
     "import:postman": "tsx core_engine/src/cli/run.ts import postman",

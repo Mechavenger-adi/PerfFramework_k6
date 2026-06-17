@@ -41,6 +41,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const commander_1 = require("commander");
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
+const readline = __importStar(require("readline"));
 const ConfigurationManager_1 = require("../config/ConfigurationManager");
 const GatekeeperValidator_1 = require("../config/GatekeeperValidator");
 const RuntimeConfigManager_1 = require("../config/RuntimeConfigManager");
@@ -52,7 +53,6 @@ const FileWriteSink_1 = require("../execution/FileWriteSink");
 const PipelineRunner_1 = require("../execution/PipelineRunner");
 const ArtifactWriter_1 = require("../reporting/ArtifactWriter");
 const EventArtifactBuilder_1 = require("../reporting/EventArtifactBuilder");
-const ErrorRuntime_1 = require("../runtime/ErrorRuntime");
 const RunReportGenerator_1 = require("../reporting/RunReportGenerator");
 const RunSummaryBuilder_1 = require("../reporting/RunSummaryBuilder");
 const TimeseriesArtifactBuilder_1 = require("../reporting/TimeseriesArtifactBuilder");
@@ -62,6 +62,7 @@ const logger_1 = require("../utils/logger");
 const LiveConsoleLogStream_1 = require("../utils/LiveConsoleLogStream");
 const ProgressBar_1 = require("../utils/ProgressBar");
 const convert_1 = require("./convert");
+const correlate_1 = require("./correlate");
 const generate_1 = require("./generate");
 const generate_byos_1 = require("./generate-byos");
 const import_1 = require("./import");
@@ -160,6 +161,34 @@ program
     .requiredOption('--har <path>', 'Path to the .har file')
     .action(async (team, scriptName, opts) => {
     await (0, generate_1.runGenerate)(opts.har, team, scriptName);
+});
+// ---------------------------------------------
+// CORRELATE command (auto-correlation / "scan for correlations")
+// ---------------------------------------------
+program
+    .command('correlate')
+    .description('Scan a recording for dynamic values and (optionally) auto-correlate a generated script')
+    .option('--script <path>', 'Generated script to correlate (required for --apply; auto-resolves its recording log)')
+    .option('--har <path>', 'Scan a .har file directly (list mode; request IDs follow HAR order)')
+    .option('--log <path>', 'Scan a recording-log.json (recommended — IDs align with the generated script)')
+    .option('--manifest <path>', 'Apply/list an existing correlation manifest instead of rescanning')
+    .option('--list', 'Print suspected dynamic values + write the manifest; do not modify the script (default)')
+    .option('--apply <level>', 'Rewrite the script: high | medium | all')
+    .option('--out <path>', 'Write the correlated script here (default: overwrite --script)')
+    .option('--manifest-out <path>', 'Where to write the manifest (default: alongside the recording log)')
+    .option('--dry-run', 'Alias for --list')
+    .action(async (opts) => {
+    await (0, correlate_1.runCorrelate)({
+        script: opts.script,
+        har: opts.har,
+        log: opts.log,
+        manifest: opts.manifest,
+        list: opts.list,
+        apply: opts.apply,
+        out: opts.out,
+        manifestOut: opts.manifestOut,
+        dryRun: opts.dryRun,
+    });
 });
 // ---------------------------------------------
 // IMPORT command family (Request Import — Phase 1)
@@ -848,6 +877,87 @@ function writeRunManifest(runManifestPath, plan, resolvedConfig, scenarioMetadat
  * "p(99)"] → [90, 99]). Used to tell the timeseries parser which percentile
  * lines the report should plot. p90 is always added by the parser.
  */
+/**
+ * Stream the raw k6 metrics JSON and rank individual requests by p90 response
+ * time. Each `http_req_duration` Point carries a `name` tag (set by request());
+ * we group durations by that name, compute p90/avg/max/count per request, and
+ * return the slowest `topN` by p90. Single pass; values are held in memory per
+ * request name — fine for typical runs, heavier for very large ones.
+ */
+async function computeTopRequestsByP90(streamPath, topN = 5) {
+    if (!fs.existsSync(streamPath) || fs.statSync(streamPath).size === 0)
+        return [];
+    const byName = new Map();
+    const stream = fs.createReadStream(streamPath, { encoding: 'utf-8' });
+    const rl = readline.createInterface({ input: stream, crlfDelay: Infinity });
+    try {
+        for await (const line of rl) {
+            // Cheap pre-filter before JSON.parse — most lines aren't http_req_duration.
+            if (line.indexOf('"http_req_duration"') === -1 || line.indexOf('"Point"') === -1)
+                continue;
+            let p;
+            try {
+                p = JSON.parse(line);
+            }
+            catch {
+                continue;
+            }
+            if (p.metric !== 'http_req_duration')
+                continue;
+            const tags = p.data?.tags ?? {};
+            const name = tags.name;
+            const value = p.data?.value;
+            if (!name || typeof value !== 'number')
+                continue;
+            let acc = byName.get(name);
+            if (!acc) {
+                // k6 aggregates HTTP metrics by the `name` tag, replacing the `url` tag
+                // with the name to bound cardinality — so `tags.url` equals the name for
+                // framework requests. We keep method + transaction (genuinely useful) and
+                // a best-effort url tag (falls back to name).
+                acc = { values: [], method: tags.method || '', transaction: tags.transaction || tags.group || '', url: tags.url || name };
+                byName.set(name, acc);
+            }
+            acc.values.push(value);
+        }
+    }
+    catch { /* unreadable stream — return what we have */ }
+    finally {
+        rl.close();
+        stream.close();
+    }
+    // Linear interpolation between closest ranks — matches k6's TrendSink.P and the
+    // report's other percentiles. Nearest-rank would collapse p90 onto max for small
+    // samples (e.g. n=6 → ceil(0.9·6)-1 = 5 = last element), so we interpolate instead.
+    const pctl = (sorted, p) => {
+        const n = sorted.length;
+        if (n === 0)
+            return 0;
+        if (n === 1)
+            return sorted[0];
+        const idx = (p / 100) * (n - 1);
+        const lo = Math.floor(idx);
+        const hi = Math.ceil(idx);
+        return lo === hi ? sorted[lo] : sorted[lo] + (sorted[hi] - sorted[lo]) * (idx - lo);
+    };
+    const rows = [...byName.entries()].map(([name, acc]) => {
+        const sorted = acc.values.slice().sort((a, b) => a - b);
+        const sum = sorted.reduce((s, v) => s + v, 0);
+        return {
+            name,
+            method: acc.method,
+            transaction: acc.transaction.replace(/^::/, ''),
+            url: acc.url,
+            count: sorted.length,
+            p90: Math.round(pctl(sorted, 90)),
+            avg: Math.round(sum / sorted.length),
+            min: Math.round(sorted[0]),
+            max: Math.round(sorted[sorted.length - 1]),
+        };
+    });
+    rows.sort((a, b) => b.p90 - a.p90 || b.max - a.max);
+    return rows.slice(0, topN);
+}
 function percentilesFromStats(stats) {
     const out = new Set();
     for (const s of stats) {
@@ -900,23 +1010,10 @@ async function finalizeRunArtifacts(options) {
         journeyName,
         summaryData: summaryData,
     });
-    // Pass/fail provenance check: if any transaction row was produced via the
-    // legacy native-check fallback (no `<name>_checkrate` Rate metric), surface
-    // a visible warning. The fallback returns an estimate derived from k6's
-    // per-check `passes`/`fails` totals, which can under-count when failures
-    // span multiple checks and over-count when a single check runs more than
-    // once per iteration. Exact per-iteration counts require `transaction()`
-    // (auto-registered in framework-generated scripts).
-    const estimatedRows = transactionMetrics.transactions.filter((row) => row.estimated === true);
-    if (transactionMetrics.hasEstimatedRows && estimatedRows.length > 0) {
-        const estimatedNames = estimatedRows.map((row) => row.transaction).slice(0, 5);
-        const more = estimatedRows.length > 5 ? ` (+${estimatedRows.length - 5} more)` : '';
-        logger_1.Logger.warn(`Pass/fail for ${estimatedRows.length} transaction(s) was estimated from native k6 check counts ` +
-            `because the per-iteration <name>_checkrate Rate metric was not present. Values shown are ` +
-            `estimates — they can under-count when failures span multiple checks and over-count when a check ` +
-            `runs more than once per iteration. Affected: ${estimatedNames.join(', ')}${more}. Re-run with the ` +
-            `current framework (scripts must use transaction() + k6Check()) for exact per-iteration counts.`);
-    }
+    // Pass/fail is always exact: the per-iteration `<name>_checkrate` Rate metric
+    // backs every transaction (the pre-flight ScriptContractGuard rejects the raw
+    // check()/group() shapes that used to need native-check estimation), so there
+    // is no estimated-pass/fail provenance warning any more.
     const eventArtifacts = EventArtifactBuilder_1.EventArtifactBuilder.build({
         runId: options.runId,
         planName: options.plan.name,
@@ -999,19 +1096,6 @@ async function finalizeRunArtifacts(options) {
     if (breachedThresholdMetricNames.length > 0) {
         logger_1.Logger.detail(`Threshold breaches surfaced into errors: ${breachedThresholdMetricNames.slice(0, 5).join(', ')}${breachedThresholdMetricNames.length > 5 ? ` (+${breachedThresholdMetricNames.length - 5} more)` : ''}`);
     }
-    // Mirror the estimated-pass/fail console warning into warnings.ndjson so it
-    // also lands in the RunReport's Warnings tab and any downstream CI consumer
-    // of the artifact pipeline. Single run-level event (not one per row) — the
-    // affected transaction names are listed in the message.
-    if (transactionMetrics.hasEstimatedRows && estimatedRows.length > 0) {
-        const estimatedNames = estimatedRows.map((row) => row.transaction);
-        eventArtifacts.warnings.push(ErrorRuntime_1.ErrorRuntime.buildWarningEvent(options.runId, 'estimated_pass_fail', `Pass/fail for ${estimatedRows.length} transaction(s) is approximate — derived from native k6 ` +
-            `check counts because the per-iteration <name>_checkrate Rate metric was unavailable. Values ` +
-            `are estimates (can under- or over-count depending on check shape). For exact per-iteration ` +
-            `counts, run scripts that use transaction() + k6Check().`, 
-        // Stored as an extra so the warnings table / consumers can see which transactions are flagged.
-        { affectedTransactions: estimatedNames }));
-    }
     const ciSummary = RunSummaryBuilder_1.RunSummaryBuilder.buildCiSummary({
         runId: options.runId,
         planName: options.plan.name,
@@ -1046,6 +1130,23 @@ async function finalizeRunArtifacts(options) {
         // charts. p90 is always included by the parser.
         percentiles: percentilesFromStats(runtime.getTransactionStats()),
     });
+    // Slowest individual requests by p90 — derived from the same raw metrics
+    // stream (per-request `name` tag). Computed before the stream may be removed
+    // below when reporting.timeseries.keepRawMetricsStream=false.
+    const topRequestsByP90 = await computeTopRequestsByP90(path.join(options.reportDir, 'metrics-stream.json'), 5);
+    // Percentiles declared in global_sla.transaction — the report renders one
+    // "P(x) Compliance" pie per percentile (transactions passing vs breaching it).
+    const compliancePercentiles = [];
+    {
+        const txnSla = options.plan.global_sla?.transaction;
+        if (txnSla) {
+            for (const [key, value] of Object.entries(txnSla)) {
+                const m = key.match(/^p(\d+(?:\.\d+)?)$/);
+                if (m && typeof value === 'number')
+                    compliancePercentiles.push(`p(${m[1]})`);
+            }
+        }
+    }
     ArtifactWriter_1.ArtifactWriter.writeJson(transactionMetricsPath, transactionMetrics);
     ArtifactWriter_1.ArtifactWriter.writeNdjson(errorsPath, eventArtifacts.errors);
     ArtifactWriter_1.ArtifactWriter.writeNdjson(warningsPath, eventArtifacts.warnings);
@@ -1148,6 +1249,8 @@ async function finalizeRunArtifacts(options) {
             runtimeSnapshot,
             thresholds: thresholdRows,
             totals,
+            topRequests: topRequestsByP90,
+            compliancePercentiles,
             ...(options.execution ? { execution: options.execution } : {}),
         },
         transactions: transactionMetrics,

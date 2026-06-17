@@ -42,7 +42,7 @@ class ParallelExecutionManager {
                     noCookiesReset: plan.noCookiesReset !== false,
                     summaryTrendStats,
                     scenarios: ScenarioBuilder_1.ScenarioBuilder.build(modifiedPlan, runtimeMetadata),
-                    thresholds: ThresholdManager_1.ThresholdManager.apply(modifiedPlan)
+                    thresholds: ThresholdManager_1.ThresholdManager.apply(modifiedPlan, runtimeMetadata?.journeyTransactionNames)
                 };
             }
         }
@@ -50,7 +50,7 @@ class ParallelExecutionManager {
             noCookiesReset: plan.noCookiesReset !== false,
             summaryTrendStats,
             scenarios: ScenarioBuilder_1.ScenarioBuilder.build(plan, runtimeMetadata),
-            thresholds: ThresholdManager_1.ThresholdManager.apply(plan)
+            thresholds: ThresholdManager_1.ThresholdManager.apply(plan, runtimeMetadata?.journeyTransactionNames)
         };
     }
     /**

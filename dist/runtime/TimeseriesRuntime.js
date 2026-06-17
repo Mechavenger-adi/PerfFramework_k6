@@ -7,6 +7,7 @@ class TimeseriesRuntime {
         this.startTime = startTime;
         this.overview = new Map();
         this.transactions = new Map();
+        this.requests = new Map();
         this.system = new Map();
         this.events = [];
     }
@@ -41,6 +42,31 @@ class TimeseriesRuntime {
         bucketMap.set(bucket, existing);
         this.transactions.set(transaction, bucketMap);
     }
+    /**
+     * Per-request bucket point. Numeric values (count/failed/durations…) merge the
+     * same way as transactions (sum numbers, concat sample arrays); string values
+     * (method/transaction/url metadata) are constant per request name and simply
+     * overwrite so they survive bucket merges without string concatenation.
+     */
+    addRequestPoint(request, ts, values) {
+        const bucket = this.bucketTs(ts);
+        const bucketMap = this.requests.get(request) ?? new Map();
+        const existing = bucketMap.get(bucket) ?? { ts: bucket };
+        for (const [key, value] of Object.entries(values)) {
+            if (Array.isArray(value)) {
+                const prev = existing[key] ?? [];
+                existing[key] = prev.concat(value);
+            }
+            else if (typeof value === 'string') {
+                existing[key] = value;
+            }
+            else {
+                existing[key] = (existing[key] ?? 0) + value;
+            }
+        }
+        bucketMap.set(bucket, existing);
+        this.requests.set(request, bucketMap);
+    }
     addSystemPoint(agent, ts, values) {
         const bucket = this.bucketTs(ts);
         const bucketMap = this.system.get(agent) ?? new Map();
@@ -63,6 +89,10 @@ class TimeseriesRuntime {
                 overview: [...this.overview.values()].sort((a, b) => String(a.ts).localeCompare(String(b.ts))),
                 transactions: Object.fromEntries([...this.transactions.entries()].map(([transaction, bucketMap]) => [
                     transaction,
+                    [...bucketMap.values()].sort((a, b) => String(a.ts).localeCompare(String(b.ts))),
+                ])),
+                requests: Object.fromEntries([...this.requests.entries()].map(([request, bucketMap]) => [
+                    request,
                     [...bucketMap.values()].sort((a, b) => String(a.ts).localeCompare(String(b.ts))),
                 ])),
                 system: Object.fromEntries([...this.system.entries()].map(([agent, bucketMap]) => [

@@ -1,0 +1,250 @@
+{
+  "version": 1,
+  "generatedAt": "2026-06-15T20:10:18.044Z",
+  "source": "testSuites\\Jpet_new\\recordings\\buyanimal_raw_28thmay.recording-log.json",
+  "candidates": [
+    {
+      "name": "c_state",
+      "value": "NewState",
+      "confidence": "medium",
+      "apply": false,
+      "producer": {
+        "requestId": "req_20",
+        "source": "html",
+        "extractor": "boundary",
+        "locator": "lb=name=\"billState\" value=\";;rb=\""
+      },
+      "consumers": [
+        {
+          "requestId": "req_22",
+          "in": "body",
+          "locator": "billState"
+        }
+      ],
+      "reason": [
+        "name-match:state",
+        "html-hidden-field",
+        "single-use"
+      ],
+      "handledByJar": false
+    },
+    {
+      "name": "c_location",
+      "value": "https://jpetstore.aspectran.com/cart/viewCart",
+      "confidence": "medium",
+      "apply": false,
+      "producer": {
+        "requestId": "req_15",
+        "source": "header",
+        "extractor": "header",
+        "locator": "location"
+      },
+      "consumers": [
+        {
+          "requestId": "req_18",
+          "in": "header",
+          "locator": "hx-current-url"
+        }
+      ],
+      "reason": [
+        "high-entropy",
+        "long-value",
+        "single-use"
+      ],
+      "handledByJar": false
+    },
+    {
+      "name": "c_billToFirstName",
+      "value": "UpdatedFirst",
+      "confidence": "medium",
+      "apply": false,
+      "producer": {
+        "requestId": "req_20",
+        "source": "html",
+        "extractor": "boundary",
+        "locator": "lb=name=\"billToFirstName\" value=\";;rb=\""
+      },
+      "consumers": [
+        {
+          "requestId": "req_22",
+          "in": "body",
+          "locator": "billToFirstName"
+        }
+      ],
+      "reason": [
+        "high-entropy",
+        "html-hidden-field",
+        "single-use"
+      ],
+      "handledByJar": false
+    },
+    {
+      "name": "c_order",
+      "value": "100102",
+      "confidence": "medium",
+      "apply": false,
+      "producer": {
+        "requestId": "req_23",
+        "source": "header",
+        "extractor": "header",
+        "locator": "Location?orderId"
+      },
+      "consumers": [
+        {
+          "requestId": "req_24",
+          "in": "query",
+          "locator": "orderId"
+        }
+      ],
+      "reason": [
+        "name-match:order",
+        "single-use"
+      ],
+      "handledByJar": false
+    },
+    {
+      "name": "c_expiryDate",
+      "value": "12/2019",
+      "confidence": "low",
+      "apply": false,
+      "producer": {
+        "requestId": "req_20",
+        "source": "html",
+        "extractor": "boundary",
+        "locator": "lb=name=\"expiryDate\" value=\";;rb=\""
+      },
+      "consumers": [
+        {
+          "requestId": "req_22",
+          "in": "body",
+          "locator": "expiryDate"
+        }
+      ],
+      "reason": [
+        "html-hidden-field",
+        "single-use"
+      ],
+      "handledByJar": false
+    },
+    {
+      "name": "c_billToLastName",
+      "value": "UpdatedLast",
+      "confidence": "low",
+      "apply": false,
+      "producer": {
+        "requestId": "req_20",
+        "source": "html",
+        "extractor": "boundary",
+        "locator": "lb=name=\"billToLastName\" value=\";;rb=\""
+      },
+      "consumers": [
+        {
+          "requestId": "req_22",
+          "in": "body",
+          "locator": "billToLastName"
+        }
+      ],
+      "reason": [
+        "html-hidden-field",
+        "single-use"
+      ],
+      "handledByJar": false
+    },
+    {
+      "name": "c_billAddress1",
+      "value": "New Address 1",
+      "confidence": "low",
+      "apply": false,
+      "producer": {
+        "requestId": "req_20",
+        "source": "html",
+        "extractor": "boundary",
+        "locator": "lb=name=\"billAddress1\" value=\";;rb=\""
+      },
+      "consumers": [
+        {
+          "requestId": "req_22",
+          "in": "body",
+          "locator": "billAddress1"
+        }
+      ],
+      "reason": [
+        "html-hidden-field",
+        "single-use"
+      ],
+      "handledByJar": false
+    },
+    {
+      "name": "c_billAddress2",
+      "value": "New Address 2",
+      "confidence": "low",
+      "apply": false,
+      "producer": {
+        "requestId": "req_20",
+        "source": "html",
+        "extractor": "boundary",
+        "locator": "lb=name=\"billAddress2\" value=\";;rb=\""
+      },
+      "consumers": [
+        {
+          "requestId": "req_22",
+          "in": "body",
+          "locator": "billAddress2"
+        }
+      ],
+      "reason": [
+        "html-hidden-field",
+        "single-use"
+      ],
+      "handledByJar": false
+    },
+    {
+      "name": "c_billCity",
+      "value": "NewCity",
+      "confidence": "low",
+      "apply": false,
+      "producer": {
+        "requestId": "req_20",
+        "source": "html",
+        "extractor": "boundary",
+        "locator": "lb=name=\"billCity\" value=\";;rb=\""
+      },
+      "consumers": [
+        {
+          "requestId": "req_22",
+          "in": "body",
+          "locator": "billCity"
+        }
+      ],
+      "reason": [
+        "html-hidden-field",
+        "single-use"
+      ],
+      "handledByJar": false
+    },
+    {
+      "name": "c_billCountry",
+      "value": "Philippines",
+      "confidence": "low",
+      "apply": false,
+      "producer": {
+        "requestId": "req_20",
+        "source": "html",
+        "extractor": "boundary",
+        "locator": "lb=name=\"billCountry\" value=\";;rb=\""
+      },
+      "consumers": [
+        {
+          "requestId": "req_22",
+          "in": "body",
+          "locator": "billCountry"
+        }
+      ],
+      "reason": [
+        "html-hidden-field",
+        "single-use"
+      ],
+      "handledByJar": false
+    }
+  ]
+}

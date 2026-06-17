@@ -1,3 +1,12 @@
+/**
+ * True when `error` is a JS-engine error type that signals a programming bug in
+ * the script — an undefined identifier, calling a non-function, a bad property
+ * access, etc. (ReferenceError / TypeError / RangeError / SyntaxError /
+ * URIError / EvalError). Failed checks and HTTP errors are raised by the
+ * framework as plain `Error` and are NOT matched here, so they still follow the
+ * configured errorBehavior; a runtime bug always aborts the test instead.
+ */
+export declare function isJsRuntimeError(error: unknown): boolean;
 /** Returns true if this VU was stopped via stop_vu errorBehavior. */
 export declare function isVuTerminated(): boolean;
 /**

@@ -105,6 +105,17 @@ function handlePhaseError(store, error, phaseName, runtime) {
     const message = error && typeof error === 'object' && 'message' in error
         ? error.message
         : String(error);
+    // A genuine JavaScript runtime error (ReferenceError, TypeError, …) raised
+    // OUTSIDE a transaction() (e.g. directly in init/end phase code) is a script
+    // bug that recurs every iteration — abort the test regardless of errorBehavior
+    // (continue included), same as inside transaction().
+    if ((0, transaction_js_1.isJsRuntimeError)(error)) {
+        const errName = error.name;
+        console.error(`[k6-perf][${phaseName}] FATAL ${errName}: ${message}\n` +
+            `  → aborting test: a JavaScript runtime error is a script bug, not subject to errorBehavior (was '${behavior}')`);
+        execution_1.default.test.abort(`[k6-perf][${phaseName}] ${errName}: ${message}`);
+        return 'abort_test';
+    }
     console.error(`[k6-perf][${phaseName}] ${message}`);
     if (behavior === 'stop_vu') {
         store.state.terminated = true;

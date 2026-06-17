@@ -91,6 +91,29 @@ export interface TransactionBucket {
   durations?: number[];
 }
 
+/**
+ * Per-bucket aggregate for a single named request (k6 `name` tag — the explicit
+ * request name, or the URL when none was supplied). Mirrors TransactionBucket but
+ * scoped to one HTTP request rather than a whole transaction. Carries the raw
+ * duration samples so the report can recompute exact stats for any time window,
+ * plus per-request metadata (method/transaction/url) needed by the Top Requests
+ * table. `failed` counts http_req_failed=1 samples in the bucket.
+ */
+export interface RequestBucket {
+  ts: string;
+  count: number;
+  failed: number;
+  durationAvg: number;
+  durationMin: number;
+  durationMax: number;
+  durationPct: Record<string, number>;
+  durations?: number[];
+  /** Constant per request name; emitted on every bucket for the renderer's convenience. */
+  method: string;
+  transaction: string;
+  url: string;
+}
+
 export interface ParsedTimeseries {
   bucketSizeSeconds: number;
   /** Earliest bucket ts observed across all metrics. */
@@ -100,6 +123,8 @@ export interface ParsedTimeseries {
   overview: OverviewBucket[];
   /** Per-transaction series keyed by transaction name. */
   transactions: Record<string, TransactionBucket[]>;
+  /** Per-request series keyed by request name (k6 `name` tag). */
+  requests: Record<string, RequestBucket[]>;
   /**
    * Total request count for the entire run, summed from all Points. Used by
    * the summary tab so we don't have to re-sum buckets in the renderer.
@@ -146,6 +171,16 @@ interface TransactionRaw {
   fail: number;
 }
 
+interface RequestRaw {
+  count: number;
+  failed: number;
+  duration: number[];
+  // First-seen tag metadata for this request name (constant across buckets).
+  method: string;
+  transaction: string;
+  url: string;
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 // Parser
 // ────────────────────────────────────────────────────────────────────────────
@@ -190,7 +225,33 @@ export class TimeseriesStreamParser {
     const pcts = normalizePercentiles(options.percentiles);
     const overview = new Map<number, OverviewRaw>();
     const txns = new Map<string, Map<number, TransactionRaw>>();
+    const reqs = new Map<string, Map<number, RequestRaw>>();
     const knownTxns = new Set(options.transactionNames ?? []);
+
+    // Bucket a single request sample (duration or failed-flag) under its `name`
+    // tag. k6 defaults `name` to the URL when the caller didn't name the request,
+    // so every http_req_* sample maps to some request series.
+    const addRequestSample = (
+      tags: Record<string, string>,
+      bucketKey: number,
+      kind: 'duration' | 'failed',
+      value: number,
+    ): void => {
+      const reqName = tags.name || tags.url;
+      if (!reqName) return;
+      const map = reqs.get(reqName) ?? new Map<number, RequestRaw>();
+      const b = map.get(bucketKey) ?? {
+        count: 0, failed: 0, duration: [],
+        method: tags.method || '', transaction: tags.transaction || '', url: tags.url || reqName,
+      };
+      if (kind === 'duration') { b.count += 1; b.duration.push(value); }
+      else if (value === 1) b.failed += 1;
+      // Backfill metadata if the first sample for this bucket lacked a tag.
+      if (!b.method && tags.method) b.method = tags.method;
+      if (!b.transaction && tags.transaction) b.transaction = tags.transaction;
+      map.set(bucketKey, b);
+      reqs.set(reqName, map);
+    };
 
     let earliestMs = Number.POSITIVE_INFINITY;
     let latestMs = Number.NEGATIVE_INFINITY;
@@ -237,6 +298,7 @@ export class TimeseriesStreamParser {
           break;
         case 'http_req_duration':
           getOverview(overview, bucketKey).httpReqDuration.push(value);
+          addRequestSample(tags, bucketKey, 'duration', value);
           break;
         // Six request-timing phases — k6's standard breakdown. The
         // dashboard's Timings tab plots one chart per phase with avg/
@@ -260,6 +322,7 @@ export class TimeseriesStreamParser {
           getOverview(overview, bucketKey).httpReqBlocked.push(value);
           break;
         case 'http_req_failed':
+          addRequestSample(tags, bucketKey, 'failed', value);
           if (value === 1) {
             getOverview(overview, bucketKey).httpFailedCount += 1;
             totalHttpFailures += 1;
@@ -358,12 +421,28 @@ export class TimeseriesStreamParser {
       transactionsOut[name] = arr;
     }
 
+    const requestsOut: Record<string, RequestBucket[]> = {};
+    for (const [name, map] of reqs) {
+      // Stable metadata for the series — take it from any bucket that has it.
+      let meta = { method: '', transaction: '', url: name };
+      for (const raw of map.values()) {
+        meta = { method: raw.method, transaction: raw.transaction, url: raw.url };
+        break;
+      }
+      const arr: RequestBucket[] = [];
+      for (let k = earliestMs; k <= latestMs; k += bucketMs) {
+        arr.push(finalizeRequest(map.get(k), k, pcts, meta));
+      }
+      requestsOut[name] = arr;
+    }
+
     return {
       bucketSizeSeconds: bucketSeconds,
       startTime: new Date(earliestMs).toISOString(),
       endTime: new Date(latestMs + bucketMs).toISOString(),
       overview: overviewBuckets,
       transactions: transactionsOut,
+      requests: requestsOut,
       totals: {
         requests: totalRequests,
         iterations: totalIterations,
@@ -492,6 +571,37 @@ function finalizeTransaction(raw: TransactionRaw | undefined, bucketKey: number,
     pass: raw.pass,
     fail: raw.fail,
     durations: raw.duration,
+  };
+}
+
+function finalizeRequest(
+  raw: RequestRaw | undefined,
+  bucketKey: number,
+  pcts: number[],
+  meta: { method: string; transaction: string; url: string },
+): RequestBucket {
+  if (!raw) {
+    return {
+      ts: new Date(bucketKey).toISOString(),
+      count: 0, failed: 0,
+      durationAvg: 0, durationMin: 0, durationMax: 0, durationPct: {},
+      durations: [],
+      method: meta.method, transaction: meta.transaction, url: meta.url,
+    };
+  }
+  const stats = computeTrendStats(raw.duration, pcts);
+  return {
+    ts: new Date(bucketKey).toISOString(),
+    count: raw.count,
+    failed: raw.failed,
+    durationAvg: stats.avg,
+    durationMin: stats.min,
+    durationMax: stats.max,
+    durationPct: stats.pct,
+    durations: raw.duration,
+    method: raw.method || meta.method,
+    transaction: raw.transaction || meta.transaction,
+    url: raw.url || meta.url,
   };
 }
 

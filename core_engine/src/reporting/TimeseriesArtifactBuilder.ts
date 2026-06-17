@@ -159,6 +159,26 @@ export class TimeseriesArtifactBuilder {
           });
         }
       }
+      for (const [name, buckets] of Object.entries(parsed.requests)) {
+        for (const b of buckets) {
+          const pctKeys: Record<string, number> = {};
+          for (const [k, v] of Object.entries(b.durationPct)) pctKeys['durationP' + k] = v;
+          runtime.addRequestPoint(name, b.ts, {
+            count: b.count,
+            failed: b.failed,
+            durationAvg: b.durationAvg,
+            durationMin: b.durationMin,
+            durationMax: b.durationMax,
+            // Raw samples for EXACT sub-range stats in the report (no approximation).
+            durations: b.durations ?? [],
+            // Constant per-request metadata for the Top Requests table.
+            method: b.method,
+            transaction: b.transaction,
+            url: b.url,
+            ...pctKeys,
+          });
+        }
+      }
     } else {
       // Legacy fallback — single endTime point per metric. Preserves the
       // pre-Wave-1 behavior for runs where the stream file is missing.
@@ -174,8 +194,8 @@ export class TimeseriesArtifactBuilder {
       for (const row of options.transactions.transactions) {
         runtime.addTransactionPoint(row.transaction, endTs, {
           count: row.count,
-          pass: row.pass,
-          fail: row.fail,
+          pass: row.pass ?? 0,
+          fail: row.fail ?? 0,
           avg: row.avg ?? this.asNumber(row['avg']),
           min: row.min ?? this.asNumber(row['min']),
           max: row.max ?? this.asNumber(row['max']),

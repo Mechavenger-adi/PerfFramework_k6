@@ -6,6 +6,25 @@
   "type": "object",
   "required": ["name", "environment", "execution_mode", "global_load_profile", "user_journeys"],
   "additionalProperties": true,
+  "definitions": {
+    "sla_definition": {
+      "type": "object",
+      "description": "A set of SLA limits: error rate, average, and any percentile keys (p50, p90, p95, p99, p99.9, …) in milliseconds.",
+      "properties": {
+        "errorRate": { "type": "number", "minimum": 0, "maximum": 100, "description": "Maximum allowed error rate in percent (0–100)." },
+        "avgResponseTime": { "type": "number", "minimum": 0, "description": "Maximum allowed average response time in milliseconds." },
+        "p50": { "type": "number", "minimum": 0, "description": "P50 (median) threshold in milliseconds." },
+        "p75": { "type": "number", "minimum": 0, "description": "P75 threshold in milliseconds." },
+        "p90": { "type": "number", "minimum": 0, "description": "P90 threshold in milliseconds." },
+        "p95": { "type": "number", "minimum": 0, "description": "P95 threshold in milliseconds." },
+        "p99": { "type": "number", "minimum": 0, "description": "P99 threshold in milliseconds." }
+      },
+      "additionalProperties": {
+        "type": "number",
+        "description": "Custom percentile threshold in milliseconds. Key must match p<N> (e.g., p97, p99.9)."
+      }
+    }
+  },
   "properties": {
     "$schema": {
       "type": "string",
@@ -169,42 +188,57 @@
     },
     "global_sla": {
       "type": "object",
-      "description": "Global SLA (Service Level Agreement) thresholds applied to all journeys. These become k6 thresholds on http_req_duration. If any SLA is breached, the test reports a threshold failure.",
+      "description": "Global SLA defaults. Use `request` for HTTP-request-level thresholds (http_req_duration / http_req_failed across all requests) and `transaction` for per-transaction defaults applied to EVERY transaction of every journey (overridable per transaction in transaction_slas). Flat percentile/errorRate keys at this level are treated as request-level (legacy shorthand).",
       "properties": {
         "errorRate": {
           "type": "number",
           "minimum": 0,
           "maximum": 100,
-          "description": "Maximum allowed error rate in percent (0–100). Example: 5 = test fails if more than 5% of requests error."
+          "description": "Legacy request-level error rate budget in percent (0–100). Prefer global_sla.request.errorRate."
         },
         "avgResponseTime": {
           "type": "number",
           "minimum": 0,
-          "description": "Maximum allowed average response time in milliseconds."
+          "description": "Legacy request-level max average response time (ms). Prefer global_sla.request.avgResponseTime."
         },
-        "p50": { "type": "number", "minimum": 0, "description": "P50 (median) response time threshold in milliseconds." },
-        "p75": { "type": "number", "minimum": 0, "description": "P75 response time threshold in milliseconds." },
-        "p90": { "type": "number", "minimum": 0, "description": "P90 response time threshold in milliseconds." },
-        "p95": { "type": "number", "minimum": 0, "description": "P95 response time threshold in milliseconds. Industry standard for SLAs." },
-        "p99": { "type": "number", "minimum": 0, "description": "P99 response time threshold in milliseconds. Captures tail latency." }
+        "p50": { "type": "number", "minimum": 0, "description": "Legacy request-level P50 threshold (ms)." },
+        "p75": { "type": "number", "minimum": 0, "description": "Legacy request-level P75 threshold (ms)." },
+        "p90": { "type": "number", "minimum": 0, "description": "Legacy request-level P90 threshold (ms)." },
+        "p95": { "type": "number", "minimum": 0, "description": "Legacy request-level P95 threshold (ms)." },
+        "p99": { "type": "number", "minimum": 0, "description": "Legacy request-level P99 threshold (ms)." },
+        "request": {
+          "$ref": "#/definitions/sla_definition",
+          "description": "Request-level SLAs → http_req_duration / http_req_failed (aggregate of all requests)."
+        },
+        "transaction": {
+          "$ref": "#/definitions/sla_definition",
+          "description": "Transaction-level SLA defaults applied to every transaction. Overridable per transaction (and per percentile) via transaction_slas."
+        }
       },
       "additionalProperties": {
         "type": "number",
-        "description": "Custom percentile threshold in milliseconds. Key must match pattern p<N> (e.g., p97, p99.9)."
+        "description": "Custom legacy request-level percentile threshold (ms). Key must match p<N> (e.g., p97, p99.9)."
       }
     },
     "journey_slas": {
       "type": "object",
-      "description": "Per-journey SLA overrides keyed by journey name. These apply to the journey's scenario-level http_req_duration metric. Override global_sla for specific journeys that have different performance requirements.",
+      "description": "Per-journey SLA overrides keyed by journey name. These apply to the journey's scenario-level http_req_duration / http_req_failed metric.",
       "additionalProperties": {
-        "$ref": "#/properties/global_sla"
+        "$ref": "#/definitions/sla_definition"
       }
     },
     "transaction_slas": {
       "type": "object",
-      "description": "Per-transaction SLA overrides keyed by transaction name (e.g., 'tx01_launch'). These apply directly to the transaction's Trend metric. Use for critical transactions that need tighter thresholds than the journey average.",
+      "description": "Per-transaction SLA overrides keyed by transaction name (e.g., 't01_launch'). Applied directly to the transaction's Trend / checkrate metric, overriding global_sla.transaction per percentile.",
       "additionalProperties": {
-        "$ref": "#/properties/global_sla"
+        "$ref": "#/definitions/sla_definition"
+      }
+    },
+    "request_slas": {
+      "type": "object",
+      "description": "Per-request SLA overrides keyed by request name — the k6 `name` tag set via request(..., { name: 'GET_corre' }), or the request URL when no name was given. Applied to the request submetric http_req_duration{name:<request>} / http_req_failed{name:<request>}, letting you hold a single specific request to its own threshold. Scoped to that request only.",
+      "additionalProperties": {
+        "$ref": "#/definitions/sla_definition"
       }
     },
     "max_total_vus": {

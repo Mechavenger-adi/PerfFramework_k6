@@ -21,6 +21,8 @@ export type { JourneyLifecycleStore, PhaseFns, TransactionGate } from './utils/l
 export { clearCookies, deleteCookie, getEnvContext, registerBaseUrl, registerFrameworkEnvironmentUrls, resolveFrameworkUrl, resolvePath, } from './utils/session.js';
 export type { TeamEnvironmentOverride } from './utils/session.js';
 export { trackCorrelation, trackParameter, trackDataRow, logExchange, logReplayExchange, } from './utils/replayLogger.js';
+export { extractJson, extractRegex, extractHeader, extractCookie, extractBoundary, } from './utils/extract.js';
+export type { ExtractableResponse } from './utils/extract.js';
 export { addAutoHeader, addAutoHeaders, removeAutoHeader, clearAutoHeaders, getAutoHeaders, addHeaderOnce, } from './utils/autoHeaders.js';
 export { writeData } from './utils/dataWriter.js';
 export type { WriteDataOptions } from './utils/dataWriter.js';

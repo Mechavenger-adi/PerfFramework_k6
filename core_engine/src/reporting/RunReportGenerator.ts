@@ -269,14 +269,23 @@ export class RunReportGenerator {
     tbody tr:hover td { background: var(--accent-soft); }
     tbody tr:last-child td { border-bottom: none; }
     .split { display: grid; grid-template-columns: 1.5fr 1fr; gap: 20px; align-items: start; margin-bottom: 24px; }
+    /* Plan + one-or-more compliance pie cards on a wrapping row.
+       Plan is pinned to 45 %; pies share the remaining space and wrap
+       individually to the next row when the container is too narrow. */
+    .flex-row { display: flex; gap: 20px; flex-wrap: wrap; align-items: stretch; margin-bottom: 24px; }
+    .flex-row > .card { flex: 1 1 180px; min-width: 160px; margin-bottom: 0; }
+    .flex-row > .plan-card { flex: 0 0 calc(45% - 10px); min-width: 280px; max-width: calc(45% - 10px); }
+    @media (max-width: 980px) { .flex-row > .card, .flex-row > .plan-card { flex: 1 1 100%; max-width: 100%; } }
     /* Wide-right variant: hand the larger column to the second card. Used for the
        Plan/Thresholds row so the 6-column threshold table isn't crammed into the
        narrow side and clipped. */
     .split.sp-wide-right { grid-template-columns: 1fr 1.6fr; }
+    /* Even 50/50 columns (default .split is 1.5fr : 1fr). */
+    .split.sp-even { grid-template-columns: 1fr 1fr; }
     /* Inside the graph grid the gap already spaces stacked splits — drop the
        extra margin so chart rows don't get a double gap. */
     .graph-shell .split { margin-bottom: 0; }
-    @media (max-width: 980px) { .split, .split.sp-wide-right { grid-template-columns: 1fr; } }
+    @media (max-width: 980px) { .split, .split.sp-wide-right, .split.sp-even { grid-template-columns: 1fr; } }
     @media (max-width: 640px) {
       .shell { padding: 16px 12px 48px; }
       .hero h1 { font-size: 22px; }
@@ -602,7 +611,24 @@ export class RunReportGenerator {
       const slowest = [...transactions].sort((a, b) => (b.avg || 0) - (a.avg || 0)).slice(0, 5);
       const failing = [...transactions].sort((a, b) => (b.fail || 0) - (a.fail || 0)).slice(0, 5);
       const highestP90 = [...transactions].sort((a, b) => ((b['p(90)'] || 0) - (a['p(90)'] || 0))).slice(0, 5);
-      const mostExecuted = [...transactions].sort((a, b) => ((b.count || 0) - (a.count || 0))).slice(0, 5);
+      // Slowest individual requests by p90 — window-aware: recomputed exactly from
+      // the per-request series for the selected time range (falls back to the
+      // server-precomputed list when no request series is present).
+      const topReqs = reqRowsForRange(5).rows;
+      const topRequestsHtml = topReqs.length
+        ? '<div class="table-scroll"><table><thead><tr><th>Request Name</th><th>Method</th><th>Transaction</th><th>p90 (ms)</th><th>avg</th><th>min</th><th>max</th><th>count</th></tr></thead><tbody>'
+            + topReqs.map((r) => '<tr>'
+                + '<td class="wrap">' + escapeHtml(String(r.name)) + '</td>'
+                + '<td>' + escapeHtml(String(r.method || '—')) + '</td>'
+                + '<td class="wrap">' + escapeHtml(String(r.transaction || '—')) + '</td>'
+                + '<td>' + escapeHtml(formatCellValue(r.p90)) + '</td>'
+                + '<td>' + escapeHtml(formatCellValue(r.avg)) + '</td>'
+                + '<td>' + escapeHtml(formatCellValue(r.min)) + '</td>'
+                + '<td>' + escapeHtml(formatCellValue(r.max)) + '</td>'
+                + '<td>' + escapeHtml(formatCellValue(r.count)) + '</td>'
+              + '</tr>').join('')
+          + '</tbody></table></div>'
+        : '<div class="empty">No per-request timing captured (raw metrics stream unavailable).</div>';
 
       // Window duration (seconds) for the Duration + avg req/s cards.
       const windowMs = ranged
@@ -642,6 +668,22 @@ export class RunReportGenerator {
 
       const passedCount = thresholds.filter((t) => t.ok).length;
       const breachedCount = thresholds.length - passedCount;
+      // One compliance pie per percentile declared in global_sla.transaction:
+      // among transactions carrying a p(x) threshold (metric = a transaction name,
+      // not http_*/{scenario:…}), how many Pass vs Fail that percentile SLA.
+      const _txnNameSet = new Set((reportData.transactions.transactions || []).map((t) => String(t.transaction)));
+      const compliancePcts = (reportData.summary && reportData.summary.compliancePercentiles) || [];
+      const complianceData = compliancePcts.map(function(pct) {
+        const rows = thresholds.filter((t) => String(t.stat || '') === pct && _txnNameSet.has(String(t.metric)));
+        const pass = rows.filter((t) => t.ok).length;
+        const num = String(pct).replace(/[^0-9.]/g, '');
+        return { pct: pct, num: num, pass: pass, breach: rows.length - pass, total: rows.length, id: 'chart-compliance-' + num.replace('.', '_') };
+      }).filter((d) => d.total > 0);
+      const complianceCardsHtml = complianceData.map(function(d) {
+        return '<div class="card"><h3>P' + escapeHtml(d.num) + ' Compliance'
+          + infoTip('Transactions meeting (Pass) vs breaching (Fail) their ' + d.pct + ' SLA — global_sla.transaction. ' + d.pass + ' of ' + d.total + ' within SLA.')
+          + '</h3><div class="donut-wrap" style="max-width:300px;height:260px;margin-top:6px"><canvas id="' + d.id + '"></canvas></div></div>';
+      }).join('');
       // Sort: breached first, then by severity (critical → major → minor).
       const sevRank = { critical: 0, major: 1, minor: 2 };
       const sortedThresholds = [...thresholds].sort((a, b) => {
@@ -741,40 +783,46 @@ export class RunReportGenerator {
       const reqTotal = Number(fullTotals.requests || 0);
       const httpFailTotal = Number(fullTotals.httpFailures || 0);
       const errPct = reqTotal > 0 ? (httpFailTotal / reqTotal) * 100 : 0;
-      // #4 Health score: 100 minus penalties, with an expandable breakdown.
-      const penalties = [];
-      if (breached.length) penalties.push(['Threshold failures (' + breached.length + ')', breached.length * 8]);
-      const errRatePen = Math.round(Math.min(40, errPct));
-      if (errRatePen > 0) penalties.push(['Error rate (' + errPct.toFixed(1) + '%)', errRatePen]);
-      const errEvtPen = ci.errorCount > 0 ? Math.min(15, ci.errorCount) : 0;
-      if (errEvtPen > 0) penalties.push(['Error events (' + ci.errorCount + ')', errEvtPen]);
-      const healthScore = Math.max(0, Math.round(100 - penalties.reduce((s, p) => s + p[1], 0)));
-      const grade = healthScore >= 90 ? 'Excellent' : healthScore >= 75 ? 'Good' : healthScore >= 60 ? 'Fair' : healthScore >= 40 ? 'Poor' : 'Critical';
-      const breakdownHtml = penalties.length
-        ? '<details class="health-breakdown"><summary>why?</summary><ul><li class="base"><span>Base</span><b>100</b></li>'
-            + penalties.map((p) => '<li><span>' + escapeHtml(p[0]) + '</span><b>−' + p[1] + '</b></li>').join('')
-            + '<li class="base"><span>Final</span><b>' + healthScore + '</b></li></ul></details>'
-        : '';
+      // #4 Health score = the share of transactions that succeeded — one
+      // signal, computed straight from the per-transaction pass/fail counts we
+      // already track. A transaction iteration counts as "passed" only when
+      // every check inside it passed and it raised no error, so:
+      //   healthScore = round(100 − transactionFailureRate%)
+      // e.g. 3% of transactions failed → 97. No weights, no caps — anyone asking
+      // "why this number?" gets one sentence.
+      //   • HTTP failures need no separate term: every generated request has a
+      //     status check, so a 5xx/timeout fails that check and is already a
+      //     transaction failure — and this also catches wrong-but-HTTP-200
+      //     responses (failed body/correlation assertions) that http_req_failed
+      //     would miss.
+      //   • Latency/SLA is deliberately NOT in the score: the threshold gate and
+      //     the PASS/FAIL banner already report that dimension, so folding it in
+      //     here would just double-count what's shown elsewhere.
+      let txnPass = 0, txnTotal = 0;
+      for (const t of allTxns) { txnPass += Number(t.pass || 0); txnTotal += Number(t.pass || 0) + Number(t.fail || 0); }
+      const txnFail = txnTotal - txnPass;
+      const txnFailRate = txnTotal > 0 ? txnFail / txnTotal : 0; // no transactions → nothing failed → 100
+      const healthScore = Math.max(0, Math.min(100, Math.round(100 * (1 - txnFailRate))));
+      // Bands map directly to transaction failure rate now that the score IS the
+      // success rate: ≥99 (≤1% failed) Excellent · ≥97 (≤3%) Good · ≥90 (≤10%)
+      // Fair · ≥75 (≤25%) Poor · else Critical.
+      const grade = healthScore >= 99 ? 'Excellent' : healthScore >= 97 ? 'Good' : healthScore >= 90 ? 'Fair' : healthScore >= 75 ? 'Poor' : 'Critical';
+      const breakdownHtml = '<details class="health-breakdown"><summary>why?</summary><ul>'
+        + '<li class="base"><span>Transactions passed</span><b>' + txnPass.toLocaleString() + ' / ' + txnTotal.toLocaleString() + '</b></li>'
+        + '<li><span>Transaction failure rate</span><b>' + (txnFailRate * 100).toFixed(1) + '%</b></li>'
+        + '<li class="base"><span>Health score (100 − failure rate)</span><b>' + healthScore + '</b></li></ul></details>';
       const reason = status === 'passed'
         ? 'All thresholds passed and no blocking failures were detected.'
         : 'Test ' + status + ' — ' + breached.length + ' threshold violation' + (breached.length === 1 ? '' : 's')
-          + (httpFailTotal > 0 ? ' and ' + httpFailTotal.toLocaleString() + ' HTTP failure' + (httpFailTotal === 1 ? '' : 's') : '')
+          + (httpFailTotal > 0 ? ' and ' + httpFailTotal.toLocaleString() + ' failed request' + (httpFailTotal === 1 ? '' : 's') : '')
           + (ci.errorCount ? ' (' + ci.errorCount + ' error event' + (ci.errorCount === 1 ? '' : 's') + ')' : '') + '.';
       const bannerHtml = '<div class="status-banner ' + status + '">'
         + '<div class="sb-main"><div class="sb-status">' + escapeHtml(status) + '</div><div class="sb-reason">' + reason + '</div></div>'
         + '<div class="health"><div class="num grade-' + grade.toLowerCase() + '">' + healthScore + '<small>/100</small></div><div class="lbl">Health · ' + grade + '</div>' + breakdownHtml + '</div>'
         + '</div>';
 
-      // #5 Critical findings — RANKED by severity (failing transactions first, then thresholds).
+      // Slowest transaction + threshold sub-text helper — feed the Insights list.
       const slowTxn = [...allTxns].sort((a, b) => ((b['p(95)'] || b.avg || 0) - (a['p(95)'] || a.avg || 0)))[0];
-      const fCard = (cls, title, value, sub) => '<div class="finding ' + cls + '"><h4>' + title + '</h4><div class="fv">' + value + '</div>' + (sub ? '<div class="fs">' + sub + '</div>' : '') + '</div>';
-      const sevMeta = (pct) => pct >= 90 ? { c: 'crit', i: '🔴', n: 'Critical' } : pct >= 40 ? { c: 'warn', i: '🟠', n: 'Major' } : { c: 'warn', i: '🟡', n: 'Minor' };
-      const findings = [];
-      const failingRanked = [...allTxns].filter((t) => (t.errorPct || 0) > 0).sort((a, b) => (b.errorPct || 0) - (a.errorPct || 0));
-      for (const t of failingRanked.slice(0, 4)) {
-        const m = sevMeta(t.errorPct || 0);
-        findings.push(fCard(m.c, m.i + ' ' + m.n, escapeHtml(String(t.transaction)), Math.round(t.errorPct || 0) + '% failed (' + (t.fail || 0) + '/' + (t.count || 0) + ')'));
-      }
       const thrSubText = (t) => {
         if (t.stat && t.op && t.limit != null && t.actual != null) {
           const lower = t.op === '<' || t.op === '<=';
@@ -783,14 +831,11 @@ export class RunReportGenerator {
         }
         return 'threshold ' + escapeHtml(String(t.rule)) + ' breached';
       };
-      for (const b of breached.slice(0, 2)) findings.push(fCard('crit', '🔴 Critical', escapeHtml(String(b.metric)), thrSubText(b)));
-      if (slowTxn && (slowTxn['p(95)'] || slowTxn.avg)) findings.push(fCard('warn', '🟠 Slowest', escapeHtml(String(slowTxn.transaction)), slowTxn['p(95)'] != null ? 'p95 = ' + Math.round(slowTxn['p(95)']) + ' ms' : 'avg = ' + Math.round(slowTxn.avg || 0) + ' ms'));
-      const findingsHtml = findings.length ? '<div class="findings">' + findings.join('') + '</div>' : '';
 
       // Auto-generated insights.
       const insights = [];
       for (const t of allTxns) { if ((t.count || 0) > 0 && (t.errorPct || 0) >= 99.5) insights.push('Transaction <strong>' + escapeHtml(String(t.transaction)) + '</strong> failed in <strong>100%</strong> of executions (' + (t.fail || 0) + '/' + (t.count || 0) + ').'); }
-      if (errPct > 0) { const exceed = breached.find((b) => String(b.metric).indexOf('http_req_failed') >= 0); insights.push('HTTP failure rate is <strong>' + errPct.toFixed(1) + '%</strong>' + (exceed ? ' — exceeds the configured threshold (' + escapeHtml(String(exceed.rule)) + ').' : '.')); }
+      if (errPct > 0) { const exceed = breached.find((b) => String(b.metric).indexOf('http_req_failed') >= 0); insights.push('Request failure rate is <strong>' + errPct.toFixed(1) + '%</strong>' + (exceed ? ' — exceeds the configured threshold (' + escapeHtml(String(exceed.rule)) + ').' : '.')); }
       if (slowTxn && (slowTxn['p(95)'] || slowTxn.avg)) insights.push('Slowest transaction <strong>' + escapeHtml(String(slowTxn.transaction)) + '</strong> has ' + (slowTxn['p(95)'] != null ? 'p95 = ' + Math.round(slowTxn['p(95)']) + ' ms' : 'avg = ' + Math.round(slowTxn.avg) + ' ms') + '.');
       for (const b of breached.slice(0, 4)) insights.push('Threshold <strong>' + escapeHtml(String(b.metric)) + '</strong> breached — ' + thrSubText(b) + '.');
       const insightsHtml = insights.length ? '<div class="insights"><ul>' + insights.slice(0, 8).map((s) => '<li>' + s + '</li>').join('') + '</ul></div>' : '';
@@ -807,6 +852,12 @@ export class RunReportGenerator {
       const kReq = Number(totals.requests || 0);
       const kFail = Number(totals.httpFailures || 0);
       const kFailPct = kReq > 0 ? (kFail / kReq) * 100 : 0;
+      // Transaction-level failure rate: Σfail / Σ executions across transactions
+      // (the same signal the health score uses). Distinct from request failure %,
+      // which is the HTTP-transport failure rate.
+      let kTxnTotal = 0, kTxnFail = 0;
+      for (const t of allTxns) { kTxnTotal += (Number(t.pass) || 0) + (Number(t.fail) || 0); kTxnFail += Number(t.fail) || 0; }
+      const kTxnFailPct = kTxnTotal > 0 ? (kTxnFail / kTxnTotal) * 100 : 0;
       // Exact weighted avg response time over the window.
       let rtW = 0, rtR = 0;
       for (const b of ov) { const r = Number(b.requests || 0); rtW += Number(b.httpDurationAvg || 0) * r; rtR += r; }
@@ -817,8 +868,9 @@ export class RunReportGenerator {
         + kpiCard('Total Iterations', (totals.iterations || 0).toLocaleString(), { series: sIters, sparkColor: '#0a9396', trend: true })
         + kpiCard('Throughput', (kReq / Math.max(1, windowMs / 1000)).toFixed(2) + ' /s', { series: sRate, sparkColor: '#0891b2', trend: true })
         + kpiCard('Avg Response Time', Math.round(avgRt).toLocaleString() + ' ms', { series: sRtAvg, sparkColor: '#7c3aed', trend: true })
-        + kpiCard('HTTP Failure %', kFailPct.toFixed(1) + '%', { series: sFailPct, sparkColor: '#dc2626', state: kFailPct > 5 ? 'crit' : kFailPct > 1 ? 'warn' : 'ok' })
-        + kpiCard('HTTP Failures', kFail.toLocaleString(), { series: sFails, sparkColor: '#dc2626', state: kFail > 0 ? 'crit' : 'ok' })
+        + kpiCard('Request Failure %', kFailPct.toFixed(1) + '%', { series: sFailPct, sparkColor: '#dc2626', state: kFailPct > 5 ? 'crit' : kFailPct > 1 ? 'warn' : 'ok' })
+        + kpiCard('Failed Requests', kFail.toLocaleString(), { series: sFails, sparkColor: '#dc2626', state: kFail > 0 ? 'crit' : 'ok' })
+        + kpiCard('Transaction Failure %', kTxnFailPct.toFixed(1) + '%', { state: kTxnFailPct > 5 ? 'crit' : kTxnFailPct > 1 ? 'warn' : 'ok' })
         + kpiCard('Errors', errorCount, { state: errorCount > 0 ? 'crit' : 'ok' })
         + kpiCard('Warnings', warningCount, { state: warningCount > 0 ? 'warn' : 'ok' })
         + kpiCard('Threshold Failures', ci.thresholdFailures, { state: ci.thresholdFailures > 0 ? 'crit' : 'ok' })
@@ -829,15 +881,14 @@ export class RunReportGenerator {
 
       document.getElementById('panel-summary').innerHTML = \`
         \${bannerHtml}
-        \${findingsHtml ? '<div class="section-title">Critical Findings' + infoTip('Findings ranked by severity.') + '</div>' + findingsHtml : ''}
         \${insightsHtml ? '<div class="section-title">Insights' + infoTip('Auto-generated observations from this run\\'s metrics.') + '</div>' + insightsHtml : ''}
         \${ranged ? '<div class="notice" style="margin-bottom:14px;padding:10px 14px;border-left:4px solid #0891b2;background:#e0f2fe;color:#0c4a6e;border-radius:4px;font-size:13px">Showing the <strong>selected time window</strong>. Counts, data and req/s are summed over the range; threshold results stay run-level. Click <strong>Full run</strong> to reset.</div>' : ''}
         <div class="section-title">Key Metrics\${infoTip('Headline totals for the run, with trend sparklines.')}</div>
         \${kpiHtml}
-        \${ov.length > 1 ? '<div class="card" style="margin-bottom:22px"><h3>Execution Timeline — VUs &amp; HTTP failures' + infoTip('Active VUs vs HTTP failures over time.') + '</h3><div class="chart-canvas-wrap" style="min-height:240px"><canvas id="chart-timeline"></canvas></div></div>' : ''}
+        \${ov.length > 1 ? '<div class="card" style="margin-bottom:22px"><h3>Execution Timeline — VUs &amp; failed requests' + infoTip('Active VUs vs failed requests over time.') + '</h3><div class="chart-canvas-wrap" style="min-height:240px"><canvas id="chart-timeline"></canvas></div></div>' : ''}
 
-        <div class="split sp-wide-right">
-          <div class="card">
+        <div class="flex-row">
+          <div class="card plan-card">
             <h3>Plan\${infoTip('What was run: plan, environment, executor and load shape.')}</h3>
             <p style="margin:6px 0"><strong>\${escapeHtml(planProfile.name || reportData.meta.plan || '—')}</strong>
               <span class="subtle"> — env: <code>\${escapeHtml(planProfile.environment || reportData.meta.environment || '—')}</code></span>
@@ -851,13 +902,26 @@ export class RunReportGenerator {
             \${stagesRow ? '<p style="margin:6px 0">Stages: ' + stagesRow + '</p>' : ''}
             \${journeyList ? '<ul style="margin:8px 0;padding-left:20px">' + journeyList + '</ul>' : ''}
           </div>
+          \${complianceCardsHtml}
+        </div>
+
+        <div class="card" style="margin-bottom:24px">
+          <h3>Thresholds (\${passedCount}/\${thresholds.length} passing\${breachedCount > 0 ? ', <span style="color:#b91c1c">' + breachedCount + ' breached</span>' : ''})\${infoTip('Pass/fail SLA rules: expected limit vs actual value.')}</h3>
+          \${thresholdTableHtml}
+        </div>
+
+        <div class="split sp-even">
           <div class="card">
-            <h3>Thresholds (\${passedCount}/\${thresholds.length} passing\${breachedCount > 0 ? ', <span style="color:#b91c1c">' + breachedCount + ' breached</span>' : ''})\${infoTip('Pass/fail SLA rules: expected limit vs actual value.')}</h3>
-            \${thresholdTableHtml}
+            <h3>Highest P90 — Transactions (ms)\${infoTip('Transactions ranked by 90th-percentile response time.')}</h3>
+            \${renderTopN(highestP90, 'p(90)', '#f59e0b', (v) => Math.round(v).toLocaleString())}
+          </div>
+          <div class="card">
+            <h3>Top 5 Slowest Requests — p90 (ms)\${infoTip('Individual requests (by request name) ranked by p90 response time. Window-aware — recomputed exactly for the selected time range.')}</h3>
+            \${topRequestsHtml}
           </div>
         </div>
 
-        <div class="split">
+        <div class="split sp-even">
           <div class="card">
             <h3>Top Slowest Transactions (avg ms)\${infoTip('Transactions with the highest average response time.')}</h3>
             \${renderTopN(slowest, 'avg', '#0e7490', (v) => Math.round(v).toLocaleString())}
@@ -865,16 +929,6 @@ export class RunReportGenerator {
           <div class="card">
             <h3>Most Failing Transactions\${infoTip('Transactions with the most failed iterations.')}</h3>
             \${renderTopN(failing, 'fail', '#dc2626', (v) => v.toLocaleString())}
-          </div>
-        </div>
-        <div class="split">
-          <div class="card">
-            <h3>Highest P90 (ms)\${infoTip('Transactions ranked by 90th-percentile response time.')}</h3>
-            \${renderTopN(highestP90, 'p(90)', '#f59e0b', (v) => Math.round(v).toLocaleString())}
-          </div>
-          <div class="card">
-            <h3>Most Executed\${infoTip('Transactions by execution count.')}</h3>
-            \${renderTopN(mostExecuted, 'count', '#0891b2', (v) => v.toLocaleString())}
           </div>
         </div>
 
@@ -891,6 +945,7 @@ export class RunReportGenerator {
         </details>
       \`;
       renderTimelineChart(ov);
+      for (const d of complianceData) renderCompliancePie(d.id, d.pct, d.pass, d.breach);
     }
 
     // ── Wave 1 (Proposal 5): per-second line charts ─────────────────
@@ -1088,7 +1143,7 @@ export class RunReportGenerator {
             <div class="chart-canvas-wrap" style="min-height:280px"><canvas id="chart-http-duration"></canvas></div>
           </div>
           <div class="chart-box">
-            <h3>HTTP Failure Rate\${infoTip('Percentage of HTTP requests that failed over time.')}</h3>
+            <h3>Request Failure Rate\${infoTip('Percentage of requests that failed over time.')}</h3>
             <div class="chart-canvas-wrap" style="min-height:220px"><canvas id="chart-http-failed"></canvas></div>
           </div>
           <div class="split">
@@ -1430,8 +1485,6 @@ export class RunReportGenerator {
       }
       const range = getSelectedRange();
       const statsList = reportData.config.transactionStats || [];
-      const estByName = {};
-      full.forEach((r) => { estByName[String(r.transaction)] = r.estimated === true; });
       const out = [];
       for (const name of Object.keys(txnSeries)) {
         const buckets = filterSeriesByRange(txnSeries[name] || [], range);
@@ -1447,7 +1500,7 @@ export class RunReportGenerator {
         const n = durations.length;
         const mean = n ? durations.reduce((s, v) => s + v, 0) / n : 0;
         const row = {
-          transaction: name, estimated: estByName[name] === true,
+          transaction: name,
           count: count, pass: pass, fail: fail,
           errorPct: count > 0 ? (fail / count) * 100 : 0,
         };
@@ -1468,6 +1521,56 @@ export class RunReportGenerator {
       return { rows: out, ranged: true };
     }
 
+    // Top individual requests (by request name) for the active time window.
+    // Mirrors txnRowsForRange but for the per-request series: concatenates the
+    // raw duration samples in-window and computes EXACT p90/avg/min/max/count +
+    // failed, so the Top Requests table tracks the time-window selector. Falls
+    // back to the server-precomputed summary.topRequests when no request series
+    // is present (legacy artifacts). Returns up to topN rows sorted by p90 desc.
+    function reqRowsForRange(topN) {
+      const reqSeries = (reportData.timeseries && reportData.timeseries.series && reportData.timeseries.series.requests) || {};
+      const names = Object.keys(reqSeries);
+      if (names.length === 0) {
+        const fallback = (reportData.summary && reportData.summary.topRequests) || [];
+        return { rows: fallback.slice(0, topN), ranged: false };
+      }
+      const ranged = !!window.__k6PerfRange;
+      const range = getSelectedRange();
+      const rows = [];
+      for (const name of names) {
+        const buckets = ranged ? filterSeriesByRange(reqSeries[name] || [], range) : (reqSeries[name] || []);
+        let count = 0, failed = 0;
+        let method = '', transaction = '', url = name;
+        const durations = [];
+        for (const b of buckets) {
+          count += Number(b.count || 0);
+          failed += Number(b.failed || 0);
+          if (Array.isArray(b.durations)) { for (const d of b.durations) durations.push(Number(d)); }
+          if (!method && b.method) method = String(b.method);
+          if (!transaction && b.transaction) transaction = String(b.transaction);
+          if (b.url) url = String(b.url);
+        }
+        if (count === 0 && durations.length === 0) continue;
+        durations.sort((a, b) => a - b);
+        const n = durations.length;
+        const sum = n ? durations.reduce((s, v) => s + v, 0) : 0;
+        rows.push({
+          name: name,
+          method: method,
+          transaction: transaction,
+          url: url,
+          count: count || n,
+          failed: failed,
+          p90: Math.round(_pct(durations, 90)),
+          avg: n ? Math.round(sum / n) : 0,
+          min: n ? Math.round(durations[0]) : 0,
+          max: n ? Math.round(durations[n - 1]) : 0,
+        });
+      }
+      rows.sort((a, b) => (b.p90 - a.p90) || (b.max - a.max));
+      return { rows: rows.slice(0, topN), ranged: ranged };
+    }
+
     function renderTransactions() {
       const host = document.getElementById('panel-transactions');
       const __src = txnRowsForRange();
@@ -1479,23 +1582,11 @@ export class RunReportGenerator {
       }
       const columns = ['transaction', 'count', 'pass', 'fail', 'errorPct', ...reportData.config.transactionStats.filter((stat) => !['count', 'pass', 'fail'].includes(stat))];
 
-      const presentationRows = rows.map(function(row) {
-        if (row.estimated === true) {
-          return Object.assign({}, row, { transaction: String(row.transaction || '') + ' ≈' });
-        }
-        return row;
-      });
+      // Pass/fail are always exact (the per-iteration checkrate Rate metric) —
+      // the pre-flight ScriptContractGuard blocks the raw check()/group() shapes
+      // that used to produce approximate rows, so there's no ≈ marker any more.
+      const presentationRows = rows;
 
-      // Banner for estimated rows (Proposal 3 fallback).
-      const estimated = rows.filter(function(r) { return r.estimated === true; });
-      const estimatedBanner = estimated.length > 0
-        ? '<div class="notice notice-warn" style="margin-bottom:12px;padding:10px 14px;border-left:4px solid #f59e0b;background:#fef3c7;color:#78350f;border-radius:4px;font-size:13px;line-height:1.5">'
-            + '<strong>Approximate pass/fail (' + estimated.length + ' transaction' + (estimated.length === 1 ? '' : 's') + ', marked with ≈).</strong> '
-            + 'Pass/fail for these rows was derived from native k6 <code>check()</code> aggregates because the per-iteration <code>&lt;name&gt;_checkrate</code> Rate metric was not present. '
-            + 'These are <strong>estimates</strong>, not exact counts — they can under-count when failures span multiple checks, and over-count when a single check runs more than once per iteration. '
-            + 'For exact per-iteration counts, run scripts that go through the framework <code>transaction()</code> + <code>k6Check()</code> wrappers.'
-          + '</div>'
-        : '';
       // Banner when the table reflects a selected sub-window. Values are EXACT —
       // recomputed from the raw duration samples within the window.
       const rangeBanner = __ranged
@@ -1504,7 +1595,7 @@ export class RunReportGenerator {
             + 'All values are exact for this range (recomputed from raw samples). Click <strong>Full run</strong> to reset.'
           + '</div>'
         : '';
-      const banner = rangeBanner + estimatedBanner;
+      const banner = rangeBanner;
 
       // Filter toolbar: free-text substring match on the transaction name +
       // CSV export of the currently-visible rows (post-filter, post-sort).
@@ -1525,8 +1616,7 @@ export class RunReportGenerator {
       const csvBtn = document.getElementById('txn-csv');
 
       function renderInner() {
-        // Filter → sort → render. Done from \`presentationRows\` so the ≈
-        // marker on estimated rows participates in the search.
+        // Filter → sort → render from the (exact) transaction rows.
         const filtered = presentationRows.filter((r) =>
           !_txnFilterText || String(r.transaction || '').toLowerCase().includes(_txnFilterText.toLowerCase()),
         );
@@ -1806,7 +1896,7 @@ export class RunReportGenerator {
           labels: ov.map((b) => fmtBucketTs(b.ts)),
           datasets: [
             { label: 'VUs', data: ov.map((b) => Number(b.vus || 0)), borderColor: '#0e7490', backgroundColor: '#0e749022', fill: true, tension: 0.3, pointRadius: 0, yAxisID: 'y' },
-            { label: 'HTTP failures', data: ov.map((b) => Number(b.httpFailedCount || 0)), borderColor: '#dc2626', backgroundColor: '#dc262622', fill: true, tension: 0.2, pointRadius: 0, yAxisID: 'y1' },
+            { label: 'Failed requests', data: ov.map((b) => Number(b.httpFailedCount || 0)), borderColor: '#dc2626', backgroundColor: '#dc262622', fill: true, tension: 0.2, pointRadius: 0, yAxisID: 'y1' },
           ],
         },
         options: {
@@ -1816,9 +1906,83 @@ export class RunReportGenerator {
           scales: {
             x: { ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 10, font: { size: 11 } }, grid: { color: gridColor() } },
             y: { position: 'left', beginAtZero: true, title: { display: true, text: 'VUs' }, grid: { color: gridColor() } },
-            y1: { position: 'right', beginAtZero: true, title: { display: true, text: 'HTTP failures' }, grid: { drawOnChartArea: false } },
+            y1: { position: 'right', beginAtZero: true, title: { display: true, text: 'Failed requests' }, grid: { drawOnChartArea: false } },
           },
         },
+      }));
+      if (typeof requestAnimationFrame === 'function') {
+        requestAnimationFrame(() => requestAnimationFrame(() => { for (const c of summaryChartInstances) { try { c.resize(); } catch {} } }));
+      }
+    }
+
+    // Transaction p(x)-SLA pass/breach doughnut on the Summary tab (one per
+    // compliance percentile). Tracked in summaryChartInstances so it's torn down
+    // with the rest on re-render. \`pctLabel\` is e.g. "p(90)".
+    function renderCompliancePie(canvasId, pctLabel, passed, breached) {
+      const el = document.getElementById(canvasId);
+      if (!el || !window.Chart || (passed + breached) === 0) return;
+      const withinLabel = 'within ' + String(pctLabel).replace(/[()]/g, '') + ' SLA';
+      const total = passed + breached;
+      const colors = ['#16a34a', '#dc2626'];
+      const pctOf = (v) => total > 0 ? Math.round((v / total) * 100) : 0;
+      // Always-on center text: the headline "within SLA" percentage. Per-arc %
+      // labels were removed; the pass/fail percentages live in the legend.
+      const alwaysOnLabels = {
+        id: 'pieAlwaysOnLabels',
+        afterDraw(chart) {
+          const ctx = chart.ctx;
+          const meta = chart.getDatasetMeta(0);
+          const first = meta.data[0];
+          if (!first) return;
+          ctx.save();
+          ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+          ctx.fillStyle = currentTheme() === 'dark' ? '#e7edf5' : '#1b2735';
+          ctx.font = '800 26px Inter, Segoe UI, sans-serif';
+          ctx.fillText(pctOf(passed) + '%', first.x, first.y - 6);
+          ctx.fillStyle = currentTheme() === 'dark' ? '#9aa8b7' : '#6b7888';
+          ctx.font = '600 11px Inter, Segoe UI, sans-serif';
+          ctx.fillText(withinLabel, first.x, first.y + 14);
+          ctx.restore();
+        },
+      };
+      summaryChartInstances.push(new Chart(el, {
+        type: 'doughnut',
+        data: {
+          labels: ['Pass', 'Fail'],
+          datasets: [{
+            data: [passed, breached],
+            backgroundColor: colors,
+            borderColor: currentTheme() === 'dark' ? '#151d27' : '#ffffff',
+            borderWidth: 2,
+          }],
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false, cutout: '62%',
+          layout: { padding: { top: 12, bottom: 6, left: 12, right: 12 } },
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: {
+                usePointStyle: true, boxWidth: 10, padding: 14,
+                // Explicit theme-aware text color — without it the legend labels
+                // render dark-on-dark and are invisible in dark mode.
+                color: currentTheme() === 'dark' ? '#e7edf5' : '#1b2735',
+                generateLabels: (chart) => {
+                  const d = chart.data.datasets[0].data;
+                  return chart.data.labels.map((lbl, i) => ({
+                    text: lbl + ' — ' + (Number(d[i]) || 0) + ' (' + pctOf(Number(d[i]) || 0) + '%)',
+                    fillStyle: colors[i], strokeStyle: colors[i], pointStyle: 'circle', index: i,
+                    fontColor: currentTheme() === 'dark' ? '#e7edf5' : '#1b2735',
+                  }));
+                },
+              },
+            },
+            tooltip: { callbacks: { label: (ctx) =>
+              ' ' + ctx.label + ': ' + ctx.parsed + ' (' + pctOf(ctx.parsed) + '%)',
+            } },
+          },
+        },
+        plugins: [alwaysOnLabels],
       }));
       if (typeof requestAnimationFrame === 'function') {
         requestAnimationFrame(() => requestAnimationFrame(() => { for (const c of summaryChartInstances) { try { c.resize(); } catch {} } }));

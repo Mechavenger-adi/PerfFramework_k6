@@ -89,6 +89,29 @@ function formatStackSnippet(stack: string | undefined, limit: number = 3): strin
   return lines.slice(0, limit).map((l) => `    ${l}`).join('\n');
 }
 
+/**
+ * True when `error` is a JS-engine error type that signals a programming bug in
+ * the script — an undefined identifier, calling a non-function, a bad property
+ * access, etc. (ReferenceError / TypeError / RangeError / SyntaxError /
+ * URIError / EvalError). Failed checks and HTTP errors are raised by the
+ * framework as plain `Error` and are NOT matched here, so they still follow the
+ * configured errorBehavior; a runtime bug always aborts the test instead.
+ */
+export function isJsRuntimeError(error: unknown): boolean {
+  const name =
+    error && typeof error === 'object' && 'name' in error
+      ? String((error as { name?: unknown }).name)
+      : '';
+  return (
+    name === 'ReferenceError' ||
+    name === 'TypeError' ||
+    name === 'RangeError' ||
+    name === 'SyntaxError' ||
+    name === 'URIError' ||
+    name === 'EvalError'
+  );
+}
+
 // Tracks the active transaction name within this VU's context (per-VU module scope in k6).
 let _activeTransaction: string = '';
 
@@ -284,6 +307,23 @@ export function transaction(name: string, fn: () => void): void {
         const locSuffix = location
           ? `\n    at ${location}`
           : (formatStackSnippet(rawStack) ? `\n${formatStackSnippet(rawStack)}` : '');
+
+        // A genuine JavaScript runtime error (ReferenceError, TypeError, …)
+        // means the SCRIPT itself is broken — an undefined variable, a call to
+        // something that isn't a function (e.g. native check()/group() that
+        // wasn't imported), a bad property access. Unlike a failed check or an
+        // HTTP error (which the framework raises as a plain Error), this will
+        // recur every iteration and only produces meaningless data. So it ALWAYS
+        // aborts the test, regardless of errorBehavior — 'continue' included.
+        if (isJsRuntimeError(error)) {
+          const errName = (error as Error).name;
+          console.error(
+            `[k6-perf][transaction:${name}] FATAL ${errName}: ${message}${locSuffix}\n` +
+            `  → aborting test: a JavaScript runtime error is a script bug, not subject to errorBehavior (was '${behavior}')`,
+          );
+          exec.test.abort(`[k6-perf][transaction:${name}] ${errName}: ${message}${location ? ` (${location})` : ''}`);
+          return;
+        }
 
         // All error-behavior paths share one truth: the *current transaction
         // body* is aborted at the point the error was thrown — anything after

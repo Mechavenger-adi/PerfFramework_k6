@@ -5,10 +5,17 @@
  */
 import { ResolvedConfig } from '../types/ConfigContracts';
 import { TestPlan } from '../types/TestPlanSchema';
+import { FileViolations } from './ScriptContractGuard';
 export interface GatekeeperResult {
     passed: boolean;
     failures: string[];
     warnings: string[];
+    /**
+     * Framework-rule violations: journey scripts that use native k6 APIs the
+     * framework forbids (check()/group()). Reported as a distinct, richly
+     * formatted block — see printResult — rather than a one-line failure.
+     */
+    frameworkViolations: FileViolations[];
 }
 export declare class GatekeeperValidator {
     /**

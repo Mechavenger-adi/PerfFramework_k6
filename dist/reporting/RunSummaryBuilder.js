@@ -22,8 +22,10 @@ class RunSummaryBuilder {
             transactions: options.transactions.transactions.map((row) => ({
                 name: row.transaction,
                 count: row.count,
-                pass: row.pass,
-                fail: row.fail,
+                // pass/fail are always present for real runs (checkrate-backed); coerce
+                // the unreachable off-contract `undefined` to 0 for the CI contract.
+                pass: row.pass ?? 0,
+                fail: row.fail ?? 0,
                 errorPct: row.errorPct,
                 avg: row.avg,
                 min: row.min,

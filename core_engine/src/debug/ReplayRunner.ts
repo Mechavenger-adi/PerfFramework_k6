@@ -10,6 +10,7 @@ import { createSpinner } from '../utils/ProgressBar';
 import { DiffChecker, DiffResult } from './DiffChecker';
 import { TaggedExchangeLogEntry } from './ExchangeLog';
 import { HTMLDiffReporter } from './HTMLDiffReporter';
+import { ScriptContractGuard } from '../config/ScriptContractGuard';
 
 /** Extract transaction names declared in a script source via transaction() or startTransaction(). */
 function extractTransactionNames(source: string): string[] {
@@ -118,6 +119,10 @@ export class ReplayRunner {
 
     // Scan script for transaction names so metrics are pre-registered in init context.
     const scriptSource = fs.readFileSync(absScriptPath, 'utf-8');
+    // Pre-flight: refuse raw k6 check()/group() — only k6Check() inside
+    // transaction() yields exact pass/fail. Covers the standalone `debug`
+    // command (the run-command path guards earlier).
+    ScriptContractGuard.assertClean(absScriptPath, scriptSource);
     const transactionNames = extractTransactionNames(scriptSource);
 
     // Set up a log-capture file so replay entries and user console.log can be

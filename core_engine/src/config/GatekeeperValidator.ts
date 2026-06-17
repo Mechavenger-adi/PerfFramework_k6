@@ -13,11 +13,18 @@ import { DataValidator } from '../data/DataValidator';
 import { RecordingLogResolver } from '../debug/RecordingLogResolver';
 import { Logger } from '../utils/logger';
 import { PathResolver } from '../utils/PathResolver';
+import { ScriptContractGuard, FileViolations } from './ScriptContractGuard';
 
 export interface GatekeeperResult {
   passed: boolean;
   failures: string[];
   warnings: string[];
+  /**
+   * Framework-rule violations: journey scripts that use native k6 APIs the
+   * framework forbids (check()/group()). Reported as a distinct, richly
+   * formatted block — see printResult — rather than a one-line failure.
+   */
+  frameworkViolations: FileViolations[];
 }
 
 export class GatekeeperValidator {
@@ -28,6 +35,7 @@ export class GatekeeperValidator {
   validate(config: ResolvedConfig, plan: TestPlan, dataRoot: string): GatekeeperResult {
     const failures: string[] = [];
     const warnings: string[] = [];
+    const frameworkViolations: FileViolations[] = [];
     const debugEnabled = plan.debug?.enabled === true;
     const autoResolveRecordingLog = plan.debug?.autoResolveRecordingLog !== false;
 
@@ -126,6 +134,17 @@ export class GatekeeperValidator {
       } else {
         warnings.push(missingMsg);
       }
+    }
+
+    // -- 3c. Framework API rules ---------------
+    // Reject journey scripts that use native k6 check()/group(): only k6Check()
+    // inside transaction() produces exact per-iteration pass/fail. Scans the
+    // resolved (absolute) script path so the reported file matches what runs.
+    for (const journey of plan.user_journeys ?? []) {
+      const sp = journey.scriptPath;
+      if (!sp || !fs.existsSync(sp)) continue;
+      const fv = ScriptContractGuard.scanFile(sp);
+      if (fv) frameworkViolations.push(fv);
     }
 
     // -- 4. Weight / VU checks -----------------
@@ -234,9 +253,10 @@ export class GatekeeperValidator {
     }
 
     return {
-      passed: failures.length === 0,
+      passed: failures.length === 0 && frameworkViolations.length === 0,
       failures,
       warnings,
+      frameworkViolations,
     };
   }
 
@@ -269,12 +289,21 @@ export class GatekeeperValidator {
       result.warnings.forEach((w) => Logger.bullet(w, 'yellow'));
     }
 
+    // Framework-rule violations get their own richly formatted block (the
+    // "Framework Validation Failed" report) rather than a one-line bullet.
+    if (result.frameworkViolations.length > 0) {
+      console.error('\n' + ScriptContractGuard.format(result.frameworkViolations) + '\n');
+    }
+
     if (result.failures.length > 0) {
       Logger.fail('FAILURES:');
       result.failures.forEach((f) => Logger.bullet(f, 'red'));
-      Logger.fail('PRE-FLIGHT FAILED \u2014 fix all issues above before running.\n');
-    } else {
+    }
+
+    if (result.passed) {
       Logger.pass('All pre-flight checks passed.\n');
+    } else {
+      Logger.fail('PRE-FLIGHT FAILED \u2014 fix all issues above before running.\n');
     }
 
     return result;

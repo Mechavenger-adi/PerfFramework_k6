@@ -45,6 +45,7 @@ const FileWriteSink_1 = require("../execution/FileWriteSink");
 const ProgressBar_1 = require("../utils/ProgressBar");
 const DiffChecker_1 = require("./DiffChecker");
 const HTMLDiffReporter_1 = require("./HTMLDiffReporter");
+const ScriptContractGuard_1 = require("../config/ScriptContractGuard");
 /** Extract transaction names declared in a script source via transaction() or startTransaction(). */
 function extractTransactionNames(source) {
     const matches = new Set();
@@ -90,6 +91,10 @@ class ReplayRunner {
         }
         // Scan script for transaction names so metrics are pre-registered in init context.
         const scriptSource = fs.readFileSync(absScriptPath, 'utf-8');
+        // Pre-flight: refuse raw k6 check()/group() — only k6Check() inside
+        // transaction() yields exact pass/fail. Covers the standalone `debug`
+        // command (the run-command path guards earlier).
+        ScriptContractGuard_1.ScriptContractGuard.assertClean(absScriptPath, scriptSource);
         const transactionNames = extractTransactionNames(scriptSource);
         // Set up a log-capture file so replay entries and user console.log can be
         // extracted after the run, while stderr stays inherited (TTY → progress bar).

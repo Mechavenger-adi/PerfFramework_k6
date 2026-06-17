@@ -45,6 +45,7 @@ const DataValidator_1 = require("../data/DataValidator");
 const RecordingLogResolver_1 = require("../debug/RecordingLogResolver");
 const logger_1 = require("../utils/logger");
 const PathResolver_1 = require("../utils/PathResolver");
+const ScriptContractGuard_1 = require("./ScriptContractGuard");
 class GatekeeperValidator {
     /**
      * Run the full pre-flight checklist.
@@ -53,6 +54,7 @@ class GatekeeperValidator {
     validate(config, plan, dataRoot) {
         const failures = [];
         const warnings = [];
+        const frameworkViolations = [];
         const debugEnabled = plan.debug?.enabled === true;
         const autoResolveRecordingLog = plan.debug?.autoResolveRecordingLog !== false;
         // -- 1. Environment checks ------------------
@@ -133,6 +135,18 @@ class GatekeeperValidator {
             else {
                 warnings.push(missingMsg);
             }
+        }
+        // -- 3c. Framework API rules ---------------
+        // Reject journey scripts that use native k6 check()/group(): only k6Check()
+        // inside transaction() produces exact per-iteration pass/fail. Scans the
+        // resolved (absolute) script path so the reported file matches what runs.
+        for (const journey of plan.user_journeys ?? []) {
+            const sp = journey.scriptPath;
+            if (!sp || !fs.existsSync(sp))
+                continue;
+            const fv = ScriptContractGuard_1.ScriptContractGuard.scanFile(sp);
+            if (fv)
+                frameworkViolations.push(fv);
         }
         // -- 4. Weight / VU checks -----------------
         if (plan.execution_mode === 'parallel') {
@@ -221,9 +235,10 @@ class GatekeeperValidator {
             }
         }
         return {
-            passed: failures.length === 0,
+            passed: failures.length === 0 && frameworkViolations.length === 0,
             failures,
             warnings,
+            frameworkViolations,
         };
     }
     /** Transaction names declared in a script via transaction()/startTransaction(). */
@@ -253,13 +268,20 @@ class GatekeeperValidator {
             logger_1.Logger.warning('WARNINGS:');
             result.warnings.forEach((w) => logger_1.Logger.bullet(w, 'yellow'));
         }
+        // Framework-rule violations get their own richly formatted block (the
+        // "Framework Validation Failed" report) rather than a one-line bullet.
+        if (result.frameworkViolations.length > 0) {
+            console.error('\n' + ScriptContractGuard_1.ScriptContractGuard.format(result.frameworkViolations) + '\n');
+        }
         if (result.failures.length > 0) {
             logger_1.Logger.fail('FAILURES:');
             result.failures.forEach((f) => logger_1.Logger.bullet(f, 'red'));
-            logger_1.Logger.fail('PRE-FLIGHT FAILED \u2014 fix all issues above before running.\n');
+        }
+        if (result.passed) {
+            logger_1.Logger.pass('All pre-flight checks passed.\n');
         }
         else {
-            logger_1.Logger.pass('All pre-flight checks passed.\n');
+            logger_1.Logger.fail('PRE-FLIGHT FAILED \u2014 fix all issues above before running.\n');
         }
         return result;
     }

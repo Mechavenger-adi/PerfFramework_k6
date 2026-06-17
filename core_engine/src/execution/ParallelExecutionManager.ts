@@ -57,7 +57,7 @@ export class ParallelExecutionManager {
           noCookiesReset: plan.noCookiesReset !== false,
           summaryTrendStats,
           scenarios: ScenarioBuilder.build(modifiedPlan, runtimeMetadata),
-          thresholds: ThresholdManager.apply(modifiedPlan)
+          thresholds: ThresholdManager.apply(modifiedPlan, runtimeMetadata?.journeyTransactionNames)
         };
       }
     }
@@ -66,7 +66,7 @@ export class ParallelExecutionManager {
       noCookiesReset: plan.noCookiesReset !== false,
       summaryTrendStats,
       scenarios: ScenarioBuilder.build(plan, runtimeMetadata),
-      thresholds: ThresholdManager.apply(plan)
+      thresholds: ThresholdManager.apply(plan, runtimeMetadata?.journeyTransactionNames)
     };
   }
 

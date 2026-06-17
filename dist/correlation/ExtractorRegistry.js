@@ -49,3 +49,41 @@ ExtractorRegistry.register('jsonpath', (res, pattern) => {
 ExtractorRegistry.register('header', (res, pattern) => {
     return (res.headers && res.headers[pattern]) ? String(res.headers[pattern]) : null;
 });
+// LoadRunner-style left-boundary/right-boundary extraction. Pattern format:
+//   "lb=<left>;;rb=<right>"  — the value is the text strictly between them.
+// Uses ';;' as the lb/rb separator so a single ';' can appear inside a boundary.
+ExtractorRegistry.register('boundary', (res, pattern) => {
+    if (!res.body)
+        return null;
+    const lbMatch = /lb=([\s\S]*?);;rb=([\s\S]*)$/.exec(pattern);
+    if (!lbMatch)
+        return null;
+    const [, left, right] = lbMatch;
+    const body = String(res.body);
+    const start = left ? body.indexOf(left) : 0;
+    if (start === -1)
+        return null;
+    const valueStart = start + left.length;
+    const end = right ? body.indexOf(right, valueStart) : body.length;
+    if (end === -1)
+        return null;
+    return body.slice(valueStart, end);
+});
+// Cookie extraction from the response Set-Cookie header(s). Pattern = cookie name.
+ExtractorRegistry.register('cookie', (res, pattern) => {
+    if (!res.headers)
+        return null;
+    const wanted = pattern.toLowerCase();
+    for (const key of Object.keys(res.headers)) {
+        if (key.toLowerCase() !== 'set-cookie')
+            continue;
+        const firstPair = String(res.headers[key]).split(';')[0].trim();
+        const eq = firstPair.indexOf('=');
+        if (eq <= 0)
+            continue;
+        if (firstPair.slice(0, eq).toLowerCase() === wanted) {
+            return firstPair.slice(eq + 1);
+        }
+    }
+    return null;
+});

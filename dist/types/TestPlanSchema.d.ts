@@ -86,6 +86,38 @@ export interface SLADefinition {
      */
     [key: string]: number | undefined;
 }
+/**
+ * Global SLA defaults, scoped explicitly into request-level and
+ * transaction-level. Precedence is "most specific wins", per individual
+ * percentile / errorRate key:
+ *
+ *   • REQUEST-level   (HTTP `http_req_duration` / `http_req_failed`):
+ *       journey_slas[journey].pN   >   global_sla.request.pN   >   legacy flat global_sla.pN
+ *     (journey + global request thresholds are different k6 metric selectors,
+ *      so both apply; "wins" only describes which limit is the more specific.)
+ *
+ *   • TRANSACTION-level (per-transaction Trend `<txn>` / `<txn>_checkrate`):
+ *       transaction_slas[txn].pN   >   global_sla.transaction.pN
+ *     global_sla.transaction is a DEFAULT applied to every transaction of every
+ *     journey; a deliberate transaction_slas entry overrides it for that
+ *     transaction + percentile only (other percentiles still inherit the global).
+ *
+ *   • PER-REQUEST (single HTTP request submetric `http_req_duration{name:<req>}`):
+ *       request_slas[req].pN — scoped to one request name only, independent of
+ *       the request-level and transaction-level scopes above.
+ */
+export interface GlobalSLADefinition {
+    /** Legacy/request error-rate budget (percent 0–100) → http_req_failed. */
+    errorRate?: number;
+    /** Legacy/request average response time (ms) → http_req_duration avg. */
+    avgResponseTime?: number;
+    /** Request-level SLAs → http_req_duration / http_req_failed (all requests). */
+    request?: SLADefinition;
+    /** Transaction-level defaults → applied to EVERY transaction's Trend / checkrate. */
+    transaction?: SLADefinition;
+    /** Legacy flat percentile keys (p90, p95, …) — treated as REQUEST-level. */
+    [key: string]: number | SLADefinition | undefined;
+}
 export interface DebugSettings {
     /** When true, journeys run in single-purpose debug replay mode instead of normal load mode */
     enabled: boolean;
@@ -112,12 +144,19 @@ export interface TestPlan {
     user_journeys: UserJourney[];
     /** Hybrid groups (required when execution_mode = 'hybrid') */
     hybrid_groups?: HybridGroup[];
-    /** Global SLA defaults applied to all journeys */
-    global_sla?: SLADefinition;
+    /** Global SLA defaults — request-level and/or transaction-level (see GlobalSLADefinition). */
+    global_sla?: GlobalSLADefinition;
     /** Per-journey SLA overrides keyed by journey name (applies to http_req_duration{scenario:name}) */
     journey_slas?: Record<string, SLADefinition>;
     /** Per-transaction SLA overrides keyed by transaction name (applies to the Trend metric directly) */
     transaction_slas?: Record<string, SLADefinition>;
+    /**
+     * Per-request SLA overrides keyed by request name (the k6 `name` tag set via
+     * request(..., { name }) — or the URL when unnamed). Applies to the request
+     * submetric http_req_duration{name:<request>} / http_req_failed{name:<request>},
+     * so you can hold a single specific request to its own threshold.
+     */
+    request_slas?: Record<string, SLADefinition>;
     /** Max total VUs allowed across all journeys */
     max_total_vus?: number;
     /** Optional debug execution settings */
