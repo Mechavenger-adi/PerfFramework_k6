@@ -706,7 +706,9 @@ function prepareRunArtifacts(plan, resolvedConfig) {
     // With override on, reuse a single stable folder (wiped each run); otherwise
     // create a fresh timestamped folder so run history is preserved.
     const runId = override ? 'Run_latest' : `Run_${new Date().toISOString().replace(/[-:.]/g, '_')}`;
-    const reportDir = path.join(process.cwd(), baseDir, safePlanName, runId);
+    // Use resolve (not join) so an absolute K6_RESULTS_BASE_DIR is honored as-is;
+    // a relative value still resolves against the framework cwd.
+    const reportDir = path.resolve(process.cwd(), baseDir, safePlanName, runId);
     if (override && fs.existsSync(reportDir)) {
         fs.rmSync(reportDir, { recursive: true, force: true });
     }
