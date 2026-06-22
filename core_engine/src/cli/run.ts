@@ -856,6 +856,13 @@ function buildRunEnvironment(
 ): Record<string, string> {
   const transactionNames = collectUniqueTransactionNames(extractJourneyTransactionNames(plan));
 
+  // Optional .env overrides surfaced to the VU runtime. Base URLs normally come
+  // from config/environments/*.json (K6_PERF_TEAM_ENVIRONMENTS); K6_BASE_URL is
+  // an optional global fallback consumed by session.ts (resolvePath/auto-register).
+  // K6_API_KEY is exposed via getApiKey() for scripts that need an auth header.
+  const baseUrlOverride = resolvedConfig.secrets['K6_BASE_URL'];
+  const apiKey = resolvedConfig.secrets['K6_API_KEY'];
+
   return {
     K6_PERF_RUN_ID: runId,
     K6_PERF_PLAN_NAME: plan.name,
@@ -867,6 +874,8 @@ function buildRunEnvironment(
     ...(transactionNames.length > 0
       ? { K6_PERF_TRANSACTION_NAMES: JSON.stringify(transactionNames) }
       : {}),
+    ...(baseUrlOverride ? { K6_PERF_BASE_URL: baseUrlOverride } : {}),
+    ...(apiKey ? { K6_PERF_API_KEY: apiKey } : {}),
   };
 }
 
