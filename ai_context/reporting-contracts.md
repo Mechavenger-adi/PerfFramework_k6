@@ -43,6 +43,8 @@ results/<PlanName>/Run_<timestamp>/
 
 Columns configurable via `runtime.reporting.transactionStats`.
 
+**Pass/fail source (since 2026-06-15):** `pass`/`fail` come solely from the exact per-iteration `<name>_checkrate` Rate metric (`pass + fail === count` by construction). The old native-`check()`-aggregate estimation path — and the `estimated` per-row flag + file-level `hasEstimatedRows` + warning banner — was removed; `ScriptContractGuard` now rejects scripts using raw k6 `check()`/`group()`, so a checkrate always exists. A transaction lacking a checkrate renders blank rather than guessing.
+
 ## ci-summary.json Schema
 
 ```json

@@ -1247,6 +1247,10 @@ async function finalizeRunArtifacts(options: {
     executionStatus: options.runStatus,
     summaryData: summaryData as any,
     transactions: transactionMetrics,
+    // Transaction failure-rate budget: prefer the transaction-scoped SLA, fall
+    // back to the flat/legacy global errorRate. Undefined → 0 (strict) in builder.
+    transactionErrorBudget: options.plan.global_sla?.transaction?.errorRate
+      ?? options.plan.global_sla?.errorRate,
   });
   ciSummary.errorCount = eventArtifacts.errors.length;
   ciSummary.warningCount = eventArtifacts.warnings.length;

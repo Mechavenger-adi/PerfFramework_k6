@@ -4,7 +4,7 @@
 
 ## What This Is
 
-Enterprise k6 performance testing framework with LoadRunner-style lifecycle (`initPhase`/`actionPhase`/`endPhase`), HAR-to-script generation, debug replay diffing, configuration-driven execution, artifact-first reporting, and multi-team suite support.
+Enterprise k6 performance testing framework with LoadRunner-style lifecycle (`initPhase`/`actionPhase`/`endPhase`), HAR/cURL/Postman-to-script generation, **smart auto-correlation** (scan a recording for dynamic values → rewrite the script), debug replay diffing, configuration-driven execution, artifact-first reporting (time-range-responsive HTML report), runtime auto-headers + data writer, and multi-team suite support.
 
 ## Quick Stats
 
@@ -13,7 +13,7 @@ Enterprise k6 performance testing framework with LoadRunner-style lifecycle (`in
 | Package | `@k6-perf/core_engine` v1.0.0 |
 | Runtime | Node 22+, k6 (latest), TypeScript → CommonJS |
 | Layers | 15 (CLI, Config, Schemas, Types, Scenario, Execution, Runtime, Data, Recording, Correlation, Assertions, Debug, Reporters, Reporting, Utils) |
-| Source files | ~75 TypeScript files across `core_engine/src/` |
+| Source files | ~95 TypeScript files across `core_engine/src/` |
 | Phase completion | Phase 1-3 complete, Phase 4 (AI/Analytics) not started |
 | Test coverage | No unit/integration tests exist |
 

@@ -9,17 +9,40 @@ interface BuildRunSummaryOptions {
     metrics?: Record<string, { thresholds?: Record<string, { ok?: boolean }> }>;
   };
   transactions: TransactionMetricsFile;
+  /**
+   * Allowed transaction failure rate (percent 0–100), resolved from
+   * global_sla.transaction.errorRate (preferred) or the flat global_sla.errorRate.
+   * The run fails only when the observed transaction failure rate exceeds this.
+   * Defaults to 0 (any transaction failure fails the run) when not configured.
+   */
+  transactionErrorBudget?: number;
 }
 
 export class RunSummaryBuilder {
   static buildCiSummary(options: BuildRunSummaryOptions): CiSummary {
+    // Thresholds are still surfaced (table + breach events) but no longer drive
+    // the headline pass/fail — that is now governed purely by the transaction
+    // failure rate against the configured budget.
     const thresholdFailures = this.countThresholdFailures(options.summaryData.metrics ?? {});
     const failedRules = this.collectFailedThresholdRules(options.summaryData.metrics ?? {});
-    const status = options.executionStatus !== 0
+
+    // Observed transaction failure rate = Σfail / Σ(pass+fail) across transactions.
+    let txnTotal = 0;
+    let txnFail = 0;
+    for (const row of options.transactions.transactions) {
+      txnTotal += (row.pass ?? 0) + (row.fail ?? 0);
+      txnFail += row.fail ?? 0;
+    }
+    const transactionFailureRate = txnTotal > 0 ? (txnFail / txnTotal) * 100 : 0;
+    const transactionErrorBudget = options.transactionErrorBudget ?? 0;
+
+    // A genuine execution crash (k6 exit code other than 0 / 99) means the run
+    // itself did not complete and the data is unreliable — still a hard fail,
+    // independent of the SLA. Exit 99 (thresholds-only) is NOT a fail here.
+    const executionCrashed = options.executionStatus !== 0 && options.executionStatus !== 99;
+    const status = executionCrashed || transactionFailureRate > transactionErrorBudget
       ? 'failed'
-      : thresholdFailures > 0
-        ? 'failed'
-        : 'passed';
+      : 'passed';
 
     return {
       status,
@@ -27,6 +50,8 @@ export class RunSummaryBuilder {
       plan: options.planName,
       environment: options.environment,
       thresholdFailures,
+      transactionFailureRate,
+      transactionErrorBudget,
       errorCount: 0,
       warningCount: 0,
       aborted: false,

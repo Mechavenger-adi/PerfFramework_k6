@@ -30,7 +30,8 @@
     "transaction": {
       "p90": 200,
       "p99": 5000,
-      "p95": 2000
+      "p70": 2000,
+      "errorRate": 1
     }
   },
   "journey_slas": {

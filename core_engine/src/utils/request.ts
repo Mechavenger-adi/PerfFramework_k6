@@ -336,12 +336,28 @@ export function captureRequestSnapshot(
       method: context.method,
       url: context.url,
       headers: cfg.includeRequestHeaders ? context.options?.headers : undefined,
-      body: cfg.includeRequestBody ? serializeBodyForLog(context.options?.body) : undefined,
+      // Same normalization as the response body: when capture is on, emit a
+      // string ('' for a bodyless request like GET) so the report can show an
+      // explicit "(empty)" instead of hiding the section — which was
+      // indistinguishable from capture being disabled.
+      body: cfg.includeRequestBody ? (serializeBodyForLog(context.options?.body) ?? '') : undefined,
     },
     response: {
       status: context.res.status,
       headers: cfg.includeResponseHeaders ? (context.res.headers ?? undefined) : undefined,
-      body: cfg.includeResponseBody && typeof context.res.body === 'string' ? context.res.body : undefined,
+      // When body capture is enabled, ALWAYS emit a string: k6 returns `null`
+      // for a zero-length / non-text body, which previously dropped the field
+      // entirely and made an empty server response indistinguishable from a
+      // config-disabled one. Normalizing null → '' lets the report render an
+      // explicit "(empty)" instead of silently hiding the section.
+      body: cfg.includeResponseBody
+        ? (typeof context.res.body === 'string' ? context.res.body : '')
+        : undefined,
+      // k6 surfaces transport-level failure detail here (timeout, reset,
+      // refused, DNS) — the closest thing to a server "reason" for status-0
+      // and other non-body errors. Omitted when empty so happy paths stay clean.
+      error: context.res.error || undefined,
+      errorCode: context.res.error_code || undefined,
     },
   };
   console.log('[k6-perf][snapshot-event] ' + JSON.stringify(payload));

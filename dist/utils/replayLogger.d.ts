@@ -83,6 +83,22 @@ export declare function trackParameter(name: string, value: unknown, source?: st
  * will register p_username, p_password, etc. — whatever columns the CSV has.
  */
 export declare function trackDataRow(sourceName: string, rowObject: Record<string, unknown> | null): Record<string, unknown> | null;
+/**
+ * Debug-time auto-tracking hook for ANY interpolated variable — parameter OR
+ * correlation. JavaScript resolves a `${expr}` template into a plain string
+ * BEFORE request() ever sees it, so the framework can't recover which variable
+ * produced a value at runtime. To make the report's variable table reflect the
+ * real per-iteration value of every `${...}` without forcing track* calls into
+ * the user's script, the debug runner rewrites each interpolation on a throwaway
+ * COPY to `${__k6PerfTrackVar("name", (expr), "source", "type")}`.
+ *
+ * It registers the value at the exact interpolation site — fresh every iteration —
+ * and returns it UNCHANGED (registers directly, never runs the NOTFOUND/placeholder
+ * logic) so the surrounding template is byte-for-byte unaffected. Best-effort:
+ * tracking must never disturb the request being built. The user's script is never
+ * modified and needs no imports (the helper is installed on globalThis).
+ */
+export declare function trackAuto(name: string, value: unknown, source?: string, type?: 'parameter' | 'correlation'): unknown;
 export declare function createVariableEvent(name: string, type: string, action: string, value: unknown, source: string): VariableEvent;
 export declare function logReplayExchange(meta: ExchangeMeta, requestInfo: RequestInfo, response: K6Response | null | undefined): void;
 /**

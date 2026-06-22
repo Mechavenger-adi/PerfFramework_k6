@@ -422,7 +422,8 @@ export class RunReportGenerator {
     </aside>
     <main class="main">
       <section class="hero">
-        <div class="status ${this.escapeHtml(bundle.meta.status)}">${this.escapeHtml(bundle.meta.status.toUpperCase())}</div>
+        <!-- Run pass/fail is shown once, in the Summary status banner alongside
+             the health score — not duplicated here. -->
         <h1>${this.escapeHtml(bundle.meta.plan)}</h1>
         <div class="meta">
           <span>${this.escapeHtml(bundle.meta.environment)}</span>
@@ -811,11 +812,16 @@ export class RunReportGenerator {
         + '<li class="base"><span>Transactions passed</span><b>' + txnPass.toLocaleString() + ' / ' + txnTotal.toLocaleString() + '</b></li>'
         + '<li><span>Transaction failure rate</span><b>' + (txnFailRate * 100).toFixed(1) + '%</b></li>'
         + '<li class="base"><span>Health score (100 − failure rate)</span><b>' + healthScore + '</b></li></ul></details>';
+      // Pass/fail is governed by the transaction failure rate vs. the configured
+      // budget (global_sla.transaction.errorRate / global_sla.errorRate). Threshold
+      // breaches are reported in the threshold table but do not flip this status.
+      const budgetPct = ci.transactionErrorBudget != null ? ci.transactionErrorBudget : 0;
+      const failPctStr = (txnFailRate * 100).toFixed(1);
       const reason = status === 'passed'
-        ? 'All thresholds passed and no blocking failures were detected.'
-        : 'Test ' + status + ' — ' + breached.length + ' threshold violation' + (breached.length === 1 ? '' : 's')
-          + (httpFailTotal > 0 ? ' and ' + httpFailTotal.toLocaleString() + ' failed request' + (httpFailTotal === 1 ? '' : 's') : '')
-          + (ci.errorCount ? ' (' + ci.errorCount + ' error event' + (ci.errorCount === 1 ? '' : 's') + ')' : '') + '.';
+        ? 'Transaction failure rate ' + failPctStr + '% is within the ' + budgetPct + '% budget.'
+        : (txnTotal === 0
+            ? 'Run did not complete successfully — no transaction data was recorded.'
+            : 'Transaction failure rate ' + failPctStr + '% exceeds the ' + budgetPct + '% budget.');
       const bannerHtml = '<div class="status-banner ' + status + '">'
         + '<div class="sb-main"><div class="sb-status">' + escapeHtml(status) + '</div><div class="sb-reason">' + reason + '</div></div>'
         + '<div class="health"><div class="num grade-' + grade.toLowerCase() + '">' + healthScore + '<small>/100</small></div><div class="lbl">Health · ' + grade + '</div>' + breakdownHtml + '</div>'
@@ -843,18 +849,13 @@ export class RunReportGenerator {
       // ── Phase 3: KPI grid (sparklines from the windowed overview + states) ──
       const sRequests = ov.map((b) => Number(b.requests || 0));
       const sIters = ov.map((b) => Number(b.iterations || 0));
-      const sFails = ov.map((b) => Number(b.httpFailedCount || 0));
       const sRate = ov.map((b) => Number(b.requestRate || 0));
       const sRtAvg = ov.map((b) => Number(b.httpDurationAvg || 0));
-      const sFailPct = ov.map((b) => Number(b.httpFailedRate || 0) * 100);
       const sRecv = ov.map((b) => Number(b.dataReceived || 0));
       const sSent = ov.map((b) => Number(b.dataSent || 0));
       const kReq = Number(totals.requests || 0);
-      const kFail = Number(totals.httpFailures || 0);
-      const kFailPct = kReq > 0 ? (kFail / kReq) * 100 : 0;
       // Transaction-level failure rate: Σfail / Σ executions across transactions
-      // (the same signal the health score uses). Distinct from request failure %,
-      // which is the HTTP-transport failure rate.
+      // (the same signal the health score uses).
       let kTxnTotal = 0, kTxnFail = 0;
       for (const t of allTxns) { kTxnTotal += (Number(t.pass) || 0) + (Number(t.fail) || 0); kTxnFail += Number(t.fail) || 0; }
       const kTxnFailPct = kTxnTotal > 0 ? (kTxnFail / kTxnTotal) * 100 : 0;
@@ -868,8 +869,6 @@ export class RunReportGenerator {
         + kpiCard('Total Iterations', (totals.iterations || 0).toLocaleString(), { series: sIters, sparkColor: '#0a9396', trend: true })
         + kpiCard('Throughput', (kReq / Math.max(1, windowMs / 1000)).toFixed(2) + ' /s', { series: sRate, sparkColor: '#0891b2', trend: true })
         + kpiCard('Avg Response Time', Math.round(avgRt).toLocaleString() + ' ms', { series: sRtAvg, sparkColor: '#7c3aed', trend: true })
-        + kpiCard('Request Failure %', kFailPct.toFixed(1) + '%', { series: sFailPct, sparkColor: '#dc2626', state: kFailPct > 5 ? 'crit' : kFailPct > 1 ? 'warn' : 'ok' })
-        + kpiCard('Failed Requests', kFail.toLocaleString(), { series: sFails, sparkColor: '#dc2626', state: kFail > 0 ? 'crit' : 'ok' })
         + kpiCard('Transaction Failure %', kTxnFailPct.toFixed(1) + '%', { state: kTxnFailPct > 5 ? 'crit' : kTxnFailPct > 1 ? 'warn' : 'ok' })
         + kpiCard('Errors', errorCount, { state: errorCount > 0 ? 'crit' : 'ok' })
         + kpiCard('Warnings', warningCount, { state: warningCount > 0 ? 'warn' : 'ok' })
@@ -934,6 +933,7 @@ export class RunReportGenerator {
 
         <details class="card adv" style="margin-top:18px">
           <summary><span class="section-title" style="margin:0;display:inline">⚙️ Advanced Settings &amp; Configuration\${infoTip('Runtime config and how the framework invoked k6.')}</span></summary>
+          <p class="subtle" style="margin:10px 0 4px;font-size:12px;font-style:italic">ℹ️ For developer reference — the resolved runtime configuration and how the framework invoked k6. Not required for interpreting test results.</p>
           <div class="cards" style="margin:14px 0 12px">
             \${runtimeKeyLines.map(([k, v]) => '<div class="card"><h3>' + escapeHtml(k) + '</h3><strong style="font-size:14px">' + escapeHtml(String(v)) + '</strong></div>').join('')}
           </div>
@@ -1857,11 +1857,25 @@ export class RunReportGenerator {
       html += _drawerSection('Request',
         '<div class="dw-line" style="margin-bottom:8px"><strong>' + escapeHtml(String(req.method || 'REQ')) + '</strong> ' + escapeHtml(String(req.url || '—')) + '</div>'
         + (req.headers ? '<h4 style="margin:10px 0 6px">Request Headers</h4>' + _kvTable(req.headers) : '')
-        + (req.body ? '<h4 style="margin:10px 0 6px">Request Body</h4><pre>' + escapeHtml(typeof req.body === 'object' ? JSON.stringify(req.body, null, 2) : String(req.body)) + '</pre>' : ''));
+        + (req.body === undefined || req.body === null
+            ? ''
+            : '<h4 style="margin:10px 0 6px">Request Body</h4>'
+              + (typeof req.body === 'string' && req.body.length === 0
+                  ? '<div class="subtle" style="font-style:italic">(empty — no request body sent)</div>'
+                  : '<pre>' + escapeHtml(typeof req.body === 'object' ? JSON.stringify(req.body, null, 2) : String(req.body)) + '</pre>')));
       html += _drawerSection('Response',
         '<div class="dw-line" style="margin-bottom:8px">Status <span class="dw-badge" style="color:' + stColor + ';background:var(--bg-2)">' + (status != null ? status : '—') + '</span></div>'
+        + ((res.error || res.errorCode) ? '<div class="dw-line" style="margin-bottom:8px;color:var(--error)">Error: ' + escapeHtml(String(res.error || '')) + (res.errorCode ? ' (code ' + escapeHtml(String(res.errorCode)) + ')' : '') + '</div>' : '')
         + (res.headers ? '<h4 style="margin:10px 0 6px">Response Headers</h4>' + _kvTable(res.headers) : '')
-        + (res.body ? '<h4 style="margin:10px 0 6px">Response Body</h4><pre>' + escapeHtml(typeof res.body === 'object' ? JSON.stringify(res.body, null, 2) : String(res.body)) + '</pre>' : ''));
+        // Distinguish three states instead of hiding them all: a captured
+        // empty body shows "(empty)", a present body renders, and an absent
+        // field (capture disabled) shows nothing.
+        + (res.body === undefined || res.body === null
+            ? ''
+            : '<h4 style="margin:10px 0 6px">Response Body</h4>'
+              + (typeof res.body === 'string' && res.body.length === 0
+                  ? '<div class="subtle" style="font-style:italic">(empty — server returned no response body)</div>'
+                  : '<pre>' + escapeHtml(typeof res.body === 'object' ? JSON.stringify(res.body, null, 2) : String(res.body)) + '</pre>')));
       if (s.correlation && Object.keys(s.correlation).length) html += _drawerSection('Correlation Values', _kvTable(s.correlation));
       html += '<details style="margin-top:8px"><summary class="subtle" style="cursor:pointer;font-size:12.5px">Raw JSON</summary><pre style="margin-top:8px">' + escapeHtml(JSON.stringify(s, null, 2)) + '</pre></details>';
       document.getElementById('snapshot-modal-content').innerHTML = html;

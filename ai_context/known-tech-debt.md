@@ -54,11 +54,9 @@
 **Description:** Generated and converted scripts now resolve primary-host requests through environment `baseUrl`, but captured multi-origin traffic is not automatically mapped to named `serviceUrls`.
 **Impact:** Secondary domains may still remain as recorded absolute URLs unless the script explicitly uses `resolveFrameworkUrl(..., { service: 'name' })` or is manually refined.
 
-## TD9 — `config/correlation-rules/` Directory Empty
+## TD9 — `config/correlation-rules/` Directory ~~Empty~~ (RESOLVED 2026-06-15)
 
-**Severity:** Low
-**Description:** Global correlation rules directory exists but is empty. All rules live per-team in `testSuites/{team}/`.
-**Impact:** No global correlation rule sharing across teams.
+**Status:** Resolved. Now holds `auto-correlation.defaults.json` (token vocabulary + scoring thresholds for the auto-correlation scanner). Per-team rule files still live in `testSuites/{team}/`.
 
 ## TD10 — Dependent-Request Flow Control Missing
 
@@ -81,5 +79,17 @@
 ## TD13 — Backup Files in Repository
 
 **Severity:** Low (hygiene)
-**Description:** Several `.bak-*` and `.backup.*` files exist in the repo root and `core_engine/src/`.
-**Files:** `index.ts.bak-2026-04-06-reporting`, `FRAMEWORK-IMPLEMENTATION-TODO.md.bak-2026-04-06`, various others.
+**Description:** Several `.bak-*` / `.backup.*` / `.bak.<date>` files exist in the repo root and `core_engine/src/`. These are NOT part of the build — ignore them.
+**Files:** `FRAMEWORK-IMPLEMENTATION-TODO.md.bak-2026-04-06`, `core_engine/src/debug/HTMLDiffReporter.ts.bak.20260615`, `core_engine/src/reporting/RunReportGenerator.ts.bak.20260615`, various others.
+
+## TD14 — Two Correlation Systems Not Yet Reconciled
+
+**Severity:** Medium
+**Description:** The correlation layer has two subsystems: (A) the new smart auto-correlation scanner (`CorrelationScanner` + `ScriptCorrelationWriter`, runtime via `utils/extract.ts` + `trackCorrelation`) and (B) the legacy hand-authored runtime rule engine (`CorrelationEngine`/`RuleProcessor`/`FallbackHandler`), which generated scripts never call.
+**Impact:** Overlapping concepts, two mental models. Reconciling System A and System B is deferred to Phase 5 of the correlation roadmap (`.md/Correlation-Engine-Design.md`).
+
+## TD15 — Auto-Correlation `generate`/`convert` Integration Pending
+
+**Severity:** Low
+**Description:** Auto-correlation ships as a standalone `correlate` CLI. The guarded post-`generate` prompt and `convert` parity are Phase 4 (after the standalone path is verified) per `.md/Correlation-Engine-Design.md`.
+**Impact:** Users must run `correlate` as a separate step after `generate`.

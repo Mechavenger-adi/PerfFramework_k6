@@ -11,6 +11,7 @@ import { DiffChecker, DiffResult } from './DiffChecker';
 import { TaggedExchangeLogEntry } from './ExchangeLog';
 import { HTMLDiffReporter } from './HTMLDiffReporter';
 import { ScriptContractGuard } from '../config/ScriptContractGuard';
+import { instrumentVariableTracking } from './VariableInstrumenter';
 
 /** Extract transaction names declared in a script source via transaction() or startTransaction(). */
 function extractTransactionNames(source: string): string[] {
@@ -133,6 +134,28 @@ export class ReplayRunner {
     const stamp = new Date().toISOString().slice(0, 19).replace(/[-:.]/g, '_');
     const logOutputPath = path.join(tempDir, `${scriptName}_debug_${stamp}.log`);
 
+    // Auto-track every interpolated `${...}` variable for the report by running a
+    // throwaway INSTRUMENTED copy of the script — never the user's file. The copy
+    // is written beside the original (same dir) so its relative imports
+    // (`../../../dist/...`) and data paths (`../Data/*.csv`) resolve identically.
+    // Removed after the run. Falls back to the original script if anything fails.
+    let execScriptPath = absScriptPath;
+    let instrumentedScriptPath: string | undefined;
+    try {
+      const { source: instrumented, wrapped } = instrumentVariableTracking(scriptSource);
+      if (wrapped > 0) {
+        instrumentedScriptPath = path.join(
+          path.dirname(absScriptPath),
+          `.${scriptName}.__debugtrack_${stamp}.js`,
+        );
+        fs.writeFileSync(instrumentedScriptPath, instrumented, 'utf-8');
+        execScriptPath = instrumentedScriptPath;
+        Logger.detail(`Auto-tracking ${wrapped} interpolated variable(s) for the report`);
+      }
+    } catch (err) {
+      Logger.detail(`Variable auto-instrumentation skipped (${(err as Error).message}); using original script`);
+    }
+
     const outputDir = path.dirname(absHtmlPath);
     fs.mkdirSync(outputDir, { recursive: true });
 
@@ -176,7 +199,7 @@ export class ReplayRunner {
     let runResult;
     try {
       runResult = await PipelineRunner.executeAsync({
-        scriptPath: absScriptPath,
+        scriptPath: execScriptPath,
         k6Options: {
           noCookiesReset: options.noCookiesReset !== false,
           summaryTrendStats,
@@ -236,6 +259,10 @@ export class ReplayRunner {
       fileWriteSink.flushFromLog(logOutputPath);
       if (fileWriteSink.fileCount > 0) {
         Logger.detail(`Data files written (writeData): ${fileWriteSink.fileCount} file(s), ${fileWriteSink.writeCount} write(s)`);
+      }
+      // Remove the throwaway instrumented copy — always, even if k6 failed.
+      if (instrumentedScriptPath && fs.existsSync(instrumentedScriptPath)) {
+        try { fs.rmSync(instrumentedScriptPath); } catch { /* ignore */ }
       }
     }
     Logger.info(`\nk6 execution complete.\n`);

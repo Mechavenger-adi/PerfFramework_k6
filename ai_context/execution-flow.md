@@ -8,7 +8,8 @@
 1. CLI parses args (Commander)
 2. TestPlanLoader.load(planPath) → validates JSON Schema → TestPlan
 3. ConfigurationManager.resolve() → merges 6 config layers → ResolvedConfig
-4. GatekeeperValidator.validate() → pre-flight checks (scripts, weights, data)
+4. GatekeeperValidator.validate() → pre-flight checks (scripts, weights, data, journey_slas keys)
+4b. ScriptContractGuard → reject journey scripts using native k6 check()/group()
 5. Check plan.debug.enabled:
    - true  → runPlanDebugMode() (see Debug Flow below)
    - false → continue
@@ -27,6 +28,7 @@
    d. buildSummaryTrendStats() → custom percentiles for k6
 10. writeRunManifest() → run-manifest.json
 11. HostMonitor.startPeriodicSampling() (if monitoring.enabled)
+11b. FileWriteSink subscribes to LiveConsoleLogStream → persists writeData() output under run dir
 12. PipelineRunner.executeAsync() → spawns k6 with options JSON + env vars
 13. k6 executes scripts, VU lifecycle runs via lifecycle.ts
 14. HostMonitor.stop() → collects final snapshots
@@ -71,6 +73,25 @@ For each journey in plan.user_journeys:
 9. RecordingLogResolver.upsertRegistryEntry() → update .recording-index.json
 ```
 
+## Auto-Correlation Flow (`npm run cli -- correlate --script <path>`)
+
+```
+1. RecordingLogResolver.resolve() → find the recording (or use --har/--log)
+   - Reads UNSTRIPPED entries (HARParser.readEntries / raw recording-log) so
+     cookie/authorization consumer evidence survives.
+2. CorrelationScanner.scan(exchanges):
+   a. ValueIndexer → producer (response) + consumer (request) occurrences
+   b. LinkMatcher → link each consumer to its nearest-preceding producer
+   c. CandidateScorer → high/medium/low; drop noise; flag handledByJar; p_ vs c_
+   d. ExtractorSynthesizer → jsonpath/header/cookie/boundary capture per candidate
+   → CorrelationPlan (manifest, reviewable JSON)
+3. --list / --dry-run → print candidate table + write manifest (script untouched)
+   --apply high|medium|all → ScriptCorrelationWriter rewrites the generated script:
+     - emits extract*()+trackCorrelation() right after the producing request
+     - hoists c_* var to module scope, substitutes matched literal → `${c_*}`
+4. At run time, extract.ts helpers pull values; a miss degrades to {NOTFOUND:name}.
+```
+
 ## k6-Side VU Lifecycle (inside k6 runtime)
 
 ```
@@ -88,11 +109,16 @@ Default function called per VU iteration:
         - startTransaction()/endTransaction() around groups
         - logExchange() per request (gated by K6_PERF_DEBUG)
         - sleep(getFrameworkThinkTime()) between groups
-     c. End detection (getEndSignal):
-        - ramping-vus: VU target interpolation vs current VU ID
-        - per-vu-iterations: iteration count check
-        - constant-vus/shared-iterations: auto-converted to synthetic ramp-down
-     d. When end triggered → endPhase(ctx) once
+     c. End detection — PROACTIVE, onboard-ranked (V1/getEndSignal deleted 2026-06-10):
+        - On a VU's first iteration, computeEndPlan derives rank =
+          round(interpolateTarget(curve, now − scenario.startTime)), which recovers
+          k6's actual cull order (handle index) on stock k6.
+        - terminalDeadlineMs(curve, rank) = the VU's cull instant; the VU plans to
+          log out LIFECYCLE_END_SAFETY_MS (5s) before it.
+        - The transaction gate (getTransactionGate, phase-scoped to action) skips
+          remaining action transactions mid-iteration so endPhase runs promptly;
+          thinktime() also early-returns once ending. isEnding() stays for long loops.
+     d. When ending → endPhase(ctx) once
         - Logout, cleanup, etc.
      e. Error behavior enforcement (handlePhaseError):
         - continue → log, proceed

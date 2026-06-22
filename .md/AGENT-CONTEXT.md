@@ -9,9 +9,9 @@
 > 6. KEEP THE STRUCTURAL FLOW MAP UPDATED - treat it as a Tree-sitter-backed structural map of the codebase. When files, imports, module boundaries, execution flow, or ownership change, update the diagram and summary so future AI assistants get precise incremental context quickly.
 > 7. KEEP AGENT-CONTEXT AND THE FLOW DIAGRAM SYNCHRONIZED - if one changes, review the other in the same pass so AI models can use this file as a token-saving orientation layer instead of rediscovering the repo from scratch.
 
-**Last Updated:** 2026-06-01
+**Last Updated:** 2026-06-19
 **Workspace:** d:\repos\K6-PerfFramework
-**Status:** Phase 1-3 complete (54/67 items = 81%), Phase 4 not started
+**Status:** Phase 1-3 complete (54/67 items = 81%), Phase 4 not started. Recent: smart auto-correlation subsystem (`correlate` CLI), auto-headers + runtime data writer, script contract guard, request/transaction-scoped + per-request SLAs, time-range-responsive HTML report.
 
 ---
 
@@ -60,6 +60,7 @@ npm run cli -- import curl <team> <name> --curl '<curl>'       # cURL string →
 npm run cli -- import curl <team> <name> --file <path>         # Multi-curl file (blank-line separated, `# name` comments) → script
 npm run cli -- import postman <team> <name> --file <coll.json> # Postman v2.1 collection → framework script (Phase 2)
 npm run cli -- import postman <team> <name> --file <coll.json> --folder <name>  # Filter to a single top-level folder
+npm run cli -- correlate --script <path> [--har <p> | --log <p>] [--list | --apply high|medium|all] [--dry-run] [--out <p>]  # Smart auto-correlation: scan a recording for dynamic values → manifest → rewrite script
 npm run cli -- validate --plan <path>                          # Pre-flight check
 npm run cli -- run --plan <path> [--debug]                     # Execute test plan through k6
 npm run cli -- debug --script <path>                           # Single-iteration debug replay → HTML diff report
@@ -227,7 +228,9 @@ flowchart LR
     DEBUGCLI["debug command"]
     GENERATE["generate.ts"]
     CONVERT["convert.ts"]
-    INIT["init.ts / generate-byos.ts"]
+    CORRELATE["correlate.ts (auto-correlation)"]
+    IMPORTCLI["import.ts (curl / postman)"]
+    INIT["init.ts / generate-byos.ts / interactive.ts"]
   end
 
   subgraph Config["Config Layer"]
@@ -255,6 +258,8 @@ flowchart LR
     JA["JourneyAllocator"]
     PR["PipelineRunner"]
     HM["HostMonitor"]
+    FWS["FileWriteSink (writeData)"]
+    LCLS["LiveConsoleLogStream"]
   end
 
   subgraph Runtime["Runtime + Suite Runtime Helpers"]
@@ -273,10 +278,17 @@ flowchart LR
     DP["DataPoolManager"]
     DV["DataValidator"]
     DYN["DynamicValueFactory"]
-    CE["CorrelationEngine"]
+    CE["CorrelationEngine (legacy runtime)"]
     EXTR["ExtractorRegistry"]
     FH["FallbackHandler"]
     RP["RuleProcessor"]
+    SCAN["CorrelationScanner"]
+    VIDX["ValueIndexer"]
+    LM["LinkMatcher"]
+    CScore["CandidateScorer"]
+    ESYN["ExtractorSynthesizer"]
+    SCW["ScriptCorrelationWriter"]
+    CMAN["CorrelationManifest"]
   end
 
   subgraph Recording["Recording + Conversion"]
@@ -371,6 +383,22 @@ flowchart LR
   CONVERT --> K6UTIL
   INIT --> TESTS
   INIT --> K6UTIL
+  IMPORTCLI --> SG
+
+  CORRELATE --> SCAN
+  CORRELATE --> RLR
+  SCAN --> VIDX
+  SCAN --> LM
+  SCAN --> CScore
+  SCAN --> ESYN
+  SCAN --> CMAN
+  CMAN --> SCW
+  SCW --> TESTS
+  RECORDINGS --> SCAN
+
+  PR --> LCLS
+  LCLS --> FWS
+  FWS --> AW
 
   CM --> SV
   CM --> ER
@@ -444,6 +472,7 @@ flowchart LR
 | GatekeeperValidator.ts | `GatekeeperValidator` | Pre-flight checklist (doesn't short-circuit). Checks: env config, scripts exist, weights, recording logs, data dirs, hybrid config. Returns `GatekeeperResult { passed, failures[], warnings[] }` |
 | RuntimeConfigManager.ts | `RuntimeConfigManager` | Accessor for runtime settings: `getThinkTimeSeconds()`, `isPacingEnabled()`, `getPacingIntervalMs()`, `getTimeoutMs()`, `getMaxRedirects()`, `shouldThrowOnError()`, `getErrorBehavior()`, `isDebugMode()`, `dump()` |
 | SchemaValidator.ts | `SchemaValidator` | AJV-based. Methods: `validateRuntime(data)`, `validatePlan(data)`. Returns `ValidationResult { valid, errors[] }`. Defines `RUNTIME_SETTINGS_SCHEMA` and `TEST_PLAN_SCHEMA` |
+| ScriptContractGuard.ts | (functions) | Pre-flight guard that scans journey scripts for **native k6 APIs that break accurate reporting** — bare `check()` and `group()` imported from `'k6'`. The framework reports exact per-iteration pass/fail from the `<name>_checkrate` Rate metric, which only exists when checks go through `k6Check()`/`transaction()`; native `check`/`group` bypass it. Returns `FileViolations { file, violations: ApiViolation[] }` with each call site (line + comment-stripped text) and the framework replacement to use. Run from `run.ts` before execution. (Replaces the old silent group/check fallbacks — see CHANGE LOG 2026-06-15.) |
 
 **Config merge order:** FRAMEWORK_DEFAULTS → environment JSON → runtime JSON → suite config → CLI overrides → .env secrets
 
@@ -467,6 +496,7 @@ flowchart LR
 | JourneyAllocator.ts | `JourneyAllocator` | `allocate(journeys, totalVUs)` → weight-based VU distribution (min 1 each, respects explicit overrides, handles rounding). `printTable()` → formatted allocation output |
 | ParallelExecutionManager.ts | `ParallelExecutionManager` | `resolve(plan)` → K6Options (scenarios + thresholds). `extractMaxVUs()` → peak VU from load profile. `scaleProfileToVUs()` → proportional scaling preserving stage ratios |
 | PipelineRunner.ts | `PipelineRunner` | `run(options)` → spawns k6 with `stdio: 'inherit'`, exits with k6 status. `execute(options)` → writes temp JSON, spawns k6 via `spawnSync`, captures stdout/stderr to files, returns PipelineRunResult. `ensureSuccess()`, `printCapturedOutput()`. Execution details (`Logger.info`) suppressed when `captureOutput: true` (debug mode — progress phases provide status instead) |
+| FileWriteSink.ts | `FileWriteSink` | Runner-side consumer for `writeData()` (Proposal 7). Subscribes to the live k6 console stream (`LiveConsoleLogStream`); for each tagged `__K6PERF_FILE__{…}` line writes/appends the payload to a file confined under the run's output dir. A single sink instance serializes every VU's writes so concurrent same-file appends stay ordered and intact (first touch truncates, later touches append). Supports append/overwrite + utf8/base64. Pairs with `utils/dataWriter.ts`. |
 
 ### 4. DATA LAYER (`core_engine/src/data/`)
 
@@ -479,17 +509,35 @@ flowchart LR
 
 ### 5. CORRELATION LAYER (`core_engine/src/correlation/`)
 
+This layer has **two distinct subsystems**. Full design in `.md/Correlation-Engine-Design.md`.
+
+**(A) Smart auto-correlation scanner (current focus).** Detects dynamic values (CSRF/JWT/session/viewstate/etc.) from a recording with **no hand-written rules**, then captures-and-substitutes them into a generated script so it replays under load without manually patching expired tokens (LoadRunner-style "Scan for Correlations"). Standalone and additive — driven by the new `correlate` CLI; `generate`/`convert`/`ScriptGenerator` are untouched. Runtime mechanism reuses System B (`trackCorrelation` + the new VU-safe `utils/extract.ts` helpers). Auto-applies `high` confidence only; `medium`/`low` listed for review.
+
+| File | Export | Purpose |
+|------|--------|---------|
+| CorrelationScanner.ts | `CorrelationScanner` | Orchestrator: `RecordingExchange[]` → `CorrelationPlan`. Runs ValueIndexer → LinkMatcher → CandidateScorer → ExtractorSynthesizer. |
+| ValueIndexer.ts | `ValueIndexer` | Per response builds **producer** occurrences (JSON leaves, headers, set-cookie, HTML hidden/meta tokens, with left/right context); per request builds **consumer** occurrences (url path, query, body, headers, cookies). |
+| LinkMatcher.ts | `LinkMatcher` | Links each consumer value to its **nearest preceding** producer (responseIndex < requestIndex); groups consumers sharing `(value, producer)` into one candidate (handles token rotation). |
+| CandidateScorer.ts | `CandidateScorer` | Heuristics → `high\|medium\|low`. Rejects low-entropy/too-short unless the key name hits the dynamic vocab; rejects values seen before any response produced them (inputs/constants → `p_` not `c_`); flags cookie→cookie-only as `handledByJar` (k6 jar replays them); boosts vocab hits + JWT/UUID/hex shapes + single-use. Vocab/thresholds from `config/correlation-rules/auto-correlation.defaults.json`. |
+| ExtractorSynthesizer.ts | `ExtractorSynthesizer` | Picks the most robust capture: `jsonpath`/`header`/`cookie`/`boundary`(regex, left+right boundary widened until value is uniquely located). Names the var `c_<derived>` (deduped). |
+| ScriptCorrelationWriter.ts | `ScriptCorrelationWriter` | **Post-processor** on an already-generated script — never touches ScriptGenerator. Anchors on the stable `replay: { id: "req_N" }` markers + `const resK = request(` naming. Emits the `extract*`+`trackCorrelation` capture right after the producing request (var hoisted to module scope), and rewrites the matched literal into a template literal referencing `c_*`. |
+| CorrelationManifest.ts | (types + io) | Types `RecordingExchange`, `CorrelationCandidate`, `CorrelationPlan` + load/save. The plan/manifest is a **design-time reviewable artifact**, not a runtime input. |
+
+**(B) Legacy runtime rule engine** (hand-authored rules; generated scripts never call it — retained, slated to reconcile with A in a later phase).
+
 | File | Class | Purpose |
 |------|-------|---------|
-| CorrelationEngine.ts | `CorrelationEngine` | `constructor(rules)`, `process(response)` → extracts tokens using registered extractors + fallback, `get(name)` → retrieve value, `dump()` → all stored values |
-| ExtractorRegistry.ts | `ExtractorRegistry` | `register(type, fn)`, `get(type)`. Built-in: `regex` (regex match), `jsonpath` (dot-notation), `header` (HTTP header). Interface: `K6ResponseLike { status, body, headers, json() }` |
-| FallbackHandler.ts | `FallbackHandler` | `handle(rule)` → on extraction failure: `fail`/`isCritical` throws, `default` returns defaultValue, otherwise empty string |
-| RuleProcessor.ts | `RuleProcessor` | `loadRules(filePath)` → JSON array of `CorrelationRule { name, source('body'|'header'), extractor('regex'|'jsonpath'|'header'), pattern, fallback('default'|'skip'|'fail'), defaultValue?, isCritical? }` |
+| CorrelationEngine.ts | `CorrelationEngine` | `constructor(rules)`, `process(response)` → extracts tokens using registered extractors + fallback, `get(name)`, `dump()` |
+| ExtractorRegistry.ts | `ExtractorRegistry` | `register(type, fn)`, `get(type)`. Built-in: `regex`, `jsonpath` (dot-notation), `header`; now also `cookie` + `boundary`. Interface: `K6ResponseLike { status, body, headers, json() }` |
+| FallbackHandler.ts | `FallbackHandler` | `handle(rule)` → on failure: `fail`/`isCritical` throws, `default` returns defaultValue, otherwise empty string |
+| RuleProcessor.ts | `RuleProcessor` | `loadRules(filePath)` → JSON array of `CorrelationRule { name, source('body'|'header'), extractor, pattern, fallback, defaultValue?, isCritical? }` |
 
-**Correlation Rule Example:**
+**Correlation Rule Example (legacy engine):**
 ```json
 {"name": "csrfToken", "source": "body", "extractor": "jsonpath", "pattern": "csrfToken", "fallback": "fail", "isCritical": true}
 ```
+
+> CLI: `core_engine/src/cli/correlate.ts` registers the standalone `correlate` subcommand (scan/list/dry-run/apply). Recording log auto-resolved from `--script` via `RecordingLogResolver` when `--har`/`--log` omitted. **Trap:** the scanner runs on `HARParser.readEntries` (unstripped) or the raw recording-log — never on `HARParser.parse()` output, which strips `cookie`/`authorization` headers and would delete consumer evidence.
 
 ### 6. RECORDING LAYER (`core_engine/src/recording/`)
 
@@ -537,7 +585,7 @@ flowchart LR
 |------|-------|---------|
 | ArtifactWriter.ts | `ArtifactWriter` | Writes JSON/NDJSON artifact files into the run folder |
 | EventArtifactBuilder.ts | `EventArtifactBuilder` | Builds structured `errors.ndjson` and `warnings.ndjson` payloads from run/debug output |
-| TransactionMetricsBuilder.ts | `TransactionMetricsBuilder` | Produces transaction-level metrics JSON and console-friendly transaction summaries. **Pass/fail source of truth — two-path resolution:** (1) PREFERRED — per-iteration Rate metric `<name>_checkrate` emitted by `transaction()` (exact iteration-level counts; `pass + fail === count` by construction). (2) FALLBACK — for runs / scripts without the Rate metric, estimates from native k6 check aggregates: `fail = min(count, max(check.fails))`. The fallback is **not** a tight bound in either direction — it under-counts when failures span multiple checks and over-counts when a single check runs more than once per iteration (capped at `count`). Rows on the fallback path are stamped `estimated: true`; the file gets `hasEstimatedRows: true` and a run-level warning fires (console + `warnings.ndjson` + report banner). `count` continues to come from the `<name>_count` Counter. See Proposal 3 in `ai_context/design-proposals.md`. |
+| TransactionMetricsBuilder.ts | `TransactionMetricsBuilder` | Produces transaction-level metrics JSON and console-friendly transaction summaries. **Pass/fail is now single-source, no estimation:** counts come straight from the per-iteration Rate metric `<name>_checkrate` emitted by `transaction()` (exact; `pass + fail === count` by construction, `count` from the `<name>_count` Counter). The old native-`check()`-aggregate fallback (and the `estimated`/`hasEstimatedRows` flags + warning banner) was **removed** — the pre-flight `ScriptContractGuard` rejects scripts that use raw k6 `check()`/`group()`, so every transaction always has a checkrate; a transaction with no checkrate simply renders blank rather than guessing. See Proposal 3 in `ai_context/design-proposals.md` and CHANGE LOG 2026-06-15. |
 | RunSummaryBuilder.ts | `RunSummaryBuilder` | Produces CI-focused summary payloads (`ci-summary.json`) from k6 summary data |
 | RunReportGenerator.ts | `RunReportGenerator` | Builds the unified `RunReport.html` artifact and its tabs/sections |
 | TimeseriesArtifactBuilder.ts | `TimeseriesArtifactBuilder` | Builds persisted `timeseries.json` data for graphs, events, and system-series support. **Wave 1 (Proposal 5):** Now async. When a `metricsStreamPath` is supplied AND parseable, delegates to `TimeseriesStreamParser` to produce per-bucket aggregates for the entire run — req/s, HTTP duration percentiles, VUs, iterations, data in/out, per-transaction duration & checkrate. Falls back to the legacy single-endTime point shape when the stream file is missing/unreadable so older runs still render. |
@@ -565,13 +613,17 @@ flowchart LR
 | replayLogger.ts | `logReplayExchange`, `logExchange`, `trackCorrelation`, `trackParameter`, `trackDataRow`, `createVariableEvent` | k6-side logging. Outputs `[k6-perf][replay-log]` JSON with: harEntryId, transaction, iteration, VU, request/response details, headers, cookies, body. `trackCorrelation(name, value, source)` / `trackParameter(name, value, source)` register variables in `_variableRegistry`. `trackDataRow(sourceName, rowObject)` bulk-registers all CSV columns as parameters. `logExchange` auto-detects variable usage by scanning request URL/body/headers for registered values (via `detectVariableEvents()`). Body values stringified defensively (`typeof body === 'object' ? JSON.stringify(body) : String(body)`). **Binary body detection:** `binaryBodyPlaceholder(url, responseHeaders)` checks Content-Type (image/audio/video/font + common binary MIME types) and URL extension (.png/.ttf/.woff2/etc.) — replaces body with `[binary: content-type]` placeholder to prevent JSON serialization failures. Cookie extraction: `extractJarCookies(url)` uses `http.cookieJar().cookiesForURL()` for auto-managed cookies, `extractK6ResponseCookies(resCookies)` for k6's parsed `res.cookies` object. Tracks per-iteration state and request sequencing |
 | session.ts | `registerBaseUrl`, `clearCookies`, `deleteCookie` | k6-side cookie management utilities. **URL registry pattern:** `_registeredUrls` Set tracks all known base URLs. `registerBaseUrl(url)` adds a URL to the registry (called automatically by generated/converted scripts at module init). `clearCookies(...urls)` clears the VU's cookie jar — with no arguments, clears all registered URLs; with arguments, clears only the given URLs. `deleteCookie(url, name)` removes a specific named cookie. Used by framework to support per-journey cookie control when `noCookiesReset` is true globally but individual journeys need session resets. |
 | lifecycle.ts | `createJourneyLifecycleStore`, `runJourneyLifecycle`, `getFrameworkThinkTime` | k6-side lifecycle orchestration. Manages `initPhase`, `actionPhase`, `endPhase` execution, pacing, and error behavior. `getFrameworkThinkTime()` reads the thinkTime config from `K6_PERF_RUNTIME_METADATA` env var and returns the appropriate sleep duration in seconds — supports `fixed` (default 1s) and `random` (random in [min, max], defaults 0.5–3s) modes. Used by generated/converted scripts via `sleep(getFrameworkThinkTime())` between transaction groups. |
+| extract.ts | **k6** | VU-safe, fs-free correlation extractors emitted by auto-correlation: `extractJson(res, locator)`, `extractRegex`, `extractHeader`, `extractCookie`, `extractBoundary(res, left, right)`. Pair with `trackCorrelation()` so a miss degrades to a visible `{NOTFOUND:name}` placeholder. Re-exported from `index.ts`. |
+| autoHeaders.ts | **k6** | LoadRunner `web_add_auto_header` parity. `addAutoHeader(name, value)` / `addAutoHeaders(obj)` register headers applied to **every subsequent** `request()` for the VU's lifetime (across iterations/phases); `addHeaderOnce` applies to the next request only; `removeAutoHeader` / `clearAutoHeaders` / `getAutoHeaders`. Per-VU isolated (module scope), case-insensitive names. Merged into outgoing requests by `request.ts`. |
+| dataWriter.ts | **k6** | Runtime data writer (Proposal 7). `writeData(file, data, opts)` lets a VU "write a file" despite k6's no-fs sandbox by emitting a tagged `__K6PERF_FILE__{…}` console line that the runner-side `FileWriteSink` tails and writes under the run's output dir. Opts: `mode` append/overwrite, `encoding` utf8/base64, `perVU` (weave VU id into filename). Concurrent same-file writes serialized runner-side. |
+| LiveConsoleLogStream.ts | Node | Tails the live k6 console output during a run and fans out lines to subscribers (e.g. `FileWriteSink`, live transaction view). The IPC channel for VU→runner side effects. |
 
 ### 13. TYPES (`core_engine/src/types/`)
 
 | File | Key Exports |
 |------|-------------|
 | ConfigContracts.ts | `EnvironmentConfig` (name, baseUrl, serviceUrls, custom), `RuntimeSettings` (thinkTime, pacing, http, errorBehavior, debugMode), `ResolvedConfig` (merged output), `ThinkTimeConfig`, `PacingConfig`, `HttpConfig`, `ErrorBehavior` ('continue'\|'stop_iteration'\|'stop_test'), `FRAMEWORK_DEFAULTS` constant |
-| TestPlanSchema.ts | `TestPlan`, `UserJourney`, `GlobalLoadProfile`, `LoadStage`, `ExecutionMode` ('parallel'\|'sequential'\|'hybrid'), `ExecutorType` (6 k6 types), `WorkloadModelType` ('load'\|'stress'\|'soak'\|'spike'\|'iteration'), `SLADefinition` (p95/p90/errorRate/avgResponseTime), `DebugSettings`, `HybridGroup`, `DataOverflowStrategy` ('terminate'\|'cycle'\|'continue_with_last') |
+| TestPlanSchema.ts | `TestPlan`, `UserJourney`, `GlobalLoadProfile`, `LoadStage`, `ExecutionMode` ('parallel'\|'sequential'\|'hybrid'), `ExecutorType` (7 k6 types), `WorkloadModelType` ('load'\|'stress'\|'soak'\|'spike'\|'iteration'), `SLADefinition` (arbitrary percentile keys + errorRate/avgResponseTime), `GlobalSLADefinition` (request-level + transaction-level scoping — see KEY TYPES), `DebugSettings`, `HybridGroup`, `DataOverflowStrategy` ('terminate'\|'cycle'\|'continue_with_last'). `TestPlan` also carries `journey_slas`, `transaction_slas`, and `request_slas`. |
 | HARContracts.ts | `HAREntry` (id, method, url, headers, postData, status, responseHeaders, responseBody, pageref, startedDateTime, time, mimeType, host, encoding), `HARRefinementOptions` (allowedDomains, excludeStaticAssets, stripHeaders) |
 
 ---
@@ -586,7 +638,10 @@ flowchart LR
   execution_mode: 'parallel' | 'sequential' | 'hybrid';
   global_load_profile: GlobalLoadProfile;
   user_journeys: UserJourney[];
-  global_sla?: SLADefinition;
+  global_sla?: GlobalSLADefinition;          // request-level and/or transaction-level defaults
+  journey_slas?: Record<string, SLADefinition>;      // per-journey scenario thresholds
+  transaction_slas?: Record<string, SLADefinition>;  // per-transaction (Trend / checkrate)
+  request_slas?: Record<string, SLADefinition>;      // per-request name (http_req_duration{name:<req>})
   debug?: DebugSettings;
   noCookiesReset?: boolean;         // default true — cookies persist across iterations
 }
@@ -648,12 +703,29 @@ flowchart LR
 ### SLADefinition
 ```typescript
 {
-  p95?: number;              // milliseconds
-  p90?: number;              // milliseconds
+  // Arbitrary percentile keys (p90, p95, p99, …) → milliseconds
+  p95?: number;
+  p90?: number;
   errorRate?: number;        // percentage
   avgResponseTime?: number;  // milliseconds
 }
 ```
+
+### GlobalSLADefinition (global_sla)
+Scopes global defaults explicitly into request-level vs transaction-level; precedence is "most specific wins" **per percentile key**.
+```typescript
+{
+  errorRate?: number;        // legacy/request error-rate budget → http_req_failed
+  avgResponseTime?: number;  // legacy/request avg → http_req_duration avg
+  request?: SLADefinition;   // request-level → http_req_duration / http_req_failed (all requests)
+  transaction?: SLADefinition; // DEFAULT applied to EVERY transaction's Trend / <txn>_checkrate
+  [pKey]?: number;           // legacy flat p90/p95/… → treated as REQUEST-level
+}
+```
+- Request precedence:  `journey_slas[j].pN` > `global_sla.request.pN` > legacy flat `global_sla.pN` (journey + global are different k6 selectors, so both apply).
+- Transaction precedence: `transaction_slas[txn].pN` > `global_sla.transaction.pN` (global transaction is a per-percentile default).
+- Per-request: `request_slas[req].pN` → `http_req_duration{name:<req>}`, independent of the above.
+- Journey-SLA gatekeeping: `GatekeeperValidator` validates `journey_slas` keys against declared journeys before run (see CHANGE LOG 2026-06-13).
 
 ---
 
@@ -2126,3 +2198,24 @@ npm run cli -- run --plan config/test_plans/debug_test.json
 - **Follow-up fix (same day): `thinktime()` skips once ending.** A 20-VU run still dropped 1/20 logout. Root cause: the transaction gate skips remaining action transactions when a VU is ending, but the `thinktime()` sleeps *between* them kept running, so a long final transaction (a VU's `add_to_cart` hung ~60s at the HTTP timeout — matrix max=60208ms) plus leftover think times overran `deadline + gracefulRampDown` and k6 force-killed the VU before `endPhase`. Fix: `thinktime()` early-returns when `_currentPhase === 'action' && isEndDueBefore()`. Verified: synthetic ramp with a tight 4s `gracefulRampDown` + 3s think times now logs out 5/5 across runs.
 - **Residuals (k6-structural):** (1) a **single transaction longer than `gracefulRampDown`** (an HTTP call hanging to `http.timeoutSeconds`, default 60s) can't be saved — k6 force-kills mid-transaction. Mitigate by lowering `http.timeoutSeconds` or raising `gracefulRampDown` above the worst-case single-transaction time. (2) simultaneous onboardings (`startVUs > 0` / very steep ramp) share a rank → that block front-loads its logout (safe — all log out before any cull — just not gradual). (3) Multi-ramp recycling makes re-onboard ranks approximate. `gracefulRampDown`/`gracefulStop` are the net. Not patchable in-script (handle index hidden); not worth forking k6.
 - **Backward compatibility:** Script contract unchanged (`initPhase`/`actionPhase`/`endPhase` + `default`). Removing the toggle is safe because V2 is strictly better and was already validated; any `lifecycle.v2` key left in a user's runtime settings is now rejected by the schema (additionalProperties:false) — remove it.
+
+### 2026-06-12 — Auto Headers + Runtime Data Writer (Proposal 7)
+- **What:** Two new VU-safe runtime capabilities, both re-exported from `index.ts`.
+- **Auto headers (`core_engine/src/utils/autoHeaders.ts`):** LoadRunner `web_add_auto_header` parity. `addAutoHeader`/`addAutoHeaders` register headers applied to **every subsequent** `request()` for the VU's lifetime; `addHeaderOnce` for the next request only; `removeAutoHeader`/`clearAutoHeaders`/`getAutoHeaders`. Per-VU isolated (k6 module scope), case-insensitive. `utils/request.ts` merges the registered headers into each outgoing request (explicit per-call headers win).
+- **Runtime data writer (`core_engine/src/utils/dataWriter.ts` + `core_engine/src/execution/FileWriteSink.ts`):** `writeData(file, data, { mode, encoding, perVU })` lets a VU write files despite k6's no-fs sandbox — it emits a tagged `__K6PERF_FILE__{…}` console line that the runner-side `FileWriteSink` (subscribed to `LiveConsoleLogStream`) tails and writes under the run's output dir. A single sink instance serializes all VUs' writes (ordered, intact); first touch truncates, later touches append. `run.ts` wires the sink into the live stream; `ReplayRunner` does the same for debug.
+
+### 2026-06-13 — Journey-SLA gatekeeping + request/transaction-scoped SLAs; transaction metrics responsive to time range
+- **SLA model (`core_engine/src/types/TestPlanSchema.ts`):** `global_sla` is now `GlobalSLADefinition` — split into `request` (→ `http_req_duration`/`http_req_failed` for all requests) and `transaction` (a per-percentile default applied to **every** transaction's Trend / `<txn>_checkrate`), keeping legacy flat percentile keys as request-level. New `request_slas` keyed by request `name` tag → `http_req_duration{name:<req>}` so a single request can hold its own threshold. Precedence is "most specific wins" per percentile: `journey_slas[j]` > `global_sla.request` > legacy flat; `transaction_slas[txn]` > `global_sla.transaction`.
+- **ThresholdManager:** translates the new scopes into k6 thresholds (gateway-check style).
+- **GatekeeperValidator:** new pre-flight check validates `journey_slas` keys against declared journeys (catches typo'd journey names before a run).
+- **RunReportGenerator:** transaction metrics in the HTML report are now responsive to the global time-range selection (drag-zoom / saved interval rescopes per-transaction rows, not just HTTP charts).
+
+### 2026-06-15 — Smart auto-correlation subsystem + ScriptContractGuard + enhanced reports + PathResolver relative/full paths
+- **Smart auto-correlation (`correlate` CLI, `core_engine/src/correlation/` + `cli/correlate.ts` + `utils/extract.ts`):** LoadRunner-style "Scan for Correlations". A scanner discovers dynamic values from a recording with **no hand-written rules**, emits a reviewable manifest (`CorrelationPlan`), and a post-processor rewrites the generated script to capture-and-substitute them so it replays under load. Standalone + additive — `generate`/`convert`/`ScriptGenerator` untouched. New files: `CorrelationScanner`, `ValueIndexer`, `LinkMatcher`, `CandidateScorer`, `ExtractorSynthesizer`, `ScriptCorrelationWriter`, `CorrelationManifest` (Node) + `utils/extract.ts` (k6: `extractJson/Regex/Header/Cookie/Boundary`, paired with `trackCorrelation` for `{NOTFOUND:…}` graceful misses). Auto-applies `high` confidence only; `medium`/`low` listed for review. `cookie→cookie-only` matches flagged `handledByJar` (k6 jar replays them). Scanner reads **unstripped** entries (`HARParser.readEntries` / raw recording-log) so `cookie`/`authorization` evidence survives. `ExtractorRegistry` gained `cookie` + `boundary` extractors. Full design: `.md/Correlation-Engine-Design.md`. See section 5 (CORRELATION LAYER).
+- **ScriptContractGuard (`core_engine/src/config/ScriptContractGuard.ts`):** pre-flight guard run from `run.ts` that rejects journey scripts using native k6 `check()`/`group()` (imported from `'k6'`), pointing the author to `k6Check()`/`transaction()`. Reports every call site (line + comment-stripped text).
+- **Transaction pass/fail fallback removed (`TransactionMetricsBuilder`):** because the guard guarantees every transaction goes through `transaction()`/`k6Check()`, the old native-`check()`-aggregate estimation path (and the `estimated`/`hasEstimatedRows` flags + warning banner) was deleted. Pass/fail now comes solely from the exact `<name>_checkrate` Rate metric; a transaction without a checkrate renders blank instead of guessing.
+- **Enhanced custom + debug reports:** `RunReportGenerator` and `HTMLDiffReporter` got further UI/structure work (pre-rewrite copies saved as `*.ts.bak.20260615` in the tree — these `.bak` files are NOT part of the build; ignore them).
+- **PathResolver:** now resolves both relative and full/absolute paths (previously testSuites-relative only).
+
+### 2026-06-19 — AI Context / AGENT-CONTEXT refresh
+- **What:** Synced `.md/AGENT-CONTEXT.md` + `ai_context/` with code as of commit `61c854e`. Documented the auto-correlation subsystem (layer 5 rewritten into A: scanner / B: legacy engine), `ScriptContractGuard` (config layer), `FileWriteSink` (execution), `autoHeaders`/`dataWriter`/`extract`/`LiveConsoleLogStream` (utils), the `GlobalSLADefinition` request/transaction scoping + `request_slas`, the transaction-metrics fallback removal, and the `correlate` CLI. Updated the structural flow map (new CLI/scanner/sink nodes + edges) and `ai_context/module-map.md` + `overview.md`.

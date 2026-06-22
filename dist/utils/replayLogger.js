@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.trackCorrelation = trackCorrelation;
 exports.trackParameter = trackParameter;
 exports.trackDataRow = trackDataRow;
+exports.trackAuto = trackAuto;
 exports.createVariableEvent = createVariableEvent;
 exports.logReplayExchange = logReplayExchange;
 exports.logExchange = logExchange;
@@ -20,6 +21,29 @@ const iterationState = {};
 // logExchange auto-detects 'used' events by scanning request url/body/headers
 // for any registered value, eliminating the need for static variableEvents arrays.
 const _variableRegistry = {};
+// "Generic" sources are the non-descriptive placeholders the framework uses when
+// no real source was given: the ctx sub-object name (correlation/data/session/
+// meta) and the auto-track fallbacks (auto/expression/parameter). A generic
+// source must NEVER overwrite a specific one a caller already recorded — e.g. an
+// explicit trackCorrelation("tok", v, "body") must keep "body" even though the
+// ctx.correlation Proxy and the debug auto-tracker both re-register "tok" with
+// the generic "correlation" afterwards.
+const _GENERIC_SOURCES = new Set([
+    'correlation', 'data', 'session', 'meta', 'auto', 'expression', 'parameter',
+]);
+/**
+ * Resolve the source to store for a variable. A specific (non-generic) source
+ * always wins; a generic incoming source is kept only when nothing more specific
+ * was registered before. This keeps the report's Source column showing the real
+ * extraction source the script declared, not the internal placeholder.
+ */
+function resolveVariableSource(name, incoming) {
+    const existing = _variableRegistry[name];
+    if (existing && _GENERIC_SOURCES.has(incoming) && !_GENERIC_SOURCES.has(existing.source)) {
+        return existing.source;
+    }
+    return incoming;
+}
 /**
  * Best-effort: pull the first user-script frame (path:line[:col]) out of a fresh
  * stack trace, skipping framework internals (dist/utils) and k6 runtime frames.
@@ -89,7 +113,12 @@ function trackCorrelation(name, value, source) {
         }
         catch { /* logging is best-effort */ }
     }
-    _variableRegistry[name] = { name, type: 'correlation', value: String(resolved), source: source || 'body' };
+    _variableRegistry[name] = {
+        name,
+        type: 'correlation',
+        value: String(resolved),
+        source: resolveVariableSource(name, source || 'body'),
+    };
     return resolved;
 }
 /**
@@ -98,7 +127,12 @@ function trackCorrelation(name, value, source) {
  */
 function trackParameter(name, value, source) {
     const v = value === undefined || value === null ? '' : String(value);
-    _variableRegistry[name] = { name, type: 'parameter', value: v, source: source || 'data' };
+    _variableRegistry[name] = {
+        name,
+        type: 'parameter',
+        value: v,
+        source: resolveVariableSource(name, source || 'data'),
+    };
     return value;
 }
 /**
@@ -112,10 +146,48 @@ function trackDataRow(sourceName, rowObject) {
         return rowObject;
     for (const [key, val] of Object.entries(rowObject)) {
         const v = val === undefined || val === null ? '' : String(val);
-        _variableRegistry[key] = { name: key, type: 'parameter', value: v, source: sourceName || 'data' };
+        _variableRegistry[key] = {
+            name: key,
+            type: 'parameter',
+            value: v,
+            source: resolveVariableSource(key, sourceName || 'data'),
+        };
     }
     return rowObject;
 }
+/**
+ * Debug-time auto-tracking hook for ANY interpolated variable — parameter OR
+ * correlation. JavaScript resolves a `${expr}` template into a plain string
+ * BEFORE request() ever sees it, so the framework can't recover which variable
+ * produced a value at runtime. To make the report's variable table reflect the
+ * real per-iteration value of every `${...}` without forcing track* calls into
+ * the user's script, the debug runner rewrites each interpolation on a throwaway
+ * COPY to `${__k6PerfTrackVar("name", (expr), "source", "type")}`.
+ *
+ * It registers the value at the exact interpolation site — fresh every iteration —
+ * and returns it UNCHANGED (registers directly, never runs the NOTFOUND/placeholder
+ * logic) so the surrounding template is byte-for-byte unaffected. Best-effort:
+ * tracking must never disturb the request being built. The user's script is never
+ * modified and needs no imports (the helper is installed on globalThis).
+ */
+function trackAuto(name, value, source, type) {
+    try {
+        const v = value === undefined || value === null ? '' : String(value);
+        _variableRegistry[name] = {
+            name,
+            type: type === 'correlation' ? 'correlation' : 'parameter',
+            value: v,
+            source: resolveVariableSource(name, source || 'auto'),
+        };
+    }
+    catch {
+        /* tracking is best-effort — never break the running request */
+    }
+    return value;
+}
+// Install on globalThis so instrumented scripts call it without an import. This
+// module is always loaded whenever a script makes a request() (request.ts → here).
+globalThis.__k6PerfTrackVar = trackAuto;
 /**
  * Auto-detect which registered variables were used in this request.
  * Scans url, body (stringified), and header values for exact matches of

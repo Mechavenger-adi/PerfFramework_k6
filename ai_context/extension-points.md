@@ -16,9 +16,11 @@
 
 ## EP3 — New Extractor for Correlation
 
-**Location:** `core_engine/src/correlation/ExtractorRegistry.ts`
+**Location (legacy runtime engine):** `core_engine/src/correlation/ExtractorRegistry.ts`
 **Pattern:** `registry.register('newType', extractorFunction)`. Extractor receives response, returns extracted value.
-**Built-in extractors:** regex, jsonpath (dot-notation), header.
+**Built-in extractors:** regex, jsonpath (dot-notation), header, cookie, boundary.
+
+**Location (auto-correlation runtime, k6-side):** `core_engine/src/utils/extract.ts` — add a new `extract*` helper (VU-safe, no fs) and export from `index.ts`. For the scanner to *emit* it, also teach `ExtractorSynthesizer.ts` to synthesize the new capture shape.
 
 ## EP4 — New Reporter/Sink
 
@@ -83,3 +85,13 @@ testSuites/<team>/
 
 **Location:** `core_engine/src/data/DataPoolManager.ts`
 **Pattern:** Add new strategy to `getRowForIteration()` switch. Update `DataOverflowStrategy` type in `TestPlanSchema.ts`.
+
+## EP12 — New Auto-Correlation Heuristic
+
+**Location:** `core_engine/src/correlation/CandidateScorer.ts` + `config/correlation-rules/auto-correlation.defaults.json`
+**Pattern:** Add token vocabulary / thresholds to the defaults JSON (data-driven), or extend the scorer for a new shape signal (e.g. a new value pattern). Keep the scanner pipeline order stable: ValueIndexer → LinkMatcher → CandidateScorer → ExtractorSynthesizer (orchestrated by `CorrelationScanner`).
+
+## EP13 — New Script-Contract Rule
+
+**Location:** `core_engine/src/config/ScriptContractGuard.ts`
+**Pattern:** Add a `ContractRule { k6Import, callRe, replacement, reason }` to flag another native k6 API that breaks framework reporting and point authors at the framework equivalent.
