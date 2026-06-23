@@ -207,9 +207,18 @@ function runInit(projectDir = process.cwd()) {
     writeIfNotExists(path.join(projectDir, '.env.template'), `# Copy this file to .env and fill in your values
 # NEVER commit .env to source control
 
-# Base URLs belong in config/environments/*.json
-K6_API_KEY=your-api-key-here
-K6_DEBUG=false
+# Per-team base URLs live in config/environments/*.json. Uncomment for a
+# global fallback base URL (used when no team/service URL is available).
+# K6_BASE_URL=https://your-dev-environment.com
+
+# Exposed to VU scripts via getApiKey() from utils/session.js.
+# K6_API_KEY=your-api-key-here
+
+# Directory for timestamped run reports (relative or absolute path).
+K6_RESULTS_BASE_DIR=./testSuites/results
+
+# Uncomment to stream metrics to InfluxDB (PowerBI/Grafana).
+# K6_INFLUXDB_URL=http://localhost:8086/k6
 `, '.env.template');
     // -- Sample: CSV data file --------------------
     writeIfNotExists(path.join(projectDir, 'testSuites/sample_team/data/p_users.csv'), `p_username,p_password,p_email

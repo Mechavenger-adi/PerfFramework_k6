@@ -12,6 +12,9 @@
 | `generate.ts` | HAR → k6 script generation command | Generate handler |
 | `generate-byos.ts` | BYOS template generation | BYOS handler |
 | `convert.ts` | Conventional k6 → framework conversion | Convert handler |
+| `correlate.ts` | Smart auto-correlation: scan recording → manifest → rewrite script | Correlate handler (`--list`/`--dry-run`/`--apply`) |
+| `import.ts` | cURL / Postman collection → framework script | `import curl`, `import postman` |
+| `interactive.ts` | Menu-driven command panel (`npm start`) | Interactive panel |
 | `validate.ts` | Pre-flight config validation | Validate handler |
 | `templates.ts` | Template library discovery/viewing | `list`, `show` |
 | `features.ts` | Framework capabilities summary | Features handler |
@@ -28,6 +31,7 @@
 | `GatekeeperValidator.ts` | Pre-flight checklist (non-short-circuit) |
 | `RuntimeConfigManager.ts` | Typed runtime setting accessors |
 | `SchemaValidator.ts` | AJV validation with Levenshtein suggestions |
+| `ScriptContractGuard.ts` | Pre-flight guard rejecting native k6 `check()`/`group()` (use `k6Check`/`transaction`) |
 
 ### Scenario (`core_engine/src/scenario/`)
 | File | Responsibility |
@@ -44,6 +48,7 @@
 | `ParallelExecutionManager.ts` | k6Options assembly (scenarios + thresholds + summaryTrendStats) |
 | `JourneyAllocator.ts` | Weight-based VU distribution |
 | `HostMonitor.ts` | CPU/memory sampling during runs |
+| `FileWriteSink.ts` | Runner-side consumer for `writeData()` — tails the k6 log stream, writes files under the run dir |
 
 ### Runtime (`core_engine/src/runtime/`)
 | File | Responsibility |
@@ -70,12 +75,27 @@
 | `TransactionGrouper.ts` | `pageref` → transaction groups |
 | `ScriptGenerator.ts` | Groups → full k6 script with lifecycle phases |
 | `ScriptConverter.ts` | Conventional k6 → framework format (Pattern A/B) |
+| `CurlAdapter.ts` | cURL string(s) → intermediate request model |
+| `PostmanAdapter.ts` | Postman v2.1 collection → intermediate request model (nested folders) |
+| `PostmanScriptTranslator.ts` | Postman pre-request/test scripts → framework equivalents |
 
 ### Correlation (`core_engine/src/correlation/`)
+**(A) Smart auto-correlation scanner** (no hand-written rules; driven by `correlate` CLI — see `.md/Correlation-Engine-Design.md`)
+| File | Responsibility |
+|------|---------------|
+| `CorrelationScanner.ts` | Orchestrator: `RecordingExchange[]` → `CorrelationPlan` |
+| `ValueIndexer.ts` | Producer (response) / consumer (request) occurrence extraction |
+| `LinkMatcher.ts` | Nearest-preceding producer→consumer linking (handles token rotation) |
+| `CandidateScorer.ts` | Heuristics → `high/medium/low`; `handledByJar` filter; `p_` vs `c_` |
+| `ExtractorSynthesizer.ts` | jsonpath/header/cookie/boundary capture synthesis (uniqueness-checked) |
+| `ScriptCorrelationWriter.ts` | Post-processor: capture + substitute into a generated script |
+| `CorrelationManifest.ts` | `RecordingExchange`/`CorrelationCandidate`/`CorrelationPlan` types + load/save |
+
+**(B) Legacy runtime rule engine** (hand-authored rules; not called by generated scripts)
 | File | Responsibility |
 |------|---------------|
 | `CorrelationEngine.ts` | Token extraction + storage |
-| `ExtractorRegistry.ts` | regex/jsonpath/header extractors |
+| `ExtractorRegistry.ts` | regex/jsonpath/header (+ cookie/boundary) extractors |
 | `RuleProcessor.ts` | Rule file loading |
 | `FallbackHandler.ts` | Extraction failure strategies |
 
@@ -98,11 +118,12 @@
 ### Reporting (`core_engine/src/reporting/`)
 | File | Responsibility |
 |------|---------------|
-| `RunReportGenerator.ts` | Unified `RunReport.html` with tabs |
-| `TransactionMetricsBuilder.ts` | Transaction metrics from k6 summary |
+| `RunReportGenerator.ts` | Unified `RunReport.html` with tabs (time-range-responsive transactions) |
+| `TransactionMetricsBuilder.ts` | Transaction metrics — pass/fail solely from `<name>_checkrate` (estimation fallback removed) |
+| `TimeseriesStreamParser.ts` | Streaming parser over k6 `--out json=` → per-bucket aggregates |
 | `EventArtifactBuilder.ts` | errors.ndjson + warnings.ndjson builder |
 | `RunSummaryBuilder.ts` | ci-summary.json builder |
-| `TimeseriesArtifactBuilder.ts` | timeseries.json builder |
+| `TimeseriesArtifactBuilder.ts` | timeseries.json builder (delegates to TimeseriesStreamParser) |
 | `ArtifactWriter.ts` | JSON/NDJSON file writer |
 
 ### Reporters (`core_engine/src/reporters/`) — All stubs
@@ -120,15 +141,25 @@
 | `replayLogger.ts` | **k6** | Replay log emission + variable tracking |
 | `session.ts` | **k6** | Cookie jar management + URL registry |
 | `lifecycle.ts` | **k6** | VU lifecycle orchestration + think time |
+| `extract.ts` | **k6** | Correlation extractors: `extractJson/Regex/Header/Cookie/Boundary` (emitted by auto-correlation) |
+| `autoHeaders.ts` | **k6** | Per-VU auto headers applied to every request (`addAutoHeader`, `addHeaderOnce`, …) |
+| `dataWriter.ts` | **k6** | `writeData()` — emit tagged lines for runner-side `FileWriteSink` to persist |
 | `logger.ts` | Node | ANSI color-coded logger |
 | `ProgressBar.ts` | Node | Phase-based terminal progress |
-| `PathResolver.ts` | Node | Recursive script path resolution |
+| `PathResolver.ts` | Node | Script path resolution — relative + full/absolute paths, recursive testSuites search |
+| `LiveConsoleLogStream.ts` | Node | Tails live k6 console output, fans out to sinks (FileWriteSink, live view) |
 
 ### Types (`core_engine/src/types/`)
 | File | Key Types |
 |------|-----------|
 | `ConfigContracts.ts` | `EnvironmentConfig`, `RuntimeSettings`, `ResolvedConfig`, `FRAMEWORK_DEFAULTS` |
-| `TestPlanSchema.ts` | `TestPlan`, `UserJourney`, `GlobalLoadProfile`, `SLADefinition` |
+| `TestPlanSchema.ts` | `TestPlan`, `UserJourney`, `GlobalLoadProfile`, `SLADefinition`, `GlobalSLADefinition` (request/transaction scoping); plus `journey_slas`/`transaction_slas`/`request_slas` |
 | `EventContracts.ts` | `ErrorEvent`, `WarningEvent` |
 | `ReportingContracts.ts` | Report output structures |
 | `HARContracts.ts` | `HAREntry`, `HARRefinementOptions` |
+
+### Package roots (`core_engine/src/`)
+| File | Responsibility |
+|------|---------------|
+| `index.ts` | **VU-safe** barrel — the only API a journey script imports (request/transaction/lifecycle/session/extract/autoHeaders/dataWriter/generate). No Node APIs. |
+| `engine.ts` | **Node-only** barrel — orchestration/engine code (ScenarioBuilder, reporters, ReplayRunner, loaders). Deliberately NOT re-exported by `index.ts` so it can't leak into a VU bundle. |

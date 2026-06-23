@@ -38,16 +38,28 @@ export interface DebugReplayResult {
 export interface K6MetricRow {
     name: string;
     values: Record<string, string>;
+    /** Transaction-level check outcome (fails === 0). Undefined when no checkrate exists. */
+    passed?: boolean;
 }
 export interface K6Metrics {
+    /** Per-check pass/fail counts (k6 native passes/fails), attributed to the k6 group (transaction). */
     checks: {
         name: string;
+        group: string;
+        passes: number;
+        fails: number;
         passed: boolean;
     }[];
     transactions: K6MetricRow[];
     http: K6MetricRow[];
     httpSummary: {
         reqs: string;
+        failedPct: string;
+    };
+    /** Aggregate transaction pass/fail (summed `<txn>_checkrate`) — drives the report's "Failed percent". */
+    transactionSummary: {
+        passes: number;
+        fails: number;
         failedPct: string;
     };
     execution: {

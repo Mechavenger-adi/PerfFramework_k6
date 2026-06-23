@@ -43,6 +43,10 @@ export interface CiSummary {
   plan: string;
   environment: string;
   thresholdFailures: number;
+  /** Actual transaction failure rate (percent 0–100) — the run's pass/fail driver. */
+  transactionFailureRate?: number;
+  /** Allowed transaction failure rate (percent 0–100) from global_sla; run fails when exceeded. */
+  transactionErrorBudget?: number;
   errorCount: number;
   warningCount: number;
   aborted: boolean;

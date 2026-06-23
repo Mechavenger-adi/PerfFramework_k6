@@ -45,7 +45,7 @@
     "includeRequestHeaders": true,
     "includeRequestBody": true,
     "includeResponseHeaders": true,
-    "includeResponseBody": false
+    "includeResponseBody": true
   },
   "monitoring": {
     "enabled": true,

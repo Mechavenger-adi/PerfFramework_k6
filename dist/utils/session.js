@@ -8,6 +8,7 @@ exports.registerBaseUrl = registerBaseUrl;
 exports.resolvePath = resolvePath;
 exports.registerFrameworkEnvironmentUrls = registerFrameworkEnvironmentUrls;
 exports.resolveFrameworkUrl = resolveFrameworkUrl;
+exports.getApiKey = getApiKey;
 exports.clearCookies = clearCookies;
 exports.deleteCookie = deleteCookie;
 // @ts-ignore - K6 runtime module
@@ -214,6 +215,19 @@ function resolveFrameworkUrl(pathOrUrl, options = {}) {
         return joinBaseAndPath(fallbackBaseUrl, pathOrUrl);
     }
     return pathOrUrl;
+}
+/**
+ * Get the API key injected from .env (K6_API_KEY → K6_PERF_API_KEY).
+ * Returns undefined when no key is configured, so callers can guard:
+ *
+ *   import { getApiKey } from '../../../dist/utils/session.js';
+ *   const key = getApiKey();
+ *   const headers = key ? { Authorization: `Bearer ${key}` } : {};
+ */
+function getApiKey() {
+    if (typeof __ENV === 'undefined')
+        return undefined;
+    return __ENV.K6_PERF_API_KEY || undefined;
 }
 /**
  * Clear all cookies from the VU's cookie jar.

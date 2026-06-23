@@ -40,6 +40,8 @@ export interface PipelineRunResult {
     reportDir?: string;
     runId?: string;
     runManifestPath?: string;
+    /** The exact k6 command line the framework launched (for report/debug traceability). */
+    command?: string;
 }
 export declare class PipelineRunner {
     /**

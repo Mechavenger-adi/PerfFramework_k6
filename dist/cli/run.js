@@ -706,7 +706,9 @@ function prepareRunArtifacts(plan, resolvedConfig) {
     // With override on, reuse a single stable folder (wiped each run); otherwise
     // create a fresh timestamped folder so run history is preserved.
     const runId = override ? 'Run_latest' : `Run_${new Date().toISOString().replace(/[-:.]/g, '_')}`;
-    const reportDir = path.join(process.cwd(), baseDir, safePlanName, runId);
+    // Use resolve (not join) so an absolute K6_RESULTS_BASE_DIR is honored as-is;
+    // a relative value still resolves against the framework cwd.
+    const reportDir = path.resolve(process.cwd(), baseDir, safePlanName, runId);
     if (override && fs.existsSync(reportDir)) {
         fs.rmSync(reportDir, { recursive: true, force: true });
     }
@@ -779,6 +781,12 @@ function buildScenarioRuntimeMetadata(plan, resolvedConfig, runId, safeReportDir
 }
 function buildRunEnvironment(plan, resolvedConfig, runId, safeReportDir, runManifestPath) {
     const transactionNames = collectUniqueTransactionNames(extractJourneyTransactionNames(plan));
+    // Optional .env overrides surfaced to the VU runtime. Base URLs normally come
+    // from config/environments/*.json (K6_PERF_TEAM_ENVIRONMENTS); K6_BASE_URL is
+    // an optional global fallback consumed by session.ts (resolvePath/auto-register).
+    // K6_API_KEY is exposed via getApiKey() for scripts that need an auth header.
+    const baseUrlOverride = resolvedConfig.secrets['K6_BASE_URL'];
+    const apiKey = resolvedConfig.secrets['K6_API_KEY'];
     return {
         K6_PERF_RUN_ID: runId,
         K6_PERF_PLAN_NAME: plan.name,
@@ -790,6 +798,8 @@ function buildRunEnvironment(plan, resolvedConfig, runId, safeReportDir, runMani
         ...(transactionNames.length > 0
             ? { K6_PERF_TRANSACTION_NAMES: JSON.stringify(transactionNames) }
             : {}),
+        ...(baseUrlOverride ? { K6_PERF_BASE_URL: baseUrlOverride } : {}),
+        ...(apiKey ? { K6_PERF_API_KEY: apiKey } : {}),
     };
 }
 function extractJourneyTransactionNames(plan) {
@@ -1103,6 +1113,10 @@ async function finalizeRunArtifacts(options) {
         executionStatus: options.runStatus,
         summaryData: summaryData,
         transactions: transactionMetrics,
+        // Transaction failure-rate budget: prefer the transaction-scoped SLA, fall
+        // back to the flat/legacy global errorRate. Undefined → 0 (strict) in builder.
+        transactionErrorBudget: options.plan.global_sla?.transaction?.errorRate
+            ?? options.plan.global_sla?.errorRate,
     });
     ciSummary.errorCount = eventArtifacts.errors.length;
     ciSummary.warningCount = eventArtifacts.warnings.length;

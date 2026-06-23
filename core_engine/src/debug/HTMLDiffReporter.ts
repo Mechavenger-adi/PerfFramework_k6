@@ -7,6 +7,23 @@ export interface ReportOptions {
   k6Errors?: string[];
   k6Metrics?: K6Metrics;
   consoleLogs?: string[];
+  /**
+   * Resolved runtime config block (http / thinkTime / pacing / reporting /
+   * errors) the framework injected for this debug run. Rendered in the
+   * "Advanced Settings & Configuration" panel so debug mirrors the run report.
+   */
+  runtimeConfig?: Record<string, unknown>;
+  /**
+   * How the framework invoked k6 for this debug run: the exact command, the
+   * resolved k6 options/scenarios (--config), and the injected K6_PERF_* env.
+   * Rendered as a collapsible block under Advanced Settings, mirroring the run
+   * report's "How this test was invoked by the framework".
+   */
+  execution?: {
+    command?: string;
+    options?: unknown;
+    env?: Record<string, string>;
+  };
 }
 
 interface ReportPayload {
@@ -21,11 +38,15 @@ interface ReportPayload {
     mismatchCount: number;
     worstTransaction: string;
     status: 'passed' | 'drift' | 'broken';
+    /** False when the replay had no recording log to diff against — scores are meaningless and suppressed. */
+    hasRecording: boolean;
   };
   results: DiffResult[];
   k6Errors: string[];
   consoleLogs: string[];
   k6Metrics?: K6Metrics;
+  runtimeConfig?: Record<string, unknown>;
+  execution?: { command?: string; options?: unknown; env?: Record<string, string> };
 }
 
 export class HTMLDiffReporter {
@@ -304,6 +325,26 @@ export class HTMLDiffReporter {
     .card:hover { box-shadow: var(--shadow-lg); transform: translateY(-1px); }
     .card-label { color: var(--muted); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; }
     .card-value { display: block; margin-top: 10px; font-size: 27px; font-weight: 700; letter-spacing: -.02em; }
+    /* Compact card variant for the runtime-config panel: values are short text
+       (modes, behaviors, stat lists), not headline numbers, so the 27px metric
+       size looks oversized and wraps badly. */
+    .cfg-cards { grid-template-columns: repeat(auto-fit, minmax(168px, 1fr)); gap: 12px; margin-bottom: 16px; }
+    .cfg-cards .card { padding: 12px 14px; }
+    .cfg-cards .card-value { margin-top: 6px; font-size: 15px; font-weight: 650; line-height: 1.35; letter-spacing: 0; word-break: break-word; }
+    .cfg-invocation { padding: 4px 2px 2px; }
+    .cfg-note { color: var(--muted); font-size: 12.5px; margin: 6px 0 12px; line-height: 1.5; }
+    .cfg-h4 { margin: 14px 0 4px; font-size: 13px; font-weight: 700; }
+    .cfg-muted { color: var(--muted); font-weight: 400; font-size: 12px; }
+    /* color: the global pre rule sets light text on a dark bg; cfg-pre uses a
+       theme-adaptive panel bg, so it must also set a theme-adaptive ink color —
+       otherwise it is light-on-light and unreadable in day mode. */
+    .cfg-pre { background: var(--panel-2); color: var(--ink); border: 1px solid var(--border-soft); border-radius: var(--radius-sm); padding: 12px 14px; font-family: var(--mono); font-size: 12px; line-height: 1.5; overflow: auto; white-space: pre-wrap; word-break: break-word; margin: 0; }
+    /* Collapsible Advanced Settings panel (mirrors the run report's adv card). */
+    .cfg-panel > summary { padding: 18px 20px; cursor: pointer; list-style: none; display: flex; flex-direction: column; gap: 3px; }
+    .cfg-panel > summary::-webkit-details-marker { display: none; }
+    .cfg-panel > summary .panel-title::before { content: '\\25B8'; margin-right: 9px; color: var(--muted); font-weight: 400; }
+    .cfg-panel[open] > summary .panel-title::before { content: '\\25BE'; }
+    .cfg-panel[open] > summary { border-bottom: 1px solid var(--border-soft); }
     .panel { margin-bottom: 24px; overflow: hidden; }
     .panel-head {
       padding: 18px 20px;
@@ -324,7 +365,7 @@ export class HTMLDiffReporter {
       gap: 18px;
       align-items: start;
     }
-    .table-scroll { width: 100%; overflow: auto; max-height: 72vh; }
+    .table-scroll { width: 100%; overflow: auto; max-height: 72vh; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; }
     table { border-collapse: separate; border-spacing: 0; width: 100%; min-width: 760px; }
     th, td {
       border-bottom: 1px solid var(--border-soft);
@@ -344,7 +385,18 @@ export class HTMLDiffReporter {
       text-transform: uppercase;
       letter-spacing: .07em;
       font-weight: 600;
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
     }
+    th:hover { color: var(--ink); }
+    /* Sort affordance: a neutral caret on every header, highlighted + directional
+       once a column is the active sort. Driven purely by data-sort-dir so the
+       header markup stays plain <th>text</th>. */
+    th::after { content: '\\2195'; margin-left: 6px; font-size: 9px; font-weight: 400; opacity: .28; }
+    th[data-sort-dir="asc"]::after { content: '\\2191'; opacity: 1; color: var(--accent); }
+    th[data-sort-dir="desc"]::after { content: '\\2193'; opacity: 1; color: var(--accent); }
+    th[data-sort-dir] { color: var(--ink); }
     tbody tr:last-child td { border-bottom: none; }
     tbody tr:nth-child(even) td { background: color-mix(in srgb, var(--panel-2) 50%, transparent); }
     tbody tr:hover td { background: var(--accent-soft); }
@@ -369,6 +421,7 @@ export class HTMLDiffReporter {
     .pill.bad { color: var(--bad); background: color-mix(in srgb, var(--bad) 10%, var(--panel)); border-color: color-mix(in srgb, var(--bad) 30%, var(--border)); }
     .pill.accent { color: var(--accent); background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); }
     .score { font-weight: 700; font-variant-numeric: tabular-nums; }
+    .muted { color: var(--muted); }
     .score.good { color: var(--good); }
     .score.warn { color: var(--warn); }
     .score.bad { color: var(--bad); }
@@ -376,6 +429,10 @@ export class HTMLDiffReporter {
     .status-3xx { color: var(--accent); font-weight: 700; }
     .status-4xx { color: var(--warn); font-weight: 700; }
     .status-5xx { color: var(--bad); font-weight: 700; }
+    /* Pass/fail pill for check & transaction status cells. */
+    .pf-pill { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 700; letter-spacing: .03em; }
+    .pf-pass { color: var(--good); background: color-mix(in srgb, var(--good) 14%, transparent); }
+    .pf-fail { color: var(--bad); background: color-mix(in srgb, var(--bad) 14%, transparent); }
     .issue-list { display: flex; flex-wrap: wrap; gap: 5px; }
     .insights { margin: 0; padding-left: 18px; color: var(--ink); line-height: 1.55; }
     .insights li { margin: 7px 0; }
@@ -499,6 +556,11 @@ export class HTMLDiffReporter {
       white-space: nowrap;
     }
     .drawer-tabs button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+    /* Prev/Next request nav, pushed to the right of the tab row. */
+    .drawer-nav { margin-left: auto; display: inline-flex; gap: 6px; flex: 0 0 auto; }
+    .drawer-tabs .btn-nav { border-color: var(--border); color: var(--ink); }
+    .drawer-tabs .btn-nav:hover:not([disabled]) { background: color-mix(in srgb, var(--accent) 14%, transparent); border-color: var(--accent); }
+    .drawer-tabs .btn-nav[disabled] { opacity: .4; cursor: not-allowed; }
     .drawer-body { padding: 16px 18px 28px; overflow-y: auto; }
     .mini-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
     .copy-ok { color: var(--good); font-size: 12px; font-weight: 700; align-self: center; }
@@ -574,6 +636,16 @@ export class HTMLDiffReporter {
       .health { border-left: none; border-top: 1px solid var(--border); width: 100%; padding-top: 14px; }
       .split, .body-grid { grid-template-columns: 1fr; }
       .topbar { top: 0; border-radius: 0; margin-left: -12px; margin-right: -12px; }
+      /* Tables stay readable on narrow screens: drop the wide min-width so they
+         fit the viewport, tighten cell padding, and let the wrapper scroll
+         horizontally only when a table genuinely overflows. */
+      table { min-width: 560px; }
+      th, td { padding: 9px 11px; font-size: 12px; }
+      .table-scroll { max-height: none; }
+    }
+    @media (max-width: 560px) {
+      table { min-width: 0; }
+      td.wrap { min-width: 0; }
     }
   </style>
 </head>
@@ -607,9 +679,9 @@ export class HTMLDiffReporter {
           <option value="headers">Header mismatch</option>
           <option value="slow">Slowest 10</option>
         </select>
-        <label class="toggle"><input type="checkbox" id="diff-only-toggle" /> Diff rows only</label>
-        <label class="toggle"><input type="checkbox" id="raw-toggle" /> Raw values</label>
-        <label class="toggle"><input type="checkbox" id="density-toggle" /> Dense</label>
+        <label class="toggle" title="Show only rows that differ between recording and replay"><input type="checkbox" id="diff-only-toggle" /> Diff rows only</label>
+        <label class="toggle" title="Show raw, un-decoded values (no percent/JSON pretty-printing)"><input type="checkbox" id="raw-toggle" /> Raw values</label>
+        <label class="toggle" title="Compact layout — tighter rows and padding"><input type="checkbox" id="density-toggle" /> Dense</label>
       </div>
       <section id="hero"></section>
       <section id="content"></section>
@@ -636,13 +708,13 @@ export class HTMLDiffReporter {
       };
 
       var navItems = [
-        ['overview', 'Overview', '\\uD83C\\uDFE0'],
-        ['iterations', 'Iterations', '\\uD83D\\uDD01'],
-        ['transactions', 'Transactions', '\\uD83E\\uDDE9'],
-        ['requests', 'Requests', '\\uD83C\\uDF10'],
-        ['variables', 'Variables', '\\uD83D\\uDD11'],
-        ['runtime', 'Runtime', '\\uD83D\\uDDA5\\uFE0F'],
-        ['performance', 'Performance', '\\uD83D\\uDCC8']
+        ['overview', 'Overview', '\\uD83C\\uDFE0', 'Health score, root-cause hints and the highest-risk requests'],
+        ['iterations', 'Iterations', '\\uD83D\\uDD01', 'Per-iteration roll-up of requests, drift and timing'],
+        ['transactions', 'Transactions', '\\uD83E\\uDDE9', 'Requests grouped by transaction for blast-radius analysis'],
+        ['requests', 'Requests', '\\uD83C\\uDF10', 'Every replayed request; click a row for the full exchange'],
+        ['variables', 'Variables', '\\uD83D\\uDD11', 'Parameter & correlation values used in each iteration'],
+        ['runtime', 'Runtime', '\\uD83D\\uDDA5\\uFE0F', 'k6 runtime errors, console output and the resolved runtime configuration'],
+        ['performance', 'Performance', '\\uD83D\\uDCC8', 'k6 metrics: checks, HTTP timings and transaction stats']
       ];
 
       var el = {
@@ -709,6 +781,13 @@ export class HTMLDiffReporter {
         if (score >= 90) return 'good';
         if (score >= 70) return 'warn';
         return 'bad';
+      }
+
+      // Render a match-score cell. When the replay had no recording log to diff
+      // against, scores are meaningless — show a muted dash instead of a value.
+      function scoreCell(score) {
+        if (!DATA.summary.hasRecording) return '<span class="muted">-</span>';
+        return '<span class="score ' + scoreClass(score) + '">' + esc(score) + '%</span>';
       }
 
       function statusClass(status) {
@@ -894,14 +973,19 @@ export class HTMLDiffReporter {
               '</div>' +
             '</div>' +
             '<div class="health">' +
-              '<div class="health-num score ' + scoreClass(DATA.summary.overallScore) + '">' + esc(DATA.summary.overallScore) + '%</div>' +
+              '<div class="health-num score ' + (DATA.summary.hasRecording ? scoreClass(DATA.summary.overallScore) : '') + '">' + (DATA.summary.hasRecording ? esc(DATA.summary.overallScore) + '%' : '-') + '</div>' +
               '<div class="health-label">Match score</div>' +
             '</div>' +
           '</div>' +
-          '<div class="status-banner ' + esc(DATA.summary.status) + '">' +
-            '<div class="status-title">' + esc(s[0]) + '</div>' +
-            '<div class="status-text">' + esc(s[1]) + '</div>' +
-          '</div>';
+          (DATA.summary.hasRecording ?
+            '<div class="status-banner ' + esc(DATA.summary.status) + '">' +
+              '<div class="status-title">' + esc(s[0]) + '</div>' +
+              '<div class="status-text">' + esc(s[1]) + '</div>' +
+            '</div>' :
+            '<div class="status-banner broken">' +
+              '<div class="status-title">No recording log found</div>' +
+              '<div class="status-text">This replay had no recording to diff against, so match scores and drift cannot be computed and are hidden. The requests below show what the replay sent and received.</div>' +
+            '</div>');
       }
 
       function summaryCards() {
@@ -911,7 +995,7 @@ export class HTMLDiffReporter {
           ['Missing', DATA.summary.missingCount],
           ['Replay only', DATA.summary.replayOnlyCount],
           ['Mismatched', DATA.summary.mismatchCount],
-          ['Runtime errors', (DATA.k6Errors || []).length]
+          ['Errors', (DATA.k6Errors || []).length]
         ];
         return '<div class="cards">' + cards.map(function(c) {
           return '<div class="card"><span class="card-label">' + esc(c[0]) + '</span><strong class="card-value">' + esc(c[1]) + '</strong></div>';
@@ -921,6 +1005,12 @@ export class HTMLDiffReporter {
       function buildInsights() {
         var list = [];
         if ((DATA.k6Errors || []).length > 0) list.push('Runtime errors were captured. Review the Runtime section before chasing payload differences.');
+        if (!DATA.summary.hasRecording) {
+          list.push('No recording log was found for this script, so there is nothing to diff against — match scores, drift, and missing/mismatch detection are unavailable.');
+          list.push('Register or generate a recording log for this script (recordings/<name>.recording-log.json, tracked in .recording-index.json) and re-run debug to get a full diff.');
+          if ((DATA.k6Errors || []).length === 0) list.push('The replay itself completed without runtime errors — use the request table below to inspect what each request sent and received.');
+          return list;
+        }
         if (DATA.summary.missingCount > 0) list.push(DATA.summary.missingCount + ' recorded request(s) did not appear during replay.');
         if (DATA.summary.replayOnlyCount > 0) list.push(DATA.summary.replayOnlyCount + ' replay-only request(s) appeared. Check redirects, resource fetches, and conditional logic.');
         var statusCount = allResults().filter(hasStatusMismatch).length;
@@ -960,37 +1050,32 @@ export class HTMLDiffReporter {
           var items = groups[k];
           var missing = items.filter(function(r) { return r.comparisonType === 'missing_in_replay'; }).length;
           var extra = items.filter(function(r) { return r.comparisonType === 'extra_in_replay'; }).length;
-          var issues = items.filter(hasIssue).length;
           var duration = items.reduce(function(sum, r) { return sum + (r.durationMs || 0); }, 0);
           return '<tr class="row-action" data-iteration-open="' + esc(k) + '">' +
             '<td class="mono">' + esc(k) + '</td>' +
             '<td>' + esc(items.length) + '</td>' +
-            '<td>' + esc(issues) + '</td>' +
             '<td>' + esc(missing) + '</td>' +
             '<td>' + esc(extra) + '</td>' +
-            '<td><span class="score ' + scoreClass(average(items.map(function(r) { return r.matchScore; }))) + '">' + average(items.map(function(r) { return r.matchScore; })) + '%</span></td>' +
+            '<td>' + scoreCell(average(items.map(function(r) { return r.matchScore; }))) + '</td>' +
             '<td>' + esc(formatDuration(duration)) + '</td>' +
           '</tr>';
         }).join('');
-        el.content.innerHTML = '<section class="panel"><div class="panel-head"><div><div class="panel-title">Iterations' + infoTip('Per-iteration roll-up of requests, issues and score. Click a row to filter.') + '</div><div class="panel-subtitle">Click an iteration to filter the console.</div></div></div><div class="table-scroll"><table><thead><tr><th>Iteration</th><th>Requests</th><th>Issues</th><th>Missing</th><th>Replay only</th><th>Avg score</th><th>Total time</th></tr></thead><tbody>' + rows + '</tbody></table></div></section>';
+        el.content.innerHTML = '<section class="panel"><div class="panel-head"><div><div class="panel-title">Iterations' + infoTip('Per-iteration roll-up of requests and score. Click a row to filter.') + '</div><div class="panel-subtitle">Click an iteration to filter the console.</div></div></div><div class="table-scroll"><table><thead><tr><th>Iteration</th><th>Requests</th><th>Missing</th><th>Replay only</th><th>Avg Match Score</th><th>Total time</th></tr></thead><tbody>' + rows + '</tbody></table></div></section>';
       }
 
       function renderTransactions() {
         var groups = groupBy(visibleResults(), function(r) { return r.transactionName || 'Ungrouped'; });
         var rows = Object.keys(groups).sort().map(function(name) {
           var items = groups[name];
-          var worst = items.reduce(function(min, r) { return Math.min(min, r.matchScore); }, 100);
           var duration = items.reduce(function(sum, r) { return sum + (r.durationMs || 0); }, 0);
           return '<tr class="row-action" data-search-transaction="' + esc(name) + '">' +
             '<td class="wrap">' + esc(name) + '</td>' +
             '<td>' + esc(items.length) + '</td>' +
-            '<td>' + esc(items.filter(hasIssue).length) + '</td>' +
-            '<td><span class="score ' + scoreClass(average(items.map(function(r) { return r.matchScore; }))) + '">' + average(items.map(function(r) { return r.matchScore; })) + '%</span></td>' +
-            '<td><span class="score ' + scoreClass(worst) + '">' + worst + '%</span></td>' +
+            '<td>' + scoreCell(average(items.map(function(r) { return r.matchScore; }))) + '</td>' +
             '<td>' + esc(formatDuration(duration)) + '</td>' +
           '</tr>';
         }).join('');
-        el.content.innerHTML = '<section class="panel"><div class="panel-head"><div><div class="panel-title">Transactions' + infoTip('Requests grouped by transaction for quick blast-radius analysis.') + '</div><div class="panel-subtitle">Aggregated by transaction name for quick blast-radius analysis.</div></div></div><div class="table-scroll"><table><thead><tr><th>Transaction</th><th>Requests</th><th>Issues</th><th>Avg score</th><th>Worst</th><th>Total time</th></tr></thead><tbody>' + (rows || '<tr><td colspan="6" class="empty">No transactions match the current view.</td></tr>') + '</tbody></table></div></section>';
+        el.content.innerHTML = '<section class="panel"><div class="panel-head"><div><div class="panel-title">Transactions' + infoTip('Requests grouped by transaction for quick blast-radius analysis.') + '</div><div class="panel-subtitle">Aggregated by transaction name for quick blast-radius analysis.</div></div></div><div class="table-scroll"><table><thead><tr><th>Transaction</th><th>Requests</th><th>Avg Match Score</th><th>Total time</th></tr></thead><tbody>' + (rows || '<tr><td colspan="4" class="empty">No transactions match the current view.</td></tr>') + '</tbody></table></div></section>';
       }
 
       function renderRequests() {
@@ -1007,35 +1092,38 @@ export class HTMLDiffReporter {
             '<td>' + esc(methodOf(r)) + '</td>' +
             '<td class="wrap" title="' + esc(decodeText(urlOf(r))) + '">' + esc(shortUrl(decodeText(urlOf(r)))) + '</td>' +
             '<td class="' + statusClass(side.status) + '">' + esc(statusDisplay(side)) + '</td>' +
-            '<td><span class="score ' + scoreClass(r.matchScore) + '">' + esc(r.matchScore) + '%</span></td>' +
+            '<td>' + scoreCell(r.matchScore) + '</td>' +
             '<td>' + esc(formatDuration(r.durationMs)) + '</td>' +
             '<td><span class="pill ' + (r.comparisonType === 'matched' ? 'good' : r.comparisonType === 'missing_in_replay' ? 'bad' : 'warn') + '">' + esc(comparisonLabel(r.comparisonType)) + '</span></td>' +
-            '<td><div class="issue-list">' + issueBadges(r) + '</div></td>' +
           '</tr>';
         }).join('');
-        return '<section class="panel"><div class="panel-head"><div><div class="panel-title">' + esc(title) + (tip ? infoTip(tip) : '') + '</div><div class="panel-subtitle">' + esc(subtitle) + ' ' + esc(list.length) + ' row(s).</div></div></div><div class="table-scroll"><table><thead><tr><th>#</th><th>Request ID</th><th>Transaction</th><th>Method</th><th>URL path</th><th>Status</th><th>Score</th><th>Duration</th><th>State</th><th>Issues</th></tr></thead><tbody>' + (rows || '<tr><td colspan="10" class="empty">No requests match the current view.</td></tr>') + '</tbody></table></div></section>';
+        return '<section class="panel"><div class="panel-head"><div><div class="panel-title">' + esc(title) + (tip ? infoTip(tip) : '') + '</div><div class="panel-subtitle">' + esc(subtitle) + ' ' + esc(list.length) + ' row(s).</div></div></div><div class="table-scroll"><table><thead><tr><th>#</th><th>Request ID</th><th>Transaction</th><th>Method</th><th>URL path</th><th>Status</th><th>Score</th><th>Duration</th><th>State</th></tr></thead><tbody>' + (rows || '<tr><td colspan="9" class="empty">No requests match the current view.</td></tr>') + '</tbody></table></div></section>';
       }
 
       function renderVariables() {
-        var latest = {};
+        // One row per (variable, iteration) so the value used in EACH iteration
+        // is visible — not just the latest. Within an iteration, the last
+        // request that used the variable wins.
+        var byKey = {};
         visibleResults().forEach(function(r) {
           (r.variableEvents || []).forEach(function(v) {
-            latest[v.name] = {
+            byKey[v.name + '||' + r.iteration] = {
               name: v.name,
               type: v.type,
-              action: v.action,
               value: v.value,
               source: v.source,
+              iteration: r.iteration,
               transactionName: r.transactionName,
               requestSequence: r.requestSequence
             };
           });
         });
-        var rows = Object.keys(latest).sort().map(function(k) {
-          var v = latest[k];
-          return '<tr><td>' + esc(v.name) + '</td><td>' + esc(v.type) + '</td><td>' + esc(v.action) + '</td><td class="wrap mono">' + esc(decodeText(v.value)) + '</td><td class="wrap">' + esc(v.source || '-') + '</td><td class="wrap">' + esc(v.transactionName || '-') + '</td><td>' + esc(v.requestSequence == null ? '-' : v.requestSequence) + '</td></tr>';
-        }).join('');
-        el.content.innerHTML = '<section class="panel"><div class="panel-head"><div><div class="panel-title">Variables' + infoTip('Latest parameter & correlation values captured during replay.') + '</div><div class="panel-subtitle">Latest parameter and correlation values visible in the current filter context.</div></div></div><div class="table-scroll"><table><thead><tr><th>Name</th><th>Type</th><th>Action</th><th>Value</th><th>Source</th><th>Last transaction</th><th>Request #</th></tr></thead><tbody>' + (rows || '<tr><td colspan="7" class="empty">No variable events match the current view.</td></tr>') + '</tbody></table></div></section>';
+        var rows = Object.keys(byKey).map(function(k) { return byKey[k]; })
+          .sort(function(a, b) { return a.name === b.name ? (Number(a.iteration) - Number(b.iteration)) : (a.name < b.name ? -1 : 1); })
+          .map(function(v) {
+            return '<tr><td>' + esc(v.name) + '</td><td>' + esc(v.type) + '</td><td class="wrap mono">' + esc(decodeText(v.value)) + '</td><td class="wrap">' + esc(v.source || '-') + '</td><td class="mono">' + esc(v.iteration == null ? '-' : v.iteration) + '</td><td class="wrap">' + esc(v.transactionName || '-') + '</td><td>' + esc(v.requestSequence == null ? '-' : v.requestSequence) + '</td></tr>';
+          }).join('');
+        el.content.innerHTML = '<section class="panel"><div class="panel-head"><div><div class="panel-title">Variables' + infoTip('Parameter & correlation values used in each iteration of the replay.') + '</div><div class="panel-subtitle">Parameter and correlation values, per iteration, in the current filter context.</div></div></div><div class="table-scroll"><table><thead><tr><th>Name</th><th>Type</th><th>Value</th><th>Source</th><th>Iteration</th><th>Transaction</th><th>Request #</th></tr></thead><tbody>' + (rows || '<tr><td colspan="7" class="empty">No variable events match the current view.</td></tr>') + '</tbody></table></div></section>';
       }
 
       function renderRuntime() {
@@ -1046,7 +1134,54 @@ export class HTMLDiffReporter {
           : '<p class="empty">No script console output captured.</p>';
         el.content.innerHTML =
           '<section class="panel"><div class="panel-head"><div><div class="panel-title">Runtime Errors' + infoTip('k6 runtime errors during replay — fix these before chasing diffs.') + '</div><div class="panel-subtitle">' + esc((DATA.k6Errors || []).length) + ' captured error(s)</div></div></div><div class="panel-body">' + (errors || '<p class="empty">No k6 runtime errors captured.</p>') + '</div></section>' +
-          '<section class="panel"><div class="panel-head"><div><div class="panel-title">Console Output' + infoTip('console.log/warn/error captured from the replay script.') + '</div><div class="panel-subtitle">' + esc((DATA.consoleLogs || []).length) + ' captured line(s)</div></div></div><div class="panel-body">' + logBlocks + '</div></section>';
+          '<section class="panel"><div class="panel-head"><div><div class="panel-title">Console Output' + infoTip('console.log/warn/error captured from the replay script.') + '</div><div class="panel-subtitle">' + esc((DATA.consoleLogs || []).length) + ' captured line(s)</div></div></div><div class="panel-body">' + logBlocks + '</div></section>' +
+          advancedConfigPanel();
+      }
+
+      // "Advanced Settings & Configuration" — mirrors the run report. Shows the
+      // resolved runtime config the framework injected for this debug run so a
+      // script's behavior (timeout/redirects/think-time/pacing) is traceable.
+      // Debug uses the SAME runtime block as a load run, so this also documents
+      // why a script behaved a given way under replay.
+      function advancedConfigPanel() {
+        var rc = DATA.runtimeConfig;
+        var exec = DATA.execution;
+        if (!rc && !exec) return '';
+        var body = '';
+        if (rc) {
+          var tt = rc.thinkTime || {};
+          var http = rc.http || {};
+          var rep = rc.reporting || {};
+          var errs = rc.errors || {};
+          var pacing = rc.pacing || {};
+          var cards = [
+            ['\\uD83D\\uDD52 Think time', tt.mode || '\\u2014'],
+            ['\\u23F1\\uFE0F Pacing', pacing.enabled ? 'enabled' : 'disabled'],
+            ['\\u26A0\\uFE0F Error behavior', rc.errorBehavior || '\\u2014'],
+            ['\\u23F3 HTTP timeout', http.timeoutMs != null ? (http.timeoutMs + ' ms') : '\\u2014'],
+            ['\\u21AA\\uFE0F Max redirects', http.maxRedirects != null ? http.maxRedirects : '\\u2014'],
+            ['\\u274C Throw on error', http.throwOnError ? 'yes' : 'no'],
+            ['\\uD83D\\uDCF8 Snapshots on failure', errs.captureSnapshotOnFailure ? ('on (cap ' + (errs.maxSnapshotsPerRun != null ? errs.maxSnapshotsPerRun : '\\u2014') + ')') : 'off'],
+            ['\\uD83D\\uDCCA Transaction stats', (rep.transactionStats && rep.transactionStats.length) ? rep.transactionStats.join(', ') : '\\u2014']
+          ];
+          var cardsHtml = cards.map(function(c) {
+            return '<div class="card"><span class="card-label">' + esc(c[0]) + '</span><strong class="card-value">' + esc(c[1]) + '</strong></div>';
+          }).join('');
+          body += '<div class="cards cfg-cards">' + cardsHtml + '</div>' + rawBlock('Full runtime config (JSON)', rc, false);
+        }
+        if (exec) {
+          // "How this test was invoked" — the exact k6 command, the resolved
+          // options/scenarios passed via --config, and the injected K6_PERF_*
+          // env. Lets users trace the debug plan → the real k6 run, mirroring
+          // the run report.
+          var invocation =
+            '<p class="cfg-note">The framework launches k6 with a generated <code>--config</code> (resolved options/scenarios) and an injected <code>K6_PERF_*</code> environment. Below is exactly how this debug run was invoked.</p>' +
+            (exec.command ? '<h4 class="cfg-h4">1 \\u00B7 k6 command</h4><pre class="cfg-pre">' + esc(exec.command) + '</pre>' : '') +
+            '<h4 class="cfg-h4">2 \\u00B7 Resolved options &amp; scenarios <span class="cfg-muted">(passed to k6 via --config)</span></h4>' + rawBlock('Resolved k6 options (JSON)', exec.options || {}, false) +
+            '<h4 class="cfg-h4">3 \\u00B7 Injected environment <span class="cfg-muted">(K6_PERF_* variables)</span></h4>' + rawBlock('Injected env (JSON)', exec.env || {}, false);
+          body += '<details class="raw-block" style="margin-top:6px"><summary>How this test was invoked by the framework</summary><div class="cfg-invocation">' + invocation + '</div></details>';
+        }
+        return '<details class="panel cfg-panel"><summary><div class="panel-title">\\u2699\\uFE0F Advanced Settings &amp; Configuration' + infoTip('The resolved runtime configuration and how the framework invoked k6 for this debug run.') + '</div><div class="panel-subtitle">For developer reference \\u2014 not required for interpreting the diff. Debug honors the same runtime settings as a load run.</div></summary><div class="panel-body">' + body + '</div></details>';
       }
 
       function renderPerformance() {
@@ -1055,25 +1190,100 @@ export class HTMLDiffReporter {
           el.content.innerHTML = '<section class="panel"><div class="panel-head"><div><div class="panel-title">Performance</div></div></div><div class="panel-body"><p class="empty">No performance metrics were embedded in this debug report.</p></div></section>';
           return;
         }
+        var txSummary = m.transactionSummary || { failedPct: '' };
         var overview = [
           ['Total requests', m.httpSummary && m.httpSummary.reqs],
-          ['Failed percent', m.httpSummary && m.httpSummary.failedPct],
+          // "Failed percent" is transaction-based (summed <txn>_checkrate fails),
+          // not http_req_failed — a transaction can fail on a check while every
+          // HTTP request returned 2xx. HTTP-level failures are a separate card.
+          ['Failed percent', txSummary.failedPct],
+          ['HTTP req failed', m.httpSummary && m.httpSummary.failedPct],
           ['Iterations', m.execution && m.execution.iterations],
           ['VUs', m.execution && m.execution.vus],
           ['Data received', m.network && m.network.received],
           ['Data sent', m.network && m.network.sent]
         ].filter(function(x) { return x[1]; });
+
+        // Per-check rows: k6 native passes/fails counts, attributed to the
+        // transaction (k6 group), with a colored PASS/FAIL status pill.
+        var checkRows = (m.checks || []).map(function(c) {
+          return { name: c.name, values: {
+            Transaction: c.group || '\\u2014',
+            Passes: String(c.passes),
+            Fails: String(c.fails),
+            Status: c.passed ? 'PASS' : 'FAIL'
+          } };
+        });
+
+        // Per-transaction timing rows + an overall check Status column derived
+        // from <txn>_checkrate (fails === 0). Status is appended only when the
+        // run actually recorded transaction checkrates.
+        var baseStats = (m.statsColumns || ['min', 'avg', 'max', 'p(90)', 'p(95)']);
+        var hasTxStatus = (m.transactions || []).some(function(t) { return t.passed != null; });
+        var txRows = (m.transactions || []).map(function(t) {
+          var v = Object.assign({}, t.values);
+          if (t.passed != null) v.Status = t.passed ? 'PASS' : 'FAIL';
+          return { name: t.name, values: v };
+        });
+        var txCols = hasTxStatus ? baseStats.concat(['Status']) : baseStats;
+
         el.content.innerHTML =
           '<div class="cards">' + overview.map(function(c) { return '<div class="card"><span class="card-label">' + esc(c[0]) + '</span><strong class="card-value">' + esc(c[1]) + '</strong></div>'; }).join('') + '</div>' +
-          metricTable('Checks', 'Check', (m.checks || []).map(function(c) { return { name: c.name, values: { Status: c.passed ? 'PASS' : 'FAIL' } }; }), ['Status'], 'Pass/fail result of each k6 check during the debug run.') +
-          metricTable('HTTP Metrics', 'Metric', m.http || [], (m.statsColumns || ['min', 'avg', 'max', 'p(90)', 'p(95)']).filter(function(c) { return c !== 'pass' && c !== 'fail'; }), 'k6 HTTP timing metrics for the debug run.') +
-          metricTable('Transaction Timings', 'Transaction', m.transactions || [], m.statsColumns || ['min', 'avg', 'max', 'p(90)', 'p(95)'], 'Per-transaction response-time stats for the debug run.');
+          metricTable('Checks', 'Check', checkRows, ['Transaction', 'Passes', 'Fails', 'Status'], 'Per-check pass/fail counts as k6 reports them, grouped by the transaction the check ran in.', ['Status']) +
+          metricTable('HTTP Metrics', 'Metric', m.http || [], baseStats.filter(function(c) { return c !== 'pass' && c !== 'fail'; }), 'k6 HTTP timing metrics for the debug run.') +
+          metricTable('Transaction Timings', 'Transaction', txRows, txCols, 'Per-transaction response-time stats and overall check status for the debug run.', ['Status']);
       }
 
-      function metricTable(title, firstHeader, rows, columns, tip) {
+      // pillCols: column names whose PASS/FAIL value should render as a colored
+      // pill instead of plain mono text (used for check & transaction status).
+      // Client-side column sort, shared by every table in the report. Operates
+      // directly on the rendered DOM (reorders <tbody> rows) so it needs no
+      // per-table wiring — a delegated <th> click calls this. Numeric-aware:
+      // cells like "120ms", "0.00%" or "1,024" sort as numbers; text (PASS/FAIL,
+      // URLs) sorts case-insensitively. Empty-state rows (td[colspan]) are left
+      // in place. Sort is a view operation and resets on the next re-render.
+      function cellSortValue(cell) {
+        if (!cell) return '';
+        var t = (cell.textContent || '').trim();
+        if (/^[-+]?[0-9]/.test(t)) {
+          var n = parseFloat(t.replace(/,/g, '').replace(/%/g, ''));
+          if (!isNaN(n)) return n;
+        }
+        return t.toLowerCase();
+      }
+      function sortTableByHeader(th) {
+        var table = th.closest('table');
+        if (!table || !table.tBodies.length) return;
+        var headRow = th.parentNode;
+        var idx = Array.prototype.indexOf.call(headRow.children, th);
+        if (idx < 0) return;
+        var dir = th.getAttribute('data-sort-dir') === 'asc' ? 'desc' : 'asc';
+        for (var i = 0; i < headRow.children.length; i++) headRow.children[i].removeAttribute('data-sort-dir');
+        th.setAttribute('data-sort-dir', dir);
+        var tbody = table.tBodies[0];
+        var rows = Array.prototype.slice.call(tbody.rows).filter(function(r) { return !r.querySelector('td[colspan]'); });
+        var factor = dir === 'asc' ? 1 : -1;
+        rows.sort(function(a, b) {
+          var av = cellSortValue(a.cells[idx]);
+          var bv = cellSortValue(b.cells[idx]);
+          if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * factor;
+          return String(av).localeCompare(String(bv), undefined, { numeric: true, sensitivity: 'base' }) * factor;
+        });
+        rows.forEach(function(r) { tbody.appendChild(r); });
+      }
+
+      function metricTable(title, firstHeader, rows, columns, tip, pillCols) {
         if (!rows || rows.length === 0) return '';
+        pillCols = pillCols || [];
         var body = rows.map(function(r) {
-          return '<tr><td class="wrap">' + esc(r.name) + '</td>' + columns.map(function(c) { return '<td class="mono">' + esc((r.values && (r.values[c] != null ? r.values[c] : r.values[String(c)])) || '-') + '</td>'; }).join('') + '</tr>';
+          return '<tr><td class="wrap">' + esc(r.name) + '</td>' + columns.map(function(c) {
+            var raw = r.values && (r.values[c] != null ? r.values[c] : r.values[String(c)]);
+            var val = (raw == null || raw === '') ? '-' : raw;
+            if (pillCols.indexOf(c) !== -1 && (val === 'PASS' || val === 'FAIL')) {
+              return '<td><span class="pf-pill ' + (val === 'PASS' ? 'pf-pass' : 'pf-fail') + '">' + esc(val) + '</span></td>';
+            }
+            return '<td class="mono">' + esc(val) + '</td>';
+          }).join('') + '</tr>';
         }).join('');
         return '<section class="panel"><div class="panel-head"><div><div class="panel-title">' + esc(title) + (tip ? infoTip(tip) : '') + '</div></div></div><div class="table-scroll"><table><thead><tr><th>' + esc(firstHeader) + '</th>' + columns.map(function(c) { return '<th>' + esc(c) + '</th>'; }).join('') + '</tr></thead><tbody>' + body + '</tbody></table></div></section>';
       }
@@ -1103,11 +1313,49 @@ export class HTMLDiffReporter {
         return r.harEntryId || ((r.transactionName || '') + '#' + (r.requestSequence == null ? '' : r.requestSequence));
       }
 
+      // One-line description for each drawer tab, shown as a hover tooltip.
+      function tabTip(t) {
+        var tips = {
+          summary: 'Status, scores and a quick overview of this request',
+          bodies: 'Recorded vs replayed request/response bodies, side by side',
+          headers: 'Request & response header diff (match / mismatch / missing)',
+          cookies: 'Cookies sent and received for this request',
+          variables: 'Parameter & correlation variables used in this request',
+          raw: 'The raw exchange JSON for this request'
+        };
+        return tips[t] || t;
+      }
+
       function iterationsForRequest(r) {
         var key = requestKey(r);
         return allResults()
           .filter(function(x) { return requestKey(x) === key; })
           .sort(function(a, b) { return Number(a.iteration) - Number(b.iteration); });
+      }
+
+      // Global request order for the drawer's Prev/Next navigation: by iteration,
+      // then by request sequence within the iteration. Independent of the table
+      // the drawer was opened from, so stepping is always predictable.
+      function orderedResults() {
+        return allResults().slice().sort(function(a, b) {
+          var d = Number(a.iteration) - Number(b.iteration);
+          if (d) return d;
+          return Number(a.requestSequence || 0) - Number(b.requestSequence || 0);
+        });
+      }
+
+      // Resolve the request id delta steps from the current drawer request in
+      // ordered order, or null at the ends.
+      function drawerNeighborId(delta) {
+        var list = orderedResults();
+        var idx = -1;
+        for (var i = 0; i < list.length; i++) {
+          if (requestId(list[i]) === state.drawerId) { idx = i; break; }
+        }
+        if (idx < 0) return null;
+        var n = idx + delta;
+        if (n < 0 || n >= list.length) return null;
+        return requestId(list[n]);
       }
 
       function drawerControls(r) {
@@ -1126,7 +1374,7 @@ export class HTMLDiffReporter {
         if (state.drawerTab === 'bodies') {
           bodyTools =
             '<input class="body-search" id="body-search" type="search" placeholder="Search in bodies" value="' + esc(state.bodySearch) + '" autocomplete="off" />' +
-            '<label class="toggle"><input type="checkbox" id="scroll-sync"' + (state.scrollSync ? ' checked' : '') + ' /> Sync scroll</label>';
+            '<label class="toggle" title="Scroll the recorded and replayed panes together"><input type="checkbox" id="scroll-sync"' + (state.scrollSync ? ' checked' : '') + ' /> Sync scroll</label>';
         }
         return '<div class="drawer-controls">' + iterSelect + bodyTools + '</div>';
       }
@@ -1144,9 +1392,14 @@ export class HTMLDiffReporter {
             '<div class="drawer-head">' +
               '<div><div class="drawer-title">Request #' + esc(r.requestSequence == null ? '-' : r.requestSequence) + ' - ' + esc(r.transactionName || 'Ungrouped') + '</div>' +
                 '<div class="drawer-meta"><span class="pill accent req-id">' + esc(r.harEntryId || 'no-id') + '</span> ' + esc(methodOf(r)) + ' ' + esc(decodeText(urlOf(r))) + '</div></div>' +
-              '<button class="btn" type="button" data-close>Close</button>' +
+              '<button class="btn" type="button" data-close title="Close this request panel (Esc)">Close</button>' +
             '</div>' +
-            '<div class="drawer-tabs">' + tabs.map(function(t) { return '<button type="button" data-tab="' + esc(t) + '" class="' + (state.drawerTab === t ? 'active' : '') + '">' + esc(t.charAt(0).toUpperCase() + t.slice(1)) + '</button>'; }).join('') + '</div>' +
+            '<div class="drawer-tabs">' + tabs.map(function(t) { return '<button type="button" data-tab="' + esc(t) + '" class="' + (state.drawerTab === t ? 'active' : '') + '" title="' + esc(tabTip(t)) + '">' + esc(t.charAt(0).toUpperCase() + t.slice(1)) + '</button>'; }).join('') +
+              '<span class="drawer-nav">' +
+                '<button type="button" class="btn-nav" data-req-nav="prev"' + (drawerNeighborId(-1) ? '' : ' disabled') + ' title="Open the previous request (by iteration, then order)">&#8592; Prev</button>' +
+                '<button type="button" class="btn-nav" data-req-nav="next"' + (drawerNeighborId(1) ? '' : ' disabled') + ' title="Open the next request (by iteration, then order)">Next &#8594;</button>' +
+              '</span>' +
+            '</div>' +
             drawerControls(r) +
             '<div class="drawer-body">' + drawerTabContent(r) + '</div>' +
           '</aside>';
@@ -1157,6 +1410,16 @@ export class HTMLDiffReporter {
       // drawer DOM is in place (innerHTML wipes any prior listeners).
       function bindDrawerInteractions() {
         bindDrawerResizer();
+        // Prev/Next request navigation — keep the current tab so the user stays
+        // on e.g. "Bodies" while stepping through requests.
+        var navBtns = el.drawer.querySelectorAll('[data-req-nav]');
+        for (var ni = 0; ni < navBtns.length; ni++) {
+          navBtns[ni].addEventListener('click', function() {
+            if (this.disabled) return;
+            var target = drawerNeighborId(this.getAttribute('data-req-nav') === 'next' ? 1 : -1);
+            if (target) { state.drawerId = target; renderDrawer(); }
+          });
+        }
         var iterSel = document.getElementById('drawer-iteration');
         if (iterSel) {
           iterSel.addEventListener('change', function() { state.drawerId = this.value; renderDrawer(); });
@@ -1249,14 +1512,14 @@ export class HTMLDiffReporter {
       function drawerSummary(r) {
         var statusSide = effectiveStatusSide(r);
         return '<div class="mini-actions">' +
-            '<button class="btn" data-copy="' + esc(decodeText(urlOf(r))) + '">Copy URL</button>' +
-            '<button class="btn" data-copy="' + esc(JSON.stringify(r, null, 2)) + '">Copy exchange JSON</button>' +
+            '<button class="btn" data-copy="' + esc(decodeText(urlOf(r))) + '" title="Copy this request URL to the clipboard">Copy URL</button>' +
+            '<button class="btn" data-copy="' + esc(JSON.stringify(r, null, 2)) + '" title="Copy the full recorded+replayed exchange as JSON">Copy exchange JSON</button>' +
             '<span class="copy-ok" id="copy-status"></span>' +
           '</div>' +
           '<div class="cards">' +
             '<div class="card"><span class="card-label">Request ID</span><strong class="card-value req-id" style="font-size:15px">' + esc(r.harEntryId || '-') + '</strong></div>' +
             '<div class="card"><span class="card-label">Iteration</span><strong class="card-value">' + esc(r.iteration == null ? '-' : r.iteration) + '</strong></div>' +
-            '<div class="card"><span class="card-label">Score</span><strong class="card-value score ' + scoreClass(r.matchScore) + '">' + esc(r.matchScore) + '%</strong></div>' +
+            '<div class="card"><span class="card-label">Score</span><strong class="card-value ' + (DATA.summary.hasRecording ? 'score ' + scoreClass(r.matchScore) : 'muted') + '">' + (DATA.summary.hasRecording ? esc(r.matchScore) + '%' : '-') + '</strong></div>' +
             '<div class="card"><span class="card-label">State</span><strong class="card-value">' + esc(comparisonLabel(r.comparisonType)) + '</strong></div>' +
             '<div class="card"><span class="card-label">Status</span><strong class="card-value ' + statusClass(statusSide.status) + '">' + esc(statusDisplay(statusSide)) + '</strong></div>' +
             '<div class="card"><span class="card-label">Duration</span><strong class="card-value">' + esc(formatDuration(r.durationMs)) + '</strong></div>' +
@@ -1437,9 +1700,9 @@ export class HTMLDiffReporter {
 
       function drawerVariables(r) {
         var rows = (r.variableEvents || []).map(function(v) {
-          return '<tr><td>' + esc(v.name) + '</td><td>' + esc(v.type) + '</td><td>' + esc(v.action) + '</td><td class="wrap mono">' + esc(decodeText(v.value)) + '</td><td class="wrap">' + esc(v.source || '-') + '</td></tr>';
+          return '<tr><td>' + esc(v.name) + '</td><td>' + esc(v.type) + '</td><td class="wrap mono">' + esc(decodeText(v.value)) + '</td><td class="wrap">' + esc(v.source || '-') + '</td></tr>';
         }).join('');
-        return '<section class="panel"><div class="panel-head"><div><div class="panel-title">Request Variables</div></div></div><div class="table-scroll"><table><thead><tr><th>Name</th><th>Type</th><th>Action</th><th>Value</th><th>Source</th></tr></thead><tbody>' + (rows || '<tr><td colspan="5" class="empty">No variables captured for this request.</td></tr>') + '</tbody></table></div></section>';
+        return '<section class="panel"><div class="panel-head"><div><div class="panel-title">Request Variables</div></div></div><div class="table-scroll"><table><thead><tr><th>Name</th><th>Type</th><th>Value</th><th>Source</th></tr></thead><tbody>' + (rows || '<tr><td colspan="4" class="empty">No variables captured for this request.</td></tr>') + '</tbody></table></div></section>';
       }
 
       // Collapsible raw-JSON block so large dumps don't dominate the panel.
@@ -1450,7 +1713,7 @@ export class HTMLDiffReporter {
       }
 
       function drawerRaw(r) {
-        return '<div class="mini-actions"><button class="btn" data-copy="' + esc(JSON.stringify(r, null, 2)) + '">Copy raw JSON</button><span class="copy-ok" id="copy-status"></span></div>' +
+        return '<div class="mini-actions"><button class="btn" data-copy="' + esc(JSON.stringify(r, null, 2)) + '" title="Copy the raw exchange JSON for this request to the clipboard">Copy raw JSON</button><span class="copy-ok" id="copy-status"></span></div>' +
           rawBlock('Full exchange JSON', r, true) +
           rawBlock('Recorded snapshot', r.recorded || {}, false) +
           rawBlock('Replayed snapshot', r.replayed || {}, false);
@@ -1467,7 +1730,7 @@ export class HTMLDiffReporter {
           performance: DATA.k6Metrics ? 1 : 0
         };
         el.nav.innerHTML = navItems.map(function(item) {
-          return '<button type="button" data-section="' + item[0] + '" title="' + esc(item[1]) + '" class="' + (state.section === item[0] ? 'active' : '') + '"><span class="nav-ico">' + item[2] + '</span><span class="nav-lbl">' + esc(item[1]) + '</span><span class="nav-count">' + esc(counts[item[0]] || 0) + '</span></button>';
+          return '<button type="button" data-section="' + item[0] + '" title="' + esc(item[3] || item[1]) + '" class="' + (state.section === item[0] ? 'active' : '') + '"><span class="nav-ico">' + item[2] + '</span><span class="nav-lbl">' + esc(item[1]) + '</span><span class="nav-count">' + esc(counts[item[0]] || 0) + '</span></button>';
         }).join('');
       }
 
@@ -1523,6 +1786,11 @@ export class HTMLDiffReporter {
         if (jtToggle) {
           var node = jtToggle.closest('.jt-node');
           if (node) node.classList.toggle('collapsed');
+          return;
+        }
+        var sortTh = e.target.closest('th');
+        if (sortTh && sortTh.closest('table')) {
+          sortTableByHeader(sortTh);
           return;
         }
         var sectionBtn = e.target.closest('[data-section]');
@@ -1616,6 +1884,12 @@ export class HTMLDiffReporter {
     const mismatchCount = results.filter((result) => this.hasMismatch(result)).length;
     const worstTransaction = this.findWorstTransaction(results);
     const k6Errors = options?.k6Errors ?? [];
+    // No recording log → every replayed request is replay-only (extra_in_replay)
+    // with nothing to diff against, so match scores are meaningless. Detect that
+    // case so the UI can suppress score columns and warn instead.
+    const hasRecording = results.some(
+      (result) => result.comparisonType === 'matched' || result.comparisonType === 'missing_in_replay',
+    );
 
     return {
       generatedAt: new Date().toISOString(),
@@ -1629,11 +1903,14 @@ export class HTMLDiffReporter {
         mismatchCount,
         worstTransaction,
         status: this.resolveStatus(overallScore, missingCount, replayOnlyCount, mismatchCount, k6Errors.length),
+        hasRecording,
       },
       results,
       k6Errors,
       consoleLogs: options?.consoleLogs ?? [],
       k6Metrics: options?.k6Metrics,
+      runtimeConfig: options?.runtimeConfig,
+      execution: options?.execution,
     };
   }
 

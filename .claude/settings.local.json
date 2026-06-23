@@ -12,7 +12,8 @@
       "Bash(node dist/cli/run.js --help)",
       "Bash(grep -n '`points`\\\\|`metric:foo`\\\\|`metric=foo`' core_engine/src/reporting/RunReportGenerator.ts)",
       "Bash(grep -n '`' core_engine/src/reporting/RunReportGenerator.ts)",
-      "Bash(grep -v '\\\\\\\\\\\\\\\\`')"
+      "Bash(grep -v '\\\\\\\\\\\\\\\\`')",
+      "Bash(python -c ' *)"
     ]
   }
 }

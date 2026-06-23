@@ -11,6 +11,7 @@ import { DiffChecker, DiffResult } from './DiffChecker';
 import { TaggedExchangeLogEntry } from './ExchangeLog';
 import { HTMLDiffReporter } from './HTMLDiffReporter';
 import { ScriptContractGuard } from '../config/ScriptContractGuard';
+import { instrumentVariableTracking } from './VariableInstrumenter';
 
 /** Extract transaction names declared in a script source via transaction() or startTransaction(). */
 function extractTransactionNames(source: string): string[] {
@@ -70,13 +71,18 @@ export interface DebugReplayResult {
 export interface K6MetricRow {
   name: string;
   values: Record<string, string>;
+  /** Transaction-level check outcome (fails === 0). Undefined when no checkrate exists. */
+  passed?: boolean;
 }
 
 export interface K6Metrics {
-  checks: { name: string; passed: boolean }[];
+  /** Per-check pass/fail counts (k6 native passes/fails), attributed to the k6 group (transaction). */
+  checks: { name: string; group: string; passes: number; fails: number; passed: boolean }[];
   transactions: K6MetricRow[];
   http: K6MetricRow[];
   httpSummary: { reqs: string; failedPct: string };
+  /** Aggregate transaction pass/fail (summed `<txn>_checkrate`) — drives the report's "Failed percent". */
+  transactionSummary: { passes: number; fails: number; failedPct: string };
   execution: { duration: string; iterations: string; vus: string };
   network: { received: string; sent: string };
   /** Ordered stat-column ids the report should render for transaction/http tables. */
@@ -133,6 +139,28 @@ export class ReplayRunner {
     const stamp = new Date().toISOString().slice(0, 19).replace(/[-:.]/g, '_');
     const logOutputPath = path.join(tempDir, `${scriptName}_debug_${stamp}.log`);
 
+    // Auto-track every interpolated `${...}` variable for the report by running a
+    // throwaway INSTRUMENTED copy of the script — never the user's file. The copy
+    // is written beside the original (same dir) so its relative imports
+    // (`../../../dist/...`) and data paths (`../Data/*.csv`) resolve identically.
+    // Removed after the run. Falls back to the original script if anything fails.
+    let execScriptPath = absScriptPath;
+    let instrumentedScriptPath: string | undefined;
+    try {
+      const { source: instrumented, wrapped } = instrumentVariableTracking(scriptSource);
+      if (wrapped > 0) {
+        instrumentedScriptPath = path.join(
+          path.dirname(absScriptPath),
+          `.${scriptName}.__debugtrack_${stamp}.js`,
+        );
+        fs.writeFileSync(instrumentedScriptPath, instrumented, 'utf-8');
+        execScriptPath = instrumentedScriptPath;
+        Logger.detail(`Auto-tracking ${wrapped} interpolated variable(s) for the report`);
+      }
+    } catch (err) {
+      Logger.detail(`Variable auto-instrumentation skipped (${(err as Error).message}); using original script`);
+    }
+
     const outputDir = path.dirname(absHtmlPath);
     fs.mkdirSync(outputDir, { recursive: true });
 
@@ -173,57 +201,59 @@ export class ReplayRunner {
     // recap so output appears LIVE instead of dumping at the end of the run.
     const fileWriteSink = new FileWriteSink(outputDir);
     const liveConsole = startLiveConsoleLogStream(logOutputPath, (m) => fileWriteSink.consume(m));
+    const debugK6Options = {
+      noCookiesReset: options.noCookiesReset !== false,
+      summaryTrendStats,
+      scenarios: {
+        debug_replay: {
+          executor: 'per-vu-iterations',
+          vus,
+          iterations,
+          env: {
+            K6_PERF_PHASES: JSON.stringify(
+              ScenarioBuilder.computeDebugPhaseEnvelope({
+                executor: 'per-vu-iterations',
+                vus,
+                iterations,
+              }),
+            ),
+          },
+        }
+      }
+    };
+    const debugEnv: Record<string, string> = {
+      K6_PERF_DEBUG: 'true',
+      ...(transactionNames.length > 0
+        ? { K6_PERF_TRANSACTION_NAMES: JSON.stringify(transactionNames) }
+        : {}),
+      ...(options.teamEnvironments
+        ? { K6_PERF_TEAM_ENVIRONMENTS: JSON.stringify(options.teamEnvironments) }
+        : {}),
+      // Honor the full resolved runtime settings when provided (debug ==
+      // load parity: same http/redirects/timeout/thinkTime/pacing). The
+      // explicit errorBehavior still wins so the debug-specific override is
+      // respected. Falls back to the minimal block for standalone callers.
+      K6_PERF_RUNTIME_METADATA: JSON.stringify(
+        options.runtimeMetadata
+          ? {
+              ...options.runtimeMetadata,
+              errorBehavior:
+                options.errorBehavior
+                ?? (options.runtimeMetadata as { errorBehavior?: string }).errorBehavior
+                ?? 'continue',
+            }
+          : {
+              errorBehavior: options.errorBehavior ?? 'continue',
+              pacing: { enabled: false },
+            },
+      ),
+    };
     let runResult;
     try {
       runResult = await PipelineRunner.executeAsync({
-        scriptPath: absScriptPath,
-        k6Options: {
-          noCookiesReset: options.noCookiesReset !== false,
-          summaryTrendStats,
-          scenarios: {
-            debug_replay: {
-              executor: 'per-vu-iterations',
-              vus,
-              iterations,
-              env: {
-                K6_PERF_PHASES: JSON.stringify(
-                  ScenarioBuilder.computeDebugPhaseEnvelope({
-                    executor: 'per-vu-iterations',
-                    vus,
-                    iterations,
-                  }),
-                ),
-              },
-            }
-          }
-        },
-        env: {
-          K6_PERF_DEBUG: 'true',
-          ...(transactionNames.length > 0
-            ? { K6_PERF_TRANSACTION_NAMES: JSON.stringify(transactionNames) }
-            : {}),
-          ...(options.teamEnvironments
-            ? { K6_PERF_TEAM_ENVIRONMENTS: JSON.stringify(options.teamEnvironments) }
-            : {}),
-          // Honor the full resolved runtime settings when provided (debug ==
-          // load parity: same http/redirects/timeout/thinkTime/pacing). The
-          // explicit errorBehavior still wins so the debug-specific override is
-          // respected. Falls back to the minimal block for standalone callers.
-          K6_PERF_RUNTIME_METADATA: JSON.stringify(
-            options.runtimeMetadata
-              ? {
-                  ...options.runtimeMetadata,
-                  errorBehavior:
-                    options.errorBehavior
-                    ?? (options.runtimeMetadata as { errorBehavior?: string }).errorBehavior
-                    ?? 'continue',
-                }
-              : {
-                  errorBehavior: options.errorBehavior ?? 'continue',
-                  pacing: { enabled: false },
-                },
-          ),
-        },
+        scriptPath: execScriptPath,
+        k6Options: debugK6Options,
+        env: debugEnv,
         // stdout/stderr both inherited (default) so k6's animated progress bar
         // renders in place. The summary is read from `summaryExportPath`, not
         // captured here.
@@ -236,6 +266,10 @@ export class ReplayRunner {
       fileWriteSink.flushFromLog(logOutputPath);
       if (fileWriteSink.fileCount > 0) {
         Logger.detail(`Data files written (writeData): ${fileWriteSink.fileCount} file(s), ${fileWriteSink.writeCount} write(s)`);
+      }
+      // Remove the throwaway instrumented copy — always, even if k6 failed.
+      if (instrumentedScriptPath && fs.existsSync(instrumentedScriptPath)) {
+        try { fs.rmSync(instrumentedScriptPath); } catch { /* ignore */ }
       }
     }
     Logger.info(`\nk6 execution complete.\n`);
@@ -281,7 +315,17 @@ export class ReplayRunner {
     const diffResults = DiffChecker.compareTaggedLogs(recordingEntries, replayEntries, {
       missingRecordingWarning,
     });
-    HTMLDiffReporter.generateReport(diffResults, absHtmlPath, { k6Errors, k6Metrics, consoleLogs });
+    HTMLDiffReporter.generateReport(diffResults, absHtmlPath, {
+      k6Errors,
+      k6Metrics,
+      consoleLogs,
+      runtimeConfig: options.runtimeMetadata,
+      execution: {
+        command: runResult.command,
+        options: debugK6Options,
+        env: debugEnv,
+      },
+    });
     reportSpinner.done('Diff report generated');
 
     // (Script console output is now printed LIVE during the run via the
@@ -596,6 +640,7 @@ export class ReplayRunner {
       transactions: [],
       http: [],
       httpSummary: { reqs: '', failedPct: '' },
+      transactionSummary: { passes: 0, fails: 0, failedPct: '' },
       execution: { duration: '', iterations: '', vus: '' },
       network: { received: '', sent: '' },
       statsColumns,
@@ -623,15 +668,33 @@ export class ReplayRunner {
     const m = parsed.metrics ?? {};
 
     // Checks live under root_group and recurse through nested groups (the
-    // framework wraps each transaction's checks in a k6 group).
-    const collectChecks = (group?: Group): void => {
+    // framework wraps each transaction's checks in a k6 group, so the group key
+    // IS the transaction name). Track that group name so each check is
+    // attributable to its transaction, and surface k6's native passes/fails.
+    const collectChecks = (group?: Group, groupName = ''): void => {
       if (!group) return;
       for (const [name, c] of Object.entries(group.checks ?? {})) {
-        metrics.checks.push({ name, passed: (c.fails ?? 0) === 0 });
+        const passes = c.passes ?? 0;
+        const fails = c.fails ?? 0;
+        metrics.checks.push({ name, group: groupName, passes, fails, passed: fails === 0 });
       }
-      for (const g of Object.values(group.groups ?? {})) collectChecks(g);
+      for (const [childName, g] of Object.entries(group.groups ?? {})) collectChecks(g, childName);
     };
     collectChecks(parsed.root_group);
+
+    // Aggregate transaction pass/fail from every `<txn>_checkrate` Rate so the
+    // report's "Failed percent" reflects transaction outcomes (not http_req_failed).
+    for (const [name, v] of Object.entries(m)) {
+      if (name.endsWith('_checkrate')) {
+        metrics.transactionSummary.passes += v.passes ?? 0;
+        metrics.transactionSummary.fails += v.fails ?? 0;
+      }
+    }
+    {
+      const total = metrics.transactionSummary.passes + metrics.transactionSummary.fails;
+      metrics.transactionSummary.failedPct =
+        total > 0 ? `${((metrics.transactionSummary.fails / total) * 100).toFixed(2)}%` : '';
+    }
 
     const isTrend = (v: MetricVal): boolean => typeof v.avg === 'number';
 
@@ -660,11 +723,18 @@ export class ReplayRunner {
       return out;
     };
 
-    // Transaction timing Trends, in declaration order.
+    // Transaction timing Trends, in declaration order. Carry the transaction's
+    // overall check status (from `<name>_checkrate`) so the report can show a
+    // per-transaction PASS/FAIL alongside the timing stats.
     for (const name of transactionNames) {
       const v = m[name];
       if (!v || !isTrend(v)) continue;
-      metrics.transactions.push({ name, values: buildValues(v, m[`${name}_checkrate`]) });
+      const rate = m[`${name}_checkrate`];
+      metrics.transactions.push({
+        name,
+        values: buildValues(v, rate),
+        passed: rate ? (rate.fails ?? 0) === 0 : undefined,
+      });
     }
 
     // HTTP timing Trends (http_req_*) and execution iteration_duration.

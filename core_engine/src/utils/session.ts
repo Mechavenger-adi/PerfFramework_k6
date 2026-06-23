@@ -243,6 +243,19 @@ export function resolveFrameworkUrl(pathOrUrl: string, options: ResolveFramework
 }
 
 /**
+ * Get the API key injected from .env (K6_API_KEY → K6_PERF_API_KEY).
+ * Returns undefined when no key is configured, so callers can guard:
+ *
+ *   import { getApiKey } from '../../../dist/utils/session.js';
+ *   const key = getApiKey();
+ *   const headers = key ? { Authorization: `Bearer ${key}` } : {};
+ */
+export function getApiKey(): string | undefined {
+  if (typeof __ENV === 'undefined') return undefined;
+  return __ENV.K6_PERF_API_KEY || undefined;
+}
+
+/**
  * Clear all cookies from the VU's cookie jar.
  * - With no arguments: clears cookies for ALL registered base URLs.
  * - With arguments: clears cookies for the given URLs only.

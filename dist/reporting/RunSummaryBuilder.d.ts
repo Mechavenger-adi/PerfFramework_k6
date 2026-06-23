@@ -12,6 +12,13 @@ interface BuildRunSummaryOptions {
         }>;
     };
     transactions: TransactionMetricsFile;
+    /**
+     * Allowed transaction failure rate (percent 0–100), resolved from
+     * global_sla.transaction.errorRate (preferred) or the flat global_sla.errorRate.
+     * The run fails only when the observed transaction failure rate exceeds this.
+     * Defaults to 0 (any transaction failure fails the run) when not configured.
+     */
+    transactionErrorBudget?: number;
 }
 export declare class RunSummaryBuilder {
     static buildCiSummary(options: BuildRunSummaryOptions): CiSummary;
