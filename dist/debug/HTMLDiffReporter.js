@@ -310,6 +310,26 @@ class HTMLDiffReporter {
     .card:hover { box-shadow: var(--shadow-lg); transform: translateY(-1px); }
     .card-label { color: var(--muted); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; }
     .card-value { display: block; margin-top: 10px; font-size: 27px; font-weight: 700; letter-spacing: -.02em; }
+    /* Compact card variant for the runtime-config panel: values are short text
+       (modes, behaviors, stat lists), not headline numbers, so the 27px metric
+       size looks oversized and wraps badly. */
+    .cfg-cards { grid-template-columns: repeat(auto-fit, minmax(168px, 1fr)); gap: 12px; margin-bottom: 16px; }
+    .cfg-cards .card { padding: 12px 14px; }
+    .cfg-cards .card-value { margin-top: 6px; font-size: 15px; font-weight: 650; line-height: 1.35; letter-spacing: 0; word-break: break-word; }
+    .cfg-invocation { padding: 4px 2px 2px; }
+    .cfg-note { color: var(--muted); font-size: 12.5px; margin: 6px 0 12px; line-height: 1.5; }
+    .cfg-h4 { margin: 14px 0 4px; font-size: 13px; font-weight: 700; }
+    .cfg-muted { color: var(--muted); font-weight: 400; font-size: 12px; }
+    /* color: the global pre rule sets light text on a dark bg; cfg-pre uses a
+       theme-adaptive panel bg, so it must also set a theme-adaptive ink color —
+       otherwise it is light-on-light and unreadable in day mode. */
+    .cfg-pre { background: var(--panel-2); color: var(--ink); border: 1px solid var(--border-soft); border-radius: var(--radius-sm); padding: 12px 14px; font-family: var(--mono); font-size: 12px; line-height: 1.5; overflow: auto; white-space: pre-wrap; word-break: break-word; margin: 0; }
+    /* Collapsible Advanced Settings panel (mirrors the run report's adv card). */
+    .cfg-panel > summary { padding: 18px 20px; cursor: pointer; list-style: none; display: flex; flex-direction: column; gap: 3px; }
+    .cfg-panel > summary::-webkit-details-marker { display: none; }
+    .cfg-panel > summary .panel-title::before { content: '\\25B8'; margin-right: 9px; color: var(--muted); font-weight: 400; }
+    .cfg-panel[open] > summary .panel-title::before { content: '\\25BE'; }
+    .cfg-panel[open] > summary { border-bottom: 1px solid var(--border-soft); }
     .panel { margin-bottom: 24px; overflow: hidden; }
     .panel-head {
       padding: 18px 20px;
@@ -330,7 +350,7 @@ class HTMLDiffReporter {
       gap: 18px;
       align-items: start;
     }
-    .table-scroll { width: 100%; overflow: auto; max-height: 72vh; }
+    .table-scroll { width: 100%; overflow: auto; max-height: 72vh; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; }
     table { border-collapse: separate; border-spacing: 0; width: 100%; min-width: 760px; }
     th, td {
       border-bottom: 1px solid var(--border-soft);
@@ -350,7 +370,18 @@ class HTMLDiffReporter {
       text-transform: uppercase;
       letter-spacing: .07em;
       font-weight: 600;
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
     }
+    th:hover { color: var(--ink); }
+    /* Sort affordance: a neutral caret on every header, highlighted + directional
+       once a column is the active sort. Driven purely by data-sort-dir so the
+       header markup stays plain <th>text</th>. */
+    th::after { content: '\\2195'; margin-left: 6px; font-size: 9px; font-weight: 400; opacity: .28; }
+    th[data-sort-dir="asc"]::after { content: '\\2191'; opacity: 1; color: var(--accent); }
+    th[data-sort-dir="desc"]::after { content: '\\2193'; opacity: 1; color: var(--accent); }
+    th[data-sort-dir] { color: var(--ink); }
     tbody tr:last-child td { border-bottom: none; }
     tbody tr:nth-child(even) td { background: color-mix(in srgb, var(--panel-2) 50%, transparent); }
     tbody tr:hover td { background: var(--accent-soft); }
@@ -383,6 +414,10 @@ class HTMLDiffReporter {
     .status-3xx { color: var(--accent); font-weight: 700; }
     .status-4xx { color: var(--warn); font-weight: 700; }
     .status-5xx { color: var(--bad); font-weight: 700; }
+    /* Pass/fail pill for check & transaction status cells. */
+    .pf-pill { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 700; letter-spacing: .03em; }
+    .pf-pass { color: var(--good); background: color-mix(in srgb, var(--good) 14%, transparent); }
+    .pf-fail { color: var(--bad); background: color-mix(in srgb, var(--bad) 14%, transparent); }
     .issue-list { display: flex; flex-wrap: wrap; gap: 5px; }
     .insights { margin: 0; padding-left: 18px; color: var(--ink); line-height: 1.55; }
     .insights li { margin: 7px 0; }
@@ -586,6 +621,16 @@ class HTMLDiffReporter {
       .health { border-left: none; border-top: 1px solid var(--border); width: 100%; padding-top: 14px; }
       .split, .body-grid { grid-template-columns: 1fr; }
       .topbar { top: 0; border-radius: 0; margin-left: -12px; margin-right: -12px; }
+      /* Tables stay readable on narrow screens: drop the wide min-width so they
+         fit the viewport, tighten cell padding, and let the wrapper scroll
+         horizontally only when a table genuinely overflows. */
+      table { min-width: 560px; }
+      th, td { padding: 9px 11px; font-size: 12px; }
+      .table-scroll { max-height: none; }
+    }
+    @media (max-width: 560px) {
+      table { min-width: 0; }
+      td.wrap { min-width: 0; }
     }
   </style>
 </head>
@@ -653,7 +698,7 @@ class HTMLDiffReporter {
         ['transactions', 'Transactions', '\\uD83E\\uDDE9', 'Requests grouped by transaction for blast-radius analysis'],
         ['requests', 'Requests', '\\uD83C\\uDF10', 'Every replayed request; click a row for the full exchange'],
         ['variables', 'Variables', '\\uD83D\\uDD11', 'Parameter & correlation values used in each iteration'],
-        ['runtime', 'Runtime', '\\uD83D\\uDDA5\\uFE0F', 'k6 runtime errors and captured console output'],
+        ['runtime', 'Runtime', '\\uD83D\\uDDA5\\uFE0F', 'k6 runtime errors, console output and the resolved runtime configuration'],
         ['performance', 'Performance', '\\uD83D\\uDCC8', 'k6 metrics: checks, HTTP timings and transaction stats']
       ];
 
@@ -1074,7 +1119,54 @@ class HTMLDiffReporter {
           : '<p class="empty">No script console output captured.</p>';
         el.content.innerHTML =
           '<section class="panel"><div class="panel-head"><div><div class="panel-title">Runtime Errors' + infoTip('k6 runtime errors during replay — fix these before chasing diffs.') + '</div><div class="panel-subtitle">' + esc((DATA.k6Errors || []).length) + ' captured error(s)</div></div></div><div class="panel-body">' + (errors || '<p class="empty">No k6 runtime errors captured.</p>') + '</div></section>' +
-          '<section class="panel"><div class="panel-head"><div><div class="panel-title">Console Output' + infoTip('console.log/warn/error captured from the replay script.') + '</div><div class="panel-subtitle">' + esc((DATA.consoleLogs || []).length) + ' captured line(s)</div></div></div><div class="panel-body">' + logBlocks + '</div></section>';
+          '<section class="panel"><div class="panel-head"><div><div class="panel-title">Console Output' + infoTip('console.log/warn/error captured from the replay script.') + '</div><div class="panel-subtitle">' + esc((DATA.consoleLogs || []).length) + ' captured line(s)</div></div></div><div class="panel-body">' + logBlocks + '</div></section>' +
+          advancedConfigPanel();
+      }
+
+      // "Advanced Settings & Configuration" — mirrors the run report. Shows the
+      // resolved runtime config the framework injected for this debug run so a
+      // script's behavior (timeout/redirects/think-time/pacing) is traceable.
+      // Debug uses the SAME runtime block as a load run, so this also documents
+      // why a script behaved a given way under replay.
+      function advancedConfigPanel() {
+        var rc = DATA.runtimeConfig;
+        var exec = DATA.execution;
+        if (!rc && !exec) return '';
+        var body = '';
+        if (rc) {
+          var tt = rc.thinkTime || {};
+          var http = rc.http || {};
+          var rep = rc.reporting || {};
+          var errs = rc.errors || {};
+          var pacing = rc.pacing || {};
+          var cards = [
+            ['\\uD83D\\uDD52 Think time', tt.mode || '\\u2014'],
+            ['\\u23F1\\uFE0F Pacing', pacing.enabled ? 'enabled' : 'disabled'],
+            ['\\u26A0\\uFE0F Error behavior', rc.errorBehavior || '\\u2014'],
+            ['\\u23F3 HTTP timeout', http.timeoutMs != null ? (http.timeoutMs + ' ms') : '\\u2014'],
+            ['\\u21AA\\uFE0F Max redirects', http.maxRedirects != null ? http.maxRedirects : '\\u2014'],
+            ['\\u274C Throw on error', http.throwOnError ? 'yes' : 'no'],
+            ['\\uD83D\\uDCF8 Snapshots on failure', errs.captureSnapshotOnFailure ? ('on (cap ' + (errs.maxSnapshotsPerRun != null ? errs.maxSnapshotsPerRun : '\\u2014') + ')') : 'off'],
+            ['\\uD83D\\uDCCA Transaction stats', (rep.transactionStats && rep.transactionStats.length) ? rep.transactionStats.join(', ') : '\\u2014']
+          ];
+          var cardsHtml = cards.map(function(c) {
+            return '<div class="card"><span class="card-label">' + esc(c[0]) + '</span><strong class="card-value">' + esc(c[1]) + '</strong></div>';
+          }).join('');
+          body += '<div class="cards cfg-cards">' + cardsHtml + '</div>' + rawBlock('Full runtime config (JSON)', rc, false);
+        }
+        if (exec) {
+          // "How this test was invoked" — the exact k6 command, the resolved
+          // options/scenarios passed via --config, and the injected K6_PERF_*
+          // env. Lets users trace the debug plan → the real k6 run, mirroring
+          // the run report.
+          var invocation =
+            '<p class="cfg-note">The framework launches k6 with a generated <code>--config</code> (resolved options/scenarios) and an injected <code>K6_PERF_*</code> environment. Below is exactly how this debug run was invoked.</p>' +
+            (exec.command ? '<h4 class="cfg-h4">1 \\u00B7 k6 command</h4><pre class="cfg-pre">' + esc(exec.command) + '</pre>' : '') +
+            '<h4 class="cfg-h4">2 \\u00B7 Resolved options &amp; scenarios <span class="cfg-muted">(passed to k6 via --config)</span></h4>' + rawBlock('Resolved k6 options (JSON)', exec.options || {}, false) +
+            '<h4 class="cfg-h4">3 \\u00B7 Injected environment <span class="cfg-muted">(K6_PERF_* variables)</span></h4>' + rawBlock('Injected env (JSON)', exec.env || {}, false);
+          body += '<details class="raw-block" style="margin-top:6px"><summary>How this test was invoked by the framework</summary><div class="cfg-invocation">' + invocation + '</div></details>';
+        }
+        return '<details class="panel cfg-panel"><summary><div class="panel-title">\\u2699\\uFE0F Advanced Settings &amp; Configuration' + infoTip('The resolved runtime configuration and how the framework invoked k6 for this debug run.') + '</div><div class="panel-subtitle">For developer reference \\u2014 not required for interpreting the diff. Debug honors the same runtime settings as a load run.</div></summary><div class="panel-body">' + body + '</div></details>';
       }
 
       function renderPerformance() {
@@ -1083,25 +1175,100 @@ class HTMLDiffReporter {
           el.content.innerHTML = '<section class="panel"><div class="panel-head"><div><div class="panel-title">Performance</div></div></div><div class="panel-body"><p class="empty">No performance metrics were embedded in this debug report.</p></div></section>';
           return;
         }
+        var txSummary = m.transactionSummary || { failedPct: '' };
         var overview = [
           ['Total requests', m.httpSummary && m.httpSummary.reqs],
-          ['Failed percent', m.httpSummary && m.httpSummary.failedPct],
+          // "Failed percent" is transaction-based (summed <txn>_checkrate fails),
+          // not http_req_failed — a transaction can fail on a check while every
+          // HTTP request returned 2xx. HTTP-level failures are a separate card.
+          ['Failed percent', txSummary.failedPct],
+          ['HTTP req failed', m.httpSummary && m.httpSummary.failedPct],
           ['Iterations', m.execution && m.execution.iterations],
           ['VUs', m.execution && m.execution.vus],
           ['Data received', m.network && m.network.received],
           ['Data sent', m.network && m.network.sent]
         ].filter(function(x) { return x[1]; });
+
+        // Per-check rows: k6 native passes/fails counts, attributed to the
+        // transaction (k6 group), with a colored PASS/FAIL status pill.
+        var checkRows = (m.checks || []).map(function(c) {
+          return { name: c.name, values: {
+            Transaction: c.group || '\\u2014',
+            Passes: String(c.passes),
+            Fails: String(c.fails),
+            Status: c.passed ? 'PASS' : 'FAIL'
+          } };
+        });
+
+        // Per-transaction timing rows + an overall check Status column derived
+        // from <txn>_checkrate (fails === 0). Status is appended only when the
+        // run actually recorded transaction checkrates.
+        var baseStats = (m.statsColumns || ['min', 'avg', 'max', 'p(90)', 'p(95)']);
+        var hasTxStatus = (m.transactions || []).some(function(t) { return t.passed != null; });
+        var txRows = (m.transactions || []).map(function(t) {
+          var v = Object.assign({}, t.values);
+          if (t.passed != null) v.Status = t.passed ? 'PASS' : 'FAIL';
+          return { name: t.name, values: v };
+        });
+        var txCols = hasTxStatus ? baseStats.concat(['Status']) : baseStats;
+
         el.content.innerHTML =
           '<div class="cards">' + overview.map(function(c) { return '<div class="card"><span class="card-label">' + esc(c[0]) + '</span><strong class="card-value">' + esc(c[1]) + '</strong></div>'; }).join('') + '</div>' +
-          metricTable('Checks', 'Check', (m.checks || []).map(function(c) { return { name: c.name, values: { Status: c.passed ? 'PASS' : 'FAIL' } }; }), ['Status'], 'Pass/fail result of each k6 check during the debug run.') +
-          metricTable('HTTP Metrics', 'Metric', m.http || [], (m.statsColumns || ['min', 'avg', 'max', 'p(90)', 'p(95)']).filter(function(c) { return c !== 'pass' && c !== 'fail'; }), 'k6 HTTP timing metrics for the debug run.') +
-          metricTable('Transaction Timings', 'Transaction', m.transactions || [], m.statsColumns || ['min', 'avg', 'max', 'p(90)', 'p(95)'], 'Per-transaction response-time stats for the debug run.');
+          metricTable('Checks', 'Check', checkRows, ['Transaction', 'Passes', 'Fails', 'Status'], 'Per-check pass/fail counts as k6 reports them, grouped by the transaction the check ran in.', ['Status']) +
+          metricTable('HTTP Metrics', 'Metric', m.http || [], baseStats.filter(function(c) { return c !== 'pass' && c !== 'fail'; }), 'k6 HTTP timing metrics for the debug run.') +
+          metricTable('Transaction Timings', 'Transaction', txRows, txCols, 'Per-transaction response-time stats and overall check status for the debug run.', ['Status']);
       }
 
-      function metricTable(title, firstHeader, rows, columns, tip) {
+      // pillCols: column names whose PASS/FAIL value should render as a colored
+      // pill instead of plain mono text (used for check & transaction status).
+      // Client-side column sort, shared by every table in the report. Operates
+      // directly on the rendered DOM (reorders <tbody> rows) so it needs no
+      // per-table wiring — a delegated <th> click calls this. Numeric-aware:
+      // cells like "120ms", "0.00%" or "1,024" sort as numbers; text (PASS/FAIL,
+      // URLs) sorts case-insensitively. Empty-state rows (td[colspan]) are left
+      // in place. Sort is a view operation and resets on the next re-render.
+      function cellSortValue(cell) {
+        if (!cell) return '';
+        var t = (cell.textContent || '').trim();
+        if (/^[-+]?[0-9]/.test(t)) {
+          var n = parseFloat(t.replace(/,/g, '').replace(/%/g, ''));
+          if (!isNaN(n)) return n;
+        }
+        return t.toLowerCase();
+      }
+      function sortTableByHeader(th) {
+        var table = th.closest('table');
+        if (!table || !table.tBodies.length) return;
+        var headRow = th.parentNode;
+        var idx = Array.prototype.indexOf.call(headRow.children, th);
+        if (idx < 0) return;
+        var dir = th.getAttribute('data-sort-dir') === 'asc' ? 'desc' : 'asc';
+        for (var i = 0; i < headRow.children.length; i++) headRow.children[i].removeAttribute('data-sort-dir');
+        th.setAttribute('data-sort-dir', dir);
+        var tbody = table.tBodies[0];
+        var rows = Array.prototype.slice.call(tbody.rows).filter(function(r) { return !r.querySelector('td[colspan]'); });
+        var factor = dir === 'asc' ? 1 : -1;
+        rows.sort(function(a, b) {
+          var av = cellSortValue(a.cells[idx]);
+          var bv = cellSortValue(b.cells[idx]);
+          if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * factor;
+          return String(av).localeCompare(String(bv), undefined, { numeric: true, sensitivity: 'base' }) * factor;
+        });
+        rows.forEach(function(r) { tbody.appendChild(r); });
+      }
+
+      function metricTable(title, firstHeader, rows, columns, tip, pillCols) {
         if (!rows || rows.length === 0) return '';
+        pillCols = pillCols || [];
         var body = rows.map(function(r) {
-          return '<tr><td class="wrap">' + esc(r.name) + '</td>' + columns.map(function(c) { return '<td class="mono">' + esc((r.values && (r.values[c] != null ? r.values[c] : r.values[String(c)])) || '-') + '</td>'; }).join('') + '</tr>';
+          return '<tr><td class="wrap">' + esc(r.name) + '</td>' + columns.map(function(c) {
+            var raw = r.values && (r.values[c] != null ? r.values[c] : r.values[String(c)]);
+            var val = (raw == null || raw === '') ? '-' : raw;
+            if (pillCols.indexOf(c) !== -1 && (val === 'PASS' || val === 'FAIL')) {
+              return '<td><span class="pf-pill ' + (val === 'PASS' ? 'pf-pass' : 'pf-fail') + '">' + esc(val) + '</span></td>';
+            }
+            return '<td class="mono">' + esc(val) + '</td>';
+          }).join('') + '</tr>';
         }).join('');
         return '<section class="panel"><div class="panel-head"><div><div class="panel-title">' + esc(title) + (tip ? infoTip(tip) : '') + '</div></div></div><div class="table-scroll"><table><thead><tr><th>' + esc(firstHeader) + '</th>' + columns.map(function(c) { return '<th>' + esc(c) + '</th>'; }).join('') + '</tr></thead><tbody>' + body + '</tbody></table></div></section>';
       }
@@ -1606,6 +1773,11 @@ class HTMLDiffReporter {
           if (node) node.classList.toggle('collapsed');
           return;
         }
+        var sortTh = e.target.closest('th');
+        if (sortTh && sortTh.closest('table')) {
+          sortTableByHeader(sortTh);
+          return;
+        }
         var sectionBtn = e.target.closest('[data-section]');
         if (sectionBtn) {
           state.section = sectionBtn.getAttribute('data-section');
@@ -1718,6 +1890,8 @@ class HTMLDiffReporter {
             k6Errors,
             consoleLogs: options?.consoleLogs ?? [],
             k6Metrics: options?.k6Metrics,
+            runtimeConfig: options?.runtimeConfig,
+            execution: options?.execution,
         };
     }
     static hasMismatch(result) {

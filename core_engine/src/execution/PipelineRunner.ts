@@ -47,6 +47,8 @@ export interface PipelineRunResult {
   reportDir?: string;
   runId?: string;
   runManifestPath?: string;
+  /** The exact k6 command line the framework launched (for report/debug traceability). */
+  command?: string;
 }
 
 export class PipelineRunner {
@@ -217,6 +219,7 @@ export class PipelineRunner {
       ...(logPathFwd ? ['--log-output', `file=${logPathFwd}`] : []),
       ...extraK6Args,
     ];
+    const k6Command = `k6 ${k6Args.join(' ')}`;
 
     return new Promise((resolve, reject) => {
       // stdio strategy:
@@ -298,6 +301,7 @@ export class PipelineRunner {
           reportDir,
           runId,
           runManifestPath,
+          command: k6Command,
         });
       });
     });

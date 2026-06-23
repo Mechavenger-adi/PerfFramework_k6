@@ -176,6 +176,7 @@ class PipelineRunner {
             ...(logPathFwd ? ['--log-output', `file=${logPathFwd}`] : []),
             ...extraK6Args,
         ];
+        const k6Command = `k6 ${k6Args.join(' ')}`;
         return new Promise((resolve, reject) => {
             // stdio strategy:
             //   captureOutput=true  → fully piped (no TTY, full capture)
@@ -258,6 +259,7 @@ class PipelineRunner {
                     reportDir,
                     runId,
                     runManifestPath,
+                    command: k6Command,
                 });
             });
         });
