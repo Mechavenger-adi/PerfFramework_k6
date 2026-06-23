@@ -1,0 +1,57 @@
+{
+  "$schema": "../schemas/runtime_settings.schema.json",
+  "thinkTime": {
+    "ignoreThinkTime": false,
+    "globalOverride": true,
+    "mode": "fixed",
+    "fixed": 5
+  },
+  "pacing": {
+    "enabled": false,
+    "mode": "fixed",
+    "fixed": 5,
+    "min": 1,
+    "max": 5
+  },
+  "http": {
+    "timeoutSeconds": 60,
+    "maxRedirects": 0,
+    "throwOnError": true
+  },
+  "errorBehavior": "continue",
+  "reporting": {
+    "transactionStats": [
+      "count",
+      "pass",
+      "fail",
+      "avg",
+      "min",
+      "max",
+      "std",
+      "p(90)",
+      "p(99)"
+    ],
+    "includeTransactionTable": true,
+    "includeErrorTable": true,
+    "overrideExistingResults": false,
+    "timeseries": {
+      "enabled": true,
+      "bucketSizeSeconds": 2
+    }
+  },
+  "errors": {
+    "captureSnapshotOnFailure": true,
+    "maxSnapshotsPerRun": 20,
+    "includeRequestHeaders": true,
+    "includeRequestBody": true,
+    "includeResponseHeaders": true,
+    "includeResponseBody": false
+  },
+  "monitoring": {
+    "enabled": true,
+    "cpuWarningPercent": 80,
+    "memoryWarningPercent": 80,
+    "sampleIntervalSeconds": 5
+  },
+  "debugMode": false
+}

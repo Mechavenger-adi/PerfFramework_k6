@@ -1,0 +1,54 @@
+{
+  "$schema": "../schemas/test_plan.schema.json",
+  "name": "WebUI Load Test - jpet",
+  "environment": "dev",
+  "execution_mode": "parallel",
+  "global_load_profile": {
+    "executor": "ramping-vus",
+    "startVUs": 0,
+    "stages": [
+            { "duration": "5s", "target": 3 },
+      { "duration": "60s",  "target": 3 },
+      { "duration": "5s", "target": 0  }
+    ],
+    "gracefulRampDown": "1m",
+    "gracefulStop": "2m"
+  },
+  "noCookiesReset": true,
+  
+  "user_journeys": [
+    {
+      "name": "buy_working_covert",
+      "scriptPath": "buy_working_covert.js",
+      "weight": 100
+    }
+  ],
+  "global_sla": {
+    "request": {
+      "errorRate": 10
+    },
+    "transaction": {
+      "p90": 200,
+      "p99": 5000,
+      "p95": 2000
+    }
+  },
+  "journey_slas": {
+    "buy_working_covert": {
+      "p95": 500,
+      "errorRate": 5
+    }
+  },
+  "transaction_slas": {
+    "t01_launch": {
+      "p95": 800
+    },
+    "t02_login": {
+      "p95": 1000
+    },
+    "click_confirm": {
+      "p95": 1500,
+      "p99": 3000
+    }
+  }
+}

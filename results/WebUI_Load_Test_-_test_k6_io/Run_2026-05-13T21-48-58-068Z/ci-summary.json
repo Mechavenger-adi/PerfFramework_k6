@@ -1,0 +1,108 @@
+{
+  "status": "failed",
+  "runId": "Run_2026-05-13T21-48-58-068Z",
+  "plan": "WebUI Load Test - test.k6.io",
+  "environment": "dev",
+  "thresholdFailures": 2,
+  "errorCount": 1,
+  "warningCount": 2,
+  "aborted": false,
+  "transactions": [
+    {
+      "name": "add to cart",
+      "count": 5,
+      "pass": 5,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 474.6,
+      "min": 451,
+      "max": 490
+    },
+    {
+      "name": "click confirm",
+      "count": 5,
+      "pass": 5,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 464.4,
+      "min": 443,
+      "max": 495
+    },
+    {
+      "name": "click continue",
+      "count": 5,
+      "pass": 5,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 196.4,
+      "min": 187,
+      "max": 203
+    },
+    {
+      "name": "increase quantity to 2 and proceed to checkout",
+      "count": 5,
+      "pass": 5,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 476.8,
+      "min": 453,
+      "max": 493
+    },
+    {
+      "name": "logout",
+      "count": 2,
+      "pass": 2,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 475.5,
+      "min": 452,
+      "max": 499
+    },
+    {
+      "name": "search_animal",
+      "count": 5,
+      "pass": 5,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 197,
+      "min": 188,
+      "max": 205
+    },
+    {
+      "name": "select product",
+      "count": 5,
+      "pass": 5,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 301.4,
+      "min": 284,
+      "max": 316
+    },
+    {
+      "name": "t01_launch",
+      "count": 2,
+      "pass": 2,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 496.5,
+      "min": 359,
+      "max": 634
+    },
+    {
+      "name": "t02_login",
+      "count": 2,
+      "pass": 2,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 768,
+      "min": 643,
+      "max": 893
+    }
+  ],
+  "gate": {
+    "failedRules": [
+      "http_req_failed:rate<0.1",
+      "http_req_failed{scenario:buy_animal_14thmay}:rate<0.05"
+    ]
+  }
+}

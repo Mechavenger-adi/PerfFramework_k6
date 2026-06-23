@@ -1,4 +1,18 @@
 {
+  "$schema": "../schemas/environment.schema.json",
   "name": "dev",
-  "baseUrl": "https://test-api.k6.io"
+  "testSuites": {
+    "sample_team": {
+      "baseUrl": "https://sample_team.dev.your-company.com",
+      "serviceUrls": {
+        "auth": "https://auth.sample_team.dev.your-company.com"
+      },
+      "custom": {
+        "tenantId": "sample_team-dev"
+      }
+    },
+    "jpet_new": {
+      "baseUrl": "https://jpetstore.aspectran.com"
+    }
+  }
 }

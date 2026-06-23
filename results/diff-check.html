@@ -1,0 +1,41 @@
+
+      <html>
+        <head>
+          <title>k6 Debug Replay Diff</title>
+          <style>
+            body { font-family: sans-serif; padding: 20px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #ccc; padding: 10px; text-align: left; }
+            th { background-color: #f4f4f4; }
+          </style>
+        </head>
+        <body>
+          <h1>Debug Replay Diff Report</h1>
+          <p>Comparison of recorded HAR vs Replay Execution</p>
+          <table>
+            <thead>
+              <tr>
+                <th>Entry ID</th>
+                <th>URL Match</th>
+                <th>Status Match</th>
+                <th>Body Match</th>
+                <th>Match Score</th>
+                <th>Header Diffs</th>
+              </tr>
+            </thead>
+            <tbody>
+              
+        <tr style="background-color: orange20;">
+          <td>req_1</td>
+          <td></td>
+          <td></td>
+          <td></td>
+          <td>75%</td>
+          <td>Missing: x-test</td>
+        </tr>
+      
+            </tbody>
+          </table>
+        </body>
+      </html>
+    

@@ -1,0 +1,52 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "k6-perf/environment",
+  "title": "K6-PerfFramework Environment Configuration",
+  "description": "Defines target environment settings: base URL, optional service URLs, optional per-team overrides, and custom key-value pairs. The environment name must match the 'environment' field in your test plan. Secrets (API keys, passwords) should go in .env, not here.",
+  "type": "object",
+  "required": ["name"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "JSON Schema reference for editor IntelliSense (ignored at runtime)."
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Logical environment name. Must match the filename (e.g., 'dev' for dev.json). Referenced by the test plan's 'environment' field. Common values: dev, staging, uat, preprod, prod."
+    },
+    "testSuites": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "baseUrl": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Team-specific base URL for the system under test."
+          },
+          "serviceUrls": {
+            "type": "object",
+            "additionalProperties": { "type": "string" },
+            "description": "Optional team-specific service URL overrides keyed by service name."
+          },
+          "custom": {
+            "type": "object",
+            "additionalProperties": {
+              "oneOf": [
+                { "type": "string" },
+                { "type": "number" },
+                { "type": "boolean" }
+              ]
+            },
+            "description": "Optional team-specific custom values."
+          }
+        },
+        "required": ["baseUrl"]
+      },
+      "description": "Team-specific environments keyed by the testSuites/<team> folder name. Example: { \"retail-ui\": { \"baseUrl\": \"https://retail-dev.example.com\" } }."
+    }
+  }
+}

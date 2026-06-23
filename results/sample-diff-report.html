@@ -1,0 +1,649 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>k6 Debug Replay Diff</title>
+    <style>
+      :root {
+        --bg: #f4f1ea;
+        --surface: #fffdf8;
+        --surface-strong: #f8f4ec;
+        --ink: #1f2937;
+        --muted: #5b6574;
+        --border: #d8d1c3;
+        --good: #2e7d32;
+        --warn: #c77d00;
+        --bad: #c0392b;
+        --accent: #255f85;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        padding: 32px;
+        background: linear-gradient(180deg, #f7f4ee 0%, #efe8dc 100%);
+        color: var(--ink);
+        font-family: Georgia, "Times New Roman", serif;
+      }
+      .shell {
+        max-width: 1400px;
+        margin: 0 auto;
+      }
+      .hero {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        padding: 24px;
+        box-shadow: 0 12px 30px rgba(62, 45, 23, 0.08);
+      }
+      h1, h2, h3, h4 { margin: 0; }
+      h1 { font-size: 32px; margin-bottom: 6px; }
+      p { color: var(--muted); }
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 14px;
+        margin-top: 22px;
+      }
+      .stat {
+        background: var(--surface-strong);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 14px 16px;
+      }
+      .stat .label {
+        display: block;
+        color: var(--muted);
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+      .stat .value {
+        display: block;
+        margin-top: 6px;
+        font-size: 28px;
+        font-weight: bold;
+      }
+      .transaction {
+        margin-top: 24px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        overflow: hidden;
+        box-shadow: 0 12px 30px rgba(62, 45, 23, 0.08);
+      }
+      .transaction-header {
+        padding: 18px 22px;
+        border-bottom: 1px solid var(--border);
+        background: linear-gradient(90deg, rgba(37,95,133,0.08), rgba(255,255,255,0));
+      }
+      .transaction-meta {
+        color: var(--muted);
+        margin-top: 6px;
+      }
+      .step {
+        padding: 20px 22px;
+        border-top: 1px solid rgba(216, 209, 195, 0.55);
+      }
+      .step:first-child {
+        border-top: 0;
+      }
+      .step-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      .score {
+        padding: 6px 10px;
+        border-radius: 999px;
+        color: white;
+        font-weight: bold;
+        min-width: 70px;
+        text-align: center;
+      }
+      .score.good { background: var(--good); }
+      .score.warn { background: var(--warn); }
+      .score.bad { background: var(--bad); }
+      .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 10px;
+      }
+      .chip {
+        border-radius: 999px;
+        padding: 6px 10px;
+        font-size: 12px;
+        border: 1px solid var(--border);
+        background: var(--surface-strong);
+      }
+      .chip.good { color: var(--good); }
+      .chip.bad { color: var(--bad); }
+      .chip.warn { color: var(--warn); }
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 18px;
+        margin-top: 18px;
+      }
+      .panel {
+        background: var(--surface-strong);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 14px;
+      }
+      .panel h4 {
+        margin-bottom: 10px;
+      }
+      .kv {
+        display: grid;
+        grid-template-columns: 110px 1fr;
+        gap: 8px 10px;
+        margin-bottom: 12px;
+        font-size: 14px;
+      }
+      .kv .key {
+        color: var(--muted);
+        font-weight: bold;
+      }
+      details {
+        margin-top: 12px;
+        border-top: 1px dashed var(--border);
+        padding-top: 12px;
+      }
+      summary {
+        cursor: pointer;
+        font-weight: bold;
+      }
+      pre {
+        margin: 10px 0 0;
+        white-space: pre-wrap;
+        word-break: break-word;
+        background: #f2ecdf;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 12px;
+        font-size: 12px;
+        line-height: 1.45;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+        font-size: 13px;
+      }
+      th, td {
+        border-bottom: 1px solid var(--border);
+        text-align: left;
+        vertical-align: top;
+        padding: 8px 6px;
+      }
+      th { color: var(--muted); }
+      .diff-match { color: var(--good); }
+      .diff-mismatch, .diff-missing { color: var(--bad); }
+      .diff-extra { color: var(--warn); }
+      @media (max-width: 960px) {
+        body { padding: 16px; }
+        .grid { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <section class="hero">
+        <h1>Debug Replay Diff Report</h1>
+        <p>Recorded HAR traffic vs replayed execution, grouped by transaction and expanded by request/response details.</p>
+        <div class="stats">
+          <div class="stat">
+            <span class="label">Overall Score</span>
+            <span class="value">74%</span>
+          </div>
+          <div class="stat">
+            <span class="label">Compared Steps</span>
+            <span class="value">3</span>
+          </div>
+          <div class="stat">
+            <span class="label">Transactions</span>
+            <span class="value">2</span>
+          </div>
+          <div class="stat">
+            <span class="label">High Mismatch Steps</span>
+            <span class="value">2</span>
+          </div>
+        </div>
+      </section>
+      <section class="transaction">
+      <div class="transaction-header">
+        <h2>T01_Login</h2>
+        <div class="transaction-meta">2 step(s), average match 76%</div>
+      </div>
+      <article class="step">
+      <div class="step-header">
+        <div>
+          <h3>req_1</h3>
+          <div class="transaction-meta">GET https://api.example.com/auth/csrf-token</div>
+        </div>
+        <div class="score warn">84%</div>
+      </div>
+      <div class="chips">
+        <span class="chip good">Method match</span>
+        <span class="chip good">URL match</span>
+        <span class="chip good">Status match</span>
+        <span class="chip good">Request headers match</span>
+        <span class="chip warn">Response headers 1 diff</span>
+        <span class="chip good">Request body 100%</span>
+        <span class="chip good">Response body 100%</span>
+      </div>
+      <div class="grid">
+        <section class="panel">
+          <h4>Recorded</h4>
+          <div class="kv">
+      <div class="key">Method</div><div>GET</div>
+      <div class="key">URL</div><div>https://api.example.com/auth/csrf-token</div>
+      <div class="key">Status</div><div>200</div>
+      <div class="key">Req Headers</div><div>1</div>
+      <div class="key">Resp Headers</div><div>2</div>
+    </div>
+    <details>
+      <summary>Request Headers</summary>
+      <pre>Accept: application/json</pre>
+    </details>
+    <details>
+      <summary>Response Headers</summary>
+      <pre>content-type: application/json
+cache-control: no-cache</pre>
+    </details>
+        </section>
+        <section class="panel">
+          <h4>Replayed</h4>
+          <div class="kv">
+      <div class="key">Method</div><div>GET</div>
+      <div class="key">URL</div><div>https://api.example.com/auth/csrf-token</div>
+      <div class="key">Status</div><div>200</div>
+      <div class="key">Req Headers</div><div>1</div>
+      <div class="key">Resp Headers</div><div>1</div>
+    </div>
+    <details>
+      <summary>Request Headers</summary>
+      <pre>Accept: application/json</pre>
+    </details>
+    <details>
+      <summary>Response Headers</summary>
+      <pre>content-type: application/json</pre>
+    </details>
+        </section>
+      </div>
+      <details>
+        <summary>Request Diff Details</summary>
+        <div class="grid">
+          <section class="panel">
+            <h4>Request Header Diff</h4>
+            <table>
+      <thead>
+        <tr>
+          <th>Header</th>
+          <th>Recorded</th>
+          <th>Replayed</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+        <td>accept</td>
+        <td>application/json</td>
+        <td>application/json</td>
+        <td class="diff-match">match</td>
+      </tr></tbody>
+    </table>
+          </section>
+          <section class="panel">
+            <h4>Request Body Diff</h4>
+            <p>Both bodies are empty.</p>
+            <div class="grid">
+              <div>
+                <div class="transaction-meta">Recorded body</div>
+                <pre>(empty)</pre>
+              </div>
+              <div>
+                <div class="transaction-meta">Replayed body</div>
+                <pre>(empty)</pre>
+              </div>
+            </div>
+          </section>
+        </div>
+      </details>
+      <details>
+        <summary>Response Diff Details</summary>
+        <div class="grid">
+          <section class="panel">
+            <h4>Response Header Diff</h4>
+            <table>
+      <thead>
+        <tr>
+          <th>Header</th>
+          <th>Recorded</th>
+          <th>Replayed</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+        <td>cache-control</td>
+        <td>no-cache</td>
+        <td></td>
+        <td class="diff-missing">missing_in_replay</td>
+      </tr>
+<tr>
+        <td>content-type</td>
+        <td>application/json</td>
+        <td>application/json</td>
+        <td class="diff-match">match</td>
+      </tr></tbody>
+    </table>
+          </section>
+          <section class="panel">
+            <h4>Response Body Diff</h4>
+            <p>Bodies match exactly.</p>
+            <div class="grid">
+              <div>
+                <div class="transaction-meta">Recorded body</div>
+                <pre>{&quot;token&quot;:&quot;abc123&quot;}</pre>
+              </div>
+              <div>
+                <div class="transaction-meta">Replayed body</div>
+                <pre>{&quot;token&quot;:&quot;abc123&quot;}</pre>
+              </div>
+            </div>
+          </section>
+        </div>
+      </details>
+    </article>
+<article class="step">
+      <div class="step-header">
+        <div>
+          <h3>req_2</h3>
+          <div class="transaction-meta">POST https://api.example.com/auth/login</div>
+        </div>
+        <div class="score bad">67%</div>
+      </div>
+      <div class="chips">
+        <span class="chip good">Method match</span>
+        <span class="chip good">URL match</span>
+        <span class="chip bad">Status diff</span>
+        <span class="chip good">Request headers match</span>
+        <span class="chip good">Response headers match</span>
+        <span class="chip good">Request body 98%</span>
+        <span class="chip warn">Response body 33%</span>
+      </div>
+      <div class="grid">
+        <section class="panel">
+          <h4>Recorded</h4>
+          <div class="kv">
+      <div class="key">Method</div><div>POST</div>
+      <div class="key">URL</div><div>https://api.example.com/auth/login</div>
+      <div class="key">Status</div><div>200</div>
+      <div class="key">Req Headers</div><div>2</div>
+      <div class="key">Resp Headers</div><div>1</div>
+    </div>
+    <details>
+      <summary>Request Headers</summary>
+      <pre>Content-Type: application/json
+Accept: application/json</pre>
+    </details>
+    <details>
+      <summary>Response Headers</summary>
+      <pre>content-type: application/json</pre>
+    </details>
+        </section>
+        <section class="panel">
+          <h4>Replayed</h4>
+          <div class="kv">
+      <div class="key">Method</div><div>POST</div>
+      <div class="key">URL</div><div>https://api.example.com/auth/login</div>
+      <div class="key">Status</div><div>401</div>
+      <div class="key">Req Headers</div><div>2</div>
+      <div class="key">Resp Headers</div><div>1</div>
+    </div>
+    <details>
+      <summary>Request Headers</summary>
+      <pre>Content-Type: application/json
+Accept: application/json</pre>
+    </details>
+    <details>
+      <summary>Response Headers</summary>
+      <pre>content-type: application/json</pre>
+    </details>
+        </section>
+      </div>
+      <details>
+        <summary>Request Diff Details</summary>
+        <div class="grid">
+          <section class="panel">
+            <h4>Request Header Diff</h4>
+            <table>
+      <thead>
+        <tr>
+          <th>Header</th>
+          <th>Recorded</th>
+          <th>Replayed</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+        <td>accept</td>
+        <td>application/json</td>
+        <td>application/json</td>
+        <td class="diff-match">match</td>
+      </tr>
+<tr>
+        <td>content-type</td>
+        <td>application/json</td>
+        <td>application/json</td>
+        <td class="diff-match">match</td>
+      </tr></tbody>
+    </table>
+          </section>
+          <section class="panel">
+            <h4>Request Body Diff</h4>
+            <p>Length delta 1 chars. Similarity 98%.</p>
+            <div class="grid">
+              <div>
+                <div class="transaction-meta">Recorded body</div>
+                <pre>{&quot;username&quot;:&quot;user&quot;,&quot;password&quot;:&quot;secret&quot;}</pre>
+              </div>
+              <div>
+                <div class="transaction-meta">Replayed body</div>
+                <pre>{&quot;username&quot;:&quot;user&quot;,&quot;password&quot;:&quot;secret2&quot;}</pre>
+              </div>
+            </div>
+          </section>
+        </div>
+      </details>
+      <details>
+        <summary>Response Diff Details</summary>
+        <div class="grid">
+          <section class="panel">
+            <h4>Response Header Diff</h4>
+            <table>
+      <thead>
+        <tr>
+          <th>Header</th>
+          <th>Recorded</th>
+          <th>Replayed</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+        <td>content-type</td>
+        <td>application/json</td>
+        <td>application/json</td>
+        <td class="diff-match">match</td>
+      </tr></tbody>
+    </table>
+          </section>
+          <section class="panel">
+            <h4>Response Body Diff</h4>
+            <p>Length delta 7 chars. Similarity 33%.</p>
+            <div class="grid">
+              <div>
+                <div class="transaction-meta">Recorded body</div>
+                <pre>{&quot;session&quot;:&quot;xyz&quot;}</pre>
+              </div>
+              <div>
+                <div class="transaction-meta">Replayed body</div>
+                <pre>{&quot;error&quot;:&quot;unauthorized&quot;}</pre>
+              </div>
+            </div>
+          </section>
+        </div>
+      </details>
+    </article>
+    </section>
+<section class="transaction">
+      <div class="transaction-header">
+        <h2>T02_Dashboard</h2>
+        <div class="transaction-meta">1 step(s), average match 71%</div>
+      </div>
+      <article class="step">
+      <div class="step-header">
+        <div>
+          <h3>req_3</h3>
+          <div class="transaction-meta">GET https://api.example.com/user/profile</div>
+        </div>
+        <div class="score warn">71%</div>
+      </div>
+      <div class="chips">
+        <span class="chip good">Method match</span>
+        <span class="chip good">URL match</span>
+        <span class="chip good">Status match</span>
+        <span class="chip warn">Request headers 1 diff</span>
+        <span class="chip good">Response headers match</span>
+        <span class="chip good">Request body 100%</span>
+        <span class="chip warn">Response body 83%</span>
+      </div>
+      <div class="grid">
+        <section class="panel">
+          <h4>Recorded</h4>
+          <div class="kv">
+      <div class="key">Method</div><div>GET</div>
+      <div class="key">URL</div><div>https://api.example.com/user/profile</div>
+      <div class="key">Status</div><div>200</div>
+      <div class="key">Req Headers</div><div>1</div>
+      <div class="key">Resp Headers</div><div>1</div>
+    </div>
+    <details>
+      <summary>Request Headers</summary>
+      <pre>Accept: application/json</pre>
+    </details>
+    <details>
+      <summary>Response Headers</summary>
+      <pre>content-type: application/json</pre>
+    </details>
+        </section>
+        <section class="panel">
+          <h4>Replayed</h4>
+          <div class="kv">
+      <div class="key">Method</div><div>GET</div>
+      <div class="key">URL</div><div>https://api.example.com/user/profile</div>
+      <div class="key">Status</div><div>200</div>
+      <div class="key">Req Headers</div><div>2</div>
+      <div class="key">Resp Headers</div><div>1</div>
+    </div>
+    <details>
+      <summary>Request Headers</summary>
+      <pre>Accept: application/json
+x-debug: 1</pre>
+    </details>
+    <details>
+      <summary>Response Headers</summary>
+      <pre>content-type: application/json</pre>
+    </details>
+        </section>
+      </div>
+      <details>
+        <summary>Request Diff Details</summary>
+        <div class="grid">
+          <section class="panel">
+            <h4>Request Header Diff</h4>
+            <table>
+      <thead>
+        <tr>
+          <th>Header</th>
+          <th>Recorded</th>
+          <th>Replayed</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+        <td>accept</td>
+        <td>application/json</td>
+        <td>application/json</td>
+        <td class="diff-match">match</td>
+      </tr>
+<tr>
+        <td>x-debug</td>
+        <td></td>
+        <td>1</td>
+        <td class="diff-extra">extra_in_replay</td>
+      </tr></tbody>
+    </table>
+          </section>
+          <section class="panel">
+            <h4>Request Body Diff</h4>
+            <p>Both bodies are empty.</p>
+            <div class="grid">
+              <div>
+                <div class="transaction-meta">Recorded body</div>
+                <pre>(empty)</pre>
+              </div>
+              <div>
+                <div class="transaction-meta">Replayed body</div>
+                <pre>(empty)</pre>
+              </div>
+            </div>
+          </section>
+        </div>
+      </details>
+      <details>
+        <summary>Response Diff Details</summary>
+        <div class="grid">
+          <section class="panel">
+            <h4>Response Header Diff</h4>
+            <table>
+      <thead>
+        <tr>
+          <th>Header</th>
+          <th>Recorded</th>
+          <th>Replayed</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+        <td>content-type</td>
+        <td>application/json</td>
+        <td>application/json</td>
+        <td class="diff-match">match</td>
+      </tr></tbody>
+    </table>
+          </section>
+          <section class="panel">
+            <h4>Response Body Diff</h4>
+            <p>Length delta 1 chars. Similarity 83%.</p>
+            <div class="grid">
+              <div>
+                <div class="transaction-meta">Recorded body</div>
+                <pre>{&quot;name&quot;:&quot;Jane&quot;,&quot;role&quot;:&quot;admin&quot;}</pre>
+              </div>
+              <div>
+                <div class="transaction-meta">Replayed body</div>
+                <pre>{&quot;name&quot;:&quot;Jane&quot;,&quot;role&quot;:&quot;user&quot;}</pre>
+              </div>
+            </div>
+          </section>
+        </div>
+      </details>
+    </article>
+    </section>
+    </div>
+  </body>
+</html>

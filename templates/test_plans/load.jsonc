@@ -1,0 +1,31 @@
+{
+  "$schema": "../../schemas/test-plan.schema.json",
+  "_meta": {
+    "title": "Standard Load Test",
+    "description": "Gradually ramps up to a target load, holds it, and ramps down. Good for assessing general performance."
+  },
+  "name": "Standard Load Test",
+  "environment": "dev",
+  "execution_mode": "parallel",
+  "global_load_profile": {
+    "executor": "ramping-vus",
+    "startVUs": 0,
+    "stages": [
+      { "duration": "2m", "target": 50 },
+      // Hold for 10 minutes
+      { "duration": "10m", "target": 50 },
+      { "duration": "2m", "target": 0 }
+    ]
+  },
+  "user_journeys": [
+    {
+      "name": "example_journey",
+      "scriptPath": "testSuites/sample_team/tests/example.js",
+      "weight": 100
+    }
+  ],
+  "global_sla": {
+    "p95": 2000,
+    "errorRate": 1
+  }
+}

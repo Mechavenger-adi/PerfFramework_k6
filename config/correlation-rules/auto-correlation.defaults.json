@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "_meta": "Tunable defaults for the auto-correlation scanner (CandidateScorer). vocabulary = key/locator words that signal a dynamic value; denyValues = literals never correlated; thresholds map the numeric score to a confidence band.",
+  "minValueLength": 6,
+  "vocabulary": [
+    "csrf", "xsrf", "token", "jwt", "bearer", "session", "sid", "ssid",
+    "viewstate", "eventvalidation", "nonce", "state", "code", "verification",
+    "requestverificationtoken", "antiforgery", "authenticity", "saml", "oauth",
+    "auth", "access", "refresh", "id_token", "transaction", "txn", "order",
+    "cart", "correlation", "request", "trace", "challenge", "otp", "ticket",
+    "continuation", "sync", "execution", "flowkey", "formkey"
+  ],
+  "denyValues": [
+    "true", "false", "null", "undefined", "none", "application/json", "text/html"
+  ],
+  "thresholds": {
+    "high": 5,
+    "medium": 3,
+    "low": 1
+  }
+}

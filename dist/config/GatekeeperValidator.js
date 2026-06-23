@@ -1,0 +1,327 @@
+"use strict";
+/**
+ * GatekeeperValidator.ts
+ * Phase 1 – Pre-flight checklist. Runs after config merge, before k6 is invoked.
+ * Accumulates ALL failures and reports them together — not just the first one.
+ */
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.GatekeeperValidator = void 0;
+const fs = __importStar(require("fs"));
+const path = __importStar(require("path"));
+const DataValidator_1 = require("../data/DataValidator");
+const RecordingLogResolver_1 = require("../debug/RecordingLogResolver");
+const logger_1 = require("../utils/logger");
+const PathResolver_1 = require("../utils/PathResolver");
+const ScriptContractGuard_1 = require("./ScriptContractGuard");
+class GatekeeperValidator {
+    /**
+     * Run the full pre-flight checklist.
+     * Returns a result object — never throws; caller decides how to handle failures.
+     */
+    validate(config, plan, dataRoot) {
+        const failures = [];
+        const warnings = [];
+        const frameworkViolations = [];
+        const debugEnabled = plan.debug?.enabled === true;
+        const autoResolveRecordingLog = plan.debug?.autoResolveRecordingLog !== false;
+        // -- 1. Environment checks ------------------
+        if (!config.environment.testSuites || Object.keys(config.environment.testSuites).length === 0) {
+            warnings.push('[Environment] No testSuites defined. Scripts will fall back to recorded URLs.');
+        }
+        if (!config.environment.name) {
+            failures.push('[Environment] name is missing or empty.');
+        }
+        // -- 2. Test plan structural checks --------
+        if (!plan.user_journeys || plan.user_journeys.length === 0) {
+            failures.push('[TestPlan] No user_journeys defined. At least one journey is required.');
+        }
+        // -- 2b. Duplicate journey names within the plan ------------------------
+        // k6 keys scenarios by journey name, so two journeys sharing a name would
+        // collide (one silently overwrites the other). Fail with the same guidance
+        // we give for ambiguous file resolution.
+        const seenJourneyNames = new Map();
+        for (const journey of plan.user_journeys ?? []) {
+            seenJourneyNames.set(journey.name, (seenJourneyNames.get(journey.name) ?? 0) + 1);
+        }
+        for (const [name, count] of seenJourneyNames) {
+            if (count > 1) {
+                failures.push(`[Journey:${name}] Defined ${count} times in this plan — journey names must be unique ` +
+                    `(k6 keys each scenario by name, so duplicates overwrite each other). ` +
+                    `Suggestion: rename one of the journeys (and/or its script file), or give each a distinct relative scriptPath.`);
+            }
+        }
+        // -- 3. Journey script files exist ---------
+        for (let i = 0; i < (plan.user_journeys?.length ?? 0); i++) {
+            const journey = plan.user_journeys[i];
+            const scriptResolution = PathResolver_1.PathResolver.resolveDetailed(journey.scriptPath);
+            if (scriptResolution.status === 'ambiguous') {
+                // Same filename lives under more than one team/folder. Picking one
+                // silently would run the wrong test, so we stop and tell the user how
+                // to disambiguate.
+                const rel = (p) => path.relative(process.cwd(), p).replace(/\\/g, '/');
+                failures.push(`[Journey:${journey.name}] Script name "${journey.scriptPath}" is ambiguous — ` +
+                    `${scriptResolution.candidates.length} files with this name exist across teams:\n` +
+                    scriptResolution.candidates.map((c) => `      • ${rel(c)}`).join('\n') + '\n' +
+                    `      Cause: the test plan referenced a bare filename, and the same file ` +
+                    `name appears in more than one team folder, so the framework cannot tell which one to run.\n` +
+                    `      Suggestion: either set scriptPath to a relative/exact path that points at the intended ` +
+                    `file (e.g. "${rel(scriptResolution.candidates[0])}"), or rename one of the files so the name is unique.`);
+                continue;
+            }
+            if (scriptResolution.status === 'not_found') {
+                failures.push(`[Journey:${journey.name}] Script file not found: ${journey.scriptPath}`);
+            }
+            else {
+                // Update the path to absolute so execution passes
+                journey.scriptPath = scriptResolution.path;
+            }
+            if (!debugEnabled) {
+                continue;
+            }
+            const explicitRecordingLogPath = journey.recordingLogPath;
+            const resolution = explicitRecordingLogPath || autoResolveRecordingLog
+                ? RecordingLogResolver_1.RecordingLogResolver.resolve(journey.scriptPath, explicitRecordingLogPath)
+                : {
+                    status: 'missing',
+                    warning: `[Journey:${journey.name}] recordingLogPath was not provided and autoResolveRecordingLog is disabled.`,
+                };
+            if (resolution.status === 'resolved') {
+                journey.recordingLogPath = resolution.resolvedPath;
+                continue;
+            }
+            if (resolution.status === 'ambiguous') {
+                failures.push(`[Journey:${journey.name}] Multiple recording logs matched this script in ${resolution.recordingsDir}. ` +
+                    `Set recordingLogPath explicitly. Candidates: ${(resolution.candidates ?? []).join(', ')}`);
+                continue;
+            }
+            journey.recordingLogPath = undefined;
+            const missingMsg = `[Journey:${journey.name}] ${resolution.warning ?? 'Recording log not found. Replay-only diff report will be generated.'}`;
+            if (plan.debug?.failOnMissingRecordingLog) {
+                failures.push(missingMsg);
+            }
+            else {
+                warnings.push(missingMsg);
+            }
+        }
+        // -- 3c. Framework API rules ---------------
+        // Reject journey scripts that use native k6 check()/group(): only k6Check()
+        // inside transaction() produces exact per-iteration pass/fail. Scans the
+        // resolved (absolute) script path so the reported file matches what runs.
+        for (const journey of plan.user_journeys ?? []) {
+            const sp = journey.scriptPath;
+            if (!sp || !fs.existsSync(sp))
+                continue;
+            const fv = ScriptContractGuard_1.ScriptContractGuard.scanFile(sp);
+            if (fv)
+                frameworkViolations.push(fv);
+        }
+        // -- 4. Weight / VU checks -----------------
+        if (plan.execution_mode === 'parallel') {
+            const journeysWithWeight = plan.user_journeys?.filter((j) => j.weight !== undefined) ?? [];
+            const weightSum = journeysWithWeight.reduce((s, j) => s + (j.weight ?? 0), 0);
+            if (journeysWithWeight.length > 0 && Math.abs(weightSum - 100) > 0.01) {
+                warnings.push(`[Execution] Journey weights sum to ${weightSum.toFixed(1)}% — expected 100%. Load will be re-distributed proportionally.`);
+            }
+        }
+        // -- 5. VU ceiling -------------------------
+        if (plan.max_total_vus !== undefined) {
+            const requestedVUs = this.estimateRequestedVUs(plan);
+            if (requestedVUs > plan.max_total_vus) {
+                failures.push(`[Execution] Requested ~${requestedVUs} VUs exceeds max_total_vus limit of ${plan.max_total_vus}.`);
+            }
+        }
+        // -- 6. Data directory ---------------------
+        const dataRootAbs = path.resolve(process.cwd(), dataRoot);
+        if (!fs.existsSync(dataRootAbs)) {
+            warnings.push(`[Data] Data directory not found: ${dataRootAbs}. No data files will be loaded.`);
+        }
+        // -- 7. Hybrid mode config -----------------
+        if (plan.execution_mode === 'hybrid' && (!plan.hybrid_groups || plan.hybrid_groups.length === 0)) {
+            failures.push('[TestPlan] execution_mode is "hybrid" but no hybrid_groups are defined.');
+        }
+        // -- 8. Data file & column validation ------
+        for (const journey of plan.user_journeys ?? []) {
+            const scriptPath = journey.scriptPath;
+            if (!scriptPath || !fs.existsSync(scriptPath))
+                continue;
+            const scriptContent = fs.readFileSync(scriptPath, 'utf-8');
+            const dataRefs = this.extractDataReferences(scriptContent);
+            if (dataRefs.length === 0)
+                continue;
+            const scriptDir = path.dirname(scriptPath);
+            for (const ref of dataRefs) {
+                const absDataPath = path.resolve(scriptDir, ref.filePath);
+                if (!fs.existsSync(absDataPath)) {
+                    failures.push(`[Journey:${journey.name}] Data file not found: ${ref.filePath} (resolved: ${absDataPath})`);
+                    continue;
+                }
+                if (ref.columns.length > 0) {
+                    const result = DataValidator_1.DataValidator.validateCSV(absDataPath, ref.columns);
+                    if (!result.valid) {
+                        for (const err of result.errors) {
+                            failures.push(`[Journey:${journey.name}] [${ref.dataset}] ${err}`);
+                        }
+                    }
+                    for (const warn of result.warnings) {
+                        warnings.push(`[Journey:${journey.name}] [${ref.dataset}] ${warn}`);
+                    }
+                }
+            }
+        }
+        // -- 9. SLA target validation --------------
+        // Fail fast on SLAs that target a journey/transaction that doesn't exist in
+        // this plan — otherwise the generated k6 threshold silently matches nothing
+        // (journey) or makes k6 error on an unknown metric (transaction).
+        const journeyNames = new Set((plan.user_journeys ?? []).map((j) => j.name));
+        if (plan.journey_slas) {
+            for (const target of Object.keys(plan.journey_slas)) {
+                if (!journeyNames.has(target)) {
+                    failures.push(`[SLA] journey_slas targets unknown journey '${target}'. Its threshold ` +
+                        `(http_req_duration{scenario:${target}}) would match no traffic. ` +
+                        `Defined journeys: ${[...journeyNames].join(', ') || '(none)'}.`);
+                }
+            }
+        }
+        if (plan.transaction_slas) {
+            const txnNames = new Set();
+            for (const journey of plan.user_journeys ?? []) {
+                const sp = journey.scriptPath;
+                if (!sp || !fs.existsSync(sp))
+                    continue;
+                for (const n of this.extractTransactionNames(fs.readFileSync(sp, 'utf-8'))) {
+                    txnNames.add(n);
+                }
+            }
+            for (const target of Object.keys(plan.transaction_slas)) {
+                if (!txnNames.has(target)) {
+                    failures.push(`[SLA] transaction_slas targets unknown transaction '${target}'. No ` +
+                        `transaction by that name was found in the journey scripts, so its ` +
+                        `threshold can never be evaluated. ` +
+                        `Known transactions: ${[...txnNames].join(', ') || '(none found)'}.`);
+                }
+            }
+        }
+        return {
+            passed: failures.length === 0 && frameworkViolations.length === 0,
+            failures,
+            warnings,
+            frameworkViolations,
+        };
+    }
+    /** Transaction names declared in a script via transaction()/startTransaction(). */
+    extractTransactionNames(source) {
+        const names = new Set();
+        const patterns = [
+            /transaction\(\s*(['"`])([^'"`]+)\1\s*,/g,
+            /startTransaction\(\s*(['"`])([^'"`]+)\1\s*\)/g,
+        ];
+        for (const re of patterns) {
+            let m;
+            while ((m = re.exec(source)) !== null) {
+                const n = m[2]?.trim();
+                if (n)
+                    names.add(n);
+            }
+        }
+        return [...names];
+    }
+    /**
+     * Print the result to console in a human-readable format.
+     * Returns the same result for chaining.
+     */
+    printResult(result) {
+        logger_1.Logger.header('FRAMEWORK PRE-FLIGHT CHECKS');
+        if (result.warnings.length > 0) {
+            logger_1.Logger.warning('WARNINGS:');
+            result.warnings.forEach((w) => logger_1.Logger.bullet(w, 'yellow'));
+        }
+        // Framework-rule violations get their own richly formatted block (the
+        // "Framework Validation Failed" report) rather than a one-line bullet.
+        if (result.frameworkViolations.length > 0) {
+            console.error('\n' + ScriptContractGuard_1.ScriptContractGuard.format(result.frameworkViolations) + '\n');
+        }
+        if (result.failures.length > 0) {
+            logger_1.Logger.fail('FAILURES:');
+            result.failures.forEach((f) => logger_1.Logger.bullet(f, 'red'));
+        }
+        if (result.passed) {
+            logger_1.Logger.pass('All pre-flight checks passed.\n');
+        }
+        else {
+            logger_1.Logger.fail('PRE-FLIGHT FAILED \u2014 fix all issues above before running.\n');
+        }
+        return result;
+    }
+    /**
+     * Scan a k6 script for data file references and column usage.
+     * Detects: fs.open("path") → file mapping, FILES["name"]["col"] → column refs.
+     */
+    extractDataReferences(scriptContent) {
+        // Match: datasetName: await csv.parse(await fs.open("path"), ...)
+        const filePattern = /(\w+)\s*:\s*await\s+csv\.parse\(\s*await\s+fs\.open\(\s*["']([^"']+)["']\)/g;
+        const datasetMap = new Map();
+        let m;
+        while ((m = filePattern.exec(scriptContent)) !== null) {
+            datasetMap.set(m[1], m[2]);
+        }
+        // Match column references: FILES["dataset"]["col"] or ...FILES["dataset"])["col"]
+        const colPattern = /FILES\s*\[\s*["'](\w+)["']\s*\](?:\s*\))?\s*\[\s*["'](\w+)["']\s*\]/g;
+        const datasetColumns = new Map();
+        while ((m = colPattern.exec(scriptContent)) !== null) {
+            const dataset = m[1];
+            const column = m[2];
+            if (!datasetColumns.has(dataset))
+                datasetColumns.set(dataset, new Set());
+            datasetColumns.get(dataset).add(column);
+        }
+        const refs = [];
+        for (const [dataset, filePath] of datasetMap) {
+            refs.push({
+                dataset,
+                filePath,
+                columns: Array.from(datasetColumns.get(dataset) ?? []),
+            });
+        }
+        return refs;
+    }
+    estimateRequestedVUs(plan) {
+        const globalMax = plan.global_load_profile.stages
+            ? Math.max(...plan.global_load_profile.stages.map((s) => s.target))
+            : plan.global_load_profile.vus ?? 0;
+        return globalMax;
+    }
+}
+exports.GatekeeperValidator = GatekeeperValidator;

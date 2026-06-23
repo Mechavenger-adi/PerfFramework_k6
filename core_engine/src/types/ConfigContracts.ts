@@ -1,0 +1,185 @@
+import { DataOverflowStrategy } from './TestPlanSchema';
+export { DataOverflowStrategy };
+
+// ---------------------------------------------
+// Environment Configuration
+// ---------------------------------------------
+
+export type EnvironmentCustomValue = string | number | boolean;
+
+export interface TeamEnvironmentOverride {
+  /** Optional per-team base URL override */
+  baseUrl?: string;
+  /** Optional per-team secondary base URLs keyed by service name */
+  serviceUrls?: Record<string, string>;
+  /** Optional per-team custom environment values */
+  custom?: Record<string, EnvironmentCustomValue>;
+}
+
+export interface EnvironmentConfig {
+  /** Logical name of the environment: dev | staging | uat | prod */
+  name: string;
+  /** Per-team configurations keyed by testSuites/<team> folder name */
+  testSuites?: Record<string, TeamEnvironmentOverride>;
+}
+
+// ---------------------------------------------
+// Runtime Settings
+// ---------------------------------------------
+
+export type ErrorBehavior = 'continue' | 'stop_iteration' | 'stop_vu' | 'abort_test';
+export type ThinkTimeMode = 'fixed' | 'random';
+export type PacingMode = 'fixed' | 'random';
+
+export interface ThinkTimeConfig {
+  mode: ThinkTimeMode;
+  /** Fixed think time in seconds (used when mode = 'fixed') */
+  fixed?: number;
+  /** Min seconds (used when mode = 'random') */
+  min?: number;
+  /** Max seconds (used when mode = 'random') */
+  max?: number;
+}
+
+export interface PacingConfig {
+  /** Enable pacing (a sleep applied between action iterations). */
+  enabled: boolean;
+  /** How the pace duration is derived (default 'fixed'). Mirrors think time. */
+  mode?: PacingMode;
+  /** Fixed pace in seconds (used when mode = 'fixed'). */
+  fixed?: number;
+  /** Min seconds (used when mode = 'random'). */
+  min?: number;
+  /** Max seconds (used when mode = 'random'). */
+  max?: number;
+  /** @deprecated legacy fixed pace; still honored as a fallback for `fixed`. */
+  targetIntervalSeconds?: number;
+}
+
+export interface HttpConfig {
+  /** Global HTTP request timeout in seconds */
+  timeoutSeconds: number;
+  /** Max redirects to follow */
+  maxRedirects: number;
+  /** Whether to throw on non-2xx by default */
+  throwOnError: boolean;
+}
+
+export interface TimeSeriesReportingConfig {
+  /** Enable bucketed timeseries collection for interactive reports */
+  enabled: boolean;
+  /** Bucket size in seconds for aggregated timeseries points */
+  bucketSizeSeconds?: number;
+  /**
+   * Retain the raw `metrics-stream.json` k6 streaming output file in the
+   * run folder after the unified report is generated. When `false`, the
+   * file is deleted to save disk (typical CI use case). When `true` (the
+   * default), it stays for ad-hoc re-analysis or external tooling.
+   * The file can be several MB to several hundred MB for long high-RPS
+   * runs — toggle off when storage-constrained.
+   */
+  keepRawMetricsStream?: boolean;
+}
+
+export interface ReportingConfig {
+  /** Visible transaction stats/columns in reports */
+  transactionStats: string[];
+  /** Include transaction table in generated reports */
+  includeTransactionTable: boolean;
+  /** Include error table in generated reports */
+  includeErrorTable: boolean;
+  /** Timeseries config for unified HTML graphs */
+  timeseries: TimeSeriesReportingConfig;
+  /**
+   * When true, debug and load-test reports overwrite a single stable output
+   * folder (`Run_latest`) each run instead of creating a new timestamped
+   * folder. Off by default so run history is preserved.
+   */
+  overrideExistingResults?: boolean;
+}
+
+export interface ErrorCaptureConfig {
+  /** Capture snapshots for supported failures */
+  captureSnapshotOnFailure: boolean;
+  /** Limit snapshot volume per run */
+  maxSnapshotsPerRun: number;
+  includeRequestHeaders: boolean;
+  includeRequestBody: boolean;
+  includeResponseHeaders: boolean;
+  includeResponseBody: boolean;
+}
+
+export interface MonitoringConfig {
+  /** Enable runner-side host monitoring */
+  enabled: boolean;
+  /** CPU warning threshold in percent */
+  cpuWarningPercent: number;
+  /** Memory warning threshold in percent */
+  memoryWarningPercent: number;
+  /** Sampling interval in seconds */
+  sampleIntervalSeconds: number;
+}
+
+export interface RuntimeSettings {
+  thinkTime: ThinkTimeConfig;
+  pacing: PacingConfig;
+  http: HttpConfig;
+  errorBehavior: ErrorBehavior;
+  reporting: ReportingConfig;
+  errors: ErrorCaptureConfig;
+  monitoring: MonitoringConfig;
+  /** Debug mode – prints resolved config; enables verbose logging */
+  debugMode: boolean;
+}
+
+// ---------------------------------------------
+// Framework Defaults
+// ---------------------------------------------
+
+export const FRAMEWORK_DEFAULTS: RuntimeSettings = {
+  thinkTime: { mode: 'fixed', fixed: 1 },
+  pacing: { enabled: false },
+  http: { timeoutSeconds: 60, maxRedirects: 10, throwOnError: false },
+  errorBehavior: 'continue',
+  reporting: {
+    transactionStats: ['count', 'pass', 'fail', 'avg', 'min', 'max', 'p(90)', 'p(95)'],
+    includeTransactionTable: true,
+    includeErrorTable: true,
+    overrideExistingResults: false,
+    timeseries: {
+      enabled: true,
+      // Default 1-second granularity per Proposal 5. Users can raise this
+      // for long-running tests where HTML size or memory matter.
+      bucketSizeSeconds: 1,
+      keepRawMetricsStream: true,
+    },
+  },
+  errors: {
+    captureSnapshotOnFailure: true,
+    maxSnapshotsPerRun: 20,
+    includeRequestHeaders: true,
+    includeRequestBody: true,
+    includeResponseHeaders: true,
+    includeResponseBody: false,
+  },
+  monitoring: {
+    enabled: false,
+    cpuWarningPercent: 80,
+    memoryWarningPercent: 80,
+    sampleIntervalSeconds: 10,
+  },
+  debugMode: false,
+};
+
+// ---------------------------------------------
+// Resolved Runtime Config (merged output)
+// ---------------------------------------------
+
+export interface ResolvedConfig {
+  environment: EnvironmentConfig;
+  runtime: RuntimeSettings;
+  /** Merged CLI overrides (highest precedence after .env secrets) */
+  cliOverrides: Record<string, unknown>;
+  /** Raw .env secrets (never logged) */
+  secrets: Record<string, string>;
+}

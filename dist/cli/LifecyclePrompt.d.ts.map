@@ -1,0 +1,1 @@
+{"version":3,"file":"LifecyclePrompt.d.ts","sourceRoot":"","sources":["../../core-engine/src/cli/LifecyclePrompt.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,SAAS,EAAE,MAAM,wBAAwB,CAAC;AACnD,OAAO,EAAE,kBAAkB,EAAE,MAAM,8BAA8B,CAAC;AAElE,wBAAsB,2BAA2B,CAC/C,EAAE,EAAE,SAAS,EACb,UAAU,EAAE,MAAM,EAAE,GACnB,OAAO,CAAC,kBAAkB,CAAC,CAkC7B"}

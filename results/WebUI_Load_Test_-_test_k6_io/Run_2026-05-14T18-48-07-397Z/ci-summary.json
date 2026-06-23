@@ -1,0 +1,98 @@
+{
+  "status": "failed",
+  "runId": "Run_2026-05-14T18-48-07-397Z",
+  "plan": "WebUI Load Test - test.k6.io",
+  "environment": "dev",
+  "thresholdFailures": 2,
+  "errorCount": 6,
+  "warningCount": 2,
+  "aborted": false,
+  "transactions": [
+    {
+      "name": "add to cart",
+      "count": 5,
+      "pass": 4,
+      "fail": 1,
+      "errorPct": 20,
+      "avg": 475.6,
+      "min": 255,
+      "max": 590
+    },
+    {
+      "name": "click confirm",
+      "count": 5,
+      "pass": 3,
+      "fail": 2,
+      "errorPct": 40,
+      "avg": 477.6666666666667,
+      "min": 459,
+      "max": 490
+    },
+    {
+      "name": "click continue",
+      "count": 5,
+      "pass": 3,
+      "fail": 2,
+      "errorPct": 40,
+      "avg": 165.2,
+      "min": 84,
+      "max": 218
+    },
+    {
+      "name": "increase quantity to 2 and proceed to checkout",
+      "count": 5,
+      "pass": 5,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 465.8,
+      "min": 251,
+      "max": 693
+    },
+    {
+      "name": "search_animal",
+      "count": 5,
+      "pass": 5,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 208.2,
+      "min": 191,
+      "max": 227
+    },
+    {
+      "name": "select product",
+      "count": 5,
+      "pass": 5,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 312,
+      "min": 287,
+      "max": 359
+    },
+    {
+      "name": "t01_launch",
+      "count": 5,
+      "pass": 5,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 607.8,
+      "min": 360,
+      "max": 755
+    },
+    {
+      "name": "t02_login",
+      "count": 5,
+      "pass": 5,
+      "fail": 0,
+      "errorPct": 0,
+      "avg": 754.6,
+      "min": 655,
+      "max": 971
+    }
+  ],
+  "gate": {
+    "failedRules": [
+      "http_req_failed:rate<0.1",
+      "http_req_failed{scenario:buy_animal_14thmay}:rate<0.05"
+    ]
+  }
+}

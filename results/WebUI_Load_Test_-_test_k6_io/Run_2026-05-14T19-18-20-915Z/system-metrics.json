@@ -1,0 +1,34 @@
+{
+  "snapshots": [
+    {
+      "ts": "2026-05-14T19:18:21.175Z",
+      "cpuPercent": 10.74,
+      "memoryPercent": 78.31,
+      "agent": {
+        "host": "MechAvenger",
+        "pid": 17032,
+        "containerId": "MechAvenger"
+      }
+    },
+    {
+      "ts": "2026-05-14T19:18:51.438Z",
+      "cpuPercent": 7.11,
+      "memoryPercent": 79.5,
+      "agent": {
+        "host": "MechAvenger",
+        "pid": 17032,
+        "containerId": "MechAvenger"
+      }
+    },
+    {
+      "ts": "2026-05-14T19:19:10.466Z",
+      "cpuPercent": 5.73,
+      "memoryPercent": 78.7,
+      "agent": {
+        "host": "MechAvenger",
+        "pid": 17032,
+        "containerId": "MechAvenger"
+      }
+    }
+  ]
+}

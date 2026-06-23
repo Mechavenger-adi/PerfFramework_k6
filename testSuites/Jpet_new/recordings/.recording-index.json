@@ -1,0 +1,26 @@
+[
+  {
+    "scriptPath": "testSuites\\jpet_new\\tests\\buyanimal_raw_19thmay.js",
+    "recordingLogPath": "testSuites\\jpet_new\\recordings\\buyanimal_raw_19thmay.recording-log.json",
+    "sourceHarPath": "C:\\Users\\aditk\\Documents\\k6-studio\\Recordings\\jpetstore.aspectran.com_animals.har",
+    "generatedAt": "2026-05-19T19:23:43.121Z"
+  },
+  {
+    "scriptPath": "testSuites\\jpet_new\\tests\\buyanimal_raw_20thmay.js",
+    "recordingLogPath": "testSuites\\jpet_new\\recordings\\buyanimal_raw_20thmay.recording-log.json",
+    "sourceHarPath": "C:\\Users\\aditk\\Documents\\k6-studio\\Recordings\\jpetstore.aspectran.com_animals.har",
+    "generatedAt": "2026-05-20T11:39:37.366Z"
+  },
+  {
+    "scriptPath": "testSuites\\jpet_new\\tests\\buyanimal_raw_25thmay.js",
+    "recordingLogPath": "testSuites\\jpet_new\\recordings\\buyanimal_raw_25thmay.recording-log.json",
+    "sourceHarPath": "C:\\Users\\aditk\\Documents\\k6-studio\\Recordings\\jpetstore.aspectran.com_animals.har",
+    "generatedAt": "2026-05-25T07:49:42.447Z"
+  },
+  {
+    "scriptPath": "testSuites\\Jpet_new\\tests\\buyanimal_raw_28thmay.js",
+    "recordingLogPath": "testSuites\\Jpet_new\\recordings\\buyanimal_raw_28thmay.recording-log.json",
+    "sourceHarPath": "C:\\Users\\aditk\\Documents\\k6-studio\\Recordings\\jpetstore.aspectran.com_animals.har",
+    "generatedAt": "2026-05-28T13:17:22.150Z"
+  }
+]

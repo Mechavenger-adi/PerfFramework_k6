@@ -1,0 +1,27 @@
+{
+  "$schema": "../../schemas/test-plan.schema.json",
+  "_meta": {
+    "title": "Soak Test (Endurance)",
+    "description": "Runs a moderate load for an extended period (hours). Ideal for finding memory leaks or DB connection exhaustion."
+  },
+  "name": "Soak Test",
+  "environment": "dev",
+  "execution_mode": "parallel",
+  "global_load_profile": {
+    "executor": "ramping-vus",
+    "startVUs": 0,
+    "stages": [
+      { "duration": "5m", "target": 40 },
+      // Hold for 8 hours
+      { "duration": "8h", "target": 40 },
+      { "duration": "5m", "target": 0 }
+    ]
+  },
+  "user_journeys": [
+    {
+      "name": "example_journey",
+      "scriptPath": "testSuites/sample_team/tests/example.js",
+      "weight": 100
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "name": "Sample Debug Test",
+  "environment": "dev",
+  "execution_mode": "parallel",
+  "global_load_profile": {
+    "executor": "ramping-vus",
+    "startVUs": 0,
+    "stages": [
+      {
+        "duration": "10s",
+        "target": 5
+      },
+      {
+        "duration": "30s",
+        "target": 5
+      },
+      {
+        "duration": "10s",
+        "target": 0
+      }
+    ]
+  },
+  "noCookiesReset": true,
+  "debug": {
+    "enabled": true,
+    "mode": "diff",
+    "vus": 1,
+    "iterations": 2,
+    "reportDir": "results/debug",
+    "failOnMissingRecordingLog": false
+  },
+  "user_journeys": [
+    {
+      "name": "buy_working_covert",
+      "scriptPath": "buy_working_covert.js"
+    }
+  ]
+}
