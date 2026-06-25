@@ -40,6 +40,7 @@ import { runGenerateByos } from './generate-byos';
 import { runImportCurl, runImportPostman } from './import';
 import { runInit } from './init';
 import { runValidate } from './validate';
+import { runMerge } from '../distributed/runMerge';
 import { listTemplates, showTemplate } from './templates';
 import { listFeatures } from './features';
 import { inspectConfig } from './config-inspect';
@@ -245,6 +246,19 @@ program
       verbose: opts.verbose,
     });
 
+    if (!passed) process.exit(1);
+  });
+
+// ---------------------------------------------
+// MERGE command (distributed) — combine per-machine results into one report
+// ---------------------------------------------
+program
+  .command('merge')
+  .description('Merge per-machine distributed run artifacts into a single report')
+  .requiredOption('--run-dir <path>', 'Shared run dir containing <machineName>/ subfolders for one runId')
+  .option('--out <path>', 'Output dir for the merged result (default: <run-dir>/_merged)')
+  .action((opts) => {
+    const passed = runMerge({ runDir: opts.runDir, out: opts.out });
     if (!passed) process.exit(1);
   });
 

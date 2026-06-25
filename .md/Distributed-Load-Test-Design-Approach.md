@@ -80,31 +80,34 @@ the framework now relies on the native `scenario`/`group` tags. This lets the me
 each metric to its `(journey, transaction, machine, run)` and drives the per-machine System-tab
 breakdown.
 
-### 1.4 Storage layout — per-machine files, never a shared-append file
-**A file is only ever written by one machine.** "One place" is achieved by folder layout;
-the single combined file is the **output of the merge**, not a contended input. Concurrent
-append from N machines to one file over a share is a corruption/locking/throughput trap and
-is explicitly **not** used.
+### 1.4 Storage layout — write local, then collect (no shared-mount writes)
+**No machine ever writes to a shared/network location during the run.** Each LG writes its
+artifacts to its **own local disk** (exactly as runs do today). A separate **collection**
+step then copies each machine's local run folder into one place on the **merge node**, and
+the merge reads that local layout. This avoids *both* the single-shared-file corruption trap
+*and* the reliability risk of live writes over a network share.
 
+- **Phase 1:** collection is a manual copy (`robocopy`/`scp`/`cp`) or a small `collect` helper.
+- **Phase 2:** the controller **pulls** each agent's local results over its result channel.
+
+Collected layout on the merge node (local dir):
 ```
-<sharedDir>/<runId>/
-    lg-a/   metrics.hgrm   counters.json   raw.ndjson?   summary.json   system.json   k6.log
-    lg-b/   metrics.hgrm   counters.json   raw.ndjson?   summary.json   system.json   k6.log
+<collectDir>/<runId>/
+    lg-a/   metrics-histogram.json  transaction-metrics.json  ci-summary.json  timeseries.json  run-manifest.json  ...
+    lg-b/   ...
     lg-c/   ...
-    _merged/                              ← produced by the merge step
-        transaction-metrics.json
-        timeseries.json
-        ci-summary.json
-        RunReport.html
+    _merged/                              ← produced by `merge` (the single combined output)
+        transaction-metrics.json  timeseries.json  ci-summary.json  metrics-histogram.json  RunReport.html
 ```
-- Each LG writes **only** into its own `<machineName>/` folder. Appending to *your own*
-  file (incremental flush, §3.x) is safe.
-- `raw.ndjson` is present **only** when raw is retained under the cap (§2.4).
-- The **merge step** reads every `<runId>/*/` folder and writes the single `_merged/` output.
+- Each LG's folder is written by **only that LG** (locally), then copied in whole — never a
+  shared concurrent write.
+- The **merge step** (`k6-framework merge --run-dir <collectDir>/<runId>`) reads every
+  `<runId>/<machine>/` folder and writes the single `_merged/` output. It does **not** read
+  or write any shared mount — it operates entirely on the merge node's local disk.
 
 ### 1.5 Merge engine — rules
-Input: a folder of per-machine result sets for one `runId` (the shared location, or CI
-artifacts — identical shape). Output: the single `_merged/` artifacts the existing report
+Input: a **collected** folder of per-machine result sets for one `runId` on the merge node's
+local disk (or CI artifacts — identical shape). Output: the single `_merged/` artifacts the existing report
 already consumes, so `RunReportGenerator` is **unchanged**.
 
 **Merge by logical name.** Transactions/journeys/requests merge by their **name**, not by
@@ -337,12 +340,12 @@ overridable per run — nothing is hard-coded. The counter bucket reuses the exi
 
 ---
 
-## 3. Approach 2 — Manual time-synchronized run + shared-location merge (Phase 1)
+## 3. Approach 2 — Manual time-synchronized run + collect-then-merge (Phase 1)
 
 The user runs the framework **manually on each LG**. **No controller, no service, no
-inbound port, no network orchestration.** Synchronization is a common **start time**. This
-is the lowest-clearance option and works fully air-gapped — agents need only read/write to
-the shared location.
+inbound port, no network orchestration, and no shared-mount writes.** Synchronization is a
+common **start time**; results are written **locally** on each LG and then **collected** to
+the merge node. Lowest-clearance, fully air-gapped — an LG needs only its own local disk.
 
 ### 3.1 Flow
 1. Vendor CDN imports (§1.1) on each LG.
@@ -351,34 +354,35 @@ the shared location.
    `machineName` and the shared `runId`.
 3. User sets a common **`startAt`** wall-clock timestamp on **every** machine.
 4. User starts the framework on each LG; each **waits until `startAt`, then begins**.
-5. Each LG runs its slice, tagging metrics with `machineName` + `runId`, rolling
-   histograms (and retaining raw under the cap, §2.4), flushing per time-bucket.
-6. Each LG writes results into `<sharedDir>/<runId>/<machineName>/`.
-7. User (or a CI job, or any machine) runs `merge` over `<sharedDir>/<runId>/` → single
-   `_merged/` output, thresholds evaluated post-merge.
+5. Each LG runs its slice **writing to its own local disk**, tagging metrics with
+   `machineName` + `runId`, rolling histograms (and retaining raw under the cap, §2.4).
+6. **Collect:** copy each LG's local run folder into one place on the merge node:
+   `<collectDir>/<runId>/<machineName>/` (manual `robocopy`/`scp`, or a `collect` helper).
+7. On the merge node, run `merge` over `<collectDir>/<runId>/` → single `_merged/` output,
+   thresholds evaluated post-merge.
 
 ### 3.2 Config
 ```jsonc
 "distributed": {
   "enabled": true,
-  "mode": "manual-shared",
+  "mode": "manual-collect",
   "machineName": "lg-a",                 // unique per machine (defaults to hostname)
   "runId": "load_2026_06_25_1430",       // SAME on every machine
   "startAt": "2026-06-25T14:30:00Z",     // SAME on every machine (CLI or .env)
-  "sharedResultsDir": "//share/runs",
   "partition": "user-split",             // user-split | segment | replicate
   "aggregation": "offline",
   "accuracy": "auto"
 }
 ```
-`startAt` is also accepted as a CLI flag / `.env` var (e.g. `K6_PERF_START_AT`), and is an
-**isolated, opt-in module** — unset → today's immediate-start behavior, and removable in
-Phase 3 without touching anything else.
+Results are written to the normal **local** results dir (`K6_RESULTS_BASE_DIR`); there is no
+shared-location setting. `startAt` is also accepted as a CLI flag / `.env` var
+(e.g. `K6_PERF_START_AT`), and is an **isolated, opt-in module** — unset → today's
+immediate-start behavior, and removable in Phase 3 without touching anything else.
 
-Merge:
+Collect + merge (on the merge node, all local paths):
 ```bash
-k6-framework merge --run-dir //share/runs/load_2026_06_25_1430 \
-  --out //share/runs/load_2026_06_25_1430/_merged
+# collect each LG's local run folder under one runId dir, then:
+k6-framework merge --run-dir ./collected/load_2026_06_25_1430
 ```
 
 ### 3.3 The merge nuance (same script on multiple machines)
