@@ -430,7 +430,9 @@ export function request(
     cookies: options?.cookies ?? {},
     redirects: options?.redirects ?? httpCfg.maxRedirects ?? 0,
     tags: {
-      transaction,
+      // The transaction a request belongs to is identified by k6's native
+      // `group` tag (value "::<txn>"); no separate `transaction` tag is emitted
+      // to avoid duplicate tags. Consumers strip the leading "::".
       har_entry_id: harEntryId,
       recording_started_at: recordingStartedAt,
       // When a request name is supplied, expose it as k6's standard `name`

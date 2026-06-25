@@ -239,16 +239,19 @@ export class TimeseriesStreamParser {
     ): void => {
       const reqName = tags.name || tags.url;
       if (!reqName) return;
+      // The owning transaction comes from k6's native `group` tag (value
+      // "::<txn>"); strip the leading "::". No separate `transaction` tag exists.
+      const grpTxn = (tags.group || '').replace(/^::/, '');
       const map = reqs.get(reqName) ?? new Map<number, RequestRaw>();
       const b = map.get(bucketKey) ?? {
         count: 0, failed: 0, duration: [],
-        method: tags.method || '', transaction: tags.transaction || '', url: tags.url || reqName,
+        method: tags.method || '', transaction: grpTxn, url: tags.url || reqName,
       };
       if (kind === 'duration') { b.count += 1; b.duration.push(value); }
       else if (value === 1) b.failed += 1;
       // Backfill metadata if the first sample for this bucket lacked a tag.
       if (!b.method && tags.method) b.method = tags.method;
-      if (!b.transaction && tags.transaction) b.transaction = tags.transaction;
+      if (!b.transaction && grpTxn) b.transaction = grpTxn;
       map.set(bucketKey, b);
       reqs.set(reqName, map);
     };
@@ -373,10 +376,11 @@ export class TimeseriesStreamParser {
           } else if (knownTxns.size > 0 && knownTxns.has(metric)) {
             txnName = metric;
             kind = 'duration';
-          } else if (knownTxns.size === 0 && tags.transaction) {
-            // No manifest available — fall back to the `transaction` tag on
-            // duration samples. Less precise but functional for legacy runs.
-            txnName = tags.transaction;
+          } else if (knownTxns.size === 0 && (tags.group || '').replace(/^::/, '')) {
+            // No manifest available — fall back to k6's native `group` tag
+            // (value "::<txn>") on duration samples. Less precise but functional
+            // for legacy runs.
+            txnName = (tags.group || '').replace(/^::/, '');
             kind = 'duration';
             // Only treat http_req_duration samples this way to avoid spamming
             // every metric into the per-transaction map.
