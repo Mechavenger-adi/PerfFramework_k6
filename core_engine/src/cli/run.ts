@@ -7,6 +7,7 @@
 import { Command } from 'commander';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as os from 'os';
 import * as readline from 'readline';
 import { ConfigurationManager } from '../config/ConfigurationManager';
 import { GatekeeperValidator } from '../config/GatekeeperValidator';
@@ -41,6 +42,8 @@ import { runImportCurl, runImportPostman } from './import';
 import { runInit } from './init';
 import { runValidate } from './validate';
 import { runMerge } from '../distributed/runMerge';
+import { runCollect, collectRunDir } from '../distributed/collectRun';
+import { awaitScheduledStart } from '../distributed/startBarrier';
 import { listTemplates, showTemplate } from './templates';
 import { listFeatures } from './features';
 import { inspectConfig } from './config-inspect';
@@ -260,6 +263,21 @@ program
   .action((opts) => {
     const passed = runMerge({ runDir: opts.runDir, out: opts.out });
     if (!passed) process.exit(1);
+  });
+
+// ---------------------------------------------
+// COLLECT command (distributed) — copy a local run folder into the shared location
+// ---------------------------------------------
+program
+  .command('collect')
+  .description('Copy a finished local run folder into <collectDir>/shared_<runId>/<machine>/')
+  .requiredOption('--from <path>', 'Local run dir to collect (e.g. results/<plan>/<runId>)')
+  .requiredOption('--into <path>', 'Shared collect base dir')
+  .option('--machine <name>', 'Machine name (defaults to hostname)')
+  .option('--run-id <id>', 'Shared runId (defaults to the run-manifest runId)')
+  .action((opts) => {
+    const ok = runCollect({ from: opts.from, into: opts.into, machine: opts.machine || os.hostname(), runId: opts.runId });
+    if (!ok) process.exit(1);
   });
 
 // ---------------------------------------------
@@ -527,6 +545,13 @@ program
       extraArgs.push('--out', `influxdb=${influxUrl}`);
     }
 
+    // Distributed (opt-in via K6_PERF_MACHINE): tag every metric with this machine
+    // and the shared runId so the merged report can attribute load per agent.
+    const distMachine = process.env.K6_PERF_MACHINE;
+    if (distMachine) {
+      extraArgs.push('--tag', `machine=${distMachine}`, '--tag', `runId=${runId}`);
+    }
+
     // Execution provenance for the report's "How this test was invoked" panel.
     // Captures the three pieces the framework assembles to drive k6: the exact
     // CLI command, the generated combined entry script (re-exports each
@@ -553,6 +578,9 @@ program
     Logger.detail(`Run manifest: ${runManifestPath}`);
     Logger.detail('Launching k6...\n');
     let runResult;
+    // Distributed start barrier (opt-in via K6_PERF_START_AT): wait for the shared
+    // wall-clock start so all LGs ramp together. No-op when unset.
+    await awaitScheduledStart();
     const k6StartTime = new Date().toISOString();
     const txnNamesForLive = runtimeEnv.K6_PERF_TRANSACTION_NAMES
       ? (JSON.parse(runtimeEnv.K6_PERF_TRANSACTION_NAMES) as string[])
@@ -621,6 +649,21 @@ program
 
     if (generatedArtifacts.transactionMetrics) {
       printTransactionTable(generatedArtifacts.transactionMetrics);
+    }
+
+    // Distributed collect (opt-in via K6_PERF_COLLECT_DIR): after the local run is
+    // fully written, copy this machine's result folder into the shared location at
+    // <collectDir>/shared_<runId>/<machineName>/. A one-shot post-run copy (no live
+    // shared writes). machineName defaults to the OS hostname when unset.
+    const collectDir = process.env.K6_PERF_COLLECT_DIR;
+    if (collectDir) {
+      const machineName = process.env.K6_PERF_MACHINE || os.hostname();
+      try {
+        const dest = collectRunDir(reportDir, runId, machineName, collectDir);
+        Logger.pass(`Collected results to shared location: ${dest}`);
+      } catch (err) {
+        Logger.warn(`[collect] copy to shared location failed (non-fatal): ${(err as Error).message}`);
+      }
     }
 
     PipelineRunner.ensureSuccess(runResult);
@@ -777,7 +820,16 @@ function prepareRunArtifacts(plan: TestPlan, resolvedConfig: ResolvedConfig): {
   const override = new RuntimeConfigManager(resolvedConfig.runtime).shouldOverrideExistingResults();
   // With override on, reuse a single stable folder (wiped each run); otherwise
   // create a fresh timestamped folder so run history is preserved.
-  const runId = override ? 'Run_latest' : `Run_${new Date().toISOString().replace(/[-:.]/g, '_')}`;
+  // Distributed runs need a SHARED runId across machines so every LG's local result
+  // folder carries the same id and `collect` groups them. Resolution order:
+  //   1. explicit K6_PERF_RUN_ID (set the same value on every machine), else
+  //   2. derived from the shared K6_PERF_START_AT (already identical on all machines,
+  //      so the runId falls out identically with no extra coordination), else
+  //   3. a fresh timestamped id (single-machine / non-distributed).
+  const startAtDigits = (process.env.K6_PERF_START_AT || '').replace(/[^0-9]/g, '').slice(0, 14);
+  const runId = process.env.K6_PERF_RUN_ID
+    || (startAtDigits.length >= 8 ? `Run_${startAtDigits}` : null)
+    || (override ? 'Run_latest' : `Run_${new Date().toISOString().replace(/[-:.]/g, '_')}`);
   // Use resolve (not join) so an absolute K6_RESULTS_BASE_DIR is honored as-is;
   // a relative value still resolves against the framework cwd.
   const reportDir = path.resolve(process.cwd(), baseDir, safePlanName, runId);
@@ -1339,7 +1391,7 @@ async function finalizeRunArtifacts(options: {
   // artifact from the same metrics stream. Off by default so normal/local runs are
   // unaffected; the distributed config turns it on. Histograms ingest 100% of the
   // data regardless of any raw cap (see design §2.4).
-  if (process.env.K6_PERF_EMIT_HISTOGRAM === '1' || process.env.K6_PERF_EMIT_HISTOGRAM === 'true') {
+  if (process.env.K6_PERF_EMIT_HISTOGRAM === '1' || process.env.K6_PERF_EMIT_HISTOGRAM === 'true' || !!process.env.K6_PERF_MACHINE) {
     try {
       const histogramPath = path.join(options.reportDir, 'metrics-histogram.json');
       // Histogram bucket is a whole multiple of the counter bucket; defaults to 10s

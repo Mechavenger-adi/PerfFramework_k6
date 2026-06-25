@@ -361,28 +361,47 @@ the merge node. Lowest-clearance, fully air-gapped — an LG needs only its own 
 7. On the merge node, run `merge` over `<collectDir>/<runId>/` → single `_merged/` output,
    thresholds evaluated post-merge.
 
-### 3.2 Config
-```jsonc
-"distributed": {
-  "enabled": true,
-  "mode": "manual-collect",
-  "machineName": "lg-a",                 // unique per machine (defaults to hostname)
-  "runId": "load_2026_06_25_1430",       // SAME on every machine
-  "startAt": "2026-06-25T14:30:00Z",     // SAME on every machine (CLI or .env)
-  "partition": "user-split",             // user-split | segment | replicate
-  "aggregation": "offline",
-  "accuracy": "auto"
-}
-```
-Results are written to the normal **local** results dir (`K6_RESULTS_BASE_DIR`); there is no
-shared-location setting. `startAt` is also accepted as a CLI flag / `.env` var
-(e.g. `K6_PERF_START_AT`), and is an **isolated, opt-in module** — unset → today's
-immediate-start behavior, and removable in Phase 3 without touching anything else.
+### 3.2 Config — env-driven (no controller yet)
+Until the Phase-2 controller exists, distributed Phase-1 runs are driven entirely by
+environment variables (CLI/`.env`) — opt-in, and removable later without touching anything:
 
-Collect + merge (on the merge node, all local paths):
+| Env var | Purpose |
+|---|---|
+| `K6_PERF_RUN_ID` | **Shared run id, set to the SAME value on every machine** (see runId resolution below). |
+| `K6_PERF_START_AT` | Shared wall-clock start (ISO 8601); each LG waits until it, then begins. Also auto-derives the runId. |
+| `K6_PERF_MACHINE` | This machine's name (tags + collect folder). Defaults to the OS hostname. |
+| `K6_PERF_COLLECT_DIR` | If set, after the local run finishes the framework copies its result folder to `<COLLECT_DIR>/shared_<runId>/<machine>/`. |
+| `K6_PERF_EMIT_HISTOGRAM` | Force histogram emission (auto-enabled whenever `K6_PERF_MACHINE` is set). |
+
+**runId resolution (how all machines agree on one id):**
+1. explicit `K6_PERF_RUN_ID` (set the same value on each machine), else
+2. **derived from `K6_PERF_START_AT`** — since the start time is already identical on every
+   machine, the runId (`Run_<digits-of-startAt>`) falls out identically with *no extra
+   coordination*, else
+3. a fresh timestamped id (single-machine / non-distributed).
+
+Results are written to the normal **local** results dir (`K6_RESULTS_BASE_DIR`); there is no
+shared-location *write* setting — only the post-run `K6_PERF_COLLECT_DIR` copy.
+
+**Shared folder naming:** the collect target is `shared_<runId>` (not bare `<runId>`). The
+`shared_` prefix namespaces the distributed aggregation folder so a different test/person
+can't accidentally overwrite the same location, and marks it as a multi-machine collection.
+
+### 3.2.1 Commands (end to end)
 ```bash
-# collect each LG's local run folder under one runId dir, then:
-k6-framework merge --run-dir ./collected/load_2026_06_25_1430
+# On each LG (same RUN_ID + START_AT on all; unique MACHINE; shared COLLECT_DIR):
+K6_PERF_RUN_ID=load_1430 K6_PERF_START_AT=2026-06-25T14:30:00Z \
+K6_PERF_MACHINE=lg-a K6_PERF_COLLECT_DIR=//collect \
+  k6-framework run --plan config/test_plans/load_test.json
+#   → runs locally, emits histogram, tags metrics, waits for START_AT, then
+#     copies results to //collect/shared_load_1430/lg-a/
+
+# (or collect manually afterward instead of K6_PERF_COLLECT_DIR:)
+k6-framework collect --from results/<plan>/load_1430 --into //collect --machine lg-a
+
+# On the merge node:
+k6-framework merge --run-dir //collect/shared_load_1430
+#   → //collect/shared_load_1430/_merged/RunReport.html
 ```
 
 ### 3.3 The merge nuance (same script on multiple machines)
