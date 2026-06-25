@@ -134,6 +134,11 @@ absolute wall-clock time (`bucketIndex = floor((ts − epoch) / bucketSize)`), f
 counter bucket and the histogram bucket. The histogram bucket must be a whole multiple of
 the counter bucket so the two overlay.
 
+Because every flushed record is **keyed by its window (bucket id), not arrival order**, the
+merge is **order-independent and idempotent** — late, out-of-order, or re-sent flushes (GC
+stalls, retries) merge correctly by bucket id. The merge is also **associative/commutative**
+(bins add, counters sum), so a future tree/incremental reduction needs no redesign (§6).
+
 1. **Clock-align.** Shift each machine's bucket timestamps by its recorded offset onto a
    common timeline.
 2. **Counters → merged counter series (exact).** For each `(transaction, counter-bucket)`,
@@ -172,9 +177,12 @@ already does the additive part — the rule is: run it only post-merge.
 ### 1.7 Reporting — reuse the System tab
 No new tab. Per-machine data lives in the **existing System tab**: per-machine host
 CPU/mem + per-machine achieved throughput vs assigned share — to catch the #1 validity
-trap, a **saturated machine that silently under-delivered load**. The merged report is the
-existing `RunReport.html`; the merge feeds it the artifacts it already consumes, plus the
-embedded HDR histograms that power the interactive any-duration view (§2).
+trap, a **saturated machine that silently under-delivered load**. Plus a few cheap
+distributed diagnostics: **per-agent clock skew, flush latency, and achieved-vs-assigned
+load**. (Deliberately *not* GC/queue/backlog metrics — those measure streaming machinery
+we are not building at this scale; see §6 non-goals.) The merged report is the existing
+`RunReport.html`; the merge feeds it the artifacts it already consumes, plus the embedded
+HDR histograms that power the interactive any-duration view (§2).
 
 ### 1.8 Togglable sink (offline ↔ DB) — and its scale ceiling
 Orchestration (partition, start sync, collection, merge) is **independent of where results
@@ -241,15 +249,24 @@ available, else from the merged histogram (≤0.1%). One knob:
 - **`efficient`** — histograms only; headline from merged histogram (≤0.1%).
 - **`auto`** (default) — decided per run by data volume (§2.4).
 
-### 2.4 The auto switch — per-run, volume-driven, decided at merge
-No upfront estimate needed (important for Phase 1, which has no controller to estimate):
+### 2.4 The auto switch — two distinct caps, decided on *total* volume
+There are **two separate caps**, which the original draft conflated:
 
+- **Per-LG retention cap** (`rawRetentionCapMB`, default ≈ 200 MB): bounds how much raw a
+  single LG keeps on disk. To avoid the write-then-discard waste, each LG decides **up
+  front** from a cheap estimate (plan duration × expected rate) whether to retain raw *at
+  all* — partial raw is useless for exact percentiles, so it's all-or-nothing per LG.
+- **Global exact-eligibility cap** (`exactEligibilityCapMB`): the **sum** of all LGs'
+  reported raw sizes. This is what actually gates exact mode — three LGs at 190 MB each
+  (each under the per-LG cap) sum to 570 MB and must **not** trigger an exact pool that
+  OOMs the coordinator.
+
+Flow:
 1. **Every LG always rolls its k6 raw stream into HDR per-bucket histograms** (shipped).
-2. **Each LG retains its raw stream only while it stays under a cap** (default ≈ 200 MB /
-   ~a few million samples per metric — configurable). On a short test, raw is kept; on an
-   endurance soak, raw crosses the cap and is dropped as it grows — only histograms survive.
-3. **At merge:** if *every* LG shipped raw **and** combined volume is within cap →
-   **exact** (pool raw + R-7). Otherwise → **histogram merge** (≤0.1%).
+2. Each LG retains raw only if its up-front estimate is under the per-LG cap, and reports
+   its actual raw byte/sample count in its manifest (§6).
+3. **At merge:** exact mode only if *every* LG shipped complete raw **and** the **summed**
+   reported size is within the global eligibility cap. Otherwise → **histogram merge** (≤0.1%).
 
 The interactive windowing always uses HDR regardless — it never needs raw.
 
@@ -530,7 +547,68 @@ gate**. One controller-assigned `runId` correlates everything.
 
 ---
 
-## 6. Consolidated limitations
+## 6. Run manifest, merge validation & non-goals (review-driven)
+
+An external architecture review surfaced ~20 points. Most were sized for a 50–100 agent
+hyperscale deployment we don't have (a handful of VMs); those are listed as **non-goals**
+below, kept cheap-to-add-later by the merge's associativity. The genuinely valuable, cheap,
+in-scope items are folded in here.
+
+### 6.1 Run manifest (extends the existing `run-manifest.json`)
+Every run writes a manifest that the merge **validates before combining**:
+```jsonc
+{
+  "runId": "load_2026_06_25_1430",      // unique; collision → merge refuses
+  "schemaVersion": 1,                    // artifact/merge format version
+  "frameworkVersion": "1.0.0",
+  "k6Version": "0.5x.x",
+  "scriptHash": "sha256:…",              // all agents must match
+  "configHash": "sha256:…",              // plan + runtime settings
+  "counterBucketSeconds": 2,
+  "histogramBucketSeconds": 10,          // actual (resolved) value, even if adaptive
+  "histogramRelativeAccuracy": 0.001,
+  "partition": { "mode": "segment", "segments": ["0:1/3","1/3:2/3","2/3:1"] },
+  "machine": "lg-a",
+  "rawRetained": true, "rawBytes": 18234123, "rawSamples": 240112,
+  "startTime": "…", "endTime": "…"
+}
+```
+
+### 6.2 Pre-merge validation (subsumes review #6/#13/#14)
+The merge **refuses** (or loudly flags) when per-machine manifests disagree:
+- **runId** mismatch or **reuse** of an already-merged runId → refuse (prevents mixing runs).
+- **scriptHash / configHash / k6Version / schemaVersion** mismatch → refuse (apples-to-apples).
+- **bucket size / precision** mismatch → refuse (buckets must align to merge).
+- **partition integrity** (`segment` mode): segments must cover `0:1` with **no overlap or
+  gap** → refuse. (`user-split`: warn on suspicious VU totals.)
+
+### 6.3 Merge-correctness test (review #19 — adopt into dev/CI)
+A deterministic test: take one real single-machine run, **split** its raw stream into N
+synthetic segments, run the merge, and **assert the merged result equals the single-machine
+baseline** within tolerance (exact mode: 0; histogram mode: ≤ relative-accuracy). This is the
+guardrail that proves the aggregation is correct and stays correct across changes.
+
+### 6.4 Non-goals (explicitly deferred — associativity keeps them cheap later)
+Rejected/deferred from the review, with rationale:
+- **Tree-reduction, incremental merge, streaming merge, backpressure/queues** — YAGNI at a
+  few agents. The merge is associative/commutative, so any of these is addable later with no
+  redesign; not built now.
+- **Mandatory lazy-loading report assets** — the single-file `RunReport.html` is a deliberate
+  strength (portable, air-gapped, emailable). Only a **size-guard/histogram-downsample** is
+  added for pathological cases; no mandatory split.
+- **Per-metric / dynamic histogram precision** — a *relative*-error histogram is already
+  scale-invariant (0.1% at 50 ms and at 30 s); per-metric tuning adds complexity for no gain.
+- **Mid-test restart/resume of a failed agent** — structurally impossible in k6 (stateful
+  VUs; k6's own design rejects hot-spares). Partial results from already-flushed buckets are
+  surfaced (flagged INVALID) instead.
+- **Continuous clock-offset interpolation** — Phase-2 (controller) refinement only; Phase 1
+  relies on NTP + a single measured offset. Periodic re-measurement added when the controller
+  exists.
+- **Merge as a time-series database** — the merge only *combines immutable artifacts into
+  aggregate metrics*. Arbitrary querying / historical comparison / live dashboards are the job
+  of the future DB sink (§1.8), not the merge engine.
+
+## 7. Consolidated limitations
 
 **Accuracy / substrate**
 - The **only** approximate value anywhere is a **Trend percentile in HDR mode (≤0.1%)**;
