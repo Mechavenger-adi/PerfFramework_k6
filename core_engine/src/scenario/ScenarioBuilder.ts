@@ -429,7 +429,7 @@ export class ScenarioBuilder {
   }
 
   /** Estimate total duration of a load profile in seconds */
-  private static estimateTotalDurationSeconds(profile: GlobalLoadProfile): number {
+  static estimateTotalDurationSeconds(profile: GlobalLoadProfile): number {
     if (profile.stages && profile.stages.length > 0) {
       return profile.stages.reduce((total, stage) => {
         return total + this.parseDurationToSeconds(stage.duration);

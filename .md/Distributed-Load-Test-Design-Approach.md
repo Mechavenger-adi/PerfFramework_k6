@@ -345,9 +345,13 @@ knob, and **not everything moves to histograms** — only the percentile views d
 ### 2.9 Defaults (configurable)
 - **Counter bucket** (`reporting.timeseries.bucketSizeSeconds`): **2s** — unchanged; drives
   throughput/error/avg/VU graphs.
-- **Histogram bucket** (`reporting.histogram.bucketSizeSeconds`): **adaptive** — auto-sized
-  from test duration to target ~600–1000 timeline points, clamped ~5–60s, aligned as a whole
-  multiple of the counter bucket. (Override with a fixed value if desired.)
+- **Histogram bucket**: **adaptive (default)** — auto-sized from the **planned** test
+  duration to target ~600 timeline points, clamped to **[counter bucket, 60s]** and aligned
+  to a whole multiple of the counter bucket. So a short/spike test gets the finest bucket
+  (= the counter bucket, e.g. **2s**), a 1h test ~6s, an 8h soak ~48s. Derived from *planned*
+  (not actual) duration so every machine resolves the **same** bucket for merge. Override:
+  `reporting.histogram.bucketSizeSeconds` or `K6_PERF_HISTOGRAM_BUCKET` (env). Bucket size
+  never affects the full-run/SLA percentile (lossless sum) — only zoom granularity.
 - **HDR precision** (`reporting.histogram.significantDigits`): 3 significant figures (0.1%)
   — *this* is the SLA-relevant knob; bump to 4 sig figs (0.01%) for very tight SLAs at little cost.
 - **Raw-retention cap** (`reporting.histogram.rawRetentionCapMB`): customisable, default

@@ -1397,9 +1397,15 @@ async function finalizeRunArtifacts(options: {
       // Histogram bucket is a whole multiple of the counter bucket; defaults to 10s
       // until the distributed runtime setting is wired (Phase 0 config scaffold).
       const counterBucket = Math.max(1, runtime.getTimeseriesBucketSizeSeconds());
-      // Histogram bucket = the smallest whole multiple of the counter bucket that is
-      // >= 10s, so the two timelines align (see design §2.8).
-      const histBucketSeconds = Math.ceil(10 / counterBucket) * counterBucket;
+      // Adaptive histogram bucket sized from the PLANNED duration (design §2.8/§2.9):
+      // fine for short/spike tests (down to the counter bucket), bounded for long
+      // soaks (~600 points, capped 60s). Explicit override wins:
+      // K6_PERF_HISTOGRAM_BUCKET or reporting.histogram.bucketSizeSeconds. Planned
+      // duration (not actual) keeps the bucket identical across machines for merge.
+      const plannedDurationSec = ScenarioBuilder.estimateTotalDurationSeconds(options.plan.global_load_profile);
+      const reportingCfg = options.resolvedConfig.runtime.reporting as ({ histogram?: { bucketSizeSeconds?: number } } | undefined);
+      const bucketOverride = Number(process.env.K6_PERF_HISTOGRAM_BUCKET) || reportingCfg?.histogram?.bucketSizeSeconds || undefined;
+      const histBucketSeconds = HistogramArtifactBuilder.resolveBucketSeconds(counterBucket, plannedDurationSec, bucketOverride);
       const art = await HistogramArtifactBuilder.writeArtifact(
         path.join(options.reportDir, 'metrics-stream.json'),
         histogramPath,

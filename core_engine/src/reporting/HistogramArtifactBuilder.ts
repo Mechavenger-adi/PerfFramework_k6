@@ -55,6 +55,26 @@ export interface BuildHistogramOptions {
 }
 
 export class HistogramArtifactBuilder {
+  /**
+   * Resolve the histogram time-bucket (seconds), kept a whole multiple of the
+   * counter bucket so the two timelines align. Default is **adaptive**: sized from
+   * the planned test duration to target ~600 timeline points, clamped to
+   * [counterBucket, 60s]. This gives short/spike tests fine resolution (down to the
+   * counter bucket, e.g. 2s) and long soaks a bounded artifact (≈600 points). An
+   * explicit `override` (runtime setting / env) wins. Bucket size never affects the
+   * full-run / SLA percentile (lossless sum) — only zoom granularity.
+   */
+  static resolveBucketSeconds(counterBucketSeconds: number, plannedDurationSeconds: number, override?: number): number {
+    const counter = Math.max(1, Math.floor(counterBucketSeconds));
+    const toMultiple = (s: number): number => Math.max(counter, Math.round(s / counter) * counter);
+    if (override && override > 0) return toMultiple(override);
+    const TARGET_POINTS = 600;
+    const MAX_SECONDS = 60;
+    const raw = plannedDurationSeconds > 0 ? plannedDurationSeconds / TARGET_POINTS : 10;
+    const maxAligned = Math.max(counter, Math.floor(MAX_SECONDS / counter) * counter);
+    return Math.min(maxAligned, toMultiple(raw));
+  }
+
   /** Build the artifact in memory. Returns null if the stream is missing/empty. */
   static async build(
     streamPath: string,
