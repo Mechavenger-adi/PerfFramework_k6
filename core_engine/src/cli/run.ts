@@ -24,6 +24,7 @@ import { RunReportGenerator } from '../reporting/RunReportGenerator';
 import { RunSummaryBuilder } from '../reporting/RunSummaryBuilder';
 import { TimeseriesArtifactBuilder } from '../reporting/TimeseriesArtifactBuilder';
 import { TransactionMetricsBuilder } from '../reporting/TransactionMetricsBuilder';
+import { HistogramArtifactBuilder } from '../reporting/HistogramArtifactBuilder';
 import { ScenarioRuntimeMetadata } from '../scenario/ScenarioBuilder';
 import { TestPlanLoader } from '../scenario/TestPlanLoader';
 import { ResolvedConfig } from '../types/ConfigContracts';
@@ -1319,6 +1320,39 @@ async function finalizeRunArtifacts(options: {
   ArtifactWriter.writeJson(systemMetricsPath, {
     snapshots: options.hostSnapshots,
   });
+
+  // Distributed Phase 0 (opt-in): emit a compact, mergeable per-machine histogram
+  // artifact from the same metrics stream. Off by default so normal/local runs are
+  // unaffected; the distributed config turns it on. Histograms ingest 100% of the
+  // data regardless of any raw cap (see design §2.4).
+  if (process.env.K6_PERF_EMIT_HISTOGRAM === '1' || process.env.K6_PERF_EMIT_HISTOGRAM === 'true') {
+    try {
+      const histogramPath = path.join(options.reportDir, 'metrics-histogram.json');
+      // Histogram bucket is a whole multiple of the counter bucket; defaults to 10s
+      // until the distributed runtime setting is wired (Phase 0 config scaffold).
+      const counterBucket = Math.max(1, runtime.getTimeseriesBucketSizeSeconds());
+      // Histogram bucket = the smallest whole multiple of the counter bucket that is
+      // >= 10s, so the two timelines align (see design §2.8).
+      const histBucketSeconds = Math.ceil(10 / counterBucket) * counterBucket;
+      const art = await HistogramArtifactBuilder.writeArtifact(
+        path.join(options.reportDir, 'metrics-stream.json'),
+        histogramPath,
+        {
+          bucketSeconds: histBucketSeconds,
+          relativeAccuracy: Number(process.env.K6_PERF_HISTOGRAM_ALPHA) || 0.001,
+          transactionNames: options.transactionNames,
+        },
+      );
+      if (art) {
+        Logger.detail(
+          `Histogram artifact: ${Object.keys(art.transactions).length} transaction(s), ` +
+          `${histBucketSeconds}s buckets, ${art.relativeAccuracy * 100}% precision`,
+        );
+      }
+    } catch (err) {
+      Logger.warn(`[histogram] emission failed (non-fatal): ${(err as Error).message}`);
+    }
+  }
 
   const snapshotsFile = path.join(options.reportDir, 'snapshots.json');
   let snapshotFiles: Array<Record<string, unknown>> = [];

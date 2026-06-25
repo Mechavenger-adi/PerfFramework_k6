@@ -141,28 +141,36 @@ export class RelativeHistogram {
   }
 
   /**
-   * Value at percentile `pct` (a fraction in [0,1]). Walks buckets in ascending
-   * order to the target rank (nearest-rank), accurate to `relativeAccuracy`.
-   * Clamped to [min, max] so the result never falls outside observed data.
+   * Value at percentile `pct` (a fraction in [0,1]). Uses the **R-7 rank
+   * interpolation** k6 uses (i = pct*(N-1); interpolate between the values at the
+   * two neighbouring ranks) so the result tracks k6's exact percentile closely —
+   * instead of nearest-rank, which diverges in sparse tails at small N. Each
+   * bucket's representative value is within `relativeAccuracy` of the true value,
+   * so the interpolated result stays within ~`relativeAccuracy` of k6's number.
+   * Clamped to [min, max] so it never falls outside observed data.
    */
   valueAtPercentile(pct: number): number {
     if (this.count === 0) return 0;
     const p = pct <= 0 ? 0 : pct >= 1 ? 1 : pct;
-    // Nearest-rank target (1-based): the rank-th smallest observation.
-    const rank = Math.max(1, Math.ceil(p * this.count));
-
-    let cumulative = this.zeroCount;
-    if (rank <= cumulative) return this.min === Number.POSITIVE_INFINITY ? 0 : Math.max(0, this.min);
-
     const sortedKeys = [...this.buckets.keys()].sort((x, y) => x - y);
+    const i = p * (this.count - 1); // 0-based fractional rank (R-7)
+    const lo = Math.floor(i);
+    const vlo = this.valueAtRank(lo, sortedKeys);
+    if (i === lo) return vlo;
+    const vhi = this.valueAtRank(Math.ceil(i), sortedKeys);
+    return vlo + (vhi - vlo) * (i - lo);
+  }
+
+  /** Representative value at a 0-based rank (the `rank`-th smallest observation). */
+  private valueAtRank(rank: number, sortedKeys: number[]): number {
+    const target = rank + 1; // 1-based
+    let cumulative = this.zeroCount;
+    if (target <= cumulative) return this.min === Number.POSITIVE_INFINITY ? 0 : Math.max(0, this.min);
     for (const key of sortedKeys) {
       cumulative += this.buckets.get(key)!;
-      if (rank <= cumulative) {
-        const v = this.valueOf(key);
-        return Math.min(this.max, Math.max(this.min, v));
-      }
+      if (target <= cumulative) return Math.min(this.max, Math.max(this.min, this.valueOf(key)));
     }
-    return this.max; // rank == count → top of distribution
+    return this.max;
   }
 
   toJSON(): HistogramJSON {
