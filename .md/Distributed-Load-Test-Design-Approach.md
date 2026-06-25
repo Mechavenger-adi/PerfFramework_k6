@@ -45,6 +45,27 @@ the merge engine; Approach 1 then adds automation on top without reimplementing 
 
 Local execution stays as-is across all phases; distributed sits behind a toggle.
 
+### Implementation status (updated 2026-06-26)
+
+**Phase 1 is functionally complete** (env-driven manual distributed → single merged report).
+Every increment builds clean and is committed; nothing changes existing/local runs.
+
+| Capability | Status | Where |
+|---|---|---|
+| Tag dedup (native `scenario`/`group`) | ✅ done | `ScenarioBuilder`, `request.ts`, `TimeseriesStreamParser` |
+| Accuracy core — exact R-7 + mergeable `RelativeHistogram` | ✅ done · validated | `reporting/Histogram.ts` |
+| Per-machine histogram emission (opt-in) | ✅ done · validated | `reporting/HistogramArtifactBuilder.ts`, wired in `run.ts` |
+| Merge engine (by logical name; histogram-derived percentiles) | ✅ done · validated | `distributed/MergeEngine.ts` |
+| Merged timeseries + ReportBundle → single `RunReport.html` | ✅ done | `distributed/MergedReportBuilder.ts` |
+| `merge` CLI | ✅ done | `distributed/runMerge.ts` |
+| Env-driven run: shared `runId`, machine tags, `startAt` gate, auto-collect | ✅ done | `run.ts`, `distributed/startBarrier.ts`, `distributed/collectRun.ts` |
+| `collect` CLI (`shared_<runId>` namespacing) | ✅ done | `distributed/collectRun.ts` |
+| **Validation:** merge correctness + histogram-vs-k6 (automated) + manual e2e steps | ✅ | `npm run test:merge`, `npm run validate:histogram`, Test Guide |
+| Vendor CDN imports (air-gapped) | ⏳ pending | `run.ts:445-446` |
+| Phase 2 — controller/agent service | ⏳ not started | — |
+
+See [Distributed-Load-Test-Test-Guide.md](Distributed-Load-Test-Test-Guide.md) for how to test.
+
 ---
 
 ## 1. Shared foundations (used by both approaches)
