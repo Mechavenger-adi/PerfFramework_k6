@@ -47,7 +47,8 @@
     "debug:script": "tsx core_engine/src/cli/run.ts debug",
     "run": "tsx core_engine/src/cli/run.ts run",
     "loadtest": "npm run cli -- run --plan config/test_plans/load_test.json",
-    "debug": "npm run cli -- run --plan config/test_plans/debug_test.json"
+    "debug": "npm run cli -- run --plan config/test_plans/debug_test.json",
+    "test:merge": "tsx tools/merge-validation.test.ts"
   },
   "dependencies": {
     "ajv": "^8.17.1",
