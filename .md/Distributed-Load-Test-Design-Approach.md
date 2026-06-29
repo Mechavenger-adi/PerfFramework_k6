@@ -1,4 +1,4 @@
-# Distributed Load Test — Design Approach
+                                                            # Distributed Load Test — Design Approach
 
 > **Status:** Finalized design (pre-development). · **Last updated:** 2026-06-25
 > **Scope:** Generate load from multiple load-generator VMs ("LGs"), collect every

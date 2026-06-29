@@ -26,6 +26,7 @@ import { RunSummaryBuilder } from '../reporting/RunSummaryBuilder';
 import { TimeseriesArtifactBuilder } from '../reporting/TimeseriesArtifactBuilder';
 import { TransactionMetricsBuilder } from '../reporting/TransactionMetricsBuilder';
 import { HistogramArtifactBuilder } from '../reporting/HistogramArtifactBuilder';
+import { RunMetricLogWriter } from '../reporting/RunMetricLogWriter';
 import { ScenarioRuntimeMetadata } from '../scenario/ScenarioBuilder';
 import { TestPlanLoader } from '../scenario/TestPlanLoader';
 import { ResolvedConfig } from '../types/ConfigContracts';
@@ -540,6 +541,22 @@ program
       extraArgs.push('--out', opts.out);
     }
 
+    // Per-request CSV log (Test_ID_<host>_run_metric.csv) — one row per HTTP
+    // request, derived live from the json stream. On by default; disable by
+    // setting K6_PERF_REQUEST_LOG=0 (or false). Modern k6 emits the current VU
+    // and iteration under each Point's `metadata` automatically, so the log gets
+    // those for free. We still pass the default system-tag set plus vu,iter for
+    // older k6 (which exposed vu/iter as tags only when explicitly enabled); the
+    // list mirrors k6's defaults so no system tag is dropped, and custom/user
+    // tags are unaffected. Gated by the toggle so the flag is only added when on.
+    const requestLogEnabled = !/^(0|false|no)$/i.test(process.env.K6_PERF_REQUEST_LOG ?? '');
+    if (requestLogEnabled) {
+      extraArgs.push(
+        '--system-tags',
+        'proto,subproto,status,method,url,name,group,check,error,error_code,tls_version,scenario,service,expected_response,vu,iter',
+      );
+    }
+
     const influxUrl = resolvedConfig.secrets['K6_INFLUXDB_URL'];
     if (influxUrl) {
       extraArgs.push('--out', `influxdb=${influxUrl}`);
@@ -596,6 +613,19 @@ program
     // writes them under the run output dir as the test runs (Proposal 7).
     const fileWriteSink = new FileWriteSink(reportDir);
     const liveConsole = startLiveConsoleLogStream(runLogPath, (m) => fileWriteSink.consume(m));
+
+    // Per-request CSV log (one row per HTTP request) tailed live from the json
+    // stream. Filename: <testId>_<host>_run_metric.csv. Gated by the same
+    // K6_PERF_REQUEST_LOG toggle that enables the vu/iter system tags above.
+    let requestLog: RunMetricLogWriter | null = null;
+    if (requestLogEnabled) {
+      const hostName = process.env.K6_PERF_MACHINE || os.hostname();
+      const testId = `TID_${plan.name}`;
+      const safe = (s: string) => s.replace(/[^a-zA-Z0-9_.-]/g, '_');
+      const requestLogPath = path.join(reportDir, `${safe(testId)}_${safe(hostName)}_run_metric.csv`);
+      requestLog = new RunMetricLogWriter(metricsStreamPath, requestLogPath, { testId, hostName });
+      requestLog.start();
+    }
     try {
       // No onLine → stdio is fully inherited → k6's live progress bar renders correctly.
       // Snapshot events are captured via --log-output file=... and parsed post-run.
@@ -611,6 +641,10 @@ program
     } finally {
       liveConsole.stop();
       if (liveDisplay) liveDisplay.stop();
+      if (requestLog) {
+        requestLog.stop(); // final sweep flushes samples written after the last poll
+        Logger.detail(`Per-request log: ${requestLog.rowCount} request(s) → ${path.basename(requestLog.path)}`);
+      }
       // Reconcile any writeData lines the live tail missed (fast runs flush last).
       fileWriteSink.flushFromLog(runLogPath);
       if (fileWriteSink.fileCount > 0) {

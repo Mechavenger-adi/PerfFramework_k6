@@ -102,7 +102,7 @@ export declare class ScenarioBuilder {
     private static computePhaseEnvelope;
     static computeDebugPhaseEnvelope(profile: GlobalLoadProfile): ScenarioPhaseEnvelope;
     /** Estimate total duration of a load profile in seconds */
-    private static estimateTotalDurationSeconds;
+    static estimateTotalDurationSeconds(profile: GlobalLoadProfile): number;
     /** Parse k6 duration strings: '2m', '30s', '1h30m' */
     private static parseDurationToSeconds;
 }

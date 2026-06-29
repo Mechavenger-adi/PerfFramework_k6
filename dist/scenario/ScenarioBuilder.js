@@ -36,7 +36,9 @@ class ScenarioBuilder {
             scenarios[journey.name] = {
                 ...executorConfig,
                 exec: execName,
-                tags: { journey: journey.name, ...journey.tags },
+                // Journey is identified by k6's native `scenario` tag (the scenario key
+                // is the journey name); no separate `journey` tag is emitted.
+                tags: { ...journey.tags },
                 env: this.buildScenarioEnv(plan, journey, execName, metadata, executorConfig.env),
             };
         }
@@ -57,7 +59,9 @@ class ScenarioBuilder {
             scenarios[journey.name] = {
                 ...executorConfig,
                 exec: execName,
-                tags: { journey: journey.name, ...journey.tags },
+                // Journey is identified by k6's native `scenario` tag (the scenario key
+                // is the journey name); no separate `journey` tag is emitted.
+                tags: { ...journey.tags },
                 env: this.buildScenarioEnv(plan, journey, execName, metadata, executorConfig.env),
                 // k6 uses string startTime in sequential scenarios
                 ...(offsetSeconds > 0 && { startTime: `${offsetSeconds}s` }),
@@ -88,7 +92,7 @@ class ScenarioBuilder {
                     scenarios[name] = {
                         ...executorConfig,
                         exec: execName,
-                        tags: { journey: name, ...journey.tags },
+                        tags: { ...journey.tags },
                         env: this.buildScenarioEnv(plan, journey, execName, metadata, executorConfig.env),
                         ...(groupOffset > 0 && { startTime: `${groupOffset}s` }),
                     };
@@ -114,7 +118,7 @@ class ScenarioBuilder {
                     scenarios[name] = {
                         ...executorConfig,
                         exec: execName,
-                        tags: { journey: name, ...journey.tags },
+                        tags: { ...journey.tags },
                         env: this.buildScenarioEnv(plan, journey, execName, metadata, executorConfig.env),
                         startTime: `${groupOffset}s`,
                     };

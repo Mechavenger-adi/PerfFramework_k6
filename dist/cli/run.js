@@ -41,6 +41,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const commander_1 = require("commander");
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
+const os = __importStar(require("os"));
 const readline = __importStar(require("readline"));
 const ConfigurationManager_1 = require("../config/ConfigurationManager");
 const GatekeeperValidator_1 = require("../config/GatekeeperValidator");
@@ -51,12 +52,14 @@ const HostMonitor_1 = require("../execution/HostMonitor");
 const ParallelExecutionManager_1 = require("../execution/ParallelExecutionManager");
 const FileWriteSink_1 = require("../execution/FileWriteSink");
 const PipelineRunner_1 = require("../execution/PipelineRunner");
+const ScenarioBuilder_1 = require("../scenario/ScenarioBuilder");
 const ArtifactWriter_1 = require("../reporting/ArtifactWriter");
 const EventArtifactBuilder_1 = require("../reporting/EventArtifactBuilder");
 const RunReportGenerator_1 = require("../reporting/RunReportGenerator");
 const RunSummaryBuilder_1 = require("../reporting/RunSummaryBuilder");
 const TimeseriesArtifactBuilder_1 = require("../reporting/TimeseriesArtifactBuilder");
 const TransactionMetricsBuilder_1 = require("../reporting/TransactionMetricsBuilder");
+const HistogramArtifactBuilder_1 = require("../reporting/HistogramArtifactBuilder");
 const TestPlanLoader_1 = require("../scenario/TestPlanLoader");
 const logger_1 = require("../utils/logger");
 const LiveConsoleLogStream_1 = require("../utils/LiveConsoleLogStream");
@@ -68,6 +71,9 @@ const generate_byos_1 = require("./generate-byos");
 const import_1 = require("./import");
 const init_1 = require("./init");
 const validate_1 = require("./validate");
+const runMerge_1 = require("../distributed/runMerge");
+const collectRun_1 = require("../distributed/collectRun");
+const startBarrier_1 = require("../distributed/startBarrier");
 const templates_1 = require("./templates");
 const features_1 = require("./features");
 const config_inspect_1 = require("./config-inspect");
@@ -248,6 +254,34 @@ program
         verbose: opts.verbose,
     });
     if (!passed)
+        process.exit(1);
+});
+// ---------------------------------------------
+// MERGE command (distributed) — combine per-machine results into one report
+// ---------------------------------------------
+program
+    .command('merge')
+    .description('Merge per-machine distributed run artifacts into a single report')
+    .requiredOption('--run-dir <path>', 'Shared run dir containing <machineName>/ subfolders for one runId')
+    .option('--out <path>', 'Output dir for the merged result (default: <run-dir>/_merged)')
+    .action((opts) => {
+    const passed = (0, runMerge_1.runMerge)({ runDir: opts.runDir, out: opts.out });
+    if (!passed)
+        process.exit(1);
+});
+// ---------------------------------------------
+// COLLECT command (distributed) — copy a local run folder into the shared location
+// ---------------------------------------------
+program
+    .command('collect')
+    .description('Copy a finished local run folder into <collectDir>/shared_<runId>/<machine>/')
+    .requiredOption('--from <path>', 'Local run dir to collect (e.g. results/<plan>/<runId>)')
+    .requiredOption('--into <path>', 'Shared collect base dir')
+    .option('--machine <name>', 'Machine name (defaults to hostname)')
+    .option('--run-id <id>', 'Shared runId (defaults to the run-manifest runId)')
+    .action((opts) => {
+    const ok = (0, collectRun_1.runCollect)({ from: opts.from, into: opts.into, machine: opts.machine || os.hostname(), runId: opts.runId });
+    if (!ok)
         process.exit(1);
 });
 // ---------------------------------------------
@@ -483,6 +517,12 @@ program
     if (influxUrl) {
         extraArgs.push('--out', `influxdb=${influxUrl}`);
     }
+    // Distributed (opt-in via K6_PERF_MACHINE): tag every metric with this machine
+    // and the shared runId so the merged report can attribute load per agent.
+    const distMachine = process.env.K6_PERF_MACHINE;
+    if (distMachine) {
+        extraArgs.push('--tag', `machine=${distMachine}`, '--tag', `runId=${runId}`);
+    }
     // Execution provenance for the report's "How this test was invoked" panel.
     // Captures the three pieces the framework assembles to drive k6: the exact
     // CLI command, the generated combined entry script (re-exports each
@@ -507,6 +547,9 @@ program
     logger_1.Logger.detail(`Run manifest: ${runManifestPath}`);
     logger_1.Logger.detail('Launching k6...\n');
     let runResult;
+    // Distributed start barrier (opt-in via K6_PERF_START_AT): wait for the shared
+    // wall-clock start so all LGs ramp together. No-op when unset.
+    await (0, startBarrier_1.awaitScheduledStart)();
     const k6StartTime = new Date().toISOString();
     const txnNamesForLive = runtimeEnv.K6_PERF_TRANSACTION_NAMES
         ? JSON.parse(runtimeEnv.K6_PERF_TRANSACTION_NAMES)
@@ -574,6 +617,21 @@ program
     logger_1.Logger.detail(`CI summary: ${generatedArtifacts.ciSummaryJson}`);
     if (generatedArtifacts.transactionMetrics) {
         printTransactionTable(generatedArtifacts.transactionMetrics);
+    }
+    // Distributed collect (opt-in via K6_PERF_COLLECT_DIR): after the local run is
+    // fully written, copy this machine's result folder into the shared location at
+    // <collectDir>/shared_<runId>/<machineName>/. A one-shot post-run copy (no live
+    // shared writes). machineName defaults to the OS hostname when unset.
+    const collectDir = process.env.K6_PERF_COLLECT_DIR;
+    if (collectDir) {
+        const machineName = process.env.K6_PERF_MACHINE || os.hostname();
+        try {
+            const dest = (0, collectRun_1.collectRunDir)(reportDir, runId, machineName, collectDir);
+            logger_1.Logger.pass(`Collected results to shared location: ${dest}`);
+        }
+        catch (err) {
+            logger_1.Logger.warn(`[collect] copy to shared location failed (non-fatal): ${err.message}`);
+        }
     }
     PipelineRunner_1.PipelineRunner.ensureSuccess(runResult);
 });
@@ -705,7 +763,16 @@ function prepareRunArtifacts(plan, resolvedConfig) {
     const override = new RuntimeConfigManager_1.RuntimeConfigManager(resolvedConfig.runtime).shouldOverrideExistingResults();
     // With override on, reuse a single stable folder (wiped each run); otherwise
     // create a fresh timestamped folder so run history is preserved.
-    const runId = override ? 'Run_latest' : `Run_${new Date().toISOString().replace(/[-:.]/g, '_')}`;
+    // Distributed runs need a SHARED runId across machines so every LG's local result
+    // folder carries the same id and `collect` groups them. Resolution order:
+    //   1. explicit K6_PERF_RUN_ID (set the same value on every machine), else
+    //   2. derived from the shared K6_PERF_START_AT (already identical on all machines,
+    //      so the runId falls out identically with no extra coordination), else
+    //   3. a fresh timestamped id (single-machine / non-distributed).
+    const startAtDigits = (process.env.K6_PERF_START_AT || '').replace(/[^0-9]/g, '').slice(0, 14);
+    const runId = process.env.K6_PERF_RUN_ID
+        || (startAtDigits.length >= 8 ? `Run_${startAtDigits}` : null)
+        || (override ? 'Run_latest' : `Run_${new Date().toISOString().replace(/[-:.]/g, '_')}`);
     // Use resolve (not join) so an absolute K6_RESULTS_BASE_DIR is honored as-is;
     // a relative value still resolves against the framework cwd.
     const reportDir = path.resolve(process.cwd(), baseDir, safePlanName, runId);
@@ -1169,6 +1236,39 @@ async function finalizeRunArtifacts(options) {
     ArtifactWriter_1.ArtifactWriter.writeJson(systemMetricsPath, {
         snapshots: options.hostSnapshots,
     });
+    // Distributed Phase 0 (opt-in): emit a compact, mergeable per-machine histogram
+    // artifact from the same metrics stream. Off by default so normal/local runs are
+    // unaffected; the distributed config turns it on. Histograms ingest 100% of the
+    // data regardless of any raw cap (see design §2.4).
+    if (process.env.K6_PERF_EMIT_HISTOGRAM === '1' || process.env.K6_PERF_EMIT_HISTOGRAM === 'true' || !!process.env.K6_PERF_MACHINE) {
+        try {
+            const histogramPath = path.join(options.reportDir, 'metrics-histogram.json');
+            // Histogram bucket is a whole multiple of the counter bucket; defaults to 10s
+            // until the distributed runtime setting is wired (Phase 0 config scaffold).
+            const counterBucket = Math.max(1, runtime.getTimeseriesBucketSizeSeconds());
+            // Adaptive histogram bucket sized from the PLANNED duration (design §2.8/§2.9):
+            // fine for short/spike tests (down to the counter bucket), bounded for long
+            // soaks (~600 points, capped 60s). Explicit override wins:
+            // K6_PERF_HISTOGRAM_BUCKET or reporting.histogram.bucketSizeSeconds. Planned
+            // duration (not actual) keeps the bucket identical across machines for merge.
+            const plannedDurationSec = ScenarioBuilder_1.ScenarioBuilder.estimateTotalDurationSeconds(options.plan.global_load_profile);
+            const reportingCfg = options.resolvedConfig.runtime.reporting;
+            const bucketOverride = Number(process.env.K6_PERF_HISTOGRAM_BUCKET) || reportingCfg?.histogram?.bucketSizeSeconds || undefined;
+            const histBucketSeconds = HistogramArtifactBuilder_1.HistogramArtifactBuilder.resolveBucketSeconds(counterBucket, plannedDurationSec, bucketOverride);
+            const art = await HistogramArtifactBuilder_1.HistogramArtifactBuilder.writeArtifact(path.join(options.reportDir, 'metrics-stream.json'), histogramPath, {
+                bucketSeconds: histBucketSeconds,
+                relativeAccuracy: Number(process.env.K6_PERF_HISTOGRAM_ALPHA) || 0.001,
+                transactionNames: options.transactionNames,
+            });
+            if (art) {
+                logger_1.Logger.detail(`Histogram artifact: ${Object.keys(art.transactions).length} transaction(s), ` +
+                    `${histBucketSeconds}s buckets, ${art.relativeAccuracy * 100}% precision`);
+            }
+        }
+        catch (err) {
+            logger_1.Logger.warn(`[histogram] emission failed (non-fatal): ${err.message}`);
+        }
+    }
     const snapshotsFile = path.join(options.reportDir, 'snapshots.json');
     let snapshotFiles = [];
     if (fs.existsSync(snapshotsFile)) {
