@@ -21,6 +21,15 @@ export class EnvResolver {
     if (fs.existsSync(resolvedPath)) {
       const parsed = dotenv.parse(fs.readFileSync(resolvedPath));
       Object.assign(this.vars, parsed);
+
+      // Bridge .env into the real process.env so process.env-based gates work
+      // (e.g. K6_PERF_EMIT_HISTOGRAM, K6_PERF_REQUEST_LOG, K6_PERF_MACHINE — all
+      // read directly off process.env). Without this, values set ONLY in .env are
+      // invisible to those checks. Real shell/CI/Docker env vars must still win,
+      // so we only fill keys that aren't already present in process.env.
+      for (const [k, v] of Object.entries(parsed)) {
+        if (process.env[k] === undefined) process.env[k] = v;
+      }
     }
 
     // Always overlay real process.env so Docker/CI env vars win

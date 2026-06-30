@@ -212,6 +212,8 @@ export function runInit(projectDir: string = process.cwd()): void {
     path.join(projectDir, '.env.template'),
     `# Copy this file to .env and fill in your values
 # NEVER commit .env to source control
+# Values set here are loaded into the environment on every run, so the toggles
+# below take effect from this file (real shell/CI env vars override them).
 
 # Per-team base URLs live in config/environments/*.json. Uncomment for a
 # global fallback base URL (used when no team/service URL is available).
@@ -225,6 +227,14 @@ K6_RESULTS_BASE_DIR=./testSuites/results
 
 # Uncomment to stream metrics to InfluxDB (PowerBI/Grafana).
 # K6_INFLUXDB_URL=http://localhost:8086/k6
+
+# Per-request CSV log (<testId>_<host>_run_metric.csv) — one row per HTTP
+# request, written live to the run report dir. ON by default; set to 0 to disable.
+# K6_PERF_REQUEST_LOG=0
+
+# Emit a mergeable per-machine latency histogram (metrics-histogram.json).
+# Off by default; set to 1 to enable.
+# K6_PERF_EMIT_HISTOGRAM=1
 `,
     '.env.template',
   );
