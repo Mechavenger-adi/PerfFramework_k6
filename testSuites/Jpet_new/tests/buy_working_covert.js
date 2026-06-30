@@ -56,26 +56,26 @@ export function initPhase(ctx) {
 
   transaction('t02_login', function() {
   
-      // const res_1 = request('GET', `${env.baseUrl}/account/signonForm`, {
-      //   name: "GET_signonForm_1",
-      //   headers: {
-      //     accept: `text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7`,
-      //     "upgrade-insecure-requests": `1`,
-      //     "sec-purpose": `prefetch`,
-      //     "sec-speculation-tags": `null`,
-      //     "sec-ch-ua": `"Chromium";v="146", "Not-A.Brand";v="24", "Google Chrome";v="146"`,
-      //     "sec-ch-ua-mobile": `?0`,
-      //     "sec-ch-ua-platform": `"Windows"`,
-      //     "sec-fetch-site": `none`,
-      //     "sec-fetch-mode": `navigate`,
-      //     "sec-fetch-dest": `document`,
-      //     referer: `https://jpetstore.aspectran.com/`,
-      //     "accept-encoding": `gzip, deflate, br, zstd`,
-      //     "accept-language": `en-US,en;q=0.9`,
-      //     priority: `u=1, i`,
-      //     },
-      //   replay: { id: "req_2", recordingStartedAt: 'converted' },
-      // });
+      const res_1 = request('GET', `${env.baseUrl}/account/signonForm`, {
+        name: "GET_signonForm_1",
+        headers: {
+          accept: `text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7`,
+          "upgrade-insecure-requests": `1`,
+          "sec-purpose": `prefetch`,
+          "sec-speculation-tags": `null`,
+          "sec-ch-ua": `"Chromium";v="146", "Not-A.Brand";v="24", "Google Chrome";v="146"`,
+          "sec-ch-ua-mobile": `?0`,
+          "sec-ch-ua-platform": `"Windows"`,
+          "sec-fetch-site": `none`,
+          "sec-fetch-mode": `navigate`,
+          "sec-fetch-dest": `document`,
+          referer: `https://jpetstore.aspectran.com/`,
+          "accept-encoding": `gzip, deflate, br, zstd`,
+          "accept-language": `en-US,en;q=0.9`,
+          priority: `u=1, i`,
+          },
+        replay: { id: "req_2", recordingStartedAt: 'converted' },
+      });
   
       // k6Check(res_1, { "status equals 503": (r) => r.status === 503 });
   
