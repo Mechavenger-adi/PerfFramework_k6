@@ -1,4 +1,15 @@
 /**
+ * Record an HTTP response the framework considers failed (status 0 = transport
+ * error, or status >= 400). Called by request() for every failing response.
+ * No-op outside an active transaction so failures in init/end phases or between
+ * transactions can't leak into the next one.
+ */
+export declare function recordFailingResponse(res: object, info: {
+    method: string;
+    url: string;
+    status: number;
+}): void;
+/**
  * True when `error` is a JS-engine error type that signals a programming bug in
  * the script — an undefined identifier, calling a non-function, a bad property
  * access, etc. (ReferenceError / TypeError / RangeError / SyntaxError /
@@ -53,4 +64,4 @@ export declare function transaction(name: string, fn: () => void): void;
  *
  * Drop-in replacement for k6's check() — same signature, same metric output.
  */
-export declare function k6Check(val: any, sets: Record<string, (v: any) => boolean>): boolean;
+export declare function k6Check(val: any, sets: Record<string, (v: any) => boolean>, tags?: Record<string, string>): boolean;

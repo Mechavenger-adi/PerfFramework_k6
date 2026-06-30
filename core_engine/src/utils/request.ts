@@ -3,7 +3,7 @@ import http from 'k6/http';
 // @ts-ignore - K6 runtime module
 import exec from 'k6/execution';
 import { resolvePath, registerBaseUrl } from './session.js';
-import { getCurrentTransaction } from './transaction.js';
+import { getCurrentTransaction, recordFailingResponse } from './transaction.js';
 import { logExchange } from './replayLogger.js';
 import { mergeRequestHeaders } from './autoHeaders.js';
 
@@ -500,6 +500,10 @@ export function request(
   // too — previously only status >= 400 was gated, so a request that never got
   // a response slipped past error behavior entirely.
   if (res && (res.status === 0 || res.status >= 400)) {
+    // Register this failing response so transaction() can backstop it if the
+    // user never applies a status check. Done BEFORE applyErrorBehaviorForStatus,
+    // which may throw under non-'continue' modes.
+    recordFailingResponse(res, { method, url: resolvedUrl, status: res.status });
     applyErrorBehaviorForStatus(method, resolvedUrl, res.status, res.error);
   }
 

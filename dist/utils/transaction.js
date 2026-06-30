@@ -3,6 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.recordFailingResponse = recordFailingResponse;
 exports.isJsRuntimeError = isJsRuntimeError;
 exports.isVuTerminated = isVuTerminated;
 exports.initTransactions = initTransactions;
@@ -43,6 +44,25 @@ const txnResults = {};
 // (failed k6Check or thrown error) during this iteration. Reset at the start of
 // every transaction(), read once in finally, then reset by the next transaction.
 let _currentIterationFailed = false;
+// Per-iteration registry of failing HTTP responses (status 0 or >= 400) seen
+// inside the active transaction, keyed by the k6 Response object. request()
+// populates it; a k6Check whose predicate inspects `.status` removes the entry
+// (user has taken ownership of the status outcome). Any entry still present
+// when the transaction ends = a failing request with no status assertion, so
+// we flag the iteration failed — the failure is never silently lost, even
+// under errorBehavior 'continue'.
+const _uncheckedFailingResponses = new Map();
+/**
+ * Record an HTTP response the framework considers failed (status 0 = transport
+ * error, or status >= 400). Called by request() for every failing response.
+ * No-op outside an active transaction so failures in init/end phases or between
+ * transactions can't leak into the next one.
+ */
+function recordFailingResponse(res, info) {
+    if (_activeTransaction === '' || !res)
+        return;
+    _uncheckedFailingResponses.set(res, info);
+}
 /**
  * Pull a user-script source location (path:line[:col]) out of an Error.stack
  * string. k6 runs scripts under the Goja JS engine which produces stack
@@ -355,6 +375,19 @@ function transaction(name, fn) {
                     `  → skipped remaining work in this transaction; continuing to next transaction (errorBehavior=continue)`);
             }
             finally {
+                // Backstop: any failing response (status 0 / >= 400) that never had a
+                // status assertion applied means the user forgot to check it. Flag the
+                // iteration failed so <name>_checkrate reflects it even under
+                // errorBehavior 'continue'. Transaction-level only — per-request
+                // visibility already comes from http_req_failed + the failure snapshot.
+                if (_uncheckedFailingResponses.size > 0) {
+                    for (const [, f] of _uncheckedFailingResponses) {
+                        console.error(`[k6-perf][transaction:${name}] unchecked failed request: ` +
+                            `${f.method} ${f.url} → HTTP ${f.status} — no status check applied; marking transaction failed`);
+                    }
+                    _currentIterationFailed = true;
+                }
+                _uncheckedFailingResponses.clear();
                 // Exactly one sample per transaction iteration, before endTransaction
                 // so it can never be skipped. By construction:
                 //   <name>_checkrate.passes + <name>_checkrate.fails === <name>_count
@@ -375,8 +408,18 @@ function transaction(name, fn) {
  *
  * Drop-in replacement for k6's check() — same signature, same metric output.
  */
-function k6Check(val, sets) {
-    const passed = (0, k6_1.check)(val, sets);
+function k6Check(val, sets, tags) {
+    // If this check asserts on the response status, the user owns the status
+    // outcome for this response — drop it from the unchecked-failure registry so
+    // the transaction-end backstop won't double-flag it. Heuristic: predicate
+    // source references `status`. Body-only checks do NOT count, so a failing
+    // request asserted only on its body still gets backstopped.
+    if (val && typeof val === 'object' && _uncheckedFailingResponses.has(val)) {
+        const assertsStatus = Object.values(sets).some((fn) => /\bstatus\b/.test(String(fn)));
+        if (assertsStatus)
+            _uncheckedFailingResponses.delete(val);
+    }
+    const passed = (0, k6_1.check)(val, sets, tags);
     if (!passed) {
         // Mark the current iteration as failed so transaction()'s finally block
         // pushes Rate.add(false) for the active transaction. Guarded on
