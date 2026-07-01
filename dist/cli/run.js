@@ -1161,10 +1161,10 @@ async function finalizeRunArtifacts(options) {
     // race these out during fast runs (and the live table owns the terminal), so
     // we always print a concise summary here after the run completes.
     const checkFailures = k6Events.errors
-        .filter((e) => e.type === 'check_failed' || e.type === 'transaction_error');
+        .filter((e) => e.type === 'check_failed' || e.type === 'transaction_error' || e.type === 'http_error');
     if (checkFailures.length > 0) {
         const MAX = 20;
-        logger_1.Logger.warn(`${checkFailures.length} check/assertion failure(s):`);
+        logger_1.Logger.warn(`${checkFailures.length} check/request failure(s):`);
         for (const e of checkFailures.slice(0, MAX)) {
             const txn = e.transaction ? `[transaction:${e.transaction}] ` : '';
             const where = e.vu !== undefined ? `(VU ${e.vu}, iter ${e.iteration}) ` : '';
@@ -1177,11 +1177,12 @@ async function finalizeRunArtifacts(options) {
             logger_1.Logger.detail(`… and ${checkFailures.length - MAX} more (see the report's Errors tab / errors.ndjson)`);
         }
     }
-    // Wave 3: also surface every breached threshold as an ERROR in addition to
-    // the existing warning event. Reasoning: a breached SLA is a run-level
-    // failure (already reflected in ciSummary.status === 'failed'), so users
-    // expect to see it in the Errors tab — not buried in Warnings next to
-    // host-monitor advisories.
+    // Threshold breaches are surfaced as WARNINGS only (see
+    // EventArtifactBuilder.collectThresholdWarningEvents) — a breached SLA is not
+    // an execution error. The run's pass/fail status still reflects it via
+    // ciSummary.status; keeping it out of the Errors tab avoids conflating SLA
+    // breaches with genuine request/script errors. We only tally the names here
+    // for a concise post-run log line.
     const breachedThresholdMetricNames = [];
     for (const [metricName, m] of Object.entries(summaryMetricsAny)) {
         for (const [rule, res] of Object.entries(m.thresholds ?? {})) {
@@ -1189,18 +1190,10 @@ async function finalizeRunArtifacts(options) {
             if (!breached)
                 continue;
             breachedThresholdMetricNames.push(`${metricName}:${rule}`);
-            eventArtifacts.errors.push({
-                ts: new Date().toISOString(),
-                type: 'threshold_breach',
-                level: 'error',
-                runId: options.runId,
-                transaction: metricName,
-                message: `Threshold breached for ${metricName}: ${rule}`,
-            });
         }
     }
     if (breachedThresholdMetricNames.length > 0) {
-        logger_1.Logger.detail(`Threshold breaches surfaced into errors: ${breachedThresholdMetricNames.slice(0, 5).join(', ')}${breachedThresholdMetricNames.length > 5 ? ` (+${breachedThresholdMetricNames.length - 5} more)` : ''}`);
+        logger_1.Logger.detail(`Threshold breaches surfaced as warnings: ${breachedThresholdMetricNames.slice(0, 5).join(', ')}${breachedThresholdMetricNames.length > 5 ? ` (+${breachedThresholdMetricNames.length - 5} more)` : ''}`);
     }
     const ciSummary = RunSummaryBuilder_1.RunSummaryBuilder.buildCiSummary({
         runId: options.runId,

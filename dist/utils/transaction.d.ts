@@ -2,12 +2,14 @@
  * Record an HTTP response the framework considers failed (status 0 = transport
  * error, or status >= 400). Called by request() for every failing response.
  * No-op outside an active transaction so failures in init/end phases or between
- * transactions can't leak into the next one.
+ * transactions can't leak into the next one. `options` is stashed so finally can
+ * build the deferred request-failure snapshot with full request context.
  */
 export declare function recordFailingResponse(res: object, info: {
     method: string;
     url: string;
     status: number;
+    options?: unknown;
 }): void;
 /**
  * True when `error` is a JS-engine error type that signals a programming bug in

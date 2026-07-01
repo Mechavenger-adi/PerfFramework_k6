@@ -201,6 +201,13 @@ function getSnapshotConfig(): SnapshotConfig {
 
 let _snapshotCount = 0;
 
+// Responses that already produced a snapshot this run. A single request that
+// both fails at the HTTP level (status >= 400) AND fails a k6Check would
+// otherwise emit two snapshots for the same request/response (http_error
+// + check_failed). We key on the response object so the first trigger wins and
+// later triggers for the same response are skipped — one snapshot per request.
+const _snapshottedResponses = new WeakSet<object>();
+
 // ── HTTP defaults from runtime settings ────────────────────────
 // timeout / maxRedirects / throwOnError configured in runtime_settings are
 // injected into K6_PERF_RUNTIME_METADATA.http and applied as DEFAULTS here.
@@ -288,7 +295,9 @@ export function recordRequestContextForSnapshot(
  * Emit a snapshot of the current request context. Returns true if a snapshot
  * was emitted, false if it was suppressed (feature off, cap hit, no context).
  * The `type` field distinguishes trigger sources for downstream consumers
- * ("http_status_failed", "check_failed", "transaction_error").
+ * ("http_error", "check_failed", "transaction_error"). Note: "http_error"
+ * matches the error-event type so a request's Errors-table row and its snapshot
+ * share one type name.
  */
 export function captureRequestSnapshot(
   type: string,
@@ -303,6 +312,12 @@ export function captureRequestSnapshot(
 ): boolean {
   const cfg = getSnapshotConfig();
   if (!cfg.captureSnapshotOnFailure) return false;
+  if (!context.res) return false;
+  // One snapshot per response — a later trigger (e.g. check_failed after the
+  // http_error auto-trigger) for the same request is skipped. Checked
+  // BEFORE the cap so a duplicate never consumes cap budget or fires the
+  // cap-reached warning.
+  if (_snapshottedResponses.has(context.res)) return false;
   if (_snapshotCount >= cfg.maxSnapshotsPerRun) {
     // Emit the cap-hit warning EXACTLY once per VU so the Warnings tab
     // surfaces it. Without this users had no way to tell that snapshots
@@ -319,7 +334,7 @@ export function captureRequestSnapshot(
     }
     return false;
   }
-  if (!context.res) return false;
+  _snapshottedResponses.add(context.res);
   _snapshotCount++;
 
   const payload = {
@@ -382,14 +397,30 @@ function emitSnapshotEvent(
   res: any,
 ): void {
   if (!res || res.status < 400) return;
-  captureRequestSnapshot('http_status_failed', { method, url: resolvedUrl, options, res });
+  captureRequestSnapshot('http_error', { method, url: resolvedUrl, options, res });
 }
 
-// Install a globalThis hook so `transaction.ts` (which can't import from
-// `request.ts` without creating a cycle) can trigger a snapshot from
-// k6Check failures and transaction() catch blocks without threading the
-// request envelope through. Set once at module init.
+/**
+ * Emit the deferred request-failure snapshot for a specific response, called by
+ * transaction()'s finally for each failing response that no status check claimed
+ * (checks-first fallback). captureRequestSnapshot dedups on the response object,
+ * so a response already snapshotted by a failing check is skipped here.
+ */
+export function emitDeferredFailureSnapshot(
+  res: any,
+  ctx: { method: string; url: string; options: RequestOptions | undefined },
+): boolean {
+  if (!res) return false;
+  return captureRequestSnapshot('http_error', { method: ctx.method, url: ctx.url, options: ctx.options, res });
+}
+
+// Install globalThis hooks so `transaction.ts` (which can't import from
+// `request.ts` without creating a cycle) can trigger snapshots without
+// threading the request envelope through. Set once at module init.
+//   - capture from the last request  → k6Check failures + transaction() catch
+//   - emit deferred failure snapshot  → transaction() finally (checks-first fallback)
 (globalThis as any).__k6PerfCaptureSnapshotFromLastRequest = captureSnapshotFromLastRequest;
+(globalThis as any).__k6PerfEmitDeferredFailureSnapshot = emitDeferredFailureSnapshot;
 
 // ── Main request helper ───────────────────────────────────────
 
@@ -490,20 +521,32 @@ export function request(
       res = http.request(method, resolvedUrl, body, k6Params);
   }
 
-  // Stash the request/response context BEFORE the legacy 4xx/5xx auto-
-  // trigger so a k6Check() failure that follows this request can call
-  // `captureSnapshotFromLastRequest()` and get a full envelope back.
+  // Stash the request/response context BEFORE anything else so a k6Check()
+  // failure that follows this request can call `captureSnapshotFromLastRequest()`
+  // and get a full envelope back.
   recordRequestContextForSnapshot(method, resolvedUrl, options, res);
-  emitSnapshotEvent(method, resolvedUrl, options, res);
 
   // Treat a status-0 transport failure (timeout / reset / refused) as an error
   // too — previously only status >= 400 was gated, so a request that never got
   // a response slipped past error behavior entirely.
   if (res && (res.status === 0 || res.status >= 400)) {
-    // Register this failing response so transaction() can backstop it if the
-    // user never applies a status check. Done BEFORE applyErrorBehaviorForStatus,
-    // which may throw under non-'continue' modes.
-    recordFailingResponse(res, { method, url: resolvedUrl, status: res.status });
+    const inTransaction = getCurrentTransaction() !== '';
+    if (inTransaction && getRuntimeErrorBehavior() === 'continue') {
+      // Checks-first snapshot: DON'T emit the request-failure snapshot now.
+      // Register the failing response (with its full request context) for
+      // transaction()'s finally. If a k6Check later runs against it, the check
+      // owns the outcome — a failing check emits its own `check_failed` snapshot
+      // and clears this entry; a passing check (expected non-2xx) clears it with
+      // no snapshot. Only if NO status check claims it does finally emit the
+      // deferred `http_error` fallback. This also registers the txn-fail
+      // backstop. Under stop_*/abort we skip registration: the request throws
+      // below and transaction()'s catch captures a `transaction_error` snapshot.
+      recordFailingResponse(res, { method, url: resolvedUrl, status: res.status, options });
+    } else {
+      // No transaction to defer to (init/end phase) — emit the request-failure
+      // snapshot immediately, as there is no finally to flush it.
+      emitSnapshotEvent(method, resolvedUrl, options, res);
+    }
     applyErrorBehaviorForStatus(method, resolvedUrl, res.status, res.error);
   }
 

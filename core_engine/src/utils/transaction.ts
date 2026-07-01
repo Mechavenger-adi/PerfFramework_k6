@@ -42,17 +42,18 @@ let _currentIterationFailed = false;
 // when the transaction ends = a failing request with no status assertion, so
 // we flag the iteration failed — the failure is never silently lost, even
 // under errorBehavior 'continue'.
-const _uncheckedFailingResponses = new Map<object, { method: string; url: string; status: number }>();
+const _uncheckedFailingResponses = new Map<object, { method: string; url: string; status: number; options?: unknown }>();
 
 /**
  * Record an HTTP response the framework considers failed (status 0 = transport
  * error, or status >= 400). Called by request() for every failing response.
  * No-op outside an active transaction so failures in init/end phases or between
- * transactions can't leak into the next one.
+ * transactions can't leak into the next one. `options` is stashed so finally can
+ * build the deferred request-failure snapshot with full request context.
  */
 export function recordFailingResponse(
   res: object,
-  info: { method: string; url: string; status: number },
+  info: { method: string; url: string; status: number; options?: unknown },
 ): void {
   if (_activeTransaction === '' || !res) return;
   _uncheckedFailingResponses.set(res, info);
@@ -398,11 +399,38 @@ export function transaction(name: string, fn: () => void): void {
         // errorBehavior 'continue'. Transaction-level only — per-request
         // visibility already comes from http_req_failed + the failure snapshot.
         if (_uncheckedFailingResponses.size > 0) {
-          for (const [, f] of _uncheckedFailingResponses) {
+          for (const [res, f] of _uncheckedFailingResponses) {
+            const reqDesc = `${f.method} ${f.url}`;
+            const failMsg = `Http error failed request: ${reqDesc} → HTTP ${f.status} ( status check unavailable, fallback status check applied)`;
             console.error(
-              `[k6-perf][transaction:${name}] unchecked failed request: ` +
-              `${f.method} ${f.url} → HTTP ${f.status} — no status check applied; marking transaction failed`,
+              `[k6-perf][transaction:${name}] ${failMsg}; marking transaction failed`,
             );
+            // Checks-first snapshot fallback: this response had no status check,
+            // so emit the deferred request-failure snapshot now. Skipped by the
+            // per-response dedup if a failing check already captured one.
+            try {
+              const snap = (globalThis as any).__k6PerfEmitDeferredFailureSnapshot;
+              if (typeof snap === 'function') snap(res, { method: f.method, url: f.url, options: f.options });
+            } catch { /* snapshot best-effort */ }
+            // Surface in the report's Errors tab, aligned with check_failed /
+            // transaction_error events. Only reached when the user applied NO
+            // status check to a failing request — a status check (pass or fail)
+            // removes the entry in k6Check before we get here, so we never
+            // double-report a failure the user already owns. Registration is
+            // gated to errorBehavior 'continue' in request(); under stop_*/abort
+            // the request throws and transaction_error already covers it.
+            try {
+              console.log('[k6-perf][error-event] ' + JSON.stringify({
+                ts: new Date().toISOString(),
+                type: 'http_error',
+                transaction: name,
+                message: failMsg,
+                request: reqDesc,
+                status: f.status,
+                vu: typeof exec !== 'undefined' && exec.vu ? exec.vu.idInInstance : undefined,
+                iteration: typeof exec !== 'undefined' && exec.vu ? exec.vu.iterationInScenario : undefined,
+              }));
+            } catch { /* never let event emission throw */ }
           }
           _currentIterationFailed = true;
         }
