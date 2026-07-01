@@ -60,7 +60,8 @@ const RunSummaryBuilder_1 = require("../reporting/RunSummaryBuilder");
 const TimeseriesArtifactBuilder_1 = require("../reporting/TimeseriesArtifactBuilder");
 const TransactionMetricsBuilder_1 = require("../reporting/TransactionMetricsBuilder");
 const HistogramArtifactBuilder_1 = require("../reporting/HistogramArtifactBuilder");
-const RunMetricLogWriter_1 = require("../reporting/RunMetricLogWriter");
+const RequestMetricLogWriter_1 = require("../reporting/RequestMetricLogWriter");
+const TransactionMetricLogWriter_1 = require("../reporting/TransactionMetricLogWriter");
 const TestPlanLoader_1 = require("../scenario/TestPlanLoader");
 const logger_1 = require("../utils/logger");
 const LiveConsoleLogStream_1 = require("../utils/LiveConsoleLogStream");
@@ -523,7 +524,10 @@ program
     // list mirrors k6's defaults so no system tag is dropped, and custom/user
     // tags are unaffected. Gated by the toggle so the flag is only added when on.
     const requestLogEnabled = !/^(0|false|no)$/i.test(process.env.K6_PERF_REQUEST_LOG ?? '');
-    if (requestLogEnabled) {
+    // Per-transaction CSV log — separate toggle. Independent of the request log,
+    // but shares the same vu/iter system-tag requirement.
+    const transactionLogEnabled = !/^(0|false|no)$/i.test(process.env.K6_PERF_TRANSACTION_LOG ?? '');
+    if (requestLogEnabled || transactionLogEnabled) {
         extraArgs.push('--system-tags', 'proto,subproto,status,method,url,name,group,check,error,error_code,tls_version,scenario,service,expected_response,vu,iter');
     }
     const influxUrl = resolvedConfig.secrets['K6_INFLUXDB_URL'];
@@ -579,16 +583,24 @@ program
     const fileWriteSink = new FileWriteSink_1.FileWriteSink(reportDir);
     const liveConsole = (0, LiveConsoleLogStream_1.startLiveConsoleLogStream)(runLogPath, (m) => fileWriteSink.consume(m));
     // Per-request CSV log (one row per HTTP request) tailed live from the json
-    // stream. Filename: <testId>_<host>_run_metric.csv. Gated by the same
+    // stream. Filename: <testId>_<host>_request_metric.csv. Gated by the same
     // K6_PERF_REQUEST_LOG toggle that enables the vu/iter system tags above.
     let requestLog = null;
-    if (requestLogEnabled) {
+    let transactionLog = null;
+    if (requestLogEnabled || transactionLogEnabled) {
         const hostName = process.env.K6_PERF_MACHINE || os.hostname();
         const testId = `TID_${plan.name}`;
         const safe = (s) => s.replace(/[^a-zA-Z0-9_.-]/g, '_');
-        const requestLogPath = path.join(reportDir, `${safe(testId)}_${safe(hostName)}_run_metric.csv`);
-        requestLog = new RunMetricLogWriter_1.RunMetricLogWriter(metricsStreamPath, requestLogPath, { testId, hostName });
-        requestLog.start();
+        if (requestLogEnabled) {
+            const requestLogPath = path.join(reportDir, `${safe(testId)}_${safe(hostName)}_request_metric.csv`);
+            requestLog = new RequestMetricLogWriter_1.RequestMetricLogWriter(metricsStreamPath, requestLogPath, { testId, hostName });
+            requestLog.start();
+        }
+        if (transactionLogEnabled) {
+            const transactionLogPath = path.join(reportDir, `${safe(testId)}_${safe(hostName)}_transaction_metric.csv`);
+            transactionLog = new TransactionMetricLogWriter_1.TransactionMetricLogWriter(metricsStreamPath, transactionLogPath, { testId, hostName });
+            transactionLog.start();
+        }
     }
     try {
         // No onLine → stdio is fully inherited → k6's live progress bar renders correctly.
@@ -610,6 +622,10 @@ program
         if (requestLog) {
             requestLog.stop(); // final sweep flushes samples written after the last poll
             logger_1.Logger.detail(`Per-request log: ${requestLog.rowCount} request(s) → ${path.basename(requestLog.path)}`);
+        }
+        if (transactionLog) {
+            transactionLog.stop(); // final sweep flushes samples written after the last poll
+            logger_1.Logger.detail(`Per-transaction log: ${transactionLog.rowCount} transaction(s) → ${path.basename(transactionLog.path)}`);
         }
         // Reconcile any writeData lines the live tail missed (fast runs flush last).
         fileWriteSink.flushFromLog(runLogPath);

@@ -228,9 +228,16 @@ K6_RESULTS_BASE_DIR=./testSuites/results
 # Uncomment to stream metrics to InfluxDB (PowerBI/Grafana).
 # K6_INFLUXDB_URL=http://localhost:8086/k6
 
-# Per-request CSV log (<testId>_<host>_run_metric.csv) — one row per HTTP
-# request, written live to the run report dir. ON by default; set to 0 to disable.
+# Per-request CSV log (<testId>_<host>_request_metric.csv) — one row per HTTP
+# request, written live to the run report dir. isError is checks-first (a passing
+# check wins even over a >=400 status; falls back to the status when unchecked).
+# ON by default; set to 0 to disable.
 # K6_PERF_REQUEST_LOG=0
+
+# Per-transaction CSV log (<testId>_<host>_transaction_metric.csv) — one row per
+# transaction iteration; IsPass mirrors the transaction's checkrate (checks-first
+# + fallback). ON by default; set to 0 to disable.
+# K6_PERF_TRANSACTION_LOG=0
 
 # Emit a mergeable per-machine latency histogram (metrics-histogram.json).
 # Off by default; set to 1 to enable.

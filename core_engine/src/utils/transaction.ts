@@ -470,7 +470,18 @@ export function k6Check(
     if (assertsStatus) _uncheckedFailingResponses.delete(val);
   }
 
-  const passed = nativeCheck(val, sets, tags);
+  // Tag the emitted `checks` samples with this response's request id so the
+  // per-request metric log can correlate a check back to its request and compute
+  // a checks-first isError. Auto-injected (no user-script change); best-effort.
+  let effectiveTags = tags;
+  if (val && typeof val === 'object') {
+    try {
+      const reqId = (globalThis as any).__k6PerfGetRequestId?.(val);
+      if (reqId) effectiveTags = { ...(tags || {}), har_entry_id: reqId };
+    } catch { /* best-effort tagging */ }
+  }
+
+  const passed = nativeCheck(val, sets, effectiveTags);
   if (!passed) {
     // Mark the current iteration as failed so transaction()'s finally block
     // pushes Rate.add(false) for the active transaction. Guarded on

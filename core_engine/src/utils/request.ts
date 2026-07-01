@@ -208,6 +208,17 @@ let _snapshotCount = 0;
 // later triggers for the same response are skipped — one snapshot per request.
 const _snapshottedResponses = new WeakSet<object>();
 
+// Maps each k6 Response to the framework request id (har_entry_id). k6Check reads
+// this to tag its `checks` samples with the request they validated, so the
+// per-request metric log can compute a checks-first isError (correlate check →
+// request by (vu, har_entry_id)).
+const _reqIdByResponse = new WeakMap<object, string>();
+
+/** The framework request id (har_entry_id) for a given k6 Response, or undefined. */
+export function getRequestIdForResponse(res: any): string | undefined {
+  return res && typeof res === 'object' ? _reqIdByResponse.get(res) : undefined;
+}
+
 // ── HTTP defaults from runtime settings ────────────────────────
 // timeout / maxRedirects / throwOnError configured in runtime_settings are
 // injected into K6_PERF_RUNTIME_METADATA.http and applied as DEFAULTS here.
@@ -421,6 +432,8 @@ export function emitDeferredFailureSnapshot(
 //   - emit deferred failure snapshot  → transaction() finally (checks-first fallback)
 (globalThis as any).__k6PerfCaptureSnapshotFromLastRequest = captureSnapshotFromLastRequest;
 (globalThis as any).__k6PerfEmitDeferredFailureSnapshot = emitDeferredFailureSnapshot;
+//   get request id for a response  → k6Check tags checks with the request id
+(globalThis as any).__k6PerfGetRequestId = getRequestIdForResponse;
 
 // ── Main request helper ───────────────────────────────────────
 
@@ -525,6 +538,9 @@ export function request(
   // failure that follows this request can call `captureSnapshotFromLastRequest()`
   // and get a full envelope back.
   recordRequestContextForSnapshot(method, resolvedUrl, options, res);
+  // Remember this response's request id so a following k6Check can tag its
+  // checks samples with it (per-request checks-first isError correlation).
+  if (res) _reqIdByResponse.set(res, harEntryId);
 
   // Treat a status-0 transport failure (timeout / reset / refused) as an error
   // too — previously only status >= 400 was gated, so a request that never got

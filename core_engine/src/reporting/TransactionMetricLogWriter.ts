@@ -1,28 +1,28 @@
 /**
- * RunMetricLogWriter.ts
+ * TransactionMetricLogWriter.ts
  *
- * Live, per-request CSV log derived from the k6 `--out json=` stream
- * (metrics-stream.json). One row per HTTP request — sourced from each
- * `http_req_duration` Point, which carries the request's tags (status, name,
- * group, scenario, and — when vu/iter system tags are enabled — vu/iter).
+ * Live, per-transaction CSV log derived from the k6 `--out json=` stream
+ * (metrics-stream.json). One row per transaction iteration — sourced from each
+ * `<transaction>_checkrate` Rate Point, which the framework emits exactly once
+ * per transaction() iteration in its finally block (value 1 = pass, 0 = fail).
  *
- * Unlike the bucketed TimeseriesStreamParser (aggregates for charts), this is a
- * flat transaction-level log meant for spreadsheet / BI ingestion: every request
- * is one line, columns fixed, the leftover tags preserved as one JSON column.
+ * IsPass is therefore read straight off the metric: the checkrate already
+ * encodes the checks-first outcome plus the fallbacks (a failed k6Check, a
+ * thrown error, or the HTTP-error backstop for an unchecked failing request all
+ * mark the iteration failed). There is no correlation or buffering to do — the
+ * sample is final at emit time, so rows are appended live.
  *
- * Lifecycle mirrors the framework's other live tailers (FileWriteSink): poll the
- * growing stream file on an interval, append rows for newly-arrived samples, and
- * do one final sweep on stop() so a fast run that flushes its last lines after
- * the tailer stops still gets them. Byte-offset + partial-line buffering makes
- * incremental reads safe across chunk boundaries.
+ * Byte-offset + partial-line buffering makes incremental reads safe across
+ * chunk boundaries (mirrors RequestMetricLogWriter's tailer).
  */
 
 import * as fs from 'fs';
 
 const POLL_INTERVAL_MS = 500;
 
-// Fixed column order. `tags` is a JSON-encoded catch-all for any request tag not
-// promoted to its own column.
+const CHECKRATE_SUFFIX = '_checkrate';
+
+// Fixed column order.
 const COLUMNS = [
   'ts',
   'testId',
@@ -32,15 +32,8 @@ const COLUMNS = [
   'i',
   'Scenario',
   'Transaction',
-  'Request Name',
-  'status',
-  'isError',
-  'responsetime',
-  'tags',
+  'IsPass',
 ] as const;
-
-// Tag keys promoted to dedicated columns — removed from the leftover `tags` blob.
-const PROMOTED_TAGS = new Set(['vu', 'iter', 'scenario', 'group', 'name', 'status']);
 
 interface RawPoint {
   type?: string;
@@ -49,13 +42,11 @@ interface RawPoint {
     time?: string;
     value?: number;
     tags?: Record<string, string>;
-    // Newer k6 emits high-cardinality values (vu, iter) here, separate from
-    // `tags`. Older k6 put them in `tags` when the vu/iter system tags were on.
     metadata?: Record<string, string>;
   };
 }
 
-export interface RunMetricLogContext {
+export interface TransactionMetricLogContext {
   /** `TID_<planName>` */
   testId: string;
   /** Machine name (K6_PERF_MACHINE or OS hostname). */
@@ -70,7 +61,7 @@ function csvField(value: string): string {
   return value;
 }
 
-export class RunMetricLogWriter {
+export class TransactionMetricLogWriter {
   private offset = 0;
   private partial = '';
   private timer: NodeJS.Timeout | null = null;
@@ -79,7 +70,7 @@ export class RunMetricLogWriter {
   constructor(
     private readonly streamPath: string,
     private readonly outPath: string,
-    private readonly ctx: RunMetricLogContext,
+    private readonly ctx: TransactionMetricLogContext,
   ) {}
 
   /** Begin polling the stream file and appending rows. */
@@ -100,7 +91,7 @@ export class RunMetricLogWriter {
     this.tick();
   }
 
-  /** Number of request rows written this run. */
+  /** Number of transaction rows written this run. */
   get rowCount(): number { return this.rows; }
 
   /** Path of the generated CSV. */
@@ -141,10 +132,11 @@ export class RunMetricLogWriter {
     }
   }
 
-  /** Parse one stream line; return a CSV row for http_req_duration Points only. */
+  /** Parse one stream line; return a CSV row for `<txn>_checkrate` Points only. */
   private lineToRow(line: string): string | null {
+    // Fast reject: must be a Point carrying a `_checkrate` metric.
     if (!line || line.indexOf('"type":"Point"') === -1) return null;
-    if (line.indexOf('"metric":"http_req_duration"') === -1) return null;
+    if (line.indexOf(CHECKRATE_SUFFIX + '"') === -1) return null;
 
     let p: RawPoint;
     try {
@@ -152,33 +144,22 @@ export class RunMetricLogWriter {
     } catch {
       return null;
     }
-    if (p.type !== 'Point' || p.metric !== 'http_req_duration') return null;
+    if (p.type !== 'Point' || !p.metric || !p.metric.endsWith(CHECKRATE_SUFFIX)) return null;
     const time = p.data?.time;
     const value = p.data?.value;
     if (!time || typeof value !== 'number') return null;
 
-    const tags = { ...(p.data?.tags ?? {}) };
+    const transaction = p.metric.slice(0, -CHECKRATE_SUFFIX.length);
+    const tags = p.data?.tags ?? {};
     const meta = p.data?.metadata ?? {};
     // vu/iter live in `metadata` on newer k6, `tags` on older — prefer metadata.
     const vu = meta.vu ?? tags.vu ?? '';
     const iter = meta.iter ?? tags.iter ?? '';
     const scenario = tags.scenario ?? '';
-    const transaction = (tags.group ?? '').replace(/^::/, '');
-    const requestName = tags.name ?? tags.url ?? '';
-    const statusStr = tags.status ?? '';
-    const status = Number(statusStr);
-    // Success = 2xx/3xx; anything else (incl. status 0 transport errors) is an error.
-    const isError = !(status >= 200 && status < 400);
+    // Rate .add(true) → 1 (pass), .add(false) → 0 (fail). Value is final at emit.
+    const isPass = value === 1;
 
     const runID = `RID_${this.ctx.hostName}_${vu || 'NA'}`;
-    const responsetime = (value / 1000).toFixed(4);
-
-    // Leftover tags: drop the keys promoted to columns, keep the rest losslessly.
-    const leftover: Record<string, string> = {};
-    for (const [k, v] of Object.entries(tags)) {
-      if (!PROMOTED_TAGS.has(k)) leftover[k] = v;
-    }
-    const tagsJson = Object.keys(leftover).length > 0 ? JSON.stringify(leftover) : '';
 
     this.rows += 1;
     return [
@@ -190,11 +171,7 @@ export class RunMetricLogWriter {
       iter,
       scenario,
       transaction,
-      requestName,
-      statusStr,
-      String(isError),
-      responsetime,
-      tagsJson,
+      String(isPass),
     ].map(csvField).join(',');
   }
 }

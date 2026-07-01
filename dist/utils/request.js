@@ -3,6 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.getRequestIdForResponse = getRequestIdForResponse;
 exports.recordRequestContextForSnapshot = recordRequestContextForSnapshot;
 exports.captureRequestSnapshot = captureRequestSnapshot;
 exports.captureSnapshotFromLastRequest = captureSnapshotFromLastRequest;
@@ -91,6 +92,15 @@ let _snapshotCount = 0;
 // + check_failed). We key on the response object so the first trigger wins and
 // later triggers for the same response are skipped — one snapshot per request.
 const _snapshottedResponses = new WeakSet();
+// Maps each k6 Response to the framework request id (har_entry_id). k6Check reads
+// this to tag its `checks` samples with the request they validated, so the
+// per-request metric log can compute a checks-first isError (correlate check →
+// request by (vu, har_entry_id)).
+const _reqIdByResponse = new WeakMap();
+/** The framework request id (har_entry_id) for a given k6 Response, or undefined. */
+function getRequestIdForResponse(res) {
+    return res && typeof res === 'object' ? _reqIdByResponse.get(res) : undefined;
+}
 let _httpConfigCache;
 function getHttpRuntimeConfig() {
     if (_httpConfigCache !== undefined)
@@ -248,6 +258,8 @@ function emitDeferredFailureSnapshot(res, ctx) {
 //   - emit deferred failure snapshot  → transaction() finally (checks-first fallback)
 globalThis.__k6PerfCaptureSnapshotFromLastRequest = captureSnapshotFromLastRequest;
 globalThis.__k6PerfEmitDeferredFailureSnapshot = emitDeferredFailureSnapshot;
+//   get request id for a response  → k6Check tags checks with the request id
+globalThis.__k6PerfGetRequestId = getRequestIdForResponse;
 // ── Main request helper ───────────────────────────────────────
 /**
  * Execute an HTTP request in a framework-aware way and return the native k6 Response.
@@ -349,6 +361,10 @@ function request(method, pathOrUrl, options) {
     // failure that follows this request can call `captureSnapshotFromLastRequest()`
     // and get a full envelope back.
     recordRequestContextForSnapshot(method, resolvedUrl, options, res);
+    // Remember this response's request id so a following k6Check can tag its
+    // checks samples with it (per-request checks-first isError correlation).
+    if (res)
+        _reqIdByResponse.set(res, harEntryId);
     // Treat a status-0 transport failure (timeout / reset / refused) as an error
     // too — previously only status >= 400 was gated, so a request that never got
     // a response slipped past error behavior entirely.

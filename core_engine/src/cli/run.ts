@@ -26,7 +26,8 @@ import { RunSummaryBuilder } from '../reporting/RunSummaryBuilder';
 import { TimeseriesArtifactBuilder } from '../reporting/TimeseriesArtifactBuilder';
 import { TransactionMetricsBuilder } from '../reporting/TransactionMetricsBuilder';
 import { HistogramArtifactBuilder } from '../reporting/HistogramArtifactBuilder';
-import { RunMetricLogWriter } from '../reporting/RunMetricLogWriter';
+import { RequestMetricLogWriter } from '../reporting/RequestMetricLogWriter';
+import { TransactionMetricLogWriter } from '../reporting/TransactionMetricLogWriter';
 import { ScenarioRuntimeMetadata } from '../scenario/ScenarioBuilder';
 import { TestPlanLoader } from '../scenario/TestPlanLoader';
 import { ResolvedConfig } from '../types/ConfigContracts';
@@ -550,7 +551,10 @@ program
     // list mirrors k6's defaults so no system tag is dropped, and custom/user
     // tags are unaffected. Gated by the toggle so the flag is only added when on.
     const requestLogEnabled = !/^(0|false|no)$/i.test(process.env.K6_PERF_REQUEST_LOG ?? '');
-    if (requestLogEnabled) {
+    // Per-transaction CSV log — separate toggle. Independent of the request log,
+    // but shares the same vu/iter system-tag requirement.
+    const transactionLogEnabled = !/^(0|false|no)$/i.test(process.env.K6_PERF_TRANSACTION_LOG ?? '');
+    if (requestLogEnabled || transactionLogEnabled) {
       extraArgs.push(
         '--system-tags',
         'proto,subproto,status,method,url,name,group,check,error,error_code,tls_version,scenario,service,expected_response,vu,iter',
@@ -615,16 +619,24 @@ program
     const liveConsole = startLiveConsoleLogStream(runLogPath, (m) => fileWriteSink.consume(m));
 
     // Per-request CSV log (one row per HTTP request) tailed live from the json
-    // stream. Filename: <testId>_<host>_run_metric.csv. Gated by the same
+    // stream. Filename: <testId>_<host>_request_metric.csv. Gated by the same
     // K6_PERF_REQUEST_LOG toggle that enables the vu/iter system tags above.
-    let requestLog: RunMetricLogWriter | null = null;
-    if (requestLogEnabled) {
+    let requestLog: RequestMetricLogWriter | null = null;
+    let transactionLog: TransactionMetricLogWriter | null = null;
+    if (requestLogEnabled || transactionLogEnabled) {
       const hostName = process.env.K6_PERF_MACHINE || os.hostname();
       const testId = `TID_${plan.name}`;
       const safe = (s: string) => s.replace(/[^a-zA-Z0-9_.-]/g, '_');
-      const requestLogPath = path.join(reportDir, `${safe(testId)}_${safe(hostName)}_run_metric.csv`);
-      requestLog = new RunMetricLogWriter(metricsStreamPath, requestLogPath, { testId, hostName });
-      requestLog.start();
+      if (requestLogEnabled) {
+        const requestLogPath = path.join(reportDir, `${safe(testId)}_${safe(hostName)}_request_metric.csv`);
+        requestLog = new RequestMetricLogWriter(metricsStreamPath, requestLogPath, { testId, hostName });
+        requestLog.start();
+      }
+      if (transactionLogEnabled) {
+        const transactionLogPath = path.join(reportDir, `${safe(testId)}_${safe(hostName)}_transaction_metric.csv`);
+        transactionLog = new TransactionMetricLogWriter(metricsStreamPath, transactionLogPath, { testId, hostName });
+        transactionLog.start();
+      }
     }
     try {
       // No onLine → stdio is fully inherited → k6's live progress bar renders correctly.
@@ -644,6 +656,10 @@ program
       if (requestLog) {
         requestLog.stop(); // final sweep flushes samples written after the last poll
         Logger.detail(`Per-request log: ${requestLog.rowCount} request(s) → ${path.basename(requestLog.path)}`);
+      }
+      if (transactionLog) {
+        transactionLog.stop(); // final sweep flushes samples written after the last poll
+        Logger.detail(`Per-transaction log: ${transactionLog.rowCount} transaction(s) → ${path.basename(transactionLog.path)}`);
       }
       // Reconcile any writeData lines the live tail missed (fast runs flush last).
       fileWriteSink.flushFromLog(runLogPath);
