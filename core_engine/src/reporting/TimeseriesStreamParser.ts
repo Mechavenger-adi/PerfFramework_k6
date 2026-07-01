@@ -306,24 +306,32 @@ export class TimeseriesStreamParser {
         // Six request-timing phases — k6's standard breakdown. The
         // dashboard's Timings tab plots one chart per phase with avg/
         // p90/p95/p99; this mirror lets the custom report do the same.
-        case 'http_req_waiting':
-          getOverview(overview, bucketKey).httpReqWaiting.push(value);
-          break;
-        case 'http_req_tls_handshaking':
-          getOverview(overview, bucketKey).httpReqTlsHandshaking.push(value);
-          break;
-        case 'http_req_sending':
-          getOverview(overview, bucketKey).httpReqSending.push(value);
-          break;
-        case 'http_req_connecting':
-          getOverview(overview, bucketKey).httpReqConnecting.push(value);
-          break;
-        case 'http_req_receiving':
-          getOverview(overview, bucketKey).httpReqReceiving.push(value);
-          break;
-        case 'http_req_blocked':
-          getOverview(overview, bucketKey).httpReqBlocked.push(value);
-          break;
+        //
+        // ── HTTP Timing Breakdown DISABLED ──────────────────────────────
+        // Collection of the six phase metrics is commented out to shrink the
+        // timeseries artifact and the report. These samples now fall through to
+        // `default`, which harmlessly ignores them (no matching transaction).
+        // To restore the Timing Breakdown graphs, uncomment this block together
+        // with the phase output in TimeseriesArtifactBuilder.ts and the charts
+        // in RunReportGenerator.ts.
+        // case 'http_req_waiting':
+        //   getOverview(overview, bucketKey).httpReqWaiting.push(value);
+        //   break;
+        // case 'http_req_tls_handshaking':
+        //   getOverview(overview, bucketKey).httpReqTlsHandshaking.push(value);
+        //   break;
+        // case 'http_req_sending':
+        //   getOverview(overview, bucketKey).httpReqSending.push(value);
+        //   break;
+        // case 'http_req_connecting':
+        //   getOverview(overview, bucketKey).httpReqConnecting.push(value);
+        //   break;
+        // case 'http_req_receiving':
+        //   getOverview(overview, bucketKey).httpReqReceiving.push(value);
+        //   break;
+        // case 'http_req_blocked':
+        //   getOverview(overview, bucketKey).httpReqBlocked.push(value);
+        //   break;
         case 'http_req_failed':
           addRequestSample(tags, bucketKey, 'failed', value);
           if (value === 1) {

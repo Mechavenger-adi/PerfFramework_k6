@@ -61,30 +61,36 @@ class TimeseriesArtifactBuilder {
                     // its own TimeSeriesPoint slot and chart renderers can pull a
                     // single series by name (e.g. `httpReqWaitingP95`). Mirrors what
                     // k6's web-dashboard plots in its Timings tab.
-                    httpReqWaitingAvg: b.httpReqWaiting.avg,
-                    httpReqWaitingP90: b.httpReqWaiting.p90,
-                    httpReqWaitingP95: b.httpReqWaiting.p95,
-                    httpReqWaitingP99: b.httpReqWaiting.p99,
-                    httpReqTlsHandshakingAvg: b.httpReqTlsHandshaking.avg,
-                    httpReqTlsHandshakingP90: b.httpReqTlsHandshaking.p90,
-                    httpReqTlsHandshakingP95: b.httpReqTlsHandshaking.p95,
-                    httpReqTlsHandshakingP99: b.httpReqTlsHandshaking.p99,
-                    httpReqSendingAvg: b.httpReqSending.avg,
-                    httpReqSendingP90: b.httpReqSending.p90,
-                    httpReqSendingP95: b.httpReqSending.p95,
-                    httpReqSendingP99: b.httpReqSending.p99,
-                    httpReqConnectingAvg: b.httpReqConnecting.avg,
-                    httpReqConnectingP90: b.httpReqConnecting.p90,
-                    httpReqConnectingP95: b.httpReqConnecting.p95,
-                    httpReqConnectingP99: b.httpReqConnecting.p99,
-                    httpReqReceivingAvg: b.httpReqReceiving.avg,
-                    httpReqReceivingP90: b.httpReqReceiving.p90,
-                    httpReqReceivingP95: b.httpReqReceiving.p95,
-                    httpReqReceivingP99: b.httpReqReceiving.p99,
-                    httpReqBlockedAvg: b.httpReqBlocked.avg,
-                    httpReqBlockedP90: b.httpReqBlocked.p90,
-                    httpReqBlockedP95: b.httpReqBlocked.p95,
-                    httpReqBlockedP99: b.httpReqBlocked.p99,
+                    //
+                    // ── HTTP Timing Breakdown DISABLED ────────────────────────────
+                    // Commented out so these 24 fields per bucket are NOT written to the
+                    // timeseries artifact, shrinking the file and the embedded report data.
+                    // To restore, uncomment this block along with the collection switch in
+                    // TimeseriesStreamParser.ts and the charts in RunReportGenerator.ts.
+                    // httpReqWaitingAvg: b.httpReqWaiting.avg,
+                    // httpReqWaitingP90: b.httpReqWaiting.p90,
+                    // httpReqWaitingP95: b.httpReqWaiting.p95,
+                    // httpReqWaitingP99: b.httpReqWaiting.p99,
+                    // httpReqTlsHandshakingAvg: b.httpReqTlsHandshaking.avg,
+                    // httpReqTlsHandshakingP90: b.httpReqTlsHandshaking.p90,
+                    // httpReqTlsHandshakingP95: b.httpReqTlsHandshaking.p95,
+                    // httpReqTlsHandshakingP99: b.httpReqTlsHandshaking.p99,
+                    // httpReqSendingAvg: b.httpReqSending.avg,
+                    // httpReqSendingP90: b.httpReqSending.p90,
+                    // httpReqSendingP95: b.httpReqSending.p95,
+                    // httpReqSendingP99: b.httpReqSending.p99,
+                    // httpReqConnectingAvg: b.httpReqConnecting.avg,
+                    // httpReqConnectingP90: b.httpReqConnecting.p90,
+                    // httpReqConnectingP95: b.httpReqConnecting.p95,
+                    // httpReqConnectingP99: b.httpReqConnecting.p99,
+                    // httpReqReceivingAvg: b.httpReqReceiving.avg,
+                    // httpReqReceivingP90: b.httpReqReceiving.p90,
+                    // httpReqReceivingP95: b.httpReqReceiving.p95,
+                    // httpReqReceivingP99: b.httpReqReceiving.p99,
+                    // httpReqBlockedAvg: b.httpReqBlocked.avg,
+                    // httpReqBlockedP90: b.httpReqBlocked.p90,
+                    // httpReqBlockedP95: b.httpReqBlocked.p95,
+                    // httpReqBlockedP99: b.httpReqBlocked.p99,
                     // Compatibility keys consumed by the older "Load Overview" KV
                     // panel — keeps existing renderers/tests happy until they migrate
                     // to the richer fields above.

@@ -156,7 +156,9 @@ export class RunReportGenerator {
     .thr-dev { display: inline-block; font-size: 11.5px; font-weight: 700; white-space: nowrap; }
     .thr-dev-bad { color: var(--error); } .thr-dev-ok { color: var(--muted); }
     .cluster-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; margin-bottom: 18px; }
-    .cluster-card { background: var(--panel); border: 1px solid var(--border); border-left: 4px solid var(--cc); border-radius: 10px; padding: 12px 14px; }
+    .cluster-card { background: var(--panel); border: 1px solid var(--border); border-left: 4px solid var(--cc); border-radius: 10px; padding: 12px 14px; cursor: pointer; transition: box-shadow .12s, transform .12s; }
+    .cluster-card:hover { box-shadow: var(--shadow); transform: translateY(-1px); }
+    .cluster-card.active { outline: 2px solid var(--cc); box-shadow: var(--shadow); }
     .cluster-top { display: flex; align-items: center; justify-content: space-between; }
     .cluster-ico { font-size: 18px; } .cluster-n { font-size: 24px; font-weight: 700; color: var(--cc); }
     .cluster-lbl { font-size: 12.5px; font-weight: 600; color: var(--text); margin-top: 2px; }
@@ -261,6 +263,9 @@ export class RunReportGenerator {
     }
     table { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 640px; }
     th, td { padding: 13px 16px; text-align: left; border-bottom: 1px solid var(--border-soft); font-size: 13px; white-space: nowrap; }
+    /* Text-heavy columns (messages, URLs, request names) opt out of nowrap so
+       long content wraps inside the cell instead of overflowing the table. */
+    td.wrap, th.wrap { white-space: normal; word-break: break-word; overflow-wrap: anywhere; max-width: 420px; }
     thead th {
       position: sticky; top: 0; z-index: 1; background: var(--panel-2, #f9fafc); color: var(--muted);
       font-size: 11px; text-transform: uppercase; letter-spacing: .07em; font-weight: 600;
@@ -276,6 +281,14 @@ export class RunReportGenerator {
     .flex-row > .card { flex: 1 1 180px; min-width: 160px; margin-bottom: 0; }
     .flex-row > .plan-card { flex: 0 0 calc(45% - 10px); min-width: 280px; max-width: calc(45% - 10px); }
     @media (max-width: 980px) { .flex-row > .card, .flex-row > .plan-card { flex: 1 1 100%; max-width: 100%; } }
+    /* Collapsible + scrollable scenario list inside the Plan card. Bounded height
+       keeps the card the same size no matter how many journeys a plan has. */
+    .plan-scenarios { margin-top: 10px; }
+    .plan-scenarios > summary { cursor: pointer; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; user-select: none; list-style-position: inside; }
+    .plan-scenarios > summary:hover { color: var(--accent); }
+    .plan-scenarios .scroll-list { max-height: 150px; overflow-y: auto; margin-top: 6px; border: 1px solid var(--border-soft); border-radius: 8px; padding: 4px 10px; }
+    .plan-scenarios .scroll-list ul { margin: 4px 0; padding-left: 18px; }
+    .plan-scenarios .scroll-list li { margin: 5px 0; font-size: 13px; word-break: break-word; }
     /* Wide-right variant: hand the larger column to the second card. Used for the
        Plan/Thresholds row so the 6-column threshold table isn't crammed into the
        narrow side and clipped. */
@@ -372,13 +385,16 @@ export class RunReportGenerator {
     .global-toolbar input[type="datetime-local"], .global-toolbar input[type="text"], .global-toolbar select {
       padding: 6px 10px; font-size: 13px;
     }
-    .global-toolbar .small-btn {
+    .small-btn {
       background: var(--panel); border: 1px solid var(--border); color: var(--ink);
       border-radius: 999px; padding: 6px 12px; cursor: pointer; font-weight: 600; font-size: 12px;
     }
-    .global-toolbar .small-btn:hover { background: var(--accent-soft); border-color: var(--accent); }
-    .global-toolbar .small-btn.primary { background: var(--accent); color: white; border-color: var(--accent); }
+    .small-btn:hover { background: var(--accent-soft); border-color: var(--accent); }
+    .small-btn.primary { background: var(--accent); color: white; border-color: var(--accent); }
     .global-toolbar .divider { width: 1px; height: 22px; background: var(--border); margin: 0 4px; }
+    /* Filter fields form a full-width second row inside the time-range ribbon,
+       revealed by the "More filters" toggle. flex-basis:100% forces the wrap. */
+    .filter-fields { flex-basis: 100%; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 4px; padding-top: 10px; border-top: 1px dashed var(--border); }
     .saved-list { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
     .saved-chip {
       display: inline-flex; align-items: center; gap: 4px;
@@ -447,6 +463,18 @@ export class RunReportGenerator {
         <button class="small-btn" id="gtb-save">Save</button>
         <span class="divider"></span>
         <span class="saved-list" id="gtb-saved-list"></span>
+        <span class="divider"></span>
+        <!-- Global scenario / transaction filters live in this same ribbon. The
+             toggle reveals a full-width second row (ftb-fields) below the time
+             controls; selections apply across every range-aware tab. -->
+        <button class="small-btn" id="ftb-toggle" aria-expanded="false">⚙ More filters</button>
+        <div class="filter-fields" id="ftb-fields" style="display:none">
+          <label>Scenario</label>
+          <select id="ftb-scenario"><option value="">All scenarios</option></select>
+          <label>Transaction</label>
+          <select id="ftb-transaction"><option value="">All transactions</option></select>
+          <button class="small-btn" id="ftb-clear">Clear</button>
+        </div>
       </div>
       <section id="panel-summary" class="tab-panel active"></section>
       <section id="panel-graphs" class="tab-panel"></section>
@@ -494,6 +522,123 @@ export class RunReportGenerator {
     // explain what the section shows.
     function infoTip(tip) {
       return '<span class="info" tabindex="0" data-tip="' + escapeHtml(tip) + '" aria-label="' + escapeHtml(tip) + '">i</span>';
+    }
+
+    // ── Global scenario / transaction filters ─────────────────────
+    // A second, collapsible toolbar under the time-range row. Selecting a
+    // scenario and/or transaction narrows every range-aware tab (Summary aside)
+    // via matchesGlobalFilters(), which each render function consults.
+    window.__k6PerfFilters = { scenario: '', transaction: '' };
+    function getActiveFilters() { return window.__k6PerfFilters || { scenario: '', transaction: '' }; }
+
+    // First non-empty value among the given keys, or null when none is present.
+    // Returning null (vs '') lets matchesGlobalFilters treat "field absent" as a
+    // pass rather than a mismatch, so rows that simply don't carry a scenario key
+    // aren't dropped by a scenario filter.
+    function _firstField(obj, keys) {
+      for (let i = 0; i < keys.length; i++) {
+        const v = obj[keys[i]];
+        if (v !== undefined && v !== null && v !== '') return String(v);
+      }
+      return null;
+    }
+    function matchesGlobalFilters(obj, scenarioKeys, txnKeys) {
+      const f = getActiveFilters();
+      if (f.scenario) { const v = _firstField(obj, scenarioKeys); if (v !== null && v !== f.scenario) return false; }
+      if (f.transaction) { const v = _firstField(obj, txnKeys); if (v !== null && v !== f.transaction) return false; }
+      return true;
+    }
+
+    // transaction name → scenario (journey), from the authoritative metrics rows.
+    // Memoized; used to filter per-transaction charts by the global scenario.
+    let _txnJourneyCache = null;
+    function txnJourneyMap() {
+      if (_txnJourneyCache) return _txnJourneyCache;
+      const map = {};
+      ((reportData.transactions && reportData.transactions.transactions) || []).forEach((t) => {
+        if (t.transaction) map[String(t.transaction)] = t.journey ? String(t.journey) : '';
+      });
+      _txnJourneyCache = map;
+      return map;
+    }
+    // True when a transaction name passes the active global scenario/transaction
+    // filter — the chart-side equivalent of matchesGlobalFilters for series keyed
+    // only by transaction name.
+    function txnAllowedByFilters(name) {
+      const f = getActiveFilters();
+      if (f.transaction && String(name) !== f.transaction) return false;
+      if (f.scenario) { const j = txnJourneyMap()[String(name)]; if (j && j !== f.scenario) return false; }
+      return true;
+    }
+
+    // Distinct scenario (journey) + transaction values, pooled from the
+    // transaction metrics (authoritative journey↔transaction pairs) plus errors
+    // and snapshots so the dropdowns cover everything the tabs can show.
+    function collectFilterOptions() {
+      const scen = new Set(), txn = new Set(), pairs = [];
+      const txnRows = (reportData.transactions && reportData.transactions.transactions) || [];
+      txnRows.forEach((r) => {
+        if (r.journey) scen.add(String(r.journey));
+        if (r.transaction) txn.add(String(r.transaction));
+        if (r.transaction) pairs.push({ scenario: r.journey ? String(r.journey) : '', transaction: String(r.transaction) });
+      });
+      (reportData.errors || []).forEach((e) => { const s = e.scenario || e.journey; if (s) scen.add(String(s)); if (e.transaction) txn.add(String(e.transaction)); });
+      (reportData.snapshots || []).forEach((s) => { const j = s.journey || s.scenario; if (j) scen.add(String(j)); if (s.transaction) txn.add(String(s.transaction)); });
+      return { scenarios: [...scen].sort(), transactions: [...txn].sort(), pairs: pairs };
+    }
+
+    function setupFilterToolbar() {
+      const toggle = document.getElementById('ftb-toggle');
+      const fields = document.getElementById('ftb-fields');
+      const scenSel = document.getElementById('ftb-scenario');
+      const txnSel = document.getElementById('ftb-transaction');
+      const clearBtn = document.getElementById('ftb-clear');
+      if (!toggle || !fields || !scenSel || !txnSel) return;
+      const opts = collectFilterOptions();
+
+      const fillTxn = (scenario) => {
+        const cur = txnSel.value;
+        const list = scenario
+          ? [...new Set(opts.pairs.filter((p) => p.scenario === scenario).map((p) => p.transaction))].sort()
+          : opts.transactions;
+        txnSel.innerHTML = '<option value="">All transactions</option>'
+          + list.map((t) => '<option value="' + escapeHtml(t) + '">' + escapeHtml(t) + '</option>').join('');
+        // Preserve the current pick if still valid under the new scenario.
+        if (cur && list.indexOf(cur) !== -1) txnSel.value = cur;
+      };
+
+      scenSel.innerHTML = '<option value="">All scenarios</option>'
+        + opts.scenarios.map((s) => '<option value="' + escapeHtml(s) + '">' + escapeHtml(s) + '</option>').join('');
+      fillTxn('');
+
+      // Hide the toggle (and its divider) when there's nothing to filter by.
+      if (!opts.scenarios.length && !opts.transactions.length) {
+        toggle.style.display = 'none';
+        if (toggle.previousElementSibling) toggle.previousElementSibling.style.display = 'none';
+        return;
+      }
+
+      toggle.onclick = () => {
+        const open = fields.style.display !== 'none';
+        fields.style.display = open ? 'none' : 'flex';
+        toggle.setAttribute('aria-expanded', String(!open));
+      };
+      scenSel.onchange = () => {
+        window.__k6PerfFilters.scenario = scenSel.value;
+        // When a transaction no longer belongs to the chosen scenario, reset it.
+        fillTxn(scenSel.value);
+        window.__k6PerfFilters.transaction = txnSel.value;
+        document.dispatchEvent(new CustomEvent('filterchange'));
+      };
+      txnSel.onchange = () => {
+        window.__k6PerfFilters.transaction = txnSel.value;
+        document.dispatchEvent(new CustomEvent('filterchange'));
+      };
+      clearBtn.onclick = () => {
+        window.__k6PerfFilters = { scenario: '', transaction: '' };
+        scenSel.value = ''; fillTxn(''); txnSel.value = '';
+        document.dispatchEvent(new CustomEvent('filterchange'));
+      };
     }
 
     function buildTabs() {
@@ -545,7 +690,9 @@ export class RunReportGenerator {
       o = o || {};
       const cls = o.state ? ' kpi-' + o.state : '';
       const sparkHtml = o.series ? spark(o.series, o.sparkColor || '#0e7490') : '';
-      const trendHtml = (o.series && o.trend) ? trendArrow(o.series) : '';
+      // Trend up/down/flat arrow removed per request — it read as a stray
+      // dropdown caret next to the value. Sparklines already convey direction.
+      const trendHtml = '';
       return '<div class="card kpi' + cls + '"><h3>' + label + '</h3><div class="kpi-row"><strong>' + value + '</strong>' + trendHtml + '</div>' + sparkHtml + '</div>';
     }
     // Phase 4: ranked horizontal-bar widget (replaces plain Top-N tables).
@@ -657,10 +804,25 @@ export class RunReportGenerator {
       // Plan card body — degrades gracefully when planProfile is absent
       // (e.g. older runs whose bundle predates Wave 3).
       const profile = planProfile.globalLoadProfile || {};
-      const stagesRow = profile.stages
+      const stagesRow = Array.isArray(profile.stages)
         ? profile.stages.map((s) => '<code>' + escapeHtml(s.duration) + ' → ' + s.target + ' VUs</code>').join(' ')
         : '';
-      const journeyList = (planProfile.journeys || []).map((j) =>
+      // Executor options that are actually present. Which apply depends on the
+      // executor (ramping-vus uses startVUs/stages/gracefulRampDown; constant-vus
+      // uses vus/duration; arrival-rate uses rate/timeUnit/preAllocatedVUs; …), so
+      // we render only the keys the profile carries.
+      const _optFields = [
+        ['startVUs', 'startVUs'], ['vus', 'VUs'], ['maxVUs', 'maxVUs'],
+        ['preAllocatedVUs', 'preAllocatedVUs'], ['duration', 'duration'],
+        ['iterations', 'iterations'], ['rate', 'rate'], ['timeUnit', 'timeUnit'],
+        ['gracefulRampDown', 'gracefulRampDown'], ['gracefulStop', 'gracefulStop'],
+      ];
+      const optionsRow = _optFields
+        .filter((pair) => profile[pair[0]] !== undefined && profile[pair[0]] !== null && profile[pair[0]] !== '')
+        .map((pair) => pair[1] + ': <code>' + escapeHtml(String(profile[pair[0]])) + '</code>')
+        .join(' · ');
+      const _journeys = planProfile.journeys || [];
+      const journeyItems = _journeys.map((j) =>
         '<li><strong>' + escapeHtml(j.name || '') + '</strong>'
         + (j.weight != null ? ' <span class="subtle">(weight ' + j.weight + ')</span>' : '')
         + (j.vus != null ? ' <span class="subtle">(vus ' + j.vus + ')</span>' : '')
@@ -888,18 +1050,15 @@ export class RunReportGenerator {
 
         <div class="flex-row">
           <div class="card plan-card">
-            <h3>Plan\${infoTip('What was run: plan, environment, executor and load shape.')}</h3>
-            <p style="margin:6px 0"><strong>\${escapeHtml(planProfile.name || reportData.meta.plan || '—')}</strong>
-              <span class="subtle"> — env: <code>\${escapeHtml(planProfile.environment || reportData.meta.environment || '—')}</code></span>
-            </p>
-            <p style="margin:6px 0" class="subtle">Mode: <code>\${escapeHtml(planProfile.executionMode || '—')}</code>
+            <h3>Plan\${infoTip('What was run: plan, environment, execution mode, executor, load-profile options and the scenarios (scripts).')}</h3>
+            <p style="margin:6px 0"><strong>\${escapeHtml(planProfile.name || reportData.meta.plan || '—')}</strong></p>
+            <p style="margin:6px 0" class="subtle">env: <code>\${escapeHtml(planProfile.environment || reportData.meta.environment || '—')}</code>
+              · Mode: <code>\${escapeHtml(planProfile.executionMode || '—')}</code>
               · Executor: <code>\${escapeHtml(profile.executor || '—')}</code>
-              \${profile.duration ? '· Duration: <code>' + escapeHtml(profile.duration) + '</code>' : ''}
-              \${profile.vus != null ? '· VUs: <code>' + profile.vus + '</code>' : ''}
-              \${profile.iterations != null ? '· Iterations: <code>' + profile.iterations + '</code>' : ''}
             </p>
+            \${optionsRow ? '<p style="margin:6px 0" class="subtle">' + optionsRow + '</p>' : ''}
             \${stagesRow ? '<p style="margin:6px 0">Stages: ' + stagesRow + '</p>' : ''}
-            \${journeyList ? '<ul style="margin:8px 0;padding-left:20px">' + journeyList + '</ul>' : ''}
+            \${journeyItems ? '<details open class="plan-scenarios"><summary>Scenarios (' + _journeys.length + ')</summary><div class="scroll-list"><ul>' + journeyItems + '</ul></div></details>' : ''}
           </div>
           \${complianceCardsHtml}
         </div>
@@ -1132,7 +1291,22 @@ export class RunReportGenerator {
           + '</div>'
         : '';
 
-      document.getElementById('panel-graphs').innerHTML = banner + \`
+      // When a global scenario/transaction filter is active, the per-transaction
+      // charts below reflect it. The aggregate charts (request rate, VUs, timing
+      // phases, …) are whole-run infrastructure metrics with no per-transaction
+      // breakdown in the series, so they stay run-level — flag that so the user
+      // isn't surprised the top charts don't change.
+      const _gf = getActiveFilters();
+      const filterNotice = (_gf.scenario || _gf.transaction)
+        ? '<div class="notice" style="margin-bottom:12px;padding:10px 14px;border-left:4px solid #0891b2;background:#e0f2fe;color:#0c4a6e;border-radius:4px;font-size:13px;line-height:1.5">'
+            + '<strong>Filter active'
+            + (_gf.scenario ? ' · scenario: ' + escapeHtml(_gf.scenario) : '')
+            + (_gf.transaction ? ' · transaction: ' + escapeHtml(_gf.transaction) : '')
+            + '.</strong> The <strong>Per-Transaction</strong> charts below reflect this filter. Aggregate charts (request rate, VUs, timing phases) remain run-level.'
+          + '</div>'
+        : '';
+
+      document.getElementById('panel-graphs').innerHTML = banner + filterNotice + \`
         <div class="graph-shell">
           <div class="chart-box">
             <h3>HTTP Request Rate\${infoTip('Requests per second over time.')}</h3>
@@ -1164,6 +1338,12 @@ export class RunReportGenerator {
             <h3>Data Transferred (bytes/sec)\${infoTip('Network bytes received and sent per second.')}</h3>
             <div class="chart-canvas-wrap" style="min-height:220px"><canvas id="chart-data"></canvas></div>
           </div>
+        \` + /* ── HTTP Timing Breakdown markup DISABLED ─────────────────────────
+             Commented out to shrink the report. Restore by uncommenting this HTML
+             together with the phaseChart() calls above, the switch cases in
+             TimeseriesStreamParser.ts, and the phase fields in
+             TimeseriesArtifactBuilder.ts.
+
           <!-- ── HTTP timing breakdown (parity with k6 web-dashboard Timings tab) ── -->
           <h3 style="margin:20px 0 8px;font-size:18px;color:var(--accent)">HTTP Timing Breakdown\${infoTip('Each request split into its k6 timing phases.')}</h3>
           <p class="subtle" style="margin:0 0 12px">Each phase is a slice of the total <code>http_req_duration</code>. Useful for pinpointing whether slow requests are server-side (waiting), network-side (sending/receiving), or pool-side (blocked).</p>
@@ -1197,6 +1377,7 @@ export class RunReportGenerator {
               <div class="chart-canvas-wrap" style="min-height:200px"><canvas id="chart-http-blocked"></canvas></div>
             </div>
           </div>
+        */ \`
           <div class="chart-box">
             <h3>Per-Transaction Response Time\${infoTip('Response-time trend per transaction; pick a metric below.')}
               <span style="font-weight:400;font-size:12px;color:#66717d">— pick a metric below; lines are per-transaction</span>
@@ -1358,12 +1539,17 @@ export class RunReportGenerator {
           options: lineOptions('ms', {}, overviewPoints),
         }));
       }
-      phaseChart('chart-http-waiting',    'httpReqWaiting');
-      phaseChart('chart-http-tls',        'httpReqTlsHandshaking');
-      phaseChart('chart-http-sending',    'httpReqSending');
-      phaseChart('chart-http-connecting', 'httpReqConnecting');
-      phaseChart('chart-http-receiving',  'httpReqReceiving');
-      phaseChart('chart-http-blocked',    'httpReqBlocked');
+      // ── HTTP Timing Breakdown DISABLED ──────────────────────────────
+      // Phase charts commented out (their canvases + section HTML above are
+      // removed too, and the underlying data is no longer produced by the
+      // timeseries pipeline). Uncomment to restore alongside the parser +
+      // artifact-builder phase code and the section markup below.
+      // phaseChart('chart-http-waiting',    'httpReqWaiting');
+      // phaseChart('chart-http-tls',        'httpReqTlsHandshaking');
+      // phaseChart('chart-http-sending',    'httpReqSending');
+      // phaseChart('chart-http-connecting', 'httpReqConnecting');
+      // phaseChart('chart-http-receiving',  'httpReqReceiving');
+      // phaseChart('chart-http-blocked',    'httpReqBlocked');
 
       function renderPerTransactionChart() {
         // Drop any prior per-txn chart instances and re-create. These live in
@@ -1374,7 +1560,10 @@ export class RunReportGenerator {
 
         const metric = txnMetricSelect.value;
         const filterText = txnFilter.value.toLowerCase();
-        const visibleNames = txnNames.filter((n) => !filterText || n.toLowerCase().includes(filterText));
+        // Honor the global scenario/transaction filter AND the local substring box.
+        const visibleNames = txnNames.filter((n) =>
+          txnAllowedByFilters(n) && (!filterText || n.toLowerCase().includes(filterText)),
+        );
         // Stable color palette per transaction — modulo a 10-color cycle.
         const palette = ['#005f73','#0a9396','#f59e0b','#b91c1c','#7c3aed','#15803d','#c2410c','#0369a1','#a16207','#6b21a8'];
         // We use the FIRST txn series for labels; assumes all series share
@@ -1470,15 +1659,19 @@ export class RunReportGenerator {
         // the (often percentile-approximated) std with the EXACT std from raw
         // samples so std is trustworthy and consistent with sub-range values.
         const rows = full.map(function(r) {
-          const series = txnSeries[String(r.transaction)];
-          if (!series) return r;
-          const durs = [];
-          for (const b of series) { if (Array.isArray(b.durations)) { for (const d of b.durations) durs.push(Number(d)); } }
-          if (durs.length === 0) return r;
-          let s = 0; for (const v of durs) s += v;
-          const exact = _stdDev(durs, s / durs.length);
           const copy = Object.assign({}, r);
-          copy.std = exact; copy.stddev = exact;
+          // Surface journey under a scenario field so the table can show it.
+          copy.scenario = r.journey ? String(r.journey) : '';
+          const series = txnSeries[String(r.transaction)];
+          if (series) {
+            const durs = [];
+            for (const b of series) { if (Array.isArray(b.durations)) { for (const d of b.durations) durs.push(Number(d)); } }
+            if (durs.length > 0) {
+              let s = 0; for (const v of durs) s += v;
+              const exact = _stdDev(durs, s / durs.length);
+              copy.std = exact; copy.stddev = exact;
+            }
+          }
           return copy;
         });
         return { rows: rows, ranged: false };
@@ -1499,8 +1692,11 @@ export class RunReportGenerator {
         durations.sort((a, b) => a - b);
         const n = durations.length;
         const mean = n ? durations.reduce((s, v) => s + v, 0) / n : 0;
+        const _scen = txnJourneyMap()[name] || '';
         const row = {
           transaction: name,
+          scenario: _scen,
+          journey: _scen,
           count: count, pass: pass, fail: fail,
           errorPct: count > 0 ? (fail / count) * 100 : 0,
         };
@@ -1575,12 +1771,15 @@ export class RunReportGenerator {
       const host = document.getElementById('panel-transactions');
       const __src = txnRowsForRange();
       const __ranged = __src.ranged;
-      let rows = __src.rows;
+      let rows = __src.rows.filter((r) => matchesGlobalFilters(r, ['journey', 'scenario'], ['transaction']));
       if (!rows.length) {
         host.innerHTML = '<div class="empty">No transaction activity in the selected window.</div>';
         return;
       }
-      const columns = ['transaction', 'count', 'pass', 'fail', 'errorPct', ...reportData.config.transactionStats.filter((stat) => !['count', 'pass', 'fail'].includes(stat))];
+      // Show a Scenario (journey) column when at least one row carries a
+      // scenario — keeps single-journey/legacy runs from getting an empty column.
+      const hasScenario = rows.some((r) => r.scenario);
+      const columns = [...(hasScenario ? ['scenario'] : []), 'transaction', 'count', 'pass', 'fail', 'errorPct', ...reportData.config.transactionStats.filter((stat) => !['count', 'pass', 'fail'].includes(stat))];
 
       // Pass/fail are always exact (the per-iteration checkrate Rate metric) —
       // the pre-flight ScriptContractGuard blocks the raw check()/group() shapes
@@ -1705,15 +1904,25 @@ export class RunReportGenerator {
           + escapeHtml(COL_LABELS[c] || c) + '<span class="sort-arrow">' + arrow + '</span></th>';
       }).join('');
       const body = rows.map((row) =>
-        '<tr>' + columns.map((c) => '<td>' + escapeHtml(formatCellValue(row[c])) + '</td>').join('') + '</tr>'
+        '<tr>' + columns.map((c) => {
+          const cls = (c === 'transaction' || c === 'scenario') ? ' class="wrap"' : '';
+          return '<td' + cls + '>' + escapeHtml(formatCellValue(row[c])) + '</td>';
+        }).join('') + '</tr>'
       ).join('');
       return '<div class="table-scroll"><table><thead><tr>' + header + '</tr></thead><tbody>' + body + '</tbody></table></div>';
     }
 
+    // Local (Errors-tab-only) filter state: a clicked category card and a Type
+    // dropdown. These are separate from the global scenario/transaction filters
+    // and reset when there are no error events.
+    let _errCat = '';
+    let _errType = '';
     function renderErrors() {
-      const rows = reportData.errors || [];
-      if (!rows.length) {
-        document.getElementById('panel-errors').innerHTML = '<div class="empty">No structured error events were captured for this run yet.</div>';
+      const panel = document.getElementById('panel-errors');
+      const baseRows = (reportData.errors || []).filter((r) => matchesGlobalFilters(r, ['scenario', 'journey'], ['transaction']));
+      if (!baseRows.length) {
+        _errCat = ''; _errType = '';
+        panel.innerHTML = '<div class="empty">No structured error events were captured for this run yet.</div>';
         return;
       }
       const snapshots = reportData.snapshots || [];
@@ -1722,28 +1931,11 @@ export class RunReportGenerator {
         const txn = snap.transaction;
         if (txn && !(txn in snapshotByTxn)) snapshotByTxn[txn] = idx;
       });
-      const header = '<tr><th>Timestamp</th><th>Type</th><th>Transaction</th><th>Request</th><th>VU</th><th>Iteration</th><th>Message</th><th></th></tr>';
-      const body = rows.map(function(row) {
-        const snapIdx = snapshotByTxn[row.transaction];
-        const hasSnap = typeof snapIdx === 'number';
-        const vu = row.vu != null ? row.vu : (hasSnap ? snapshots[snapIdx].vu : '');
-        const iteration = row.iteration != null ? row.iteration : (hasSnap ? snapshots[snapIdx].iteration : '');
-        return '<tr>' +
-          '<td style="white-space:nowrap">' + escapeHtml(String(row.ts || '')) + '</td>' +
-          '<td>' + escapeHtml(String(row.type || '')) + '</td>' +
-          '<td>' + escapeHtml(String(row.transaction || '')) + '</td>' +
-          '<td>' + escapeHtml(String(row.request || row.requestName || '')) + '</td>' +
-          '<td>' + escapeHtml(String(vu ?? '')) + '</td>' +
-          '<td>' + escapeHtml(String(iteration ?? '')) + '</td>' +
-          '<td style="max-width:320px;word-break:break-word">' + escapeHtml(String(row.message || '')) + '</td>' +
-          '<td>' + (hasSnap ? '<button class="view-btn" onclick="showSnapshotDetail(' + snapIdx + ')">View Request</button>' : '') + '</td>' +
-          '</tr>';
-      }).join('');
 
       // #11 Error clustering — bucket every event into a semantic category
       // (Auth, Server 5xx, Client 4xx, Validation, Timeout/Network, …) from its
       // status code + type + message, so the noise collapses into a handful of
-      // actionable groups shown as cards above the raw "top causes" + table.
+      // actionable groups shown as cards above the table.
       const CATS = [
         { key: 'auth', label: 'Authentication', icon: '🔑', color: '#a855f7' },
         { key: 'server', label: 'Server Errors (5xx)', icon: '🔥', color: '#dc2626' },
@@ -1763,59 +1955,143 @@ export class RunReportGenerator {
         if (st >= 500) return 'server';
         return 'other';
       };
+
+      // Category counts + type options are computed over the globally-filtered
+      // rows (NOT the local filters) so the cards + dropdown always show the full
+      // picture. Drop any active local filter that no longer has matches.
       const catCounts = {};
-      for (const r of rows) { const c = classify(r); catCounts[c] = (catCounts[c] || 0) + 1; }
-      const totalErr = rows.length;
+      for (const r of baseRows) { const c = classify(r); catCounts[c] = (catCounts[c] || 0) + 1; }
+      const totalErr = baseRows.length;
+      const types = [...new Set(baseRows.map((r) => String(r.type || '')).filter(Boolean))].sort();
+      if (_errCat && !catCounts[_errCat]) _errCat = '';
+      if (_errType && types.indexOf(_errType) === -1) _errType = '';
+
+      // Apply the local category + type filters to get the visible rows.
+      const rows = baseRows.filter((r) =>
+        (!_errCat || classify(r) === _errCat) && (!_errType || String(r.type || '') === _errType),
+      );
+
       const clusterCards = CATS.filter((c) => catCounts[c.key]).map((c) => {
         const n = catCounts[c.key];
         const pct = totalErr ? Math.round((n / totalErr) * 100) : 0;
-        return '<div class="cluster-card" style="--cc:' + c.color + '">'
+        const active = _errCat === c.key ? ' active' : '';
+        return '<div class="cluster-card' + active + '" data-cat="' + c.key + '" style="--cc:' + c.color + '" title="Click to filter the table by this category">'
           + '<div class="cluster-top"><span class="cluster-ico">' + c.icon + '</span><span class="cluster-n">' + n + '</span></div>'
           + '<div class="cluster-lbl">' + c.label + '</div>'
           + '<div class="cluster-bar"><span style="width:' + pct + '%"></span></div>'
           + '<div class="cluster-pct">' + pct + '% of events</div></div>';
       }).join('');
       const clustersHtml = clusterCards
-        ? '<div class="section-title">Error Categories (' + totalErr + ' events)' + infoTip('Errors grouped into categories by status and message.') + '</div><div class="cluster-grid">' + clusterCards + '</div>'
+        ? '<div class="section-title">Error Categories (' + totalErr + ' events)' + infoTip('Each error is placed in one category from its HTTP status + type + message (first match wins, in this order). Click a card to filter the table. — Authentication: status 401/403 or text mentioning unauthorized/forbidden/token/auth/login/credential. Timeout / Network: timeout, connection reset/refused, DNS, socket, EOF. Server Errors: status 5xx. Client Errors: status 4xx. Validation / Assertion: failed checks (check_failed) or text mentioning assert/validation/expected/mismatch/correlation. Other: anything that matches none of the above.') + '</div><div class="cluster-grid">' + clusterCards + '</div>'
         : '';
 
-      // Phase 4: error analytics — group by message (top causes) as horizontal
-      // bars above the raw table. Treemap/pie avoided per spec.
-      const groups = {};
-      for (const r of rows) {
-        const key = String(r.message || r.type || 'unknown').slice(0, 80);
-        groups[key] = (groups[key] || 0) + 1;
-      }
-      const grouped = Object.keys(groups).map((k) => ({ transaction: k, count: groups[k] })).sort((a, b) => b.count - a.count).slice(0, 8);
-      const groupsHtml = grouped.length
-        ? '<div class="section-title">Top Error Causes' + infoTip('Most frequent error messages by count.') + '</div>'
-          + '<div class="card" style="margin-bottom:18px">' + renderTopN(grouped, 'count', '#dc2626', (v) => v.toLocaleString()) + '</div>'
-          + '<div class="section-title">All Error Events' + infoTip('Every captured error event; View opens the snapshot.') + '</div>'
-        : '';
-      document.getElementById('panel-errors').innerHTML = clustersHtml + groupsHtml + '<div class="table-scroll"><table><thead>' + header + '</thead><tbody>' + body + '</tbody></table></div>';
+      // Local filter toolbar: a Type dropdown (options = the error types actually
+      // present) + a live count + a Clear button when any local filter is set.
+      const typeOptions = '<option value="">All types</option>'
+        + types.map((t) => '<option value="' + escapeHtml(t) + '"' + (t === _errType ? ' selected' : '') + '>' + escapeHtml(t) + '</option>').join('');
+      const anyLocal = _errCat || _errType;
+      const toolbar = '<div class="txn-toolbar">'
+        + '<label style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em">Type</label>'
+        + '<select id="err-type-filter">' + typeOptions + '</select>'
+        + '<span class="subtle" id="err-count-label">' + rows.length + ' of ' + totalErr + ' events'
+        + (_errCat ? ' · category: ' + escapeHtml(_errCat) : '') + '</span>'
+        + '<span style="flex:1"></span>'
+        + (anyLocal ? '<button class="small-btn" id="err-clear">Clear filters</button>' : '')
+        + '</div>';
+
+      const header = '<tr><th>Timestamp</th><th>Type</th><th>Transaction</th><th>Request</th><th>VU</th><th>Iteration</th><th>Message</th><th></th></tr>';
+      const body = rows.length ? rows.map(function(row) {
+        const snapIdx = snapshotByTxn[row.transaction];
+        const hasSnap = typeof snapIdx === 'number';
+        const vu = row.vu != null ? row.vu : (hasSnap ? snapshots[snapIdx].vu : '');
+        const iteration = row.iteration != null ? row.iteration : (hasSnap ? snapshots[snapIdx].iteration : '');
+        return '<tr>' +
+          '<td style="white-space:nowrap">' + escapeHtml(String(row.ts || '')) + '</td>' +
+          '<td>' + escapeHtml(String(row.type || '')) + '</td>' +
+          '<td>' + escapeHtml(String(row.transaction || '')) + '</td>' +
+          '<td class="wrap">' + escapeHtml(String(row.request || row.requestName || '')) + '</td>' +
+          '<td>' + escapeHtml(String(vu ?? '')) + '</td>' +
+          '<td>' + escapeHtml(String(iteration ?? '')) + '</td>' +
+          '<td class="wrap">' + escapeHtml(String(row.message || '')) + '</td>' +
+          '<td>' + (hasSnap ? '<button class="view-btn" onclick="showSnapshotDetail(' + snapIdx + ')">View Request</button>' : '') + '</td>' +
+          '</tr>';
+      }).join('') : '<tr><td colspan="8" class="subtle" style="text-align:center;padding:18px">No events match the current filter.</td></tr>';
+
+      const groupsHtml = '<div class="section-title">All Error Events' + infoTip('Every captured error event; View opens the snapshot.') + '</div>';
+      panel.innerHTML = clustersHtml + groupsHtml + toolbar + '<div class="table-scroll"><table><thead>' + header + '</thead><tbody>' + body + '</tbody></table></div>';
+
+      // Wire the local filters (Errors tab only). Handlers re-run renderErrors,
+      // which preserves _errCat/_errType across the re-render.
+      panel.querySelectorAll('.cluster-card').forEach((card) => {
+        card.addEventListener('click', () => {
+          const k = card.getAttribute('data-cat');
+          _errCat = (_errCat === k) ? '' : k; // toggle
+          renderErrors();
+        });
+      });
+      const typeSel = document.getElementById('err-type-filter');
+      if (typeSel) typeSel.addEventListener('change', () => { _errType = typeSel.value; renderErrors(); });
+      const clearBtn = document.getElementById('err-clear');
+      if (clearBtn) clearBtn.addEventListener('click', () => { _errCat = ''; _errType = ''; renderErrors(); });
     }
 
+    // Local (Warnings-tab-only) Type filter — mirrors the Errors tab.
+    let _warnType = '';
     function renderWarnings() {
-      const rows = reportData.warnings || [];
+      const panel = document.getElementById('panel-warnings');
+      const baseRows = reportData.warnings || [];
+      if (!baseRows.length) {
+        _warnType = '';
+        panel.innerHTML = '<div class="empty">No structured warning events were captured for this run yet.</div>';
+        return;
+      }
+      const types = [...new Set(baseRows.map((r) => String(r.type || '')).filter(Boolean))].sort();
+      if (_warnType && types.indexOf(_warnType) === -1) _warnType = '';
+      const rows = baseRows.filter((r) => !_warnType || String(r.type || '') === _warnType);
+
+      const typeOptions = '<option value="">All types</option>'
+        + types.map((t) => '<option value="' + escapeHtml(t) + '"' + (t === _warnType ? ' selected' : '') + '>' + escapeHtml(t) + '</option>').join('');
+      const toolbar = '<div class="txn-toolbar">'
+        + '<label style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em">Type</label>'
+        + '<select id="warn-type-filter">' + typeOptions + '</select>'
+        + '<span class="subtle">' + rows.length + ' of ' + baseRows.length + ' warnings</span>'
+        + '<span style="flex:1"></span>'
+        + (_warnType ? '<button class="small-btn" id="warn-clear">Clear filters</button>' : '')
+        + '</div>';
+
       const title = '<div class="section-title">Warnings' + infoTip('Non-fatal advisories — worth reviewing, won\\'t fail the test.') + '</div>';
-      document.getElementById('panel-warnings').innerHTML = rows.length
-        ? title + renderTable(rows, ['ts', 'type', 'message'])
-        : '<div class="empty">No structured warning events were captured for this run yet.</div>';
+      const table = rows.length
+        ? renderTable(rows, ['ts', 'type', 'message'])
+        : '<div class="empty">No warnings match the current filter.</div>';
+      panel.innerHTML = title + toolbar + table;
+
+      const typeSel = document.getElementById('warn-type-filter');
+      if (typeSel) typeSel.addEventListener('change', () => { _warnType = typeSel.value; renderWarnings(); });
+      const clearBtn = document.getElementById('warn-clear');
+      if (clearBtn) clearBtn.addEventListener('click', () => { _warnType = ''; renderWarnings(); });
     }
 
     function renderSnapshots() {
-      const rows = reportData.snapshots || [];
-      if (!rows.length) {
+      // Map over the ORIGINAL array so the index passed to showSnapshotDetail()
+      // still points at reportData.snapshots; skip non-matching rows in place so
+      // the global scenario/transaction filter narrows the table without breaking
+      // the View-drawer index mapping.
+      const allRows = reportData.snapshots || [];
+      const matches = allRows.filter((r) => matchesGlobalFilters(r, ['journey', 'scenario'], ['transaction']));
+      if (!matches.length) {
         document.getElementById('panel-snapshots').innerHTML = '<div class="empty">No failure snapshots were captured for this run.</div>';
         return;
       }
       const header = '<tr><th>#</th><th>Timestamp</th><th>Type</th><th>Transaction</th><th>VU</th><th>Iteration</th><th></th></tr>';
-      const body = rows.map(function(row, index) {
+      let seq = 0;
+      const body = allRows.map(function(row, index) {
+        if (!matchesGlobalFilters(row, ['journey', 'scenario'], ['transaction'])) return '';
+        seq++;
         return '<tr>' +
-          '<td>' + escapeHtml(String(index + 1)) + '</td>' +
+          '<td>' + escapeHtml(String(seq)) + '</td>' +
           '<td>' + escapeHtml(String(row.ts || '')) + '</td>' +
           '<td>' + escapeHtml(String(row.type || '')) + '</td>' +
-          '<td>' + escapeHtml(String(row.transaction || '')) + '</td>' +
+          '<td class="wrap">' + escapeHtml(String(row.transaction || '')) + '</td>' +
           '<td>' + escapeHtml(row.vu != null ? String(row.vu) : '') + '</td>' +
           '<td>' + escapeHtml(row.iteration != null ? String(row.iteration) : '') + '</td>' +
           '<td><button class="view-btn" onclick="showSnapshotDetail(' + index + ')">View</button></td>' +
@@ -2372,6 +2648,7 @@ export class RunReportGenerator {
 
     buildTabs();
     setupGlobalToolbar();
+    setupFilterToolbar();
     renderSummary();
     renderGraphs();
     renderTransactions();
@@ -2381,13 +2658,13 @@ export class RunReportGenerator {
     renderSystem();
     enhanceTables();
 
-    // ── Wave 2: rangechange broadcast ─────────────────────────────
+    // ── Wave 2: rangechange / filterchange broadcast ──────────────
     // Re-render every range-aware tab when the user applies a new
-    // window. Cheap because each render fully replaces its panel's
-    // innerHTML — we don't try to incrementally update. Tabs that
-    // ignore the range (Warnings, raw snapshot table) re-render
-    // identically.
-    document.addEventListener('rangechange', () => {
+    // window OR changes the global scenario/transaction filter. Cheap
+    // because each render fully replaces its panel's innerHTML — we
+    // don't try to incrementally update. Tabs that ignore both (raw
+    // warnings) re-render identically.
+    function rerenderRangeAwareTabs() {
       renderSummary();
       renderGraphs();
       renderTransactions();
@@ -2395,7 +2672,9 @@ export class RunReportGenerator {
       renderSnapshots();
       renderSystem();
       enhanceTables();
-    });
+    }
+    document.addEventListener('rangechange', rerenderRangeAwareTabs);
+    document.addEventListener('filterchange', rerenderRangeAwareTabs);
   </script>
 </body>
 </html>`;
