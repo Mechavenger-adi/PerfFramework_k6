@@ -637,7 +637,9 @@ program
     let transactionLog: TransactionMetricLogWriter | null = null;
     if (requestLogEnabled || transactionLogEnabled) {
       const hostName = process.env.K6_PERF_MACHINE || os.hostname();
-      const testId = `TID_${plan.name}`;
+      // Test ID: explicit K6_PERF_TEST_ID wins (lets distributed LGs share one id,
+      // like K6_PERF_RUN_ID), else fall back to the plan-derived TID_<plan> pattern.
+      const testId = process.env.K6_PERF_TEST_ID?.trim() || `TID_${plan.name}`;
       const safe = (s: string) => s.replace(/[^a-zA-Z0-9_.-]/g, '_');
       if (requestLogEnabled) {
         const requestLogPath = path.join(reportDir, `${safe(testId)}_${safe(hostName)}_request_metric.csv`);
