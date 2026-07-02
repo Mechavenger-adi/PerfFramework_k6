@@ -888,9 +888,16 @@ function prepareRunArtifacts(plan: TestPlan, resolvedConfig: ResolvedConfig): {
   //   2. derived from the shared K6_PERF_START_AT (already identical on all machines,
   //      so the runId falls out identically with no extra coordination), else
   //   3. a fresh timestamped id (single-machine / non-distributed).
-  const startAtDigits = (process.env.K6_PERF_START_AT || '').replace(/[^0-9]/g, '').slice(0, 14);
+  // Normalize the shared start time into the same ISO-underscore shape used by the
+  // fallback timestamp so both branches yield the same folder pattern. Parsing then
+  // re-serializing to ISO also canonicalizes it (UTC, ms), so every machine derives
+  // an identical runId regardless of how the operator wrote K6_PERF_START_AT.
+  const startAtMs = Date.parse(process.env.K6_PERF_START_AT || '');
+  const startAtId = Number.isFinite(startAtMs)
+    ? `Run_${new Date(startAtMs).toISOString().replace(/[-:.]/g, '_')}`
+    : null;
   const runId = process.env.K6_PERF_RUN_ID
-    || (startAtDigits.length >= 8 ? `Run_${startAtDigits}` : null)
+    || startAtId
     || (override ? 'Run_latest' : `Run_${new Date().toISOString().replace(/[-:.]/g, '_')}`);
   // Use resolve (not join) so an absolute K6_RESULTS_BASE_DIR is honored as-is;
   // a relative value still resolves against the framework cwd.
