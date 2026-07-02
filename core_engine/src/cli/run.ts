@@ -28,6 +28,7 @@ import { TransactionMetricsBuilder } from '../reporting/TransactionMetricsBuilde
 import { HistogramArtifactBuilder } from '../reporting/HistogramArtifactBuilder';
 import { RequestMetricLogWriter } from '../reporting/RequestMetricLogWriter';
 import { TransactionMetricLogWriter } from '../reporting/TransactionMetricLogWriter';
+import { LiveEventLogWriter } from '../reporting/LiveEventLogWriter';
 import { ScenarioRuntimeMetadata } from '../scenario/ScenarioBuilder';
 import { TestPlanLoader } from '../scenario/TestPlanLoader';
 import { ResolvedConfig } from '../types/ConfigContracts';
@@ -616,7 +617,18 @@ program
     // FileWriteSink consumes writeData() lines from the same live log stream and
     // writes them under the run output dir as the test runs (Proposal 7).
     const fileWriteSink = new FileWriteSink(reportDir);
-    const liveConsole = startLiveConsoleLogStream(runLogPath, (m) => fileWriteSink.consume(m));
+    // Write errors.ndjson / warnings.ndjson LIVE off the same console tap. The
+    // final finalizeRunArtifacts pass overwrites them with the complete merged
+    // set; until then they fill in real time as failures occur.
+    const liveEventLog = new LiveEventLogWriter(
+      path.join(reportDir, 'errors.ndjson'),
+      path.join(reportDir, 'warnings.ndjson'),
+    );
+    liveEventLog.start();
+    const liveConsole = startLiveConsoleLogStream(runLogPath, (m) => {
+      liveEventLog.consume(m);
+      return fileWriteSink.consume(m);
+    });
 
     // Per-request CSV log (one row per HTTP request) tailed live from the json
     // stream. Filename: <testId>_<host>_request_metric.csv. Gated by the same

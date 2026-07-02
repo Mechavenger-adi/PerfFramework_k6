@@ -62,6 +62,7 @@ const TransactionMetricsBuilder_1 = require("../reporting/TransactionMetricsBuil
 const HistogramArtifactBuilder_1 = require("../reporting/HistogramArtifactBuilder");
 const RequestMetricLogWriter_1 = require("../reporting/RequestMetricLogWriter");
 const TransactionMetricLogWriter_1 = require("../reporting/TransactionMetricLogWriter");
+const LiveEventLogWriter_1 = require("../reporting/LiveEventLogWriter");
 const TestPlanLoader_1 = require("../scenario/TestPlanLoader");
 const logger_1 = require("../utils/logger");
 const LiveConsoleLogStream_1 = require("../utils/LiveConsoleLogStream");
@@ -581,7 +582,15 @@ program
     // FileWriteSink consumes writeData() lines from the same live log stream and
     // writes them under the run output dir as the test runs (Proposal 7).
     const fileWriteSink = new FileWriteSink_1.FileWriteSink(reportDir);
-    const liveConsole = (0, LiveConsoleLogStream_1.startLiveConsoleLogStream)(runLogPath, (m) => fileWriteSink.consume(m));
+    // Write errors.ndjson / warnings.ndjson LIVE off the same console tap. The
+    // final finalizeRunArtifacts pass overwrites them with the complete merged
+    // set; until then they fill in real time as failures occur.
+    const liveEventLog = new LiveEventLogWriter_1.LiveEventLogWriter(path.join(reportDir, 'errors.ndjson'), path.join(reportDir, 'warnings.ndjson'));
+    liveEventLog.start();
+    const liveConsole = (0, LiveConsoleLogStream_1.startLiveConsoleLogStream)(runLogPath, (m) => {
+        liveEventLog.consume(m);
+        return fileWriteSink.consume(m);
+    });
     // Per-request CSV log (one row per HTTP request) tailed live from the json
     // stream. Filename: <testId>_<host>_request_metric.csv. Gated by the same
     // K6_PERF_REQUEST_LOG toggle that enables the vu/iter system tags above.
