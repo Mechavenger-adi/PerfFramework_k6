@@ -38,20 +38,15 @@ import { Logger } from '../utils/logger';
 import { startLiveConsoleLogStream } from '../utils/LiveConsoleLogStream';
 import { ProgressBar } from '../utils/ProgressBar';
 import { runConvert } from './convert';
-import { runCorrelate } from './correlate';
 import { runGenerate } from './generate';
 import { runGenerateByos } from './generate-byos';
 import { runImportCurl, runImportPostman } from './import';
 import { runInit } from './init';
 import { runValidate } from './validate';
-import { runMerge } from '../distributed/runMerge';
-import { runCollect, collectRunDir } from '../distributed/collectRun';
 import { awaitScheduledStart } from '../distributed/startBarrier';
-import { listTemplates, showTemplate } from './templates';
-import { listFeatures } from './features';
 import { inspectConfig } from './config-inspect';
 import { runNewWizard } from './new';
-import { generateDocs } from './docs';
+
 
 const program = new Command();
 
@@ -112,16 +107,7 @@ program
     runNewWizard();
   });
 
-// ---------------------------------------------
-// DOCS command
-// ---------------------------------------------
 
-program
-  .command('docs')
-  .description('Auto-generate Markdown reference documentation from JSON schemas')
-  .action(() => {
-    generateDocs();
-  });
 
 // ---------------------------------------------
 // GENERATE BYOS command
@@ -158,35 +144,7 @@ program
     await runGenerate(opts.har, team, scriptName);
   });
 
-// ---------------------------------------------
-// CORRELATE command (auto-correlation / "scan for correlations")
-// ---------------------------------------------
 
-program
-  .command('correlate')
-  .description('Scan a recording for dynamic values and (optionally) auto-correlate a generated script')
-  .option('--script <path>', 'Generated script to correlate (required for --apply; auto-resolves its recording log)')
-  .option('--har <path>', 'Scan a .har file directly (list mode; request IDs follow HAR order)')
-  .option('--log <path>', 'Scan a recording-log.json (recommended — IDs align with the generated script)')
-  .option('--manifest <path>', 'Apply/list an existing correlation manifest instead of rescanning')
-  .option('--list', 'Print suspected dynamic values + write the manifest; do not modify the script (default)')
-  .option('--apply <level>', 'Rewrite the script: high | medium | all')
-  .option('--out <path>', 'Write the correlated script here (default: overwrite --script)')
-  .option('--manifest-out <path>', 'Where to write the manifest (default: alongside the recording log)')
-  .option('--dry-run', 'Alias for --list')
-  .action(async (opts) => {
-    await runCorrelate({
-      script: opts.script,
-      har: opts.har,
-      log: opts.log,
-      manifest: opts.manifest,
-      list: opts.list,
-      apply: opts.apply,
-      out: opts.out,
-      manifestOut: opts.manifestOut,
-      dryRun: opts.dryRun,
-    });
-  });
 
 // ---------------------------------------------
 // IMPORT command family (Request Import — Phase 1)
@@ -253,77 +211,6 @@ program
     });
 
     if (!passed) process.exit(1);
-  });
-
-// ---------------------------------------------
-// MERGE command (distributed) — combine per-machine results into one report
-// ---------------------------------------------
-program
-  .command('merge')
-  .description('Merge per-machine distributed run artifacts into a single report')
-  .requiredOption('--run-dir <path>', 'Shared run dir containing <machineName>/ subfolders for one runId')
-  .option('--out <path>', 'Output dir for the merged result (default: <run-dir>/_merged)')
-  .action((opts) => {
-    const passed = runMerge({ runDir: opts.runDir, out: opts.out });
-    if (!passed) process.exit(1);
-  });
-
-// ---------------------------------------------
-// COLLECT command (distributed) — copy a local run folder into the shared location
-// ---------------------------------------------
-program
-  .command('collect')
-  .description('Copy a finished local run folder into <collectDir>/shared_<runId>/<machine>/')
-  .requiredOption('--from <path>', 'Local run dir to collect (e.g. results/<plan>/<runId>)')
-  .requiredOption('--into <path>', 'Shared collect base dir')
-  .option('--machine <name>', 'Machine name (defaults to hostname)')
-  .option('--run-id <id>', 'Shared runId (defaults to the run-manifest runId)')
-  .action((opts) => {
-    const ok = runCollect({ from: opts.from, into: opts.into, machine: opts.machine || os.hostname(), runId: opts.runId });
-    if (!ok) process.exit(1);
-  });
-
-// ---------------------------------------------
-// TEMPLATES command
-// ---------------------------------------------
-
-const templatesCmd = program
-  .command('templates')
-  .description('Discover and view built-in config templates');
-
-templatesCmd
-  .command('list')
-  .description('List all available templates')
-  .option('--type <type>', 'Type of templates (test_plans | runtime_settings)', 'test_plans')
-  .action((opts) => {
-    if (opts.type !== 'test_plans' && opts.type !== 'runtime_settings') {
-      console.error('Invalid type. Must be test_plans or runtime_settings.');
-      process.exit(1);
-    }
-    listTemplates(opts.type);
-  });
-
-templatesCmd
-  .command('show <name>')
-  .description('Show the content of a specific template')
-  .option('--type <type>', 'Type of template (test_plans | runtime_settings)', 'test_plans')
-  .action((name, opts) => {
-    if (opts.type !== 'test_plans' && opts.type !== 'runtime_settings') {
-      console.error('Invalid type. Must be test_plans or runtime_settings.');
-      process.exit(1);
-    }
-    showTemplate(opts.type, name);
-  });
-
-// ---------------------------------------------
-// FEATURES command
-// ---------------------------------------------
-
-program
-  .command('features')
-  .description('Discover built-in framework capabilities')
-  .action(() => {
-    listFeatures();
   });
 
 // ---------------------------------------------
@@ -714,22 +601,6 @@ program
     if (generatedArtifacts.transactionMetrics) {
       printTransactionTable(generatedArtifacts.transactionMetrics);
     }
-
-    // Distributed collect (opt-in via K6_PERF_COLLECT_DIR): after the local run is
-    // fully written, copy this machine's result folder into the shared location at
-    // <collectDir>/shared_<runId>/<machineName>/. A one-shot post-run copy (no live
-    // shared writes). machineName defaults to the OS hostname when unset.
-    const collectDir = process.env.K6_PERF_COLLECT_DIR;
-    if (collectDir) {
-      const machineName = process.env.K6_PERF_MACHINE || os.hostname();
-      try {
-        const dest = collectRunDir(reportDir, runId, machineName, collectDir);
-        Logger.pass(`Collected results to shared location: ${dest}`);
-      } catch (err) {
-        Logger.warn(`[collect] copy to shared location failed (non-fatal): ${(err as Error).message}`);
-      }
-    }
-
     PipelineRunner.ensureSuccess(runResult);
   });
 

@@ -80,11 +80,7 @@ export { JourneyAssertionResolver } from './assertions/JourneyAssertionResolver'
 export { SLARegistry } from './assertions/SLARegistry';
 export { ThresholdManager } from './assertions/ThresholdManager';
 
-// -- Correlation Layer --------------------------
-export { CorrelationEngine } from './correlation/CorrelationEngine';
-export { ExtractorRegistry } from './correlation/ExtractorRegistry';
-export { FallbackHandler } from './correlation/FallbackHandler';
-export { RuleProcessor } from './correlation/RuleProcessor';
+
 
 // -- Debug Layer --------------------------------
 export { DiffChecker } from './debug/DiffChecker';
@@ -94,11 +90,7 @@ export { HTMLDiffReporter } from './debug/HTMLDiffReporter';
 export { RecordingLogResolver } from './debug/RecordingLogResolver';
 export { ReplayRunner } from './debug/ReplayRunner';
 
-// -- Reporters Layer ----------------------------
-export { AzureReporter } from './reporters/AzureReporter';
-export { CustomUploader } from './reporters/CustomUploader';
-export { GrafanaReporter } from './reporters/GrafanaReporter';
-export { ResultTransformer } from './reporters/ResultTransformer';
+
 
 // -- Reporting Layer ----------------------------
 export { ArtifactWriter } from './reporting/ArtifactWriter';
