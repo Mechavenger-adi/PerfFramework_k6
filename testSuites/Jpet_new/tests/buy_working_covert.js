@@ -77,7 +77,8 @@ export function initPhase(ctx) {
         replay: { id: "req_2", recordingStartedAt: 'converted' },
       });
   
-      // k6Check(res_1, { "status equals 503": (r) => r.status === 503 });
+       k6Check(res_1, { "status equals 503": (r) => r.status === 503 });
+       k6Check(res_1, { "test text": (r) => r.body.includes("Sign In no")});
   
   
       const res_2 = request('GET', `${env.baseUrl}/account/signonForm`, {
