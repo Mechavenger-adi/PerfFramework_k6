@@ -894,8 +894,12 @@ function prepareRunArtifacts(plan: TestPlan, resolvedConfig: ResolvedConfig): {
   // fallback timestamp so both branches yield the same folder pattern. Parsing then
   // re-serializing to ISO also canonicalizes it (UTC, ms), so every machine derives
   // an identical runId regardless of how the operator wrote K6_PERF_START_AT.
+  // Only derive the runId from K6_PERF_START_AT while it is still upcoming: once
+  // that instant has passed the start barrier no longer waits, so reusing the
+  // stale scheduled time would collide every subsequent run into one folder.
+  // A past start time therefore falls through to the fresh current-time id below.
   const startAtMs = Date.parse(process.env.K6_PERF_START_AT || '');
-  const startAtId = Number.isFinite(startAtMs)
+  const startAtId = Number.isFinite(startAtMs) && startAtMs >= Date.now()
     ? `Run_${new Date(startAtMs).toISOString().replace(/[-:.]/g, '_')}`
     : null;
   const runId = process.env.K6_PERF_RUN_ID
