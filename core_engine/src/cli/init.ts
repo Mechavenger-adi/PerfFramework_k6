@@ -241,7 +241,8 @@ K6_RESULTS_BASE_DIR=./testSuites/results
 
 # Per-transaction CSV log (<testId>_<host>_transaction_metric.csv) — one row per
 # transaction iteration; IsPass mirrors the transaction's checkrate (checks-first
-# + fallback). ON by default; set to 0 to disable.
+# + fallback) and responsetime is the transaction's own duration (seconds).
+# ON by default; set to 0 to disable.
 # K6_PERF_TRANSACTION_LOG=0
 
 # Emit a mergeable per-machine latency histogram (metrics-histogram.json).
