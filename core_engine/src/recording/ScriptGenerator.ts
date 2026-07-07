@@ -167,7 +167,7 @@ export class ScriptGenerator {
         // request itself. request() surfaces this as k6's `name` tag so
         // per-request metrics group under it instead of the raw URL.
         const nameTag = entryNames?.get(req.id) ?? this.deriveRequestName(method, req.url, nameCounters);
-        script += `      name: ${JSON.stringify(nameTag)},\n`;
+        script += `      name: ${this.buildStringExpression(nameTag)},\n`;
 
         if (hasHeaders) {
           const headersObj: Record<string, string> = {};
@@ -190,8 +190,8 @@ export class ScriptGenerator {
         }
 
         script += `      replay: {\n`;
-        script += `        id: ${JSON.stringify(sequentialId)},\n`;
-        script += `        recordingStartedAt: ${JSON.stringify(req.startedDateTime)},\n`;
+        script += `        id: ${this.buildStringExpression(sequentialId)},\n`;
+        script += `        recordingStartedAt: ${this.buildStringExpression(req.startedDateTime)},\n`;
         script += `      },\n`;
         script += `    });\n`;
 
@@ -337,8 +337,11 @@ export class ScriptGenerator {
    * primary base origin, those occurrences are rewritten to `${env.baseUrl}` so
    * the value tracks the parametrised base URL rather than pinning the recorded
    * host (the same substitution buildUrlExpression applies to the request URL).
+   *
+   * Public so the convert path (ScriptConverter) emits metadata values in the
+   * same uniform backtick style.
    */
-  private static buildStringExpression(value: string, primaryBaseUrl?: string): string {
+  static buildStringExpression(value: string, primaryBaseUrl?: string): string {
     // Escape for a template literal FIRST, then substitute — the origin has no
     // backtick/`${`, so splitting the escaped string on it is still safe.
     let escaped = this.escapeForTemplate(value);
