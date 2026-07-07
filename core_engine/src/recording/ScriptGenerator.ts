@@ -172,7 +172,7 @@ export class ScriptGenerator {
         if (hasHeaders) {
           const headersObj: Record<string, string> = {};
           req.headers.forEach((h) => { headersObj[h.name] = h.value; });
-          script += `      headers: ${this.formatInlineObject(headersObj, 6)},\n`;
+          script += `      headers: ${this.formatInlineObject(headersObj, 6, primaryBaseUrl)},\n`;
         }
 
         if (hasBody) {
@@ -183,7 +183,9 @@ export class ScriptGenerator {
             script += `      body: ${req.postData.expression},\n`;
           } else {
             const body = this.buildRequestBody(req.postData);
-            script += `      body: ${JSON.stringify(body)},\n`;
+            // Bodies can embed the recorded host too (form-posted return URLs,
+            // JSON callbacks) — parametrise the base origin the same way.
+            script += `      body: ${body === null ? 'null' : this.buildStringExpression(body, primaryBaseUrl)},\n`;
           }
         }
 
@@ -260,24 +262,26 @@ export class ScriptGenerator {
 
   /**
    * Returns the URL expression to embed directly in the generated script (no extra quoting needed).
-   * Same-domain paths become `${env.baseUrl}/path` template literals so request() receives an
-   * absolute URL; different-domain URLs are kept as JSON string literals.
+   * Every URL is emitted as a backtick template literal for a uniform style (matching the k6
+   * recorder). Same-origin URLs collapse to `${env.baseUrl}/path`; different-domain URLs stay
+   * absolute (still backticked). Base-origin substitution and escaping are shared with
+   * buildStringExpression.
    */
   private static buildUrlExpression(absoluteUrl: string, primaryBaseUrl?: string): string {
-    if (!primaryBaseUrl) {
-      return JSON.stringify(absoluteUrl);
+    if (primaryBaseUrl) {
+      try {
+        const parsed = new URL(absoluteUrl);
+        // Exact-origin match → collapse to the parametrised base plus the path,
+        // avoiding any substring false-positive on the raw origin.
+        if (parsed.origin + '/' === primaryBaseUrl) {
+          const path = parsed.pathname + (parsed.search || '') + (parsed.hash || '');
+          return '`${env.baseUrl}' + this.escapeForTemplate(path) + '`';
+        }
+      } catch { /* fall through to the generic literal */ }
     }
-    try {
-      const parsed = new URL(absoluteUrl);
-      const normalizedOrigin = parsed.origin + '/';
-      if (normalizedOrigin === primaryBaseUrl) {
-        const path = parsed.pathname + (parsed.search || '') + (parsed.hash || '');
-        return `\`\${env.baseUrl}${path}\``;
-      }
-      return JSON.stringify(absoluteUrl);
-    } catch {
-      return JSON.stringify(absoluteUrl);
-    }
+    // Cross-domain or no base: uniform backtick literal (substitutes the base
+    // origin too, though a different-origin URL won't contain it).
+    return this.buildStringExpression(absoluteUrl, primaryBaseUrl);
   }
 
   private static buildRequestBody(
@@ -295,17 +299,56 @@ export class ScriptGenerator {
       .join('&');
   }
 
-  /** Inline-format a plain object as a JS object literal at the given indent level. */
-  private static formatInlineObject(obj: Record<string, string>, indent: number): string {
+  /**
+   * Inline-format a plain object as a JS object literal at the given indent level.
+   * Values are emitted via buildStringExpression — every value becomes a backtick
+   * template literal (uniform recorder-style output), with any occurrence of the
+   * primary base origin (e.g. in `referer` / `origin` headers) parametrised to
+   * `${env.baseUrl}` instead of hardcoding the recorded host. Keys keep their
+   * shape: bare identifiers stay unquoted, others are JSON-quoted.
+   */
+  private static formatInlineObject(
+    obj: Record<string, string>,
+    indent: number,
+    primaryBaseUrl?: string,
+  ): string {
     const pad = ' '.repeat(indent);
     const closePad = ' '.repeat(indent - 2);
     const entries = Object.entries(obj);
     if (entries.length === 0) return '{}';
     const lines = entries.map(([k, v]) => {
       const key = /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(k) ? k : JSON.stringify(k);
-      return `${pad}${key}: ${JSON.stringify(v)}`;
+      return `${pad}${key}: ${this.buildStringExpression(v, primaryBaseUrl)}`;
     });
     return `{\n${lines.join(',\n')},\n${closePad}}`;
+  }
+
+  /** Escape a raw string so it is safe to embed inside a `...` template literal. */
+  private static escapeForTemplate(s: string): string {
+    return s
+      .replace(/\\/g, '\\\\')
+      .replace(/`/g, '\\`')
+      .replace(/\$\{/g, '\\${');
+  }
+
+  /**
+   * Emit a recorded string value (header value, body, URL) as a backtick
+   * template literal — uniform recorder-style output. When it contains the
+   * primary base origin, those occurrences are rewritten to `${env.baseUrl}` so
+   * the value tracks the parametrised base URL rather than pinning the recorded
+   * host (the same substitution buildUrlExpression applies to the request URL).
+   */
+  private static buildStringExpression(value: string, primaryBaseUrl?: string): string {
+    // Escape for a template literal FIRST, then substitute — the origin has no
+    // backtick/`${`, so splitting the escaped string on it is still safe.
+    let escaped = this.escapeForTemplate(value);
+    if (primaryBaseUrl) {
+      // env.baseUrl carries no trailing slash (see fallbackUrl in generate()),
+      // so match the bare origin and let any retained path/query follow it.
+      const origin = primaryBaseUrl.replace(/\/+$/, '');
+      if (origin) escaped = escaped.split(origin).join('${env.baseUrl}');
+    }
+    return '`' + escaped + '`';
   }
 
   /** Extract unique origin URLs (protocol+host) from all HAR entries in all groups. */
