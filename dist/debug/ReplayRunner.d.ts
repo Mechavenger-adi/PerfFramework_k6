@@ -115,6 +115,26 @@ export declare class ReplayRunner {
      * Extract k6 runtime error messages from captured stdout/stderr.
      * k6 errors appear as `level=error msg="..."` or `ERRO[xxxx] ...` lines.
      */
+    /** Filename shape of a throwaway instrumented debug copy: `.<name>.__debugtrack_<stamp>.js`. */
+    private static readonly INSTRUMENTED_COPY_RE;
+    /**
+     * Delete leftover instrumented debug copies sitting in `dir`. The active run
+     * removes its own copy in a `finally`, but a hard process kill (Ctrl+C) or a
+     * throw before that block can strand one. Sweeping at the start of every debug
+     * run guarantees these never accumulate, regardless of how a prior run ended.
+     */
+    private static sweepStaleInstrumentedCopies;
+    /**
+     * Rewrite references to the throwaway instrumented copy back to the user's
+     * original script in any k6 output string. The instrumenter only rewrites
+     * `${...}` in place — it never adds or removes lines — so line numbers already
+     * match the original 1:1; only the FILE is wrong (it names the copy). We swap
+     * the unique copy basename for the original's, which covers every path form k6
+     * emits (file:// URL, native path, bare filename) and leaves the `:line:col`
+     * suffix intact, so clicking the error jumps to the right line of the real
+     * script. No-op when no copy was made (nothing to remap).
+     */
+    private static remapInstrumentedRefs;
     private static extractK6Errors;
     /**
      * Build the diff report's performance-metrics view from k6's `--summary-export`

@@ -144,6 +144,12 @@ export class ReplayRunner {
     // is written beside the original (same dir) so its relative imports
     // (`../../../dist/...`) and data paths (`../Data/*.csv`) resolve identically.
     // Removed after the run. Falls back to the original script if anything fails.
+    // Best-effort: remove any instrumented copies stranded by a previous run
+    // that died before its own cleanup (hard kill, or a throw before the
+    // finally below). Sweeping here guarantees these throwaway files never pile
+    // up in the user's script folder regardless of how a prior run ended.
+    ReplayRunner.sweepStaleInstrumentedCopies(path.dirname(absScriptPath));
+
     let execScriptPath = absScriptPath;
     let instrumentedScriptPath: string | undefined;
     try {
@@ -200,7 +206,11 @@ export class ReplayRunner {
     // errors in real time while k6 is running. Replaces the previous post-run
     // recap so output appears LIVE instead of dumping at the end of the run.
     const fileWriteSink = new FileWriteSink(outputDir);
-    const liveConsole = startLiveConsoleLogStream(logOutputPath, (m) => fileWriteSink.consume(m));
+    const liveConsole = startLiveConsoleLogStream(
+      logOutputPath,
+      (m) => fileWriteSink.consume(m),
+      (m) => ReplayRunner.remapInstrumentedRefs(m, instrumentedScriptPath, absScriptPath),
+    );
     const debugK6Options = {
       noCookiesReset: options.noCookiesReset !== false,
       summaryTrendStats,
@@ -281,14 +291,14 @@ export class ReplayRunner {
     extractSpinner.done(`Extracted ${replayEntries.length} replay entries`);
 
     // Extract k6 runtime errors, performance metrics, and console.log lines
-    const k6Errors = this.extractK6Errors(runResult);
+    const k6Errors = this.extractK6Errors(runResult, instrumentedScriptPath, absScriptPath);
     const k6Metrics = this.extractK6Metrics(summaryExportPath, transactionNames, statsColumns);
     // std isn't in k6's summary export — compute it from the raw point stream
     // (same approach as the live console table) and fill the std column.
     if (statsColumns.includes('std')) {
       await this.fillStdDevs(k6Metrics, metricsStreamPath);
     }
-    const consoleLogs = this.extractConsoleLogs(runResult);
+    const consoleLogs = this.extractConsoleLogs(runResult, instrumentedScriptPath, absScriptPath);
 
     if (replayEntries.length === 0) {
       if (runResult.status !== 0) {
@@ -564,9 +574,50 @@ export class ReplayRunner {
    * Extract k6 runtime error messages from captured stdout/stderr.
    * k6 errors appear as `level=error msg="..."` or `ERRO[xxxx] ...` lines.
    */
-  private static extractK6Errors(runResult: { stdout?: string; stderr?: string; stdoutPath?: string; stderrPath?: string }): string[] {
+  /** Filename shape of a throwaway instrumented debug copy: `.<name>.__debugtrack_<stamp>.js`. */
+  private static readonly INSTRUMENTED_COPY_RE = /^\..*\.__debugtrack_.*\.js$/;
+
+  /**
+   * Delete leftover instrumented debug copies sitting in `dir`. The active run
+   * removes its own copy in a `finally`, but a hard process kill (Ctrl+C) or a
+   * throw before that block can strand one. Sweeping at the start of every debug
+   * run guarantees these never accumulate, regardless of how a prior run ended.
+   */
+  private static sweepStaleInstrumentedCopies(dir: string): void {
+    try {
+      for (const name of fs.readdirSync(dir)) {
+        if (ReplayRunner.INSTRUMENTED_COPY_RE.test(name)) {
+          try { fs.rmSync(path.join(dir, name)); } catch { /* ignore locked/gone */ }
+        }
+      }
+    } catch { /* ignore — dir unreadable */ }
+  }
+
+  /**
+   * Rewrite references to the throwaway instrumented copy back to the user's
+   * original script in any k6 output string. The instrumenter only rewrites
+   * `${...}` in place — it never adds or removes lines — so line numbers already
+   * match the original 1:1; only the FILE is wrong (it names the copy). We swap
+   * the unique copy basename for the original's, which covers every path form k6
+   * emits (file:// URL, native path, bare filename) and leaves the `:line:col`
+   * suffix intact, so clicking the error jumps to the right line of the real
+   * script. No-op when no copy was made (nothing to remap).
+   */
+  private static remapInstrumentedRefs(text: string, copyPath?: string, originalPath?: string): string {
+    if (!copyPath || !originalPath) return text;
+    return text.split(path.basename(copyPath)).join(path.basename(originalPath));
+  }
+
+  private static extractK6Errors(
+    runResult: { stdout?: string; stderr?: string; stdoutPath?: string; stderrPath?: string },
+    copyPath?: string,
+    originalPath?: string,
+  ): string[] {
     const errors: string[] = [];
     const seen = new Set<string>();
+    // Swap any references to the throwaway instrumented copy back to the user's
+    // original script so the report's errors point at the real source file.
+    const remap = (m: string) => ReplayRunner.remapInstrumentedRefs(m, copyPath, originalPath);
 
     const processLine = (line: string) => {
       // k6 logfmt: level=error msg="GoError: ..." or level=error msg="..."
@@ -578,6 +629,7 @@ export class ReplayRunner {
         } catch {
           msg = logfmtMatch[1].replace(/\\"/g, '"');
         }
+        msg = remap(msg);
         if (!seen.has(msg)) {
           seen.add(msg);
           errors.push(msg);
@@ -587,7 +639,7 @@ export class ReplayRunner {
       // k6 ERRO prefix: ERRO[0042] GoError: ...
       const erroMatch = line.match(/ERRO\[\d+\]\s+(.*)/);
       if (erroMatch) {
-        const msg = erroMatch[1].trim();
+        const msg = remap(erroMatch[1].trim());
         if (!seen.has(msg)) {
           seen.add(msg);
           errors.push(msg);
@@ -826,7 +878,11 @@ export class ReplayRunner {
    * k6 emits these as logfmt lines: level=info msg="..." source=console
    * Excludes internal framework prefixes like [k6-perf] and [replay-log].
    */
-  private static extractConsoleLogs(runResult: { stdout?: string; stderr?: string; stdoutPath?: string; stderrPath?: string }): string[] {
+  private static extractConsoleLogs(
+    runResult: { stdout?: string; stderr?: string; stdoutPath?: string; stderrPath?: string },
+    copyPath?: string,
+    originalPath?: string,
+  ): string[] {
     const logs: string[] = [];
 
     const processLine = (line: string) => {
@@ -857,7 +913,8 @@ export class ReplayRunner {
       ) return;
 
       const level = consoleMatch[1].toUpperCase();
-      logs.push(`[${level}] ${msg}`);
+      // Point any instrumented-copy references back at the user's real script.
+      logs.push(`[${level}] ${ReplayRunner.remapInstrumentedRefs(msg, copyPath, originalPath)}`);
     };
 
     const processText = (text?: string) => {

@@ -31,10 +31,16 @@ const LIVE_CONSOLE_POLL_MS = 250;
  * @param onMessage optional tap invoked with every extracted console message
  *   (before display). Return true to mark the message consumed — it will then
  *   be suppressed from the live display (used by FileWriteSink for writeData()).
+ * @param rewrite optional transform applied to a message just before it's
+ *   displayed. Debug mode uses it to swap references to the throwaway
+ *   instrumented script copy back to the user's original file, so clicking a
+ *   live error jumps to the real source instead of a temp (often already
+ *   deleted) file.
  */
 export function startLiveConsoleLogStream(
   runLogPath: string,
   onMessage?: (msg: string) => boolean,
+  rewrite?: (msg: string) => string,
 ): { stop: () => void } {
   let offset = 0;
   let stopped = false;
@@ -72,10 +78,11 @@ export function startLiveConsoleLogStream(
     // Hide k6's internal info/debug chatter — too noisy.
     if (!isConsole && level !== 'ERROR' && level !== 'WARN') return;
 
-    if (level === 'ERROR') Logger.error(msg);
-    else if (level === 'WARN') Logger.warn(msg);
-    else if (level === 'DEBUG') Logger.debug(msg);
-    else Logger.info(msg);
+    const display = rewrite ? rewrite(msg) : msg;
+    if (level === 'ERROR') Logger.error(display);
+    else if (level === 'WARN') Logger.warn(display);
+    else if (level === 'DEBUG') Logger.debug(display);
+    else Logger.info(display);
   }
 
   function tick(): void {
