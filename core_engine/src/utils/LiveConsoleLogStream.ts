@@ -113,10 +113,18 @@ export function startLiveConsoleLogStream(
 
   return {
     stop: () => {
-      stopped = true;
       clearInterval(timer);
-      // Drain anything written between the final poll and now.
+      // Final drain of everything k6 wrote between the last poll and process
+      // exit. This MUST run before `stopped` is set: tick() early-returns once
+      // `stopped` is true, so setting it first (as this did previously) made the
+      // drain a no-op and dropped the last <=POLL_MS of output. On short runs
+      // (especially 1-iteration debug) console.* and runtime errors usually land
+      // in exactly that final window, which is why they showed only
+      // intermittently — in both the debug and load-test paths, which share this
+      // tailer. stop() runs after the k6 process has closed, so the log file is
+      // fully flushed and a single read captures the tail.
       tick();
+      stopped = true;
       if (carry.trim()) processLine(carry);
     },
   };

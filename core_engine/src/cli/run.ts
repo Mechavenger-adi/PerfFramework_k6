@@ -1818,6 +1818,21 @@ function startLiveTransactionDisplay(
   const isTTY = process.stdout.isTTY === true;
   const useColor = isTTY && !process.env.NO_COLOR;
 
+  // Live-table display mode. The fixed scroll-region table (below) relies on ANSI
+  // DECSTBM (`\x1b[1;Nr`) + absolute cursor positioning, which xterm.js/ConPTY
+  // terminals — notably the VS Code integrated terminal — mishandle: the table
+  // area flickers/blanks as it fights k6's sub-second progress-bar redraws.
+  // Modes via env K6_PERF_LIVE_TABLE:
+  //   off        → no live table (the final table still prints after the run)
+  //   scrollback → append the table to scrollback each tick (stable, no scroll region)
+  //   fixed      → force the scroll-region table even in editor terminals
+  //   (unset)    → auto: fixed on a real TTY, scrollback in the VS Code terminal
+  const liveTableMode = (process.env.K6_PERF_LIVE_TABLE || '').trim().toLowerCase();
+  if (liveTableMode === 'off') {
+    return { stop: () => { /* nothing rendered live; final table prints post-run */ } };
+  }
+  const editorTerminal = process.env.TERM_PROGRAM === 'vscode';
+
   // Reserve the bottom of the terminal for the live table; confine k6's
   // output (banner + animated progress bar) to the top region via an ANSI
   // scroll region. The two never overlap. Falls back to scrollback printing
@@ -1828,8 +1843,11 @@ function startLiveTransactionDisplay(
   // title + top border + header row + header separator + N data rows + bottom border
   const tableRows = transactionNames.length + 5;
   let termRows = process.stdout.rows || 40;
-  // k6 needs at least ~12 rows for its banner + progress bar to remain readable
-  let useFixedTable = isTTY && termRows >= tableRows + 12;
+  // k6 needs at least ~12 rows for its banner + progress bar to remain readable.
+  // Editor terminals (VS Code) flicker with the scroll-region table, so default
+  // them to scrollback unless the user forces `fixed`.
+  let useFixedTable = isTTY && termRows >= tableRows + 12
+    && (liveTableMode === 'fixed' || (liveTableMode !== 'scrollback' && !editorTerminal));
   let tableTop = useFixedTable ? termRows - tableRows + 1 : 0;
   let scrollRegionSet = false;
 
