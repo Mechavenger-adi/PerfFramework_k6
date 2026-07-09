@@ -423,8 +423,11 @@ Use transaction names consistently. They appear in console summaries, `transacti
 
 ## More Documentation
 
-- [Prerequisites.md](Prerequisites.md)
-- [HOW_TO_USE_FRAMEWORK.md](HOW_TO_USE_FRAMEWORK.md)
-- [docs/configuration-reference.md](docs/configuration-reference.md)
-- [HowTo-AutoCorrelation.md](HowTo-AutoCorrelation.md)
-- [HowTo-Parameterisation-And-Correlation.md](HowTo-Parameterisation-And-Correlation.md)
+Start at the [Framework Atlas](FrameworkAtlas.md) (navigation for humans and AI) or the
+[docs index](docs/index.md).
+
+- [Installation](docs/installation.md) · [Getting Started](docs/getting-started.md)
+- [CLI Reference](docs/cli-reference.md) *(generated)* · [Configuration Guide](docs/configuration.md) · [Configuration Reference](docs/configuration-reference.md) *(generated)*
+- [Migration](docs/migration.md) · [Troubleshooting](docs/troubleshooting.md) · [FAQ](docs/faq.md)
+- Engineering deep-dives: `engineering_docs/edd/` (lifecycle, correlation, replay, reporting, config)
+- Historical/superseded docs are frozen under `archive/`.
