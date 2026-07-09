@@ -1,0 +1,26 @@
+name: docs-check
+# Hard gate: regenerated L4 indexes + Atlas must match what's committed.
+on:
+  pull_request:
+    paths:
+      - "core_engine/src/**"
+      - "config/**"
+      - "ai_context/**"
+      - "engineering_docs/**"
+      - "tools/**"
+      - "ai_generated/**"
+      - "FrameworkAtlas.md"
+  push:
+    branches: [main]
+
+jobs:
+  docs-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm ci
+      - name: Regenerate indexes and fail on drift
+        run: npm run docs:check

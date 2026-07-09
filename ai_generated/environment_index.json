@@ -1,0 +1,120 @@
+[
+  {
+    "templates": [],
+    "usedIn": [
+      "core_engine/src/execution/HostMonitor.ts",
+      "core_engine/src/reporting/EventArtifactBuilder.ts"
+    ],
+    "var": "BUILD_BUILDID"
+  },
+  {
+    "templates": [],
+    "usedIn": [
+      "core_engine/src/execution/HostMonitor.ts",
+      "core_engine/src/reporting/EventArtifactBuilder.ts"
+    ],
+    "var": "CI_JOB_ID"
+  },
+  {
+    "templates": [],
+    "usedIn": [
+      "core_engine/src/execution/HostMonitor.ts",
+      "core_engine/src/reporting/EventArtifactBuilder.ts"
+    ],
+    "var": "GITHUB_RUN_ID"
+  },
+  {
+    "templates": [],
+    "usedIn": [
+      "core_engine/src/execution/HostMonitor.ts",
+      "core_engine/src/reporting/EventArtifactBuilder.ts"
+    ],
+    "var": "HOSTNAME"
+  },
+  {
+    "templates": [],
+    "usedIn": [
+      "core_engine/src/cli/run.ts"
+    ],
+    "var": "K6_PERF_COLLECT_DIR"
+  },
+  {
+    "templates": [
+      ".env.template"
+    ],
+    "usedIn": [
+      "core_engine/src/cli/run.ts"
+    ],
+    "var": "K6_PERF_EMIT_HISTOGRAM"
+  },
+  {
+    "templates": [],
+    "usedIn": [
+      "core_engine/src/cli/run.ts"
+    ],
+    "var": "K6_PERF_HISTOGRAM_ALPHA"
+  },
+  {
+    "templates": [],
+    "usedIn": [
+      "core_engine/src/cli/run.ts"
+    ],
+    "var": "K6_PERF_HISTOGRAM_BUCKET"
+  },
+  {
+    "templates": [],
+    "usedIn": [
+      "core_engine/src/cli/run.ts"
+    ],
+    "var": "K6_PERF_MACHINE"
+  },
+  {
+    "templates": [],
+    "usedIn": [
+      "core_engine/src/cli/run.ts"
+    ],
+    "var": "K6_PERF_REQUEST_LOG"
+  },
+  {
+    "templates": [],
+    "usedIn": [
+      "core_engine/src/cli/run.ts"
+    ],
+    "var": "K6_PERF_RUN_ID"
+  },
+  {
+    "templates": [
+      ".env"
+    ],
+    "usedIn": [
+      "core_engine/src/cli/run.ts",
+      "core_engine/src/distributed/startBarrier.ts"
+    ],
+    "var": "K6_PERF_START_AT"
+  },
+  {
+    "templates": [
+      ".env"
+    ],
+    "usedIn": [
+      "core_engine/src/cli/run.ts"
+    ],
+    "var": "K6_PERF_TEST_ID"
+  },
+  {
+    "templates": [],
+    "usedIn": [
+      "core_engine/src/cli/run.ts"
+    ],
+    "var": "K6_PERF_TRANSACTION_LOG"
+  },
+  {
+    "templates": [],
+    "usedIn": [
+      "core_engine/src/cli/run.ts",
+      "core_engine/src/utils/ProgressBar.ts",
+      "core_engine/src/utils/logger.ts"
+    ],
+    "var": "NO_COLOR"
+  }
+]

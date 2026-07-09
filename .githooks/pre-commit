@@ -1,0 +1,10 @@
+#!/bin/sh
+# Docs staleness check (WARN mode — never blocks a commit).
+# Enable once per clone: git config core.hooksPath .githooks
+# CI enforces the same check as a hard gate (.github/workflows/docs-check.yml).
+node tools/docs-index.js >/dev/null 2>&1
+if ! git diff --quiet -- ai_generated/ FrameworkAtlas.md; then
+  echo "⚠  docs indexes are stale. Run 'npm run docs:index' and stage the result."
+  echo "   (commit allowed; CI will fail until synced)"
+fi
+exit 0

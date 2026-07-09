@@ -19,7 +19,7 @@ Requirements:
 Constraints:
 - Must not break existing CLI commands
 - Must follow dependency direction rules
-- Must update AGENT-CONTEXT.md change log
+- Must run `npm run docs:index` and sync the affected EDD/mini-EDD
 ```
 
 ## PT2 — Bug Fix

@@ -80,7 +80,7 @@
 | `PostmanScriptTranslator.ts` | Postman pre-request/test scripts → framework equivalents |
 
 ### Correlation (`core_engine/src/correlation/`)
-**(A) Smart auto-correlation scanner** (no hand-written rules; driven by `correlate` CLI — see `.md/Correlation-Engine-Design.md`)
+**(A) Smart auto-correlation scanner** (no hand-written rules; driven by `correlate` CLI — see `archive/Correlation-Engine-Design.md`)
 | File | Responsibility |
 |------|---------------|
 | `CorrelationScanner.ts` | Orchestrator: `RecordingExchange[]` → `CorrelationPlan` |

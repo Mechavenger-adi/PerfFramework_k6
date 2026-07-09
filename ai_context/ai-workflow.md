@@ -44,16 +44,37 @@ Low:  All other files (load on-demand per task)
 3. `runtime-contracts.md` for k6-side behavior
 4. `reporting-contracts.md` for artifact pipeline
 
-## After Making Changes
+## After Making Changes — Documentation Sync (MANDATORY)
 
-1. Run `npm exec tsc -- --noEmit` to verify TypeScript
-2. Update `AGENT-CONTEXT.md` change log (mandatory)
-3. Update affected `ai_context/` files if architecture changed
-4. Test manually: existing CLI commands + new feature
+Docs are source code; outdated docs are bugs. Every code change must sync the knowledge system
+in the **same** change:
+
+1. `npm exec tsc -- --noEmit` — TypeScript passes
+2. `npm run docs:index` — regenerate L4 indexes (`ai_generated/*.json`) + `FrameworkAtlas.md` tables
+3. If the touched files map to an EDD/mini-EDD (see table below), update it — including the §4A
+   reverse-engineering rows with fresh `file:line` citations
+4. `npm run docs:check` — must exit clean (regenerate + `git diff --exit-code`); a non-empty diff
+   means the committed indexes are stale
+5. Bump `updated:` front-matter on any hand-edited L1/L2 doc
+6. Test manually: existing CLI commands + new feature
+
+### Change → docs mapping
+
+| You changed | You must touch |
+|-------------|----------------|
+| `core_engine/src/**/*.ts` | `npm run docs:index`; if a full-EDD subsystem → its EDD §4A; else the feature's mini-EDD |
+| `core_engine/src/cli/**` (new command) | `module-map.md`; `docs/cli-reference.md` regenerates via `npm run docs:index` (gated by `docs:check`) |
+| `config/schemas/**` | `npm run docs:index` (config_index) + `docs/configuration-reference.md` via `npm run docs` (gated by `docs:check`) + EDD config tables |
+| `config/environments/**`, `.env*` | `npm run docs:index` (environment_index) |
+| new feature added | add a row to `ai_context/features.seed.json` → mini-EDD → `integration-checklist.md` |
+| `ai_context/*-contracts.md` | EDDs whose front-matter `related:` names that slug |
+| any L1/L2 doc | `npm run docs:index` (search_index) |
+
+Full rules: `ai_context/knowledge-architecture-proposal.md` §8. Never hand-edit `ai_generated/`.
 
 ## Token-Saving Tips
 
-- Don't read AGENT-CONTEXT.md (1841 lines). Use ai_context/ files instead.
-- Don't read graph.html. Use dependency-rules.md instead.
+- Don't read `archive/` (frozen legacy, incl. the old AGENT-CONTEXT.md). Use `ai_context/` files instead.
+- Don't read graph.html. Use `dependency-rules.md` or `ai_generated/dependency_graph.json` instead.
 - Don't read all markdown files. Use module-map.md to find what you need.
 - Load subsystem files only when working on that subsystem.

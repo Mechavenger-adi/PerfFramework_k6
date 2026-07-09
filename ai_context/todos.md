@@ -2,6 +2,9 @@
 
 > A shared task list for AI agents to maintain continuity across sessions.
 > **All AI agents MUST update this file when completing tasks or discovering new work.**
+>
+> **Note:** references below to `ai_context/design-proposals.md` now live at
+> `engineering_docs/adr/0001-dx-simplification-proposals.md` (migrated 2026-07-09).
 
 ## Completed Tasks
 

@@ -1,0 +1,983 @@
+[
+  {
+    "config": [
+      "config/schemas/test_plan.schema.json"
+    ],
+    "contracts": [
+      "ai_context/runtime-contracts.md",
+      "ai_context/execution-flow.md"
+    ],
+    "dirs": [
+      "core_engine/src/utils",
+      "core_engine/src/scenario"
+    ],
+    "edd": "engineering_docs/edd/EDD-lifecycle.md",
+    "entry": "core_engine/src/utils/lifecycle.ts",
+    "env": [
+      "K6_PERF_PHASES"
+    ],
+    "feature": "lifecycle",
+    "files": [
+      {
+        "exports": [
+          "JourneyLifecycleStore",
+          "PhaseFns",
+          "TransactionGate",
+          "createJourneyLifecycleStore",
+          "getTransactionGate",
+          "isEnding",
+          "runJourneyLifecycle",
+          "thinktime"
+        ],
+        "loc": 583,
+        "path": "core_engine/src/utils/lifecycle.ts"
+      },
+      {
+        "exports": [
+          "endTransaction",
+          "getCurrentTransaction",
+          "initTransactions",
+          "isJsRuntimeError",
+          "isVuTerminated",
+          "k6Check",
+          "recordFailingResponse",
+          "startTransaction",
+          "transaction"
+        ],
+        "loc": 567,
+        "path": "core_engine/src/utils/transaction.ts"
+      },
+      {
+        "exports": [
+          "K6ScenarioDefinition",
+          "K6ScenariosMap",
+          "ScenarioBuilder",
+          "ScenarioRuntimeMetadata"
+        ],
+        "loc": 459,
+        "path": "core_engine/src/scenario/ScenarioBuilder.ts"
+      },
+      {
+        "exports": [
+          "K6ExecutorConfig",
+          "buildConstantArrivalRateProfile",
+          "buildExternallyControlledProfile",
+          "buildIterationProfile",
+          "buildLoadProfile",
+          "buildRampingArrivalRateProfile",
+          "buildSoakProfile",
+          "buildSpikeProfile",
+          "buildStressProfile",
+          "toK6ExecutorConfig"
+        ],
+        "loc": 178,
+        "path": "core_engine/src/scenario/WorkloadModels.ts"
+      }
+    ],
+    "risks": [
+      "RZ1",
+      "RZ4",
+      "F5"
+    ],
+    "tests": [],
+    "tier": "full",
+    "title": "VU Lifecycle & Phase Envelope"
+  },
+  {
+    "config": [
+      "config/correlation-rules"
+    ],
+    "contracts": [
+      "ai_context/integration-contracts.md"
+    ],
+    "dirs": [
+      "core_engine/src/correlation"
+    ],
+    "edd": "engineering_docs/edd/EDD-auto-correlation.md",
+    "entry": "core_engine/src/cli/correlate.ts",
+    "env": [],
+    "feature": "auto-correlation",
+    "files": [
+      {
+        "exports": [
+          "CorrelationScanner",
+          "ScanOptions"
+        ],
+        "loc": 57,
+        "path": "core_engine/src/correlation/CorrelationScanner.ts"
+      },
+      {
+        "exports": [
+          "ConsumerOccurrence",
+          "IndexedValues",
+          "ProducerOccurrence",
+          "ValueIndexer"
+        ],
+        "loc": 311,
+        "path": "core_engine/src/correlation/ValueIndexer.ts"
+      },
+      {
+        "exports": [
+          "LinkMatcher",
+          "RawCandidate"
+        ],
+        "loc": 89,
+        "path": "core_engine/src/correlation/LinkMatcher.ts"
+      },
+      {
+        "exports": [
+          "CandidateScorer",
+          "ScoreOptions",
+          "ScoredCandidate",
+          "ScorerConfig"
+        ],
+        "loc": 222,
+        "path": "core_engine/src/correlation/CandidateScorer.ts"
+      },
+      {
+        "exports": [
+          "ExtractorSynthesizer"
+        ],
+        "loc": 189,
+        "path": "core_engine/src/correlation/ExtractorSynthesizer.ts"
+      },
+      {
+        "exports": [
+          "ApplyOptions",
+          "ApplyResult",
+          "ScriptCorrelationWriter"
+        ],
+        "loc": 335,
+        "path": "core_engine/src/correlation/ScriptCorrelationWriter.ts"
+      },
+      {
+        "exports": [
+          "ConsumerLocation",
+          "CorrelationCandidate",
+          "CorrelationConfidence",
+          "CorrelationConsumer",
+          "CorrelationManifest",
+          "CorrelationPlan",
+          "CorrelationProducer",
+          "ExtractorKind",
+          "ProducerSource",
+          "RecordingCookie",
+          "RecordingExchange",
+          "RecordingHeader",
+          "RecordingRequest",
+          "RecordingResponse"
+        ],
+        "loc": 133,
+        "path": "core_engine/src/correlation/CorrelationManifest.ts"
+      },
+      {
+        "exports": [
+          "ScriptConverter"
+        ],
+        "loc": 1208,
+        "path": "core_engine/src/recording/ScriptConverter.ts"
+      }
+    ],
+    "risks": [
+      "F4"
+    ],
+    "tests": [],
+    "tier": "full",
+    "title": "Smart Auto-Correlation"
+  },
+  {
+    "config": [],
+    "contracts": [
+      "ai_context/replay-debug-contracts.md"
+    ],
+    "dirs": [
+      "core_engine/src/debug"
+    ],
+    "edd": "engineering_docs/edd/EDD-debug-replay.md",
+    "entry": "core_engine/src/debug/ReplayRunner.ts",
+    "env": [],
+    "feature": "debug-replay",
+    "files": [
+      {
+        "exports": [
+          "DebugReplayOptions",
+          "DebugReplayResult",
+          "K6MetricRow",
+          "K6Metrics",
+          "ReplayRunner"
+        ],
+        "loc": 943,
+        "path": "core_engine/src/debug/ReplayRunner.ts"
+      },
+      {
+        "exports": [
+          "BodyDiffResult",
+          "DiffChecker",
+          "DiffResult",
+          "HeaderDiffEntry",
+          "SideSnapshot"
+        ],
+        "loc": 643,
+        "path": "core_engine/src/debug/DiffChecker.ts"
+      },
+      {
+        "exports": [
+          "HTMLDiffReporter",
+          "ReportOptions"
+        ],
+        "loc": 1971,
+        "path": "core_engine/src/debug/HTMLDiffReporter.ts"
+      },
+      {
+        "exports": [
+          "ExchangeLogBuilder",
+          "ExchangeLogCookie",
+          "ExchangeLogHeader",
+          "ExchangeLogParams",
+          "ExchangeLogRequest",
+          "ExchangeLogResponse",
+          "TaggedExchangeLogEntry",
+          "VariableEvent"
+        ],
+        "loc": 207,
+        "path": "core_engine/src/debug/ExchangeLog.ts"
+      },
+      {
+        "exports": [
+          "RecordingIndexEntry",
+          "RecordingLogResolution",
+          "RecordingLogResolver"
+        ],
+        "loc": 189,
+        "path": "core_engine/src/debug/RecordingLogResolver.ts"
+      },
+      {
+        "exports": [
+          "createVariableEvent",
+          "logExchange",
+          "logReplayExchange",
+          "trackAuto",
+          "trackCorrelation",
+          "trackDataRow",
+          "trackParameter"
+        ],
+        "loc": 578,
+        "path": "core_engine/src/utils/replayLogger.ts"
+      }
+    ],
+    "risks": [
+      "RZ6",
+      "F1",
+      "F2"
+    ],
+    "tests": [],
+    "tier": "full",
+    "title": "Debug Replay & Diff"
+  },
+  {
+    "config": [
+      "config/runtime_settings/default.json",
+      "config/schemas/runtime_settings.schema.json"
+    ],
+    "contracts": [
+      "ai_context/reporting-contracts.md"
+    ],
+    "dirs": [
+      "core_engine/src/reporting",
+      "core_engine/src/assertions"
+    ],
+    "edd": "engineering_docs/edd/EDD-reporting.md",
+    "entry": "core_engine/src/reporting/RunReportGenerator.ts",
+    "env": [],
+    "feature": "reporting",
+    "files": [
+      {
+        "exports": [
+          "RunReportGenerator"
+        ],
+        "loc": 2692,
+        "path": "core_engine/src/reporting/RunReportGenerator.ts"
+      },
+      {
+        "exports": [
+          "TransactionMetricsBuilder"
+        ],
+        "loc": 392,
+        "path": "core_engine/src/reporting/TransactionMetricsBuilder.ts"
+      },
+      {
+        "exports": [
+          "OverviewBucket",
+          "ParsedTimeseries",
+          "PhaseTimings",
+          "RequestBucket",
+          "TimeseriesStreamParser",
+          "TransactionBucket"
+        ],
+        "loc": 670,
+        "path": "core_engine/src/reporting/TimeseriesStreamParser.ts"
+      },
+      {
+        "exports": [
+          "EventArtifactBuilder"
+        ],
+        "loc": 188,
+        "path": "core_engine/src/reporting/EventArtifactBuilder.ts"
+      },
+      {
+        "exports": [
+          "RunSummaryBuilder"
+        ],
+        "loc": 128,
+        "path": "core_engine/src/reporting/RunSummaryBuilder.ts"
+      },
+      {
+        "exports": [
+          "TimeseriesArtifactBuilder"
+        ],
+        "loc": 255,
+        "path": "core_engine/src/reporting/TimeseriesArtifactBuilder.ts"
+      },
+      {
+        "exports": [
+          "ArtifactWriter"
+        ],
+        "loc": 20,
+        "path": "core_engine/src/reporting/ArtifactWriter.ts"
+      },
+      {
+        "exports": [
+          "ThresholdManager"
+        ],
+        "loc": 173,
+        "path": "core_engine/src/assertions/ThresholdManager.ts"
+      },
+      {
+        "exports": [
+          "SLARegistry"
+        ],
+        "loc": 26,
+        "path": "core_engine/src/assertions/SLARegistry.ts"
+      },
+      {
+        "exports": [
+          "JourneyAssertionResolver"
+        ],
+        "loc": 44,
+        "path": "core_engine/src/assertions/JourneyAssertionResolver.ts"
+      }
+    ],
+    "risks": [
+      "RZ7",
+      "RZ8"
+    ],
+    "tests": [
+      "tools/validate-histogram.test.ts"
+    ],
+    "tier": "full",
+    "title": "Artifact-First Reporting & Thresholds"
+  },
+  {
+    "config": [
+      "config/environments",
+      "config/runtime_settings",
+      "config/schemas"
+    ],
+    "contracts": [
+      "ai_context/dependency-rules.md"
+    ],
+    "dirs": [
+      "core_engine/src/config"
+    ],
+    "edd": "engineering_docs/edd/EDD-config.md",
+    "entry": "core_engine/src/config/ConfigurationManager.ts",
+    "env": [],
+    "feature": "config",
+    "files": [
+      {
+        "exports": [
+          "ConfigurationManager"
+        ],
+        "loc": 161,
+        "path": "core_engine/src/config/ConfigurationManager.ts"
+      },
+      {
+        "exports": [
+          "EnvResolver"
+        ],
+        "loc": 78,
+        "path": "core_engine/src/config/EnvResolver.ts"
+      },
+      {
+        "exports": [
+          "GatekeeperResult",
+          "GatekeeperValidator"
+        ],
+        "loc": 359,
+        "path": "core_engine/src/config/GatekeeperValidator.ts"
+      },
+      {
+        "exports": [
+          "RuntimeConfigManager"
+        ],
+        "loc": 222,
+        "path": "core_engine/src/config/RuntimeConfigManager.ts"
+      },
+      {
+        "exports": [
+          "SchemaValidator",
+          "ValidationResult"
+        ],
+        "loc": 330,
+        "path": "core_engine/src/config/SchemaValidator.ts"
+      },
+      {
+        "exports": [
+          "ApiViolation",
+          "CallHit",
+          "FileViolations",
+          "ScriptContractGuard"
+        ],
+        "loc": 255,
+        "path": "core_engine/src/config/ScriptContractGuard.ts"
+      }
+    ],
+    "risks": [
+      "RZ3",
+      "RZ10",
+      "F3"
+    ],
+    "tests": [
+      "tools/merge-validation.test.ts"
+    ],
+    "tier": "full",
+    "title": "Configuration Resolution"
+  },
+  {
+    "config": [],
+    "contracts": [
+      "ai_context/orchestration-map.md"
+    ],
+    "dirs": [
+      "core_engine/src/cli"
+    ],
+    "edd": null,
+    "entry": "core_engine/src/cli/run.ts",
+    "env": [],
+    "feature": "cli",
+    "files": [
+      {
+        "exports": [],
+        "loc": 2259,
+        "path": "core_engine/src/cli/run.ts"
+      },
+      {
+        "exports": [
+          "runInit"
+        ],
+        "loc": 414,
+        "path": "core_engine/src/cli/init.ts"
+      },
+      {
+        "exports": [
+          "runGenerate"
+        ],
+        "loc": 151,
+        "path": "core_engine/src/cli/generate.ts"
+      },
+      {
+        "exports": [
+          "ConflictPolicy",
+          "ImportCurlOptions",
+          "ImportPostmanOptions",
+          "runImportCurl",
+          "runImportPostman"
+        ],
+        "loc": 489,
+        "path": "core_engine/src/cli/import.ts"
+      },
+      {
+        "exports": [
+          "runInteractivePanel"
+        ],
+        "loc": 873,
+        "path": "core_engine/src/cli/interactive.ts"
+      },
+      {
+        "exports": [
+          "ValidateOptions",
+          "runValidate"
+        ],
+        "loc": 95,
+        "path": "core_engine/src/cli/validate.ts"
+      }
+    ],
+    "risks": [
+      "RZ2"
+    ],
+    "tests": [],
+    "tier": "mini",
+    "title": "CLI Command Surface"
+  },
+  {
+    "config": [
+      "config/test_plans",
+      "config/schemas/test_plan.schema.json"
+    ],
+    "contracts": [
+      "ai_context/integration-contracts.md"
+    ],
+    "dirs": [
+      "core_engine/src/scenario"
+    ],
+    "edd": null,
+    "entry": "core_engine/src/scenario/ScenarioBuilder.ts",
+    "env": [],
+    "feature": "scenario",
+    "files": [
+      {
+        "exports": [
+          "K6ScenarioDefinition",
+          "K6ScenariosMap",
+          "ScenarioBuilder",
+          "ScenarioRuntimeMetadata"
+        ],
+        "loc": 459,
+        "path": "core_engine/src/scenario/ScenarioBuilder.ts"
+      },
+      {
+        "exports": [
+          "K6ExecutorConfig",
+          "buildConstantArrivalRateProfile",
+          "buildExternallyControlledProfile",
+          "buildIterationProfile",
+          "buildLoadProfile",
+          "buildRampingArrivalRateProfile",
+          "buildSoakProfile",
+          "buildSpikeProfile",
+          "buildStressProfile",
+          "toK6ExecutorConfig"
+        ],
+        "loc": 178,
+        "path": "core_engine/src/scenario/WorkloadModels.ts"
+      },
+      {
+        "exports": [
+          "ExecutorFactory"
+        ],
+        "loc": 91,
+        "path": "core_engine/src/scenario/ExecutorFactory.ts"
+      },
+      {
+        "exports": [
+          "TestPlanLoader"
+        ],
+        "loc": 54,
+        "path": "core_engine/src/scenario/TestPlanLoader.ts"
+      }
+    ],
+    "risks": [
+      "RZ4",
+      "RZ5"
+    ],
+    "tests": [],
+    "tier": "mini",
+    "title": "Scenario & Workload Modeling"
+  },
+  {
+    "config": [],
+    "contracts": [
+      "ai_context/orchestration-map.md"
+    ],
+    "dirs": [
+      "core_engine/src/execution"
+    ],
+    "edd": null,
+    "entry": "core_engine/src/execution/PipelineRunner.ts",
+    "env": [],
+    "feature": "execution",
+    "files": [
+      {
+        "exports": [
+          "PipelineRunResult",
+          "PipelineRunner",
+          "RunOptions"
+        ],
+        "loc": 330,
+        "path": "core_engine/src/execution/PipelineRunner.ts"
+      },
+      {
+        "exports": [
+          "K6Options",
+          "ParallelExecutionManager"
+        ],
+        "loc": 134,
+        "path": "core_engine/src/execution/ParallelExecutionManager.ts"
+      },
+      {
+        "exports": [
+          "JourneyAllocation",
+          "JourneyAllocator"
+        ],
+        "loc": 93,
+        "path": "core_engine/src/execution/JourneyAllocator.ts"
+      },
+      {
+        "exports": [
+          "HostMonitor",
+          "HostSnapshot"
+        ],
+        "loc": 129,
+        "path": "core_engine/src/execution/HostMonitor.ts"
+      },
+      {
+        "exports": [
+          "FileWriteSink"
+        ],
+        "loc": 123,
+        "path": "core_engine/src/execution/FileWriteSink.ts"
+      }
+    ],
+    "risks": [
+      "RZ2",
+      "RZ5",
+      "F6",
+      "F8"
+    ],
+    "tests": [],
+    "tier": "mini",
+    "title": "k6 Process Execution"
+  },
+  {
+    "config": [],
+    "contracts": [
+      "ai_context/runtime-contracts.md"
+    ],
+    "dirs": [
+      "core_engine/src/utils",
+      "core_engine/src/runtime"
+    ],
+    "edd": null,
+    "entry": "core_engine/src/index.ts",
+    "env": [],
+    "feature": "vu-runtime",
+    "files": [
+      {
+        "exports": [
+          "endTransaction",
+          "getCurrentTransaction",
+          "initTransactions",
+          "isJsRuntimeError",
+          "isVuTerminated",
+          "k6Check",
+          "recordFailingResponse",
+          "startTransaction",
+          "transaction"
+        ],
+        "loc": 567,
+        "path": "core_engine/src/utils/transaction.ts"
+      },
+      {
+        "exports": [
+          "TeamEnvironmentOverride",
+          "clearCookies",
+          "deleteCookie",
+          "getApiKey",
+          "getEnvContext",
+          "registerBaseUrl",
+          "registerFrameworkEnvironmentUrls",
+          "resolveFrameworkUrl",
+          "resolvePath"
+        ],
+        "loc": 290,
+        "path": "core_engine/src/utils/session.ts"
+      },
+      {
+        "exports": [
+          "ExtractableResponse",
+          "extractBoundary",
+          "extractCookie",
+          "extractHeader",
+          "extractJson",
+          "extractRegex"
+        ],
+        "loc": 247,
+        "path": "core_engine/src/utils/extract.ts"
+      },
+      {
+        "exports": [
+          "addAutoHeader",
+          "addAutoHeaders",
+          "addHeaderOnce",
+          "clearAutoHeaders",
+          "getAutoHeaders",
+          "mergeRequestHeaders",
+          "removeAutoHeader"
+        ],
+        "loc": 100,
+        "path": "core_engine/src/utils/autoHeaders.ts"
+      },
+      {
+        "exports": [
+          "WriteDataOptions",
+          "writeData"
+        ],
+        "loc": 65,
+        "path": "core_engine/src/utils/dataWriter.ts"
+      },
+      {
+        "exports": [
+          "MetricsRuntime",
+          "TransactionAggregate"
+        ],
+        "loc": 30,
+        "path": "core_engine/src/runtime/MetricsRuntime.ts"
+      },
+      {
+        "exports": [
+          "ErrorRuntime",
+          "ErrorRuntimeContext"
+        ],
+        "loc": 79,
+        "path": "core_engine/src/runtime/ErrorRuntime.ts"
+      }
+    ],
+    "risks": [
+      "RZ1",
+      "RZ8",
+      "F7"
+    ],
+    "tests": [],
+    "tier": "mini",
+    "title": "k6-side VU Runtime Helpers"
+  },
+  {
+    "config": [],
+    "contracts": [],
+    "dirs": [
+      "core_engine/src/data"
+    ],
+    "edd": null,
+    "entry": "core_engine/src/data/DataFactory.ts",
+    "env": [],
+    "feature": "data",
+    "files": [
+      {
+        "exports": [
+          "DataFactory",
+          "DataRow",
+          "LoadedDataset"
+        ],
+        "loc": 140,
+        "path": "core_engine/src/data/DataFactory.ts"
+      },
+      {
+        "exports": [
+          "DataOverflowStrategy",
+          "DataPoolManager",
+          "PoolConfig"
+        ],
+        "loc": 131,
+        "path": "core_engine/src/data/DataPoolManager.ts"
+      },
+      {
+        "exports": [
+          "DataValidationResult",
+          "DataValidator"
+        ],
+        "loc": 145,
+        "path": "core_engine/src/data/DataValidator.ts"
+      },
+      {
+        "exports": [
+          "DynamicValueFactory"
+        ],
+        "loc": 95,
+        "path": "core_engine/src/data/DynamicValueFactory.ts"
+      }
+    ],
+    "risks": [
+      "RZ9"
+    ],
+    "tests": [],
+    "tier": "mini",
+    "title": "Test Data Management"
+  },
+  {
+    "config": [],
+    "contracts": [
+      "ai_context/integration-contracts.md"
+    ],
+    "dirs": [
+      "core_engine/src/recording"
+    ],
+    "edd": null,
+    "entry": "core_engine/src/recording/ScriptGenerator.ts",
+    "env": [],
+    "feature": "recording",
+    "files": [
+      {
+        "exports": [
+          "HARParser"
+        ],
+        "loc": 91,
+        "path": "core_engine/src/recording/HARParser.ts"
+      },
+      {
+        "exports": [
+          "DomainFilter",
+          "DomainStat"
+        ],
+        "loc": 48,
+        "path": "core_engine/src/recording/DomainFilter.ts"
+      },
+      {
+        "exports": [
+          "TransactionGroup",
+          "TransactionGrouper"
+        ],
+        "loc": 34,
+        "path": "core_engine/src/recording/TransactionGrouper.ts"
+      },
+      {
+        "exports": [
+          "GenerateOptions",
+          "LifecycleSelection",
+          "SCRIPT_API_MODULE",
+          "ScriptGenerator"
+        ],
+        "loc": 371,
+        "path": "core_engine/src/recording/ScriptGenerator.ts"
+      },
+      {
+        "exports": [
+          "CurlAdapter",
+          "CurlParseResult",
+          "ParsedCurlBlock"
+        ],
+        "loc": 463,
+        "path": "core_engine/src/recording/CurlAdapter.ts"
+      },
+      {
+        "exports": [
+          "PostmanAdapter",
+          "PostmanFolderInfo",
+          "PostmanParseOptions",
+          "PostmanParseResult"
+        ],
+        "loc": 951,
+        "path": "core_engine/src/recording/PostmanAdapter.ts"
+      },
+      {
+        "exports": [
+          "TranslationResult",
+          "translatePostmanScript"
+        ],
+        "loc": 269,
+        "path": "core_engine/src/recording/PostmanScriptTranslator.ts"
+      }
+    ],
+    "risks": [
+      "F4"
+    ],
+    "tests": [],
+    "tier": "mini",
+    "title": "Recording → Script Generation"
+  },
+  {
+    "config": [
+      "config/correlation-rules"
+    ],
+    "contracts": [],
+    "dirs": [
+      "core_engine/src/correlation"
+    ],
+    "edd": null,
+    "entry": "core_engine/src/correlation/CorrelationEngine.ts",
+    "env": [],
+    "feature": "legacy-correlation",
+    "files": [
+      {
+        "exports": [
+          "CorrelationEngine"
+        ],
+        "loc": 58,
+        "path": "core_engine/src/correlation/CorrelationEngine.ts"
+      },
+      {
+        "exports": [
+          "ExtractorFn",
+          "ExtractorRegistry",
+          "K6ResponseLike"
+        ],
+        "loc": 92,
+        "path": "core_engine/src/correlation/ExtractorRegistry.ts"
+      },
+      {
+        "exports": [
+          "CorrelationRule",
+          "RuleProcessor"
+        ],
+        "loc": 33,
+        "path": "core_engine/src/correlation/RuleProcessor.ts"
+      },
+      {
+        "exports": [
+          "FallbackHandler"
+        ],
+        "loc": 21,
+        "path": "core_engine/src/correlation/FallbackHandler.ts"
+      }
+    ],
+    "risks": [],
+    "tests": [],
+    "tier": "mini",
+    "title": "Legacy Runtime Rule Engine"
+  },
+  {
+    "config": [],
+    "contracts": [],
+    "dirs": [
+      "core_engine/src/reporters"
+    ],
+    "edd": null,
+    "entry": "core_engine/src/reporters/ResultTransformer.ts",
+    "env": [],
+    "feature": "reporters",
+    "files": [
+      {
+        "exports": [
+          "ResultContract",
+          "ResultTransformer"
+        ],
+        "loc": 23,
+        "path": "core_engine/src/reporters/ResultTransformer.ts"
+      },
+      {
+        "exports": [
+          "GrafanaReporter"
+        ],
+        "loc": 14,
+        "path": "core_engine/src/reporters/GrafanaReporter.ts"
+      },
+      {
+        "exports": [
+          "AzureReporter"
+        ],
+        "loc": 14,
+        "path": "core_engine/src/reporters/AzureReporter.ts"
+      },
+      {
+        "exports": [
+          "CustomUploader"
+        ],
+        "loc": 14,
+        "path": "core_engine/src/reporters/CustomUploader.ts"
+      }
+    ],
+    "risks": [],
+    "tests": [],
+    "tier": "mini",
+    "title": "External Reporters (stubs)"
+  }
+]

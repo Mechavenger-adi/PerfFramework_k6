@@ -24,9 +24,13 @@ Controls think time, pacing, HTTP behavior, error handling, reporting, error cap
 | `thinkTime.fixed` | number | No | Think time in seconds when mode='fixed'. Ignored when mode='random'. Example: 1 = one-second pause between transactions. |
 | `thinkTime.min` | number | No | Minimum think time in seconds when mode='random'. Must be less than 'max'. Example: 0.5 = half-second minimum pause. |
 | `thinkTime.max` | number | No | Maximum think time in seconds when mode='random'. Must be greater than 'min'. Example: 3 = up to three seconds pause. |
-| `pacing` | object | **Yes** | Iteration-level rate control. When enabled, the framework ensures each iteration takes at least 'targetIntervalSeconds' — adding sleep at the end if the iteration finishes early. This prevents VU 'bunching' under light load. Similar to LoadRunner Pacing. |
-| `pacing.enabled` | boolean | **Yes** | Enable iteration pacing. When false, VUs start the next iteration immediately after the previous one completes. |
-| `pacing.targetIntervalSeconds` | number | No | Target duration in seconds for one complete iteration (init → action → end). If the iteration finishes faster, the remaining time is added as a sleep. Example: 30 = each iteration takes at least 30 seconds. |
+| `pacing` | object | **Yes** | Inter-iteration pacing. When enabled, a sleep is applied at the END of each action phase (between iterations) to control how often a VU starts a new iteration. Mirrors think time's fixed/random modes — but think time spaces transactions within an action, whereas pacing spaces the iterations themselves. Skipped automatically when a VU is in its end window so it does not eat into gracefulRampDown. |
+| `pacing.enabled` | boolean | **Yes** | Enable inter-iteration pacing. When false, VUs start the next iteration immediately after the previous one completes. |
+| `pacing.mode` | enum (fixed \| random) | No | How the pace duration is derived. 'fixed' uses `fixed` seconds every iteration; 'random' picks a fresh value in [min, max] each iteration. |
+| `pacing.fixed` | number | No | Pace in seconds applied between iterations when mode = 'fixed'. Example: 5 = sleep 5s after each iteration's action phase. |
+| `pacing.min` | number | No | Minimum pace in seconds (mode = 'random'). |
+| `pacing.max` | number | No | Maximum pace in seconds (mode = 'random'). |
+| `pacing.targetIntervalSeconds` | number | No | DEPRECATED: legacy fixed pace in seconds. Use `fixed` instead. Still honored as a fallback when `fixed` is absent. |
 | `http` | object | **Yes** | Global HTTP request defaults applied to all k6 HTTP calls. These can be overridden per-request in individual scripts. |
 | `http.timeoutSeconds` | number | **Yes** | Global HTTP request timeout in seconds. Requests exceeding this duration are aborted. Tip: Set higher (120+) for API endpoints with heavy processing; lower (10–30) for fast UI pages. |
 | `http.maxRedirects` | number | **Yes** | Maximum number of HTTP redirects to follow automatically. Set to 0 to disable redirect following (useful for testing redirect logic explicitly). |
@@ -36,6 +40,7 @@ Controls think time, pacing, HTTP behavior, error handling, reporting, error cap
 | `reporting.transactionStats` | array | No | Which statistical columns to show in the transaction metrics table. Common values: count, pass, fail, avg, min, max, p(50), p(75), p(90), p(95), p(97), p(99). Example: ["count", "pass", "fail", "avg", "p(90)", "p(95)"]. |
 | `reporting.includeTransactionTable` | boolean | No | Include the transaction metrics matrix in the generated HTML report and console output. |
 | `reporting.includeErrorTable` | boolean | No | Include the error summary table in the generated HTML report. |
+| `reporting.overrideExistingResults` | boolean | No | When true, debug and load-test reports overwrite a single stable 'Run_latest' output folder each run instead of creating a new timestamped folder. Off by default so run history is preserved. |
 | `reporting.timeseries` | object | No | Bucketed timeseries data collection for interactive Chart.js graphs in RunReport.html. Produces time-bucketed response time trends, throughput, and error rate charts. |
 | `errors` | object | No | Error capture and request/response snapshot settings. When a check() assertion fails, the framework can capture a full snapshot of the HTTP exchange for post-run debugging. |
 | `errors.captureSnapshotOnFailure` | boolean | No | When true, failed check() assertions trigger a full request/response snapshot capture. Snapshots are included in the RunReport.html for post-run debugging. |
@@ -67,18 +72,23 @@ Defines a complete performance test: which journeys to run, how many VUs, what l
 | `global_load_profile.vus` | number | No | Fixed VU count for 'constant-vus', 'shared-iterations', or 'per-vu-iterations' executors. |
 | `global_load_profile.duration` | string | No | Test duration for 'constant-vus' or arrival-rate executors. k6 duration string. Examples: '5m', '1h', '30s'. |
 | `global_load_profile.iterations` | number | No | Total iterations for 'shared-iterations' or per-VU iterations for 'per-vu-iterations'. For shared-iterations: all VUs share this pool. For per-vu-iterations: each VU runs this many. |
+| `global_load_profile.gracefulRampDown` | string | No | Time k6 waits for an in-flight iteration to finish before removing a VU during ramp-down (ramping-vus / ramping-arrival-rate). k6 duration string, e.g. '30s', '2m'. Defaults to k6's 30s when omitted. Gives endPhase (logout) room to complete before a VU is removed. |
+| `global_load_profile.gracefulStop` | string | No | Time k6 waits for in-flight iterations to finish at scenario end before forcibly stopping (all executors except externally-controlled). k6 duration string, e.g. '30s'. Defaults to k6's 30s when omitted. |
 | `user_journeys` | array<object> | **Yes** | List of user journey scripts to include in this test. Each journey maps to a k6 scenario. At least one journey is required. |
 | `hybrid_groups` | array<object> | No | Required when execution_mode='hybrid'. Defines groups of journeys that run in parallel or sequential sub-groups. Allows mixing execution patterns within a single test plan. |
-| `global_sla` | object | No | Global SLA (Service Level Agreement) thresholds applied to all journeys. These become k6 thresholds on http_req_duration. If any SLA is breached, the test reports a threshold failure. |
-| `global_sla.errorRate` | number | No | Maximum allowed error rate in percent (0–100). Example: 5 = test fails if more than 5% of requests error. |
-| `global_sla.avgResponseTime` | number | No | Maximum allowed average response time in milliseconds. |
-| `global_sla.p50` | number | No | P50 (median) response time threshold in milliseconds. |
-| `global_sla.p75` | number | No | P75 response time threshold in milliseconds. |
-| `global_sla.p90` | number | No | P90 response time threshold in milliseconds. |
-| `global_sla.p95` | number | No | P95 response time threshold in milliseconds. Industry standard for SLAs. |
-| `global_sla.p99` | number | No | P99 response time threshold in milliseconds. Captures tail latency. |
-| `journey_slas` | object | No | Per-journey SLA overrides keyed by journey name. These apply to the journey's scenario-level http_req_duration metric. Override global_sla for specific journeys that have different performance requirements. |
-| `transaction_slas` | object | No | Per-transaction SLA overrides keyed by transaction name (e.g., 'tx01_launch'). These apply directly to the transaction's Trend metric. Use for critical transactions that need tighter thresholds than the journey average. |
+| `global_sla` | object | No | Global SLA defaults. Use `request` for HTTP-request-level thresholds (http_req_duration / http_req_failed across all requests) and `transaction` for per-transaction defaults applied to EVERY transaction of every journey (overridable per transaction in transaction_slas). Flat percentile/errorRate keys at this level are treated as request-level (legacy shorthand). |
+| `global_sla.errorRate` | number | No | Legacy request-level error rate budget in percent (0–100). Prefer global_sla.request.errorRate. |
+| `global_sla.avgResponseTime` | number | No | Legacy request-level max average response time (ms). Prefer global_sla.request.avgResponseTime. |
+| `global_sla.p50` | number | No | Legacy request-level P50 threshold (ms). |
+| `global_sla.p75` | number | No | Legacy request-level P75 threshold (ms). |
+| `global_sla.p90` | number | No | Legacy request-level P90 threshold (ms). |
+| `global_sla.p95` | number | No | Legacy request-level P95 threshold (ms). |
+| `global_sla.p99` | number | No | Legacy request-level P99 threshold (ms). |
+| `global_sla.request` | any | No | Request-level SLAs → http_req_duration / http_req_failed (aggregate of all requests). |
+| `global_sla.transaction` | any | No | Transaction-level SLA defaults applied to every transaction. Overridable per transaction (and per percentile) via transaction_slas. |
+| `journey_slas` | object | No | Per-journey SLA overrides keyed by journey name. These apply to the journey's scenario-level http_req_duration / http_req_failed metric. |
+| `transaction_slas` | object | No | Per-transaction SLA overrides keyed by transaction name (e.g., 't01_launch'). Applied directly to the transaction's Trend / checkrate metric, overriding global_sla.transaction per percentile. |
+| `request_slas` | object | No | Per-request SLA overrides keyed by request name — the k6 `name` tag set via request(..., { name: 'GET_corre' }), or the request URL when no name was given. Applied to the request submetric http_req_duration{name:<request>} / http_req_failed{name:<request>}, letting you hold a single specific request to its own threshold. Scoped to that request only. |
 | `max_total_vus` | number | No | Safety ceiling for total VU count across all journeys. The gatekeeper pre-flight check blocks execution if the calculated VUs exceed this limit. Use as a guardrail to prevent accidental overload. |
 | `debug` | object | No | Debug replay execution settings. When enabled, journeys run in single-VU mode and produce HTML diff reports comparing recorded vs. live HTTP exchanges. Use for validating script correctness before running full load. |
 | `debug.enabled` | boolean | No | When true, switches from normal load execution to debug replay mode. Journeys run with minimal VUs/iterations and produce diff reports. |

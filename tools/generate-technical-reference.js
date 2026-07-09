@@ -17,7 +17,9 @@ const EXCLUDED_DIRS = new Set([
   ".tmp-init-check",
   "node_modules",
   "results",
-  "dist"
+  "dist",
+  "k6-master",
+  "archive"
 ]);
 
 const SOURCE_EXTENSIONS = new Set([".ts", ".js"]);

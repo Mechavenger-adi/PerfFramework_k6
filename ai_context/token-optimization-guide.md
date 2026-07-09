@@ -4,11 +4,15 @@
 
 ## Problem
 
-AGENT-CONTEXT.md is 1,841 lines / 140KB. Reading it fully consumes ~35K tokens — wasteful when you only need to edit one file.
+The old monolith `AGENT-CONTEXT.md` (now frozen at `archive/AGENT-CONTEXT.md`, 2,258 lines) cost ~35K tokens to read fully — wasteful when you only need one file. It is superseded by this layer.
+
+## Strategy 0: Route via L4 indexes first
+
+`ai_generated/feature_index.json` maps a feature → its owning files, config, tests, and EDD. One read pins the exact files, replacing several prose reads. Regenerate indexes with `npm run docs:index`.
 
 ## Strategy 1: Modular Loading
 
-Use `ai_context/` files instead of AGENT-CONTEXT.md:
+Use `ai_context/` files instead of the frozen monolith:
 
 | Task | Load These (~tokens) | vs AGENT-CONTEXT.md |
 |------|---------------------|---------------------|
@@ -45,11 +49,9 @@ Each ai_context file is designed to be:
 
 | File | Lines | Why Skip |
 |------|-------|----------|
-| `AGENT-CONTEXT.md` | 1,841 | Use ai_context/ files instead |
-| `graph.html` | 993 | Use dependency-rules.md instead |
-| `BaseArchitecture.md` | 1,020 | Historical design doc, superseded by implementation |
-| `VU-Lifecycle-Implementation-Plan.md` | 595 | Planning doc, decisions already extracted |
-| `schema-driven-dx-strategy.md` | 461 | Strategy doc, already implemented |
+| `archive/**` (whole folder) | ~11,500 | Frozen legacy (AGENT-CONTEXT, BaseArchitecture, VU-Lifecycle plans, schema-dx). Superseded — do not read |
+| `graph.html` | 993 | Use `dependency-rules.md` or `ai_generated/dependency_graph.json` |
+| `docs/K6_PerfFramework_Technical_Reference.md` | ~4,764 | Generated. Query `ai_generated/symbol_index.json` instead |
 | `HTMLDiffReporter.ts` | ~2000+ | Only read if editing the HTML report |
 
 ## Estimated Token Budget Per Task

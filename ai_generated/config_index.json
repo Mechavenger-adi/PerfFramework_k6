@@ -1,0 +1,715 @@
+[
+  {
+    "default": null,
+    "enum": null,
+    "key": "$schema",
+    "required": false,
+    "source": "config/schemas/environment.schema.json",
+    "type": "string"
+  },
+  {
+    "default": null,
+    "enum": null,
+    "key": "name",
+    "required": true,
+    "source": "config/schemas/environment.schema.json",
+    "type": "string"
+  },
+  {
+    "default": null,
+    "enum": null,
+    "key": "testSuites",
+    "required": false,
+    "source": "config/schemas/environment.schema.json",
+    "type": "object"
+  },
+  {
+    "default": null,
+    "enum": null,
+    "key": "_meta",
+    "required": false,
+    "source": "config/schemas/runtime_settings.schema.json",
+    "type": "object"
+  },
+  {
+    "default": null,
+    "enum": null,
+    "key": "$schema",
+    "required": false,
+    "source": "config/schemas/runtime_settings.schema.json",
+    "type": "string"
+  },
+  {
+    "default": false,
+    "enum": null,
+    "key": "debugMode",
+    "required": false,
+    "source": "config/schemas/runtime_settings.schema.json",
+    "type": "boolean"
+  },
+  {
+    "default": "continue",
+    "enum": [
+      "continue",
+      "stop_iteration",
+      "stop_vu",
+      "abort_test"
+    ],
+    "key": "errorBehavior",
+    "required": true,
+    "source": "config/schemas/runtime_settings.schema.json",
+    "type": "string"
+  },
+  {
+    "default": null,
+    "enum": null,
+    "key": "errors",
+    "required": false,
+    "source": "config/schemas/runtime_settings.schema.json",
+    "type": "object"
+  },
+  {
+    "default": true,
+    "enum": null,
+    "key": "errors.captureSnapshotOnFailure",
+    "required": false,
+    "source": "config/schemas/runtime_settings.schema.json",
+    "type": "boolean"
+  },
+  {
+    "default": true,
+    "enum": null,
+    "key": "errors.includeRequestBody",
+    "required": false,
+    "source": "config/schemas/runtime_settings.schema.json",
+    "type": "boolean"
+  },
+  {
+    "default": true,
+    "enum": null,
+    "key": "errors.includeRequestHeaders",
+    "required": false,
+    "source": "config/schemas/runtime_settings.schema.json",
+    "type": "boolean"
+  },
+  {
+    "default": false,
+    "enum": null,
+    "key": "errors.includeResponseBody",
+    "required": false,
+    "source": "config/schemas/runtime_settings.schema.json",
+    "type": "boolean"
+  },
+  {
+    "default": true,
+    "enum": null,
+    "key": "errors.includeResponseHeaders",
+    "required": false,
+    "source": "config/schemas/runtime_settings.schema.json",
+    "type": "boolean"
+  },
+  {
+    "default": 20,
+    "enum": null,
+    "key": "errors.maxSnapshotsPerRun",
+    "required": false,
+    "source": "config/schemas/runtime_settings.schema.json",
+    "type": "number"
+  },
+  {
+    "default": null,
+    "enum": null,
+    "key": "http",
+    "required": true,
+    "source": "config/schemas/runtime_settings.schema.json",
+    "type": "object"
+  },
+  {
+    "default": 10,
+    "enum": null,
+    "key": "http.maxRedirects",
+    "required": true,
+    "source": "config/schemas/runtime_settings.schema.json",
+    "type": "number"
+  },
+  {
+    "default": false,
+    "enum": null,
+    "key": "http.throwOnError",
+    "required": true,
+    "source": "config/schemas/runtime_settings.schema.json",
+    "type": "boolean"
+  },
+  {
+    "default": 60,
+    "enum": null,
+    "key": "http.timeoutSeconds",
+    "required": true,
+    "source": "config/schemas/runtime_settings.schema.json",
+    "type": "number"
+  },
+  {
+    "default": null,
+    "enum": null,
+    "key": "monitoring",
+    "required": false,
+    "source": "config/schemas/runtime_settings.schema.json",
+    "type": "object"
+  },
+  {
+    "default": 80,
+    "enum": null,
+    "key": "monitoring.cpuWarningPercent",
+    "required": false,
+    "source": "config/schemas/runtime_settings.schema.json",
+    "type": "number"
+  },
+  {
+    "default": false,
+    "enum": null,
+    "key": "monitoring.enabled",
+    "required": false,
+    "source": "config/schemas/runtime_settings.schema.json",
+    "type": "boolean"
+  },
+  {
+    "default": 80,
+    "enum": null,
+    "key": "monitoring.memoryWarningPercent",
+    "required": false,
+    "source": "config/schemas/runtime_settings.schema.json",
+    "type": "number"
+  },
+  {
+    "default": 10,
+    "enum": null,
+    "key": "monitoring.sampleIntervalSeconds",
+    "required": false,
+    "source": "config/schemas/runtime_settings.schema.json",
+    "type": "number"
+  },
+  {
+    "default": null,
+    "enum": null,
+    "key": "pacing",
+    "required": true,
+    "source": "config/schemas/runtime_settings.schema.json",
+    "type": "object"
+  },
+  {
+    "default": false,
+    "enum": null,
+    "key": "pacing.enabled",
+    "required": true,
+    "source": "config/schemas/runtime_settings.schema.json",
+    "type": "boolean"
+  },
+  {
+    "default": null,
+    "enum": null,
+    "key": "pacing.fixed",
+    "required": false,
+    "source": "config/schemas/runtime_settings.schema.json",
+    "type": "number"
+  },
+  {
+    "default": null,
+    "enum": null,
+    "key": "pacing.max",
+    "required": false,
+    "source": "config/schemas/runtime_settings.schema.json",
+    "type": "number"
+  },
+  {
+    "default": null,
+    "enum": null,
+    "key": "pacing.min",
+    "required": false,
+    "source": "config/schemas/runtime_settings.schema.json",
+    "type": "number"
+  },
+  {
+    "default": "fixed",
+    "enum": [
+      "fixed",
+      "random"
+    ],
+    "key": "pacing.mode",
+    "required": false,
+    "source": "config/schemas/runtime_settings.schema.json",
+    "type": "string"
+  },
+  {
+    "default": null,
+    "enum": null,
+    "key": "pacing.targetIntervalSeconds",
+    "required": false,
+    "source": "config/schemas/runtime_settings.schema.json",
+    "type": "number"
+  },
+  {
+    "default": null,
+    "enum": null,
+    "key": "reporting",
+    "required": false,
+    "source": "config/schemas/runtime_settings.schema.json",
+    "type": "object"
+  },
+  {
+    "default": true,
+    "enum": null,
+    "key": "reporting.includeErrorTable",
+    "required": false,
+    "source": "config/schemas/runtime_settings.schema.json",
+    "type": "boolean"
+  },
+  {
+    "default": true,
+    "enum": null,
+    "key": "reporting.includeTransactionTable",
+    "required": false,
+    "source": "config/schemas/runtime_settings.schema.json",
+    "type": "boolean"
+  },
+  {
+    "default": false,
+    "enum": null,
+    "key": "reporting.overrideExistingResults",
+    "required": false,
+    "source": "config/schemas/runtime_settings.schema.json",
+    "type": "boolean"
+  },
+  {
+    "default": null,
+    "enum": null,
+    "key": "reporting.timeseries",
+    "required": false,
+    "source": "config/schemas/runtime_settings.schema.json",
+    "type": "object"
+  },
+  {
+    "default": 1,
+    "enum": null,
+    "key": "reporting.timeseries.bucketSizeSeconds",
+    "required": false,
+    "source": "config/schemas/runtime_settings.schema.json",
+    "type": "number"
+  },
+  {
+    "default": true,
+    "enum": null,
+    "key": "reporting.timeseries.enabled",
+    "required": false,
+    "source": "config/schemas/runtime_settings.schema.json",
+    "type": "boolean"
+  },
+  {
+    "default": true,
+    "enum": null,
+    "key": "reporting.timeseries.keepRawMetricsStream",
+    "required": false,
+    "source": "config/schemas/runtime_settings.schema.json",
+    "type": "boolean"
+  },
+  {
+    "default": [
+      "count",
+      "pass",
+      "fail",
+      "avg",
+      "min",
+      "max",
+      "p(90)",
+      "p(95)"
+    ],
+    "enum": null,
+    "key": "reporting.transactionStats",
+    "required": false,
+    "source": "config/schemas/runtime_settings.schema.json",
+    "type": "array"
+  },
+  {
+    "default": null,
+    "enum": null,
+    "key": "thinkTime",
+    "required": true,
+    "source": "config/schemas/runtime_settings.schema.json",
+    "type": "object"
+  },
+  {
+    "default": 1,
+    "enum": null,
+    "key": "thinkTime.fixed",
+    "required": false,
+    "source": "config/schemas/runtime_settings.schema.json",
+    "type": "number"
+  },
+  {
+    "default": true,
+    "enum": null,
+    "key": "thinkTime.globalOverride",
+    "required": false,
+    "source": "config/schemas/runtime_settings.schema.json",
+    "type": "boolean"
+  },
+  {
+    "default": false,
+    "enum": null,
+    "key": "thinkTime.ignoreThinkTime",
+    "required": false,
+    "source": "config/schemas/runtime_settings.schema.json",
+    "type": "boolean"
+  },
+  {
+    "default": 3,
+    "enum": null,
+    "key": "thinkTime.max",
+    "required": false,
+    "source": "config/schemas/runtime_settings.schema.json",
+    "type": "number"
+  },
+  {
+    "default": 0.5,
+    "enum": null,
+    "key": "thinkTime.min",
+    "required": false,
+    "source": "config/schemas/runtime_settings.schema.json",
+    "type": "number"
+  },
+  {
+    "default": "fixed",
+    "enum": [
+      "fixed",
+      "random"
+    ],
+    "key": "thinkTime.mode",
+    "required": true,
+    "source": "config/schemas/runtime_settings.schema.json",
+    "type": "string"
+  },
+  {
+    "default": null,
+    "enum": null,
+    "key": "_meta",
+    "required": false,
+    "source": "config/schemas/test_plan.schema.json",
+    "type": "object"
+  },
+  {
+    "default": null,
+    "enum": null,
+    "key": "$schema",
+    "required": false,
+    "source": "config/schemas/test_plan.schema.json",
+    "type": "string"
+  },
+  {
+    "default": null,
+    "enum": null,
+    "key": "debug",
+    "required": false,
+    "source": "config/schemas/test_plan.schema.json",
+    "type": "object"
+  },
+  {
+    "default": true,
+    "enum": null,
+    "key": "debug.autoResolveRecordingLog",
+    "required": false,
+    "source": "config/schemas/test_plan.schema.json",
+    "type": "boolean"
+  },
+  {
+    "default": null,
+    "enum": null,
+    "key": "debug.enabled",
+    "required": false,
+    "source": "config/schemas/test_plan.schema.json",
+    "type": "boolean"
+  },
+  {
+    "default": false,
+    "enum": null,
+    "key": "debug.failOnMissingRecordingLog",
+    "required": false,
+    "source": "config/schemas/test_plan.schema.json",
+    "type": "boolean"
+  },
+  {
+    "default": 1,
+    "enum": null,
+    "key": "debug.iterations",
+    "required": false,
+    "source": "config/schemas/test_plan.schema.json",
+    "type": "number"
+  },
+  {
+    "default": "diff",
+    "enum": [
+      "diff"
+    ],
+    "key": "debug.mode",
+    "required": false,
+    "source": "config/schemas/test_plan.schema.json",
+    "type": "string"
+  },
+  {
+    "default": "results/debug",
+    "enum": null,
+    "key": "debug.reportDir",
+    "required": false,
+    "source": "config/schemas/test_plan.schema.json",
+    "type": "string"
+  },
+  {
+    "default": 1,
+    "enum": null,
+    "key": "debug.vus",
+    "required": false,
+    "source": "config/schemas/test_plan.schema.json",
+    "type": "number"
+  },
+  {
+    "default": null,
+    "enum": null,
+    "key": "environment",
+    "required": true,
+    "source": "config/schemas/test_plan.schema.json",
+    "type": "string"
+  },
+  {
+    "default": null,
+    "enum": [
+      "parallel",
+      "sequential",
+      "hybrid"
+    ],
+    "key": "execution_mode",
+    "required": true,
+    "source": "config/schemas/test_plan.schema.json",
+    "type": "string"
+  },
+  {
+    "default": null,
+    "enum": null,
+    "key": "global_load_profile",
+    "required": true,
+    "source": "config/schemas/test_plan.schema.json",
+    "type": "object"
+  },
+  {
+    "default": null,
+    "enum": null,
+    "key": "global_load_profile.duration",
+    "required": false,
+    "source": "config/schemas/test_plan.schema.json",
+    "type": "string"
+  },
+  {
+    "default": null,
+    "enum": [
+      "ramping-vus",
+      "constant-vus",
+      "ramping-arrival-rate",
+      "constant-arrival-rate",
+      "shared-iterations",
+      "per-vu-iterations"
+    ],
+    "key": "global_load_profile.executor",
+    "required": true,
+    "source": "config/schemas/test_plan.schema.json",
+    "type": "string"
+  },
+  {
+    "default": null,
+    "enum": null,
+    "key": "global_load_profile.gracefulRampDown",
+    "required": false,
+    "source": "config/schemas/test_plan.schema.json",
+    "type": "string"
+  },
+  {
+    "default": null,
+    "enum": null,
+    "key": "global_load_profile.gracefulStop",
+    "required": false,
+    "source": "config/schemas/test_plan.schema.json",
+    "type": "string"
+  },
+  {
+    "default": null,
+    "enum": null,
+    "key": "global_load_profile.iterations",
+    "required": false,
+    "source": "config/schemas/test_plan.schema.json",
+    "type": "number"
+  },
+  {
+    "default": null,
+    "enum": null,
+    "key": "global_load_profile.stages",
+    "required": false,
+    "source": "config/schemas/test_plan.schema.json",
+    "type": "array"
+  },
+  {
+    "default": 0,
+    "enum": null,
+    "key": "global_load_profile.startVUs",
+    "required": false,
+    "source": "config/schemas/test_plan.schema.json",
+    "type": "number"
+  },
+  {
+    "default": null,
+    "enum": null,
+    "key": "global_load_profile.vus",
+    "required": false,
+    "source": "config/schemas/test_plan.schema.json",
+    "type": "number"
+  },
+  {
+    "default": null,
+    "enum": null,
+    "key": "global_sla",
+    "required": false,
+    "source": "config/schemas/test_plan.schema.json",
+    "type": "object"
+  },
+  {
+    "default": null,
+    "enum": null,
+    "key": "global_sla.avgResponseTime",
+    "required": false,
+    "source": "config/schemas/test_plan.schema.json",
+    "type": "number"
+  },
+  {
+    "default": null,
+    "enum": null,
+    "key": "global_sla.errorRate",
+    "required": false,
+    "source": "config/schemas/test_plan.schema.json",
+    "type": "number"
+  },
+  {
+    "default": null,
+    "enum": null,
+    "key": "global_sla.p50",
+    "required": false,
+    "source": "config/schemas/test_plan.schema.json",
+    "type": "number"
+  },
+  {
+    "default": null,
+    "enum": null,
+    "key": "global_sla.p75",
+    "required": false,
+    "source": "config/schemas/test_plan.schema.json",
+    "type": "number"
+  },
+  {
+    "default": null,
+    "enum": null,
+    "key": "global_sla.p90",
+    "required": false,
+    "source": "config/schemas/test_plan.schema.json",
+    "type": "number"
+  },
+  {
+    "default": null,
+    "enum": null,
+    "key": "global_sla.p95",
+    "required": false,
+    "source": "config/schemas/test_plan.schema.json",
+    "type": "number"
+  },
+  {
+    "default": null,
+    "enum": null,
+    "key": "global_sla.p99",
+    "required": false,
+    "source": "config/schemas/test_plan.schema.json",
+    "type": "number"
+  },
+  {
+    "default": null,
+    "enum": null,
+    "key": "global_sla.request",
+    "required": false,
+    "source": "config/schemas/test_plan.schema.json",
+    "type": "ref"
+  },
+  {
+    "default": null,
+    "enum": null,
+    "key": "global_sla.transaction",
+    "required": false,
+    "source": "config/schemas/test_plan.schema.json",
+    "type": "ref"
+  },
+  {
+    "default": null,
+    "enum": null,
+    "key": "hybrid_groups",
+    "required": false,
+    "source": "config/schemas/test_plan.schema.json",
+    "type": "array"
+  },
+  {
+    "default": null,
+    "enum": null,
+    "key": "journey_slas",
+    "required": false,
+    "source": "config/schemas/test_plan.schema.json",
+    "type": "object"
+  },
+  {
+    "default": null,
+    "enum": null,
+    "key": "max_total_vus",
+    "required": false,
+    "source": "config/schemas/test_plan.schema.json",
+    "type": "number"
+  },
+  {
+    "default": null,
+    "enum": null,
+    "key": "name",
+    "required": true,
+    "source": "config/schemas/test_plan.schema.json",
+    "type": "string"
+  },
+  {
+    "default": true,
+    "enum": null,
+    "key": "noCookiesReset",
+    "required": false,
+    "source": "config/schemas/test_plan.schema.json",
+    "type": "boolean"
+  },
+  {
+    "default": null,
+    "enum": null,
+    "key": "request_slas",
+    "required": false,
+    "source": "config/schemas/test_plan.schema.json",
+    "type": "object"
+  },
+  {
+    "default": null,
+    "enum": null,
+    "key": "transaction_slas",
+    "required": false,
+    "source": "config/schemas/test_plan.schema.json",
+    "type": "object"
+  },
+  {
+    "default": null,
+    "enum": null,
+    "key": "user_journeys",
+    "required": true,
+    "source": "config/schemas/test_plan.schema.json",
+    "type": "array"
+  }
+]

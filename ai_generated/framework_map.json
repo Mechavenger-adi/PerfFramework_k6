@@ -1,0 +1,117 @@
+{
+  "layers": {
+    "cli": [
+      {
+        "edd": null,
+        "entry": "core_engine/src/cli/run.ts",
+        "feature": "cli",
+        "tier": "mini",
+        "title": "CLI Command Surface"
+      }
+    ],
+    "config": [
+      {
+        "edd": "engineering_docs/edd/EDD-config.md",
+        "entry": "core_engine/src/config/ConfigurationManager.ts",
+        "feature": "config",
+        "tier": "full",
+        "title": "Configuration Resolution"
+      }
+    ],
+    "correlation": [
+      {
+        "edd": "engineering_docs/edd/EDD-auto-correlation.md",
+        "entry": "core_engine/src/cli/correlate.ts",
+        "feature": "auto-correlation",
+        "tier": "full",
+        "title": "Smart Auto-Correlation"
+      },
+      {
+        "edd": null,
+        "entry": "core_engine/src/correlation/CorrelationEngine.ts",
+        "feature": "legacy-correlation",
+        "tier": "mini",
+        "title": "Legacy Runtime Rule Engine"
+      }
+    ],
+    "data": [
+      {
+        "edd": null,
+        "entry": "core_engine/src/data/DataFactory.ts",
+        "feature": "data",
+        "tier": "mini",
+        "title": "Test Data Management"
+      }
+    ],
+    "debug": [
+      {
+        "edd": "engineering_docs/edd/EDD-debug-replay.md",
+        "entry": "core_engine/src/debug/ReplayRunner.ts",
+        "feature": "debug-replay",
+        "tier": "full",
+        "title": "Debug Replay & Diff"
+      }
+    ],
+    "execution": [
+      {
+        "edd": null,
+        "entry": "core_engine/src/execution/PipelineRunner.ts",
+        "feature": "execution",
+        "tier": "mini",
+        "title": "k6 Process Execution"
+      }
+    ],
+    "recording": [
+      {
+        "edd": null,
+        "entry": "core_engine/src/recording/ScriptGenerator.ts",
+        "feature": "recording",
+        "tier": "mini",
+        "title": "Recording → Script Generation"
+      }
+    ],
+    "reporters": [
+      {
+        "edd": null,
+        "entry": "core_engine/src/reporters/ResultTransformer.ts",
+        "feature": "reporters",
+        "tier": "mini",
+        "title": "External Reporters (stubs)"
+      }
+    ],
+    "reporting": [
+      {
+        "edd": "engineering_docs/edd/EDD-reporting.md",
+        "entry": "core_engine/src/reporting/RunReportGenerator.ts",
+        "feature": "reporting",
+        "tier": "full",
+        "title": "Artifact-First Reporting & Thresholds"
+      }
+    ],
+    "scenario": [
+      {
+        "edd": null,
+        "entry": "core_engine/src/scenario/ScenarioBuilder.ts",
+        "feature": "scenario",
+        "tier": "mini",
+        "title": "Scenario & Workload Modeling"
+      }
+    ],
+    "utils": [
+      {
+        "edd": "engineering_docs/edd/EDD-lifecycle.md",
+        "entry": "core_engine/src/utils/lifecycle.ts",
+        "feature": "lifecycle",
+        "tier": "full",
+        "title": "VU Lifecycle & Phase Envelope"
+      },
+      {
+        "edd": null,
+        "entry": "core_engine/src/index.ts",
+        "feature": "vu-runtime",
+        "tier": "mini",
+        "title": "k6-side VU Runtime Helpers"
+      }
+    ]
+  }
+}

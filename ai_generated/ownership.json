@@ -1,0 +1,171 @@
+{
+  "auto-correlation": {
+    "dirs": [
+      "core_engine/src/correlation"
+    ],
+    "files": [
+      "core_engine/src/correlation/CorrelationScanner.ts",
+      "core_engine/src/correlation/ValueIndexer.ts",
+      "core_engine/src/correlation/LinkMatcher.ts",
+      "core_engine/src/correlation/CandidateScorer.ts",
+      "core_engine/src/correlation/ExtractorSynthesizer.ts",
+      "core_engine/src/correlation/ScriptCorrelationWriter.ts",
+      "core_engine/src/correlation/CorrelationManifest.ts",
+      "core_engine/src/recording/ScriptConverter.ts"
+    ]
+  },
+  "cli": {
+    "dirs": [
+      "core_engine/src/cli"
+    ],
+    "files": [
+      "core_engine/src/cli/run.ts",
+      "core_engine/src/cli/init.ts",
+      "core_engine/src/cli/generate.ts",
+      "core_engine/src/cli/import.ts",
+      "core_engine/src/cli/interactive.ts",
+      "core_engine/src/cli/validate.ts"
+    ]
+  },
+  "config": {
+    "dirs": [
+      "core_engine/src/config"
+    ],
+    "files": [
+      "core_engine/src/config/ConfigurationManager.ts",
+      "core_engine/src/config/EnvResolver.ts",
+      "core_engine/src/config/GatekeeperValidator.ts",
+      "core_engine/src/config/RuntimeConfigManager.ts",
+      "core_engine/src/config/SchemaValidator.ts",
+      "core_engine/src/config/ScriptContractGuard.ts"
+    ]
+  },
+  "data": {
+    "dirs": [
+      "core_engine/src/data"
+    ],
+    "files": [
+      "core_engine/src/data/DataFactory.ts",
+      "core_engine/src/data/DataPoolManager.ts",
+      "core_engine/src/data/DataValidator.ts",
+      "core_engine/src/data/DynamicValueFactory.ts"
+    ]
+  },
+  "debug-replay": {
+    "dirs": [
+      "core_engine/src/debug"
+    ],
+    "files": [
+      "core_engine/src/debug/ReplayRunner.ts",
+      "core_engine/src/debug/DiffChecker.ts",
+      "core_engine/src/debug/HTMLDiffReporter.ts",
+      "core_engine/src/debug/ExchangeLog.ts",
+      "core_engine/src/debug/RecordingLogResolver.ts",
+      "core_engine/src/utils/replayLogger.ts"
+    ]
+  },
+  "execution": {
+    "dirs": [
+      "core_engine/src/execution"
+    ],
+    "files": [
+      "core_engine/src/execution/PipelineRunner.ts",
+      "core_engine/src/execution/ParallelExecutionManager.ts",
+      "core_engine/src/execution/JourneyAllocator.ts",
+      "core_engine/src/execution/HostMonitor.ts",
+      "core_engine/src/execution/FileWriteSink.ts"
+    ]
+  },
+  "legacy-correlation": {
+    "dirs": [
+      "core_engine/src/correlation"
+    ],
+    "files": [
+      "core_engine/src/correlation/CorrelationEngine.ts",
+      "core_engine/src/correlation/ExtractorRegistry.ts",
+      "core_engine/src/correlation/RuleProcessor.ts",
+      "core_engine/src/correlation/FallbackHandler.ts"
+    ]
+  },
+  "lifecycle": {
+    "dirs": [
+      "core_engine/src/utils",
+      "core_engine/src/scenario"
+    ],
+    "files": [
+      "core_engine/src/utils/lifecycle.ts",
+      "core_engine/src/utils/transaction.ts",
+      "core_engine/src/scenario/ScenarioBuilder.ts",
+      "core_engine/src/scenario/WorkloadModels.ts"
+    ]
+  },
+  "recording": {
+    "dirs": [
+      "core_engine/src/recording"
+    ],
+    "files": [
+      "core_engine/src/recording/HARParser.ts",
+      "core_engine/src/recording/DomainFilter.ts",
+      "core_engine/src/recording/TransactionGrouper.ts",
+      "core_engine/src/recording/ScriptGenerator.ts",
+      "core_engine/src/recording/CurlAdapter.ts",
+      "core_engine/src/recording/PostmanAdapter.ts",
+      "core_engine/src/recording/PostmanScriptTranslator.ts"
+    ]
+  },
+  "reporters": {
+    "dirs": [
+      "core_engine/src/reporters"
+    ],
+    "files": [
+      "core_engine/src/reporters/ResultTransformer.ts",
+      "core_engine/src/reporters/GrafanaReporter.ts",
+      "core_engine/src/reporters/AzureReporter.ts",
+      "core_engine/src/reporters/CustomUploader.ts"
+    ]
+  },
+  "reporting": {
+    "dirs": [
+      "core_engine/src/reporting",
+      "core_engine/src/assertions"
+    ],
+    "files": [
+      "core_engine/src/reporting/RunReportGenerator.ts",
+      "core_engine/src/reporting/TransactionMetricsBuilder.ts",
+      "core_engine/src/reporting/TimeseriesStreamParser.ts",
+      "core_engine/src/reporting/EventArtifactBuilder.ts",
+      "core_engine/src/reporting/RunSummaryBuilder.ts",
+      "core_engine/src/reporting/TimeseriesArtifactBuilder.ts",
+      "core_engine/src/reporting/ArtifactWriter.ts",
+      "core_engine/src/assertions/ThresholdManager.ts",
+      "core_engine/src/assertions/SLARegistry.ts",
+      "core_engine/src/assertions/JourneyAssertionResolver.ts"
+    ]
+  },
+  "scenario": {
+    "dirs": [
+      "core_engine/src/scenario"
+    ],
+    "files": [
+      "core_engine/src/scenario/ScenarioBuilder.ts",
+      "core_engine/src/scenario/WorkloadModels.ts",
+      "core_engine/src/scenario/ExecutorFactory.ts",
+      "core_engine/src/scenario/TestPlanLoader.ts"
+    ]
+  },
+  "vu-runtime": {
+    "dirs": [
+      "core_engine/src/utils",
+      "core_engine/src/runtime"
+    ],
+    "files": [
+      "core_engine/src/utils/transaction.ts",
+      "core_engine/src/utils/session.ts",
+      "core_engine/src/utils/extract.ts",
+      "core_engine/src/utils/autoHeaders.ts",
+      "core_engine/src/utils/dataWriter.ts",
+      "core_engine/src/runtime/MetricsRuntime.ts",
+      "core_engine/src/runtime/ErrorRuntime.ts"
+    ]
+  }
+}

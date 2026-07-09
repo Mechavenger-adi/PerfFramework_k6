@@ -1,0 +1,904 @@
+[
+  {
+    "headings": [
+      "AI Workflow",
+      "First Steps (Every Session)",
+      "File Reading Priority",
+      "Common Task Patterns",
+      "Adding a New Feature",
+      "Fixing a Bug",
+      "Refactoring",
+      "Understanding the Codebase",
+      "After Making Changes — Documentation Sync (MANDATORY)",
+      "Change → docs mapping",
+      "Token-Saving Tips"
+    ],
+    "layer": "L1",
+    "path": "ai_context/ai-workflow.md",
+    "title": "AI Workflow"
+  },
+  {
+    "headings": [
+      "Architecture Evolution",
+      "Timeline",
+      "Phase 1 — Foundation (2026-03-21)",
+      "Phase 2 — Productivity (2026-03-26 → 2026-04-02)",
+      "Phase 3 — Enterprise Control (2026-03-26 → 2026-04-06)",
+      "Lifecycle/Reporting Architecture (2026-04-06)",
+      "Lifecycle Overhaul (2026-04-09)",
+      "Cookie Persistence Fix (2026-04-08)",
+      "Schema-Driven DX (2026-05-07)",
+      "Transaction Counter Metrics (2026-05-13)",
+      "Architectural Trajectory",
+      "What's Next (Planned but Not Implemented)"
+    ],
+    "layer": "L1",
+    "path": "ai_context/architecture-evolution.md",
+    "title": "Architecture Evolution"
+  },
+  {
+    "headings": [
+      "Architecture Laws",
+      "L1 — Dependency Direction",
+      "L2 — No Silent Coupling",
+      "L3 — Configuration Merge Precedence (Immutable)",
+      "L4 — k6-Side vs Node-Side Boundary",
+      "L5 — Replay Log Contract",
+      "L6 — Artifact Schema Stability",
+      "L7 — Transaction Metric Naming",
+      "L8 — Cookie Persistence Default",
+      "L9 — Phase-Based Script Contract",
+      "L10 — Non-Regression Rule"
+    ],
+    "layer": "L1",
+    "path": "ai_context/architecture-laws.md",
+    "title": "Architecture Laws"
+  },
+  {
+    "headings": [
+      "Change Impact Map",
+      "Config Changes",
+      "Execution Changes",
+      "k6-Side Runtime Changes",
+      "Reporting Changes",
+      "Recording/Generation Changes",
+      "Debug Changes"
+    ],
+    "layer": "L1",
+    "path": "ai_context/change-impact-map.md",
+    "title": "Change Impact Map"
+  },
+  {
+    "headings": [
+      "Architectural Decisions",
+      "D1 — CommonJS Module System",
+      "D2 — Phase-Based Blocking Progress (Not Animated Spinner)",
+      "D3 — LoadRunner Lifecycle Model",
+      "D4 — VU Target Interpolation for End Detection",
+      "D5 — Dynamic SLA System (Index Signature)",
+      "D6 — Cookie Persistence Default (true)",
+      "D7 — Debug Replay Gated by Environment Variable",
+      "D8 — JSON Schema as Single Source of Truth",
+      "D9 — JSONC Config Support",
+      "D10 — Transaction Names Without Prefix",
+      "D11 — Artifact-First CI/CD Model",
+      "D12 — Transaction Counter Metrics",
+      "D13 â€” Team-Aware Environment Overrides via Scenario Env Vars"
+    ],
+    "layer": "L1",
+    "path": "ai_context/decisions.md",
+    "title": "Architectural Decisions"
+  },
+  {
+    "headings": [
+      "Dependency Hotspots",
+      "Hotspot Ranking (by edge count in/out)",
+      "Critical Paths",
+      "Config → Everything",
+      "Utils → k6-Side Chain",
+      "run.ts → Full Pipeline",
+      "Files by Size (complexity indicator)"
+    ],
+    "layer": "L1",
+    "path": "ai_context/dependency-hotspots.md",
+    "title": "Dependency Hotspots"
+  },
+  {
+    "headings": [
+      "Dependency Rules",
+      "Layer Dependency Matrix",
+      "Prohibited Dependencies",
+      "k6-Side Import Rules",
+      "npm Dependencies",
+      "Schema as Source of Truth"
+    ],
+    "layer": "L1",
+    "path": "ai_context/dependency-rules.md",
+    "title": "Dependency Rules"
+  },
+  {
+    "headings": [
+      "Execution Flow",
+      "Normal Load Run (`npm run cli -- run --plan <path>`)",
+      "Debug Replay Flow (`plan.debug.enabled = true`)",
+      "HAR Generation Flow (`npm run cli -- generate`)",
+      "Auto-Correlation Flow (`npm run cli -- correlate --script <path>`)",
+      "k6-Side VU Lifecycle (inside k6 runtime)",
+      "Config Resolution Chain"
+    ],
+    "layer": "L1",
+    "path": "ai_context/execution-flow.md",
+    "title": "Execution Flow"
+  },
+  {
+    "headings": [
+      "Extension Points",
+      "EP1 — New CLI Command",
+      "EP2 — New Executor Type",
+      "EP3 — New Extractor for Correlation",
+      "EP4 — New Reporter/Sink",
+      "EP5 — New Artifact Type",
+      "EP6 — New Runtime Config Section",
+      "EP7 — New Test Plan Config Section",
+      "EP8 — New Template",
+      "EP9 — New k6-Side Utility",
+      "EP10 — New Team Suite",
+      "EP11 — New Data Overflow Strategy",
+      "EP12 — New Auto-Correlation Heuristic",
+      "EP13 — New Script-Contract Rule"
+    ],
+    "layer": "L1",
+    "path": "ai_context/extension-points.md",
+    "title": "Extension Points"
+  },
+  {
+    "headings": [
+      "Fragile Areas",
+      "F1 — HTMLDiffReporter.ts (87KB, largest file)",
+      "F2 — Replay Log Pipeline (3-file sync)",
+      "F3 — ConfigurationManager.deepMerge()",
+      "F4 — ScriptConverter.ts (39KB, dual-pattern)",
+      "F5 — lifecycle.ts VU Target Interpolation",
+      "F6 — k6 CLI Flag vs JSON Config Precedence",
+      "F7 — Cookie Jar Clearing Between Iterations",
+      "F8 — Entry Script Path Resolution"
+    ],
+    "layer": "L1",
+    "path": "ai_context/fragile-areas.md",
+    "title": "Fragile Areas"
+  },
+  {
+    "headings": [
+      "Framework Philosophy",
+      "P1 — Configuration Over Code",
+      "P2 — Thin Abstraction",
+      "P3 — Contract-Based Development",
+      "P4 — Convention Over Configuration",
+      "P5 — Decoupled Core + Suite Architecture",
+      "P6 — Artifact-First Reporting",
+      "P7 — Progressive Disclosure",
+      "P8 — Debug Replay as First-Class Feature",
+      "P9 — LoadRunner-Style Lifecycle",
+      "P10 — AI Features Are Optional"
+    ],
+    "layer": "L1",
+    "path": "ai_context/framework-philosophy.md",
+    "title": "Framework Philosophy"
+  },
+  {
+    "headings": [
+      "Integration Checklist",
+      "Before Writing Code",
+      "Implementation Steps",
+      "1. Type Contracts First",
+      "2. Config Integration",
+      "3. Core Implementation",
+      "4. CLI Wiring",
+      "5. Reporting Integration",
+      "6. k6-Side Changes",
+      "7. Documentation Sync (see `ai-workflow.md` → mapping table)",
+      "Verification"
+    ],
+    "layer": "L1",
+    "path": "ai_context/integration-checklist.md",
+    "title": "Integration Checklist"
+  },
+  {
+    "headings": [
+      "Integration Contracts",
+      "Config → Scenario",
+      "Scenario → k6 (via env vars)",
+      "Reporting Pipeline Contract",
+      "Replay Log Entry Contract",
+      "SLA Threshold Contract"
+    ],
+    "layer": "L1",
+    "path": "ai_context/integration-contracts.md",
+    "title": "Integration Contracts"
+  },
+  {
+    "headings": [
+      "Knowledge Architecture Proposal — K6-PerfFramework",
+      "0. Scope, method, exclusions",
+      "1. Audit findings",
+      "1a. `ai_context/` — 28 files, ~3,608 lines. Verdict: **strong, keep the bulk; fix 3 problems.**",
+      "1b. `docs/` — 6 files, ~5,666 lines. Verdict: **repurpose as L3; one file is generated.**",
+      "1c. `.md/AGENT-CONTEXT.md` and the `.md/` archive — 25 files, ~11,553 lines. Verdict: **FREEZE (approved).**",
+      "1d. Tooling / rules",
+      "2. Target folder structure & ownership",
+      "3. Naming conventions & doc standards",
+      "4. Layer design",
+      "L1 — AI Context (`ai_context/` + `FrameworkAtlas.md`) — handwritten, routing/rules/contracts",
+      "L2 — Engineering docs (`engineering_docs/`) — handwritten, canonical SSoT, reverse-engineered from code (§4A)",
+      "L3 — Published docs (`docs/`) — derived, never hand-duplicated",
+      "L4 — Generated indexes (`ai_generated/`, JSON) — generated only",
+      "4A. Implementation Reverse-Engineering (MANDATORY)",
+      "5. Loading strategy (extends `overview.md` / `token-optimization-guide.md`)",
+      "6. Index catalog (L4)",
+      "7. Framework Atlas (`FrameworkAtlas.md`)",
+      "8. Synchronization mechanism (mechanical, not aspirational)",
+      "8a. Change → docs mapping table (encoded in `ai-workflow.md`)",
+      "8b. Checklist persisted in files (so every session inherits it)",
+      "8c. Automatable vs manual + staleness detection",
+      "9. Phased roadmap",
+      "10. Risks, open questions, decisions needed before Phase 1"
+    ],
+    "layer": "L1",
+    "path": "ai_context/knowledge-architecture-proposal.md",
+    "title": "Knowledge Architecture Proposal — K6-PerfFramework"
+  },
+  {
+    "headings": [
+      "Known Technical Debt",
+      "TD1 — No Tests",
+      "TD2 — Reporter Stubs",
+      "TD3 — Summary-Derived Observability Only",
+      "TD4 — No Snapshot-on-Failure",
+      "TD5 — Simplified JSONPath Extractor",
+      "TD6 — No npm Publish Workflow",
+      "TD7 — HTMLDiffReporter Size (87KB)",
+      "TD8 — Secondary Service URL Auto-Mapping Missing",
+      "TD9 — `config/correlation-rules/` Directory ~~Empty~~ (RESOLVED 2026-06-15)",
+      "TD10 — Dependent-Request Flow Control Missing",
+      "TD11 — ResultTransformer httpErrors Bug",
+      "TD12 — HAR Generation Missing Think-Time Prompt",
+      "TD13 — Backup Files in Repository",
+      "TD14 — Two Correlation Systems Not Yet Reconciled",
+      "TD15 — Auto-Correlation `generate`/`convert` Integration Pending"
+    ],
+    "layer": "L1",
+    "path": "ai_context/known-tech-debt.md",
+    "title": "Known Technical Debt"
+  },
+  {
+    "headings": [
+      "Module Map",
+      "Layer → File → Responsibility",
+      "CLI (`core_engine/src/cli/`)",
+      "Config (`core_engine/src/config/`)",
+      "Scenario (`core_engine/src/scenario/`)",
+      "Execution (`core_engine/src/execution/`)",
+      "Runtime (`core_engine/src/runtime/`)",
+      "Data (`core_engine/src/data/`)",
+      "Recording (`core_engine/src/recording/`)",
+      "Correlation (`core_engine/src/correlation/`)",
+      "Debug (`core_engine/src/debug/`)",
+      "Assertions (`core_engine/src/assertions/`)",
+      "Reporting (`core_engine/src/reporting/`)",
+      "Reporters (`core_engine/src/reporters/`) — All stubs",
+      "Utils (`core_engine/src/utils/`)",
+      "Types (`core_engine/src/types/`)",
+      "Package roots (`core_engine/src/`)"
+    ],
+    "layer": "L1",
+    "path": "ai_context/module-map.md",
+    "title": "Module Map"
+  },
+  {
+    "headings": [
+      "Orchestration Map",
+      "Command → Layer Flow",
+      "`run --plan <path>`",
+      "`run --plan <path>` with `debug.enabled: true`",
+      "`generate <team> <name> --har <path>`",
+      "`convert <input> <team> <name>`",
+      "`validate --plan <path>`",
+      "`init`",
+      "`debug --script <path>`"
+    ],
+    "layer": "L1",
+    "path": "ai_context/orchestration-map.md",
+    "title": "Orchestration Map"
+  },
+  {
+    "headings": [
+      "K6-PerfFramework — AI Context Overview",
+      "What This Is",
+      "Quick Stats",
+      "Knowledge System Layers",
+      "AI Loading Strategy",
+      "Primary Entry Points",
+      "File Index"
+    ],
+    "layer": "L1",
+    "path": "ai_context/overview.md",
+    "title": "K6-PerfFramework — AI Context Overview"
+  },
+  {
+    "headings": [
+      "Prompt Templates",
+      "PT1 — Feature Addition",
+      "PT2 — Bug Fix",
+      "PT3 — Architecture Review",
+      "PT4 — New Agent Onboarding",
+      "PT5 — Change Impact Assessment"
+    ],
+    "layer": "L1",
+    "path": "ai_context/prompt-templates.md",
+    "title": "Prompt Templates"
+  },
+  {
+    "headings": [
+      "Rejected Approaches",
+      "R1 — Animated Spinner for Debug Progress",
+      "R2 — `txn_` Prefix for Transaction Metrics",
+      "R3 — Single ramp-down Detection for endPhase",
+      "R4 — `summaryTrendStats` in k6 JSON Config",
+      "R5 — Deep Merge for Arrays",
+      "R6 — YAML Config Files",
+      "R7 — Auto-Generate JSON Schema from TypeScript Types",
+      "R8 — `.vscode/settings.json` for Schema Mapping",
+      "R9 — Stripping `let match;` / `let regex;` in Converter",
+      "R10 — Body Preview in Snapshot Table"
+    ],
+    "layer": "L1",
+    "path": "ai_context/rejected-approaches.md",
+    "title": "Rejected Approaches"
+  },
+  {
+    "headings": [
+      "Replay & Debug Contracts",
+      "Debug Replay Pipeline",
+      "Recording Log Format",
+      "Recording Log Resolution Strategy",
+      "Replay Entry Matching",
+      "Diff Scoring",
+      "HTML Report Features",
+      "Binary Content Handling",
+      "Known Failure Modes"
+    ],
+    "layer": "L1",
+    "path": "ai_context/replay-debug-contracts.md",
+    "title": "Replay & Debug Contracts"
+  },
+  {
+    "headings": [
+      "Reporting Contracts",
+      "Run Artifact Directory Layout",
+      "transaction-metrics.json Schema",
+      "ci-summary.json Schema",
+      "errors.ndjson Schema (one JSON per line)",
+      "warnings.ndjson Schema (one JSON per line)",
+      "timeseries.json Schema",
+      "RunReport.html Tabs",
+      "CI/CD Integration Pattern",
+      "Pipeline reads ci-summary.json, not console output"
+    ],
+    "layer": "L1",
+    "path": "ai_context/reporting-contracts.md",
+    "title": "Reporting Contracts"
+  },
+  {
+    "headings": [
+      "Risk Zones",
+      "RZ1 — Node-Side ↔ k6-Side Boundary",
+      "RZ2 — Entry Script Generation in run.ts",
+      "RZ3 — ConfigurationManager.deepMerge() Array Handling",
+      "RZ4 — ScenarioBuilder Phase Envelope ↔ lifecycle.ts Synchronization",
+      "RZ5 — k6 Flag vs JSON Config Behavior",
+      "RZ6 — HTMLDiffReporter Self-Contained HTML",
+      "RZ7 — ThresholdManager Dynamic Percentile Detection",
+      "RZ8 — Transaction Counter vs Check-Based Pass/Fail",
+      "RZ9 — Multi-Team Suite Isolation",
+      "RZ10 — JSONC Parsing in Config Pipeline"
+    ],
+    "layer": "L1",
+    "path": "ai_context/risk-zones.md",
+    "title": "Risk Zones"
+  },
+  {
+    "headings": [
+      "Runtime Contracts",
+      "k6-Side Files",
+      "Transaction Metrics Contract",
+      "Lifecycle Store Contract",
+      "Think Time Contract",
+      "Phase Envelope Contract",
+      "Error Behavior Contract",
+      "Replay Log Emission Contract",
+      "Session Contract",
+      "Environment URL Contract"
+    ],
+    "layer": "L1",
+    "path": "ai_context/runtime-contracts.md",
+    "title": "Runtime Contracts"
+  },
+  {
+    "headings": [
+      "Subsystem Boundaries",
+      "Boundary Map",
+      "CLI Layer — Orchestration Only",
+      "Config Layer — Configuration Loading & Validation",
+      "Scenario Layer — Test Plan → k6 Scenarios",
+      "Execution Layer — k6 Process Management",
+      "Runtime Layer — TypeScript-Side Runtime Contracts",
+      "Data Layer — Data File Management",
+      "Recording Layer — Script Generation & Conversion",
+      "Correlation Layer — Dynamic Value Extraction",
+      "Assertions Layer — SLA & Threshold Management",
+      "Debug Layer — Replay & Diff",
+      "Reporting Layer — Artifact Generation",
+      "Reporters Layer — External Sinks",
+      "Utils Layer — Shared Utilities",
+      "Types Layer — Contracts"
+    ],
+    "layer": "L1",
+    "path": "ai_context/subsystem-boundaries.md",
+    "title": "Subsystem Boundaries"
+  },
+  {
+    "headings": [
+      "Framework To-Do List",
+      "Completed Tasks",
+      "Current / In-Progress Tasks",
+      "Future Tasks / Backlog"
+    ],
+    "layer": "L1",
+    "path": "ai_context/todos.md",
+    "title": "Framework To-Do List"
+  },
+  {
+    "headings": [
+      "Token Optimization Guide",
+      "Problem",
+      "Strategy 0: Route via L4 indexes first",
+      "Strategy 1: Modular Loading",
+      "Strategy 2: Targeted File Reading",
+      "Strategy 3: Incremental Context",
+      "Strategy 4: Context File Design",
+      "What NOT to Read",
+      "Estimated Token Budget Per Task"
+    ],
+    "layer": "L1",
+    "path": "ai_context/token-optimization-guide.md",
+    "title": "Token Optimization Guide"
+  },
+  {
+    "headings": [
+      "Design Proposals",
+      "Cross-Cutting Constraints",
+      "C1. Single Owner For Lifecycle End Detection",
+      "C2. Explicit Runtime Contracts Only",
+      "C3. Init-Context Metric Registration Remains Mandatory",
+      "C4. Replay And Snapshot Contracts Must Be Reused",
+      "C5. Unsupported Executor Modes Must Fail Fast",
+      "Proposal 1: `transaction()` Wrapper - Group-Level Error Boundaries",
+      "Problem",
+      "Revised Solution",
+      "Public API",
+      "Required Behavior",
+      "Automatic Transaction Registration",
+      "Error Behavior Mapping",
+      "Phase Scope Rules",
+      "Nested Transaction Rule",
+      "Lifecycle Coverage Requirement",
+      "Implementation Notes",
+      "Backward Compatibility",
+      "Proposal 2: Unified `request()` Function - Single-Entry HTTP Execution",
+      "Problem",
+      "Revised Solution",
+      "Non-Goals",
+      "Public API",
+      "Responsibilities Of `request()`",
+      "Responsibilities That Stay Outside `request()`",
+      "Request Flow",
+      "Request Metadata Rules",
+      "Context And Tracking Rules",
+      "Snapshot Rules",
+      "Failure Semantics",
+      "Environment And URL Resolution",
+      "Generator / Converter Output",
+      "Import Strategy",
+      "Proposal 3: Per-Iteration Transaction Pass/Fail Metric",
+      "Problem",
+      "Solution",
+      "Required behavior",
+      "Metric contract",
+      "Edge-case truth table",
+      "Reporting integration",
+      "Backward compatibility",
+      "Acceptance criteria",
+      "Proposal 4: Interactive Command Panel",
+      "Problem",
+      "Goal",
+      "Required behavior",
+      "Top-level menu structure",
+      "Non-goals (v1)",
+      "Backward compatibility",
+      "Bonus fix bundled in this proposal",
+      "Acceptance criteria",
+      "Proposal 5: Custom HTML Report — Phased Overhaul",
+      "Problem",
+      "Phased plan",
+      "Wave 1: per-second time series + interactive charts",
+      "Wave 2: global time range + saved intervals + table polish (SHIPPED 2026-06-02)",
+      "Wave 3: summary depth + error completeness + snapshot trigger expansion (SHIPPED 2026-06-02)",
+      "Wave 4 (future): live dashboard",
+      "Combined Generated Script Direction",
+      "Target Pattern",
+      "What Changes",
+      "What Does Not Change",
+      "Acceptance Criteria",
+      "Suggested Implementation Order",
+      "Proposal: Request Import (`import curl|postman|openapi`)",
+      "Motivation",
+      "Design Principles",
+      "Phased Plan",
+      "Phase 1 — cURL (v1) ✅ IMPLEMENTED",
+      "Phase 2 — Postman (v2) ✅ IMPLEMENTED",
+      "Phase 3 — OpenAPI / Swagger (v3, conditional)",
+      "Phase 4+ — Deferred / conditional",
+      "CLI Shape (Phase 1)",
+      "Internal Pipeline (Phase 1)",
+      "Architectural Constraints",
+      "Suggested Implementation Order (Phase 1) ✅ COMPLETE",
+      "Proposal 6: Auto Headers — Persistent Per-VU Request Headers",
+      "Problem",
+      "Locked Decisions",
+      "Script API (exported via the safe barrel `index.ts`)",
+      "Mechanism",
+      "Constraints / contracts",
+      "Edge cases",
+      "Proposal 7: Runtime Data Writer — Write Files During the Run",
+      "Hard constraint (the thing this design works around)",
+      "Locked Decisions",
+      "Script API (exported via the safe barrel `index.ts`)",
+      "Wire format",
+      "Capture channel (verified)",
+      "Mechanism",
+      "Constraints / contracts",
+      "Risks (no enforced caps, per decision)",
+      "Alternative (deferred)"
+    ],
+    "layer": "L2",
+    "path": "engineering_docs/adr/0001-dx-simplification-proposals.md",
+    "title": "Design Proposals"
+  },
+  {
+    "headings": [
+      "Lifecycle Redesign — Design Proposal",
+      "1. Problem & Objective",
+      "2. The Governing Insight — two control planes",
+      "3. Architecture — thin shell + per-family strategy",
+      "4. Strategy A — `RampingDeadlineStrategy` (the ramping-VUs family)",
+      "4.1 The terminal-crossing deadline (fully general)",
+      "4.2 Iteration model & long actions",
+      "5. Strategy B — `IterationCountStrategy` (`per-vu-iterations`, `shared-iterations`)",
+      "6. Strategy C — `ArrivalRateStrategy` (`constant-arrival-rate`, `ramping-arrival-rate`)",
+      "6.1 Why per-VU end cannot work here (the deciding reason: VU dormancy)",
+      "6.2 Decision",
+      "7. Strategy D — `BestEffortHeartbeatStrategy` (`externally-controlled`)",
+      "8. constant-vus — drop the synthetic ramp-down",
+      "9. Graceful plane — `gracefulRampDown` / `gracefulStop` passthrough (IMPLEMENTED)",
+      "10. Unified shell control flow (pseudocode)",
+      "11. Strategy selection",
+      "12. Metrics & semantics preservation",
+      "13. Honest residual limits (k6-structural, not solvable by design)",
+      "14. Implementation plan / rollout",
+      "15. Change log vs. current framework"
+    ],
+    "layer": "L2",
+    "path": "engineering_docs/adr/0002-lifecycle-redesign.md",
+    "title": "Lifecycle Redesign — Design Proposal"
+  },
+  {
+    "headings": [
+      "Architecture Decision Records",
+      "Index"
+    ],
+    "layer": "L2",
+    "path": "engineering_docs/adr/README.md",
+    "title": "Architecture Decision Records"
+  },
+  {
+    "headings": [
+      "EDD: Smart Auto-Correlation",
+      "Executive Summary",
+      "Problem Statement",
+      "Goals / Non-Goals",
+      "Architecture",
+      "Component Responsibilities",
+      "Runtime Flow + Implementation Reverse-Engineering (§4A)",
+      "Sequence Diagram",
+      "Design Patterns",
+      "Interfaces",
+      "Error Handling · Logging · Metrics",
+      "Performance / Security",
+      "Testing Strategy",
+      "Risks / Tradeoffs",
+      "Future Improvements",
+      "Related Files",
+      "Related ADRs"
+    ],
+    "layer": "L2",
+    "path": "engineering_docs/edd/EDD-auto-correlation.md",
+    "title": "Smart Auto-Correlation — Engineering Design Document"
+  },
+  {
+    "headings": [
+      "EDD: Configuration Resolution",
+      "Executive Summary",
+      "Problem Statement",
+      "Goals / Non-Goals",
+      "Architecture",
+      "Component Responsibilities",
+      "Runtime Flow + Implementation Reverse-Engineering (§4A)",
+      "Sequence Diagram",
+      "State Diagram",
+      "Design Patterns",
+      "Interfaces",
+      "Error Handling · Logging · Metrics",
+      "Performance / Security",
+      "Testing Strategy",
+      "Risks / Tradeoffs",
+      "Future Improvements",
+      "Related Files",
+      "Related ADRs"
+    ],
+    "layer": "L2",
+    "path": "engineering_docs/edd/EDD-config.md",
+    "title": "Configuration Resolution — Engineering Design Document"
+  },
+  {
+    "headings": [
+      "EDD: Debug Replay & Diff",
+      "Executive Summary",
+      "Problem Statement",
+      "Goals / Non-Goals",
+      "Architecture",
+      "Component Responsibilities",
+      "Runtime Flow + Implementation Reverse-Engineering (§4A)",
+      "Sequence Diagram",
+      "Design Patterns",
+      "Interfaces",
+      "Error Handling · Logging · Metrics",
+      "Performance / Security",
+      "Testing Strategy",
+      "Risks / Tradeoffs",
+      "Future Improvements",
+      "Related Files",
+      "Related ADRs"
+    ],
+    "layer": "L2",
+    "path": "engineering_docs/edd/EDD-debug-replay.md",
+    "title": "Debug Replay & Diff — Engineering Design Document"
+  },
+  {
+    "headings": [
+      "EDD: VU Lifecycle & Phase Envelope",
+      "Executive Summary",
+      "Problem Statement",
+      "Goals",
+      "Non-Goals",
+      "Functional Requirements",
+      "Non-Functional Requirements",
+      "Architecture",
+      "Component Responsibilities",
+      "Runtime Flow + Implementation Reverse-Engineering (§4A)",
+      "Sequence Diagram",
+      "State Diagram",
+      "Design Patterns",
+      "Interfaces",
+      "Configuration",
+      "Extension Points · Error Handling · Logging",
+      "Metrics",
+      "Performance Considerations",
+      "Security Considerations",
+      "Testing Strategy",
+      "Risks",
+      "Tradeoffs",
+      "Future Improvements",
+      "Related Files",
+      "Related ADRs"
+    ],
+    "layer": "L2",
+    "path": "engineering_docs/edd/EDD-lifecycle.md",
+    "title": "VU Lifecycle & Phase Envelope — Engineering Design Document"
+  },
+  {
+    "headings": [
+      "EDD: Artifact-First Reporting & Thresholds",
+      "Executive Summary",
+      "Problem Statement",
+      "Goals / Non-Goals",
+      "Architecture",
+      "Component Responsibilities",
+      "Runtime Flow + Implementation Reverse-Engineering (§4A)",
+      "Sequence Diagram",
+      "Design Patterns",
+      "Interfaces",
+      "Error Handling · Logging · Metrics",
+      "Performance / Security",
+      "Testing Strategy",
+      "Risks / Tradeoffs",
+      "Future Improvements",
+      "Related Files",
+      "Related ADRs"
+    ],
+    "layer": "L2",
+    "path": "engineering_docs/edd/EDD-reporting.md",
+    "title": "Artifact-First Reporting & Thresholds — Engineering Design Document"
+  },
+  {
+    "headings": [
+      "Full Engineering Design Documents"
+    ],
+    "layer": "L2",
+    "path": "engineering_docs/edd/README.md",
+    "title": "Full EDDs"
+  },
+  {
+    "headings": [
+      "CLI Command Surface (Mini-EDD)"
+    ],
+    "layer": "L2",
+    "path": "engineering_docs/features/cli.md",
+    "title": "CLI Command Surface — Mini EDD"
+  },
+  {
+    "headings": [
+      "Test Data Management (Mini-EDD)"
+    ],
+    "layer": "L2",
+    "path": "engineering_docs/features/data.md",
+    "title": "Test Data Management — Mini EDD"
+  },
+  {
+    "headings": [
+      "k6 Process Execution (Mini-EDD)"
+    ],
+    "layer": "L2",
+    "path": "engineering_docs/features/execution.md",
+    "title": "k6 Process Execution — Mini EDD"
+  },
+  {
+    "headings": [
+      "Legacy Runtime Rule Engine (Mini-EDD)"
+    ],
+    "layer": "L2",
+    "path": "engineering_docs/features/legacy-correlation.md",
+    "title": "Legacy Runtime Rule Engine — Mini EDD"
+  },
+  {
+    "headings": [
+      "Mini-EDDs"
+    ],
+    "layer": "L2",
+    "path": "engineering_docs/features/README.md",
+    "title": "Mini-EDDs"
+  },
+  {
+    "headings": [
+      "Recording → Script Generation (Mini-EDD)"
+    ],
+    "layer": "L2",
+    "path": "engineering_docs/features/recording.md",
+    "title": "Recording → Script Generation — Mini EDD"
+  },
+  {
+    "headings": [
+      "External Reporters (Mini-EDD) — STUBS"
+    ],
+    "layer": "L2",
+    "path": "engineering_docs/features/reporters.md",
+    "title": "External Reporters (stubs) — Mini EDD"
+  },
+  {
+    "headings": [
+      "Scenario & Workload Modeling (Mini-EDD)"
+    ],
+    "layer": "L2",
+    "path": "engineering_docs/features/scenario.md",
+    "title": "Scenario & Workload Modeling — Mini EDD"
+  },
+  {
+    "headings": [
+      "k6-side VU Runtime Helpers (Mini-EDD)"
+    ],
+    "layer": "L2",
+    "path": "engineering_docs/features/vu-runtime.md",
+    "title": "k6-side VU Runtime Helpers — Mini EDD"
+  },
+  {
+    "headings": [
+      "Engineering Documentation (Layer 2)",
+      "Structure",
+      "Full EDD roster (Phase 2, risk-ranked)"
+    ],
+    "layer": "L2",
+    "path": "engineering_docs/README.md",
+    "title": "Engineering Docs (L2) — Index"
+  },
+  {
+    "headings": [
+      "k6-side Runtime Model"
+    ],
+    "layer": "L2",
+    "path": "engineering_docs/runtime/README.md",
+    "title": "Runtime Model"
+  },
+  {
+    "headings": [
+      "ADR-NNNN: <decision>",
+      "Context",
+      "Decision",
+      "Consequences",
+      "Alternatives considered"
+    ],
+    "layer": "L2",
+    "path": "engineering_docs/templates/adr.md",
+    "title": "ADR-NNNN — <decision>"
+  },
+  {
+    "headings": [
+      "EDD: <Subsystem>",
+      "Executive Summary",
+      "Problem Statement",
+      "Goals",
+      "Non-Goals",
+      "Functional Requirements",
+      "Non-Functional Requirements",
+      "Architecture",
+      "Component Responsibilities",
+      "Runtime Flow + Implementation Reverse-Engineering (§4A)",
+      "Sequence Diagram",
+      "State Diagram",
+      "Design Patterns",
+      "Interfaces",
+      "Configuration",
+      "Extension Points",
+      "Error Handling",
+      "Logging",
+      "Metrics",
+      "Performance Considerations",
+      "Security Considerations",
+      "Testing Strategy",
+      "Risks",
+      "Tradeoffs",
+      "Future Improvements",
+      "Related Files",
+      "Related ADRs"
+    ],
+    "layer": "L2",
+    "path": "engineering_docs/templates/full-edd.md",
+    "title": "<Subsystem> — Engineering Design Document"
+  },
+  {
+    "headings": [
+      "<Feature> (Mini-EDD)"
+    ],
+    "layer": "L2",
+    "path": "engineering_docs/templates/mini-edd.md",
+    "title": "<Feature> — Mini EDD"
+  },
+  {
+    "headings": [
+      "Testing Strategy & Inventory",
+      "Current state (audited 2026-07-09)",
+      "Gaps (Phase 2 EDDs must record per subsystem)"
+    ],
+    "layer": "L2",
+    "path": "engineering_docs/testing/README.md",
+    "title": "Testing Strategy & Inventory"
+  }
+]

@@ -49,7 +49,10 @@
     "loadtest": "npm run cli -- run --plan config/test_plans/load_test.json",
     "debug": "npm run cli -- run --plan config/test_plans/debug_test.json",
     "test:merge": "tsx tools/merge-validation.test.ts",
-    "validate:histogram": "tsx tools/validate-histogram.test.ts"
+    "validate:histogram": "tsx tools/validate-histogram.test.ts",
+    "docs:index": "node tools/docs-index.js",
+    "docs:reference": "node tools/generate-technical-reference.js",
+    "docs:check": "node tools/docs-index.js && npm run docs && git diff --exit-code -- ai_generated/ FrameworkAtlas.md docs/cli-reference.md docs/configuration-reference.md docs/presentation/architecture-deck.md"
   },
   "dependencies": {
     "ajv": "^8.17.1",

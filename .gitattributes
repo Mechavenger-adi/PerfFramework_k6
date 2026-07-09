@@ -1,0 +1,8 @@
+# Generated files: force LF and never apply autocrlf, so regeneration is byte-stable
+# and the docs staleness gate (npm run docs:check) doesn't false-positive on EOL churn.
+ai_generated/*.json      text eol=lf linguist-generated
+FrameworkAtlas.md        text eol=lf
+docs/cli-reference.md    text eol=lf linguist-generated
+docs/configuration-reference.md            text eol=lf linguist-generated
+docs/K6_PerfFramework_Technical_Reference.md text eol=lf linguist-generated
+docs/presentation/architecture-deck.md text eol=lf linguist-generated

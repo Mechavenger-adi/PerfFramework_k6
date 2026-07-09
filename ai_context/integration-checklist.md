@@ -43,11 +43,13 @@
 - [ ] Test that k6 can load the compiled JS (no Node.js imports)
 - [ ] Verify `K6_PERF_*` env vars are documented in `runtime-contracts.md`
 
-### 7. Documentation Sync
-- [ ] Update `AGENT-CONTEXT.md` change log
-- [ ] Update `ai_context/` affected files
-- [ ] Update `HOW_TO_USE_FRAMEWORK.md` if user-facing
-- [ ] Update `FRAMEWORK-IMPLEMENTATION-TODO.md` if task-tracked
+### 7. Documentation Sync (see `ai-workflow.md` → mapping table)
+- [ ] Add the feature to `ai_context/features.seed.json`
+- [ ] `npm run docs:index` — regenerate `ai_generated/*.json` + Atlas tables
+- [ ] Write/refresh the feature's mini-EDD (or EDD §4A) under `engineering_docs/`
+- [ ] Update affected `ai_context/` files; bump their `updated:` front-matter
+- [ ] `npm run docs:check` passes (no stale indexes)
+- [ ] Note user-facing changes for L3 `docs/` (Phase 3)
 
 ## Verification
 

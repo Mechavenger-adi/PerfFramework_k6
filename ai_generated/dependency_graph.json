@@ -1,0 +1,949 @@
+{
+  "edges": [
+    {
+      "from": "core_engine/src/assertions/JourneyAssertionResolver.ts",
+      "to": "core_engine/src/utils/logger.ts"
+    },
+    {
+      "from": "core_engine/src/assertions/SLARegistry.ts",
+      "to": "core_engine/src/types/TestPlanSchema.ts"
+    },
+    {
+      "from": "core_engine/src/assertions/ThresholdManager.ts",
+      "to": "core_engine/src/types/TestPlanSchema.ts"
+    },
+    {
+      "from": "core_engine/src/cli/config-inspect.ts",
+      "to": "core_engine/src/config/ConfigurationManager.ts"
+    },
+    {
+      "from": "core_engine/src/cli/config-inspect.ts",
+      "to": "core_engine/src/scenario/TestPlanLoader.ts"
+    },
+    {
+      "from": "core_engine/src/cli/convert.ts",
+      "to": "core_engine/src/cli/LifecyclePrompt.ts"
+    },
+    {
+      "from": "core_engine/src/cli/convert.ts",
+      "to": "core_engine/src/recording/ScriptConverter.ts"
+    },
+    {
+      "from": "core_engine/src/cli/convert.ts",
+      "to": "core_engine/src/recording/ScriptGenerator.ts"
+    },
+    {
+      "from": "core_engine/src/cli/convert.ts",
+      "to": "core_engine/src/utils/logger.ts"
+    },
+    {
+      "from": "core_engine/src/cli/correlate.ts",
+      "to": "core_engine/src/correlation/CorrelationManifest.ts"
+    },
+    {
+      "from": "core_engine/src/cli/correlate.ts",
+      "to": "core_engine/src/correlation/CorrelationScanner.ts"
+    },
+    {
+      "from": "core_engine/src/cli/correlate.ts",
+      "to": "core_engine/src/correlation/ScriptCorrelationWriter.ts"
+    },
+    {
+      "from": "core_engine/src/cli/correlate.ts",
+      "to": "core_engine/src/debug/ExchangeLog.ts"
+    },
+    {
+      "from": "core_engine/src/cli/correlate.ts",
+      "to": "core_engine/src/debug/RecordingLogResolver.ts"
+    },
+    {
+      "from": "core_engine/src/cli/correlate.ts",
+      "to": "core_engine/src/recording/HARParser.ts"
+    },
+    {
+      "from": "core_engine/src/cli/correlate.ts",
+      "to": "core_engine/src/utils/logger.ts"
+    },
+    {
+      "from": "core_engine/src/cli/generate-byos.ts",
+      "to": "core_engine/src/recording/ScriptGenerator.ts"
+    },
+    {
+      "from": "core_engine/src/cli/generate.ts",
+      "to": "core_engine/src/cli/LifecyclePrompt.ts"
+    },
+    {
+      "from": "core_engine/src/cli/generate.ts",
+      "to": "core_engine/src/debug/ExchangeLog.ts"
+    },
+    {
+      "from": "core_engine/src/cli/generate.ts",
+      "to": "core_engine/src/debug/RecordingLogResolver.ts"
+    },
+    {
+      "from": "core_engine/src/cli/generate.ts",
+      "to": "core_engine/src/recording/DomainFilter.ts"
+    },
+    {
+      "from": "core_engine/src/cli/generate.ts",
+      "to": "core_engine/src/recording/HARParser.ts"
+    },
+    {
+      "from": "core_engine/src/cli/generate.ts",
+      "to": "core_engine/src/recording/ScriptGenerator.ts"
+    },
+    {
+      "from": "core_engine/src/cli/generate.ts",
+      "to": "core_engine/src/recording/TransactionGrouper.ts"
+    },
+    {
+      "from": "core_engine/src/cli/generate.ts",
+      "to": "core_engine/src/utils/logger.ts"
+    },
+    {
+      "from": "core_engine/src/cli/import.ts",
+      "to": "core_engine/src/recording/CurlAdapter.ts"
+    },
+    {
+      "from": "core_engine/src/cli/import.ts",
+      "to": "core_engine/src/recording/PostmanAdapter.ts"
+    },
+    {
+      "from": "core_engine/src/cli/import.ts",
+      "to": "core_engine/src/recording/ScriptGenerator.ts"
+    },
+    {
+      "from": "core_engine/src/cli/import.ts",
+      "to": "core_engine/src/recording/TransactionGrouper.ts"
+    },
+    {
+      "from": "core_engine/src/cli/init.ts",
+      "to": "core_engine/src/recording/ScriptGenerator.ts"
+    },
+    {
+      "from": "core_engine/src/cli/interactive.ts",
+      "to": "core_engine/src/cli/convert.ts"
+    },
+    {
+      "from": "core_engine/src/cli/interactive.ts",
+      "to": "core_engine/src/cli/generate-byos.ts"
+    },
+    {
+      "from": "core_engine/src/cli/interactive.ts",
+      "to": "core_engine/src/cli/generate.ts"
+    },
+    {
+      "from": "core_engine/src/cli/interactive.ts",
+      "to": "core_engine/src/cli/import.ts"
+    },
+    {
+      "from": "core_engine/src/cli/interactive.ts",
+      "to": "core_engine/src/cli/init.ts"
+    },
+    {
+      "from": "core_engine/src/cli/interactive.ts",
+      "to": "core_engine/src/cli/validate.ts"
+    },
+    {
+      "from": "core_engine/src/cli/interactive.ts",
+      "to": "core_engine/src/recording/PostmanAdapter.ts"
+    },
+    {
+      "from": "core_engine/src/cli/interactive.ts",
+      "to": "core_engine/src/utils/logger.ts"
+    },
+    {
+      "from": "core_engine/src/cli/LifecyclePrompt.ts",
+      "to": "core_engine/src/recording/ScriptGenerator.ts"
+    },
+    {
+      "from": "core_engine/src/cli/LifecyclePrompt.ts",
+      "to": "core_engine/src/utils/logger.ts"
+    },
+    {
+      "from": "core_engine/src/cli/run.ts",
+      "to": "core_engine/src/cli/config-inspect.ts"
+    },
+    {
+      "from": "core_engine/src/cli/run.ts",
+      "to": "core_engine/src/cli/convert.ts"
+    },
+    {
+      "from": "core_engine/src/cli/run.ts",
+      "to": "core_engine/src/cli/correlate.ts"
+    },
+    {
+      "from": "core_engine/src/cli/run.ts",
+      "to": "core_engine/src/cli/docs.ts"
+    },
+    {
+      "from": "core_engine/src/cli/run.ts",
+      "to": "core_engine/src/cli/features.ts"
+    },
+    {
+      "from": "core_engine/src/cli/run.ts",
+      "to": "core_engine/src/cli/generate-byos.ts"
+    },
+    {
+      "from": "core_engine/src/cli/run.ts",
+      "to": "core_engine/src/cli/generate.ts"
+    },
+    {
+      "from": "core_engine/src/cli/run.ts",
+      "to": "core_engine/src/cli/import.ts"
+    },
+    {
+      "from": "core_engine/src/cli/run.ts",
+      "to": "core_engine/src/cli/init.ts"
+    },
+    {
+      "from": "core_engine/src/cli/run.ts",
+      "to": "core_engine/src/cli/new.ts"
+    },
+    {
+      "from": "core_engine/src/cli/run.ts",
+      "to": "core_engine/src/cli/templates.ts"
+    },
+    {
+      "from": "core_engine/src/cli/run.ts",
+      "to": "core_engine/src/cli/validate.ts"
+    },
+    {
+      "from": "core_engine/src/cli/run.ts",
+      "to": "core_engine/src/config/ConfigurationManager.ts"
+    },
+    {
+      "from": "core_engine/src/cli/run.ts",
+      "to": "core_engine/src/config/GatekeeperValidator.ts"
+    },
+    {
+      "from": "core_engine/src/cli/run.ts",
+      "to": "core_engine/src/config/RuntimeConfigManager.ts"
+    },
+    {
+      "from": "core_engine/src/cli/run.ts",
+      "to": "core_engine/src/debug/RecordingLogResolver.ts"
+    },
+    {
+      "from": "core_engine/src/cli/run.ts",
+      "to": "core_engine/src/debug/ReplayRunner.ts"
+    },
+    {
+      "from": "core_engine/src/cli/run.ts",
+      "to": "core_engine/src/distributed/collectRun.ts"
+    },
+    {
+      "from": "core_engine/src/cli/run.ts",
+      "to": "core_engine/src/distributed/runMerge.ts"
+    },
+    {
+      "from": "core_engine/src/cli/run.ts",
+      "to": "core_engine/src/distributed/startBarrier.ts"
+    },
+    {
+      "from": "core_engine/src/cli/run.ts",
+      "to": "core_engine/src/execution/FileWriteSink.ts"
+    },
+    {
+      "from": "core_engine/src/cli/run.ts",
+      "to": "core_engine/src/execution/HostMonitor.ts"
+    },
+    {
+      "from": "core_engine/src/cli/run.ts",
+      "to": "core_engine/src/execution/ParallelExecutionManager.ts"
+    },
+    {
+      "from": "core_engine/src/cli/run.ts",
+      "to": "core_engine/src/execution/PipelineRunner.ts"
+    },
+    {
+      "from": "core_engine/src/cli/run.ts",
+      "to": "core_engine/src/reporting/ArtifactWriter.ts"
+    },
+    {
+      "from": "core_engine/src/cli/run.ts",
+      "to": "core_engine/src/reporting/EventArtifactBuilder.ts"
+    },
+    {
+      "from": "core_engine/src/cli/run.ts",
+      "to": "core_engine/src/reporting/HistogramArtifactBuilder.ts"
+    },
+    {
+      "from": "core_engine/src/cli/run.ts",
+      "to": "core_engine/src/reporting/LiveEventLogWriter.ts"
+    },
+    {
+      "from": "core_engine/src/cli/run.ts",
+      "to": "core_engine/src/reporting/RequestMetricLogWriter.ts"
+    },
+    {
+      "from": "core_engine/src/cli/run.ts",
+      "to": "core_engine/src/reporting/RunReportGenerator.ts"
+    },
+    {
+      "from": "core_engine/src/cli/run.ts",
+      "to": "core_engine/src/reporting/RunSummaryBuilder.ts"
+    },
+    {
+      "from": "core_engine/src/cli/run.ts",
+      "to": "core_engine/src/reporting/TimeseriesArtifactBuilder.ts"
+    },
+    {
+      "from": "core_engine/src/cli/run.ts",
+      "to": "core_engine/src/reporting/TransactionMetricLogWriter.ts"
+    },
+    {
+      "from": "core_engine/src/cli/run.ts",
+      "to": "core_engine/src/reporting/TransactionMetricsBuilder.ts"
+    },
+    {
+      "from": "core_engine/src/cli/run.ts",
+      "to": "core_engine/src/scenario/ScenarioBuilder.ts"
+    },
+    {
+      "from": "core_engine/src/cli/run.ts",
+      "to": "core_engine/src/scenario/TestPlanLoader.ts"
+    },
+    {
+      "from": "core_engine/src/cli/run.ts",
+      "to": "core_engine/src/types/ConfigContracts.ts"
+    },
+    {
+      "from": "core_engine/src/cli/run.ts",
+      "to": "core_engine/src/types/ReportingContracts.ts"
+    },
+    {
+      "from": "core_engine/src/cli/run.ts",
+      "to": "core_engine/src/types/TestPlanSchema.ts"
+    },
+    {
+      "from": "core_engine/src/cli/run.ts",
+      "to": "core_engine/src/utils/LiveConsoleLogStream.ts"
+    },
+    {
+      "from": "core_engine/src/cli/run.ts",
+      "to": "core_engine/src/utils/logger.ts"
+    },
+    {
+      "from": "core_engine/src/cli/run.ts",
+      "to": "core_engine/src/utils/ProgressBar.ts"
+    },
+    {
+      "from": "core_engine/src/cli/validate.ts",
+      "to": "core_engine/src/config/ConfigurationManager.ts"
+    },
+    {
+      "from": "core_engine/src/cli/validate.ts",
+      "to": "core_engine/src/config/GatekeeperValidator.ts"
+    },
+    {
+      "from": "core_engine/src/cli/validate.ts",
+      "to": "core_engine/src/scenario/TestPlanLoader.ts"
+    },
+    {
+      "from": "core_engine/src/config/ConfigurationManager.ts",
+      "to": "core_engine/src/config/EnvResolver.ts"
+    },
+    {
+      "from": "core_engine/src/config/ConfigurationManager.ts",
+      "to": "core_engine/src/config/SchemaValidator.ts"
+    },
+    {
+      "from": "core_engine/src/config/ConfigurationManager.ts",
+      "to": "core_engine/src/types/ConfigContracts.ts"
+    },
+    {
+      "from": "core_engine/src/config/ConfigurationManager.ts",
+      "to": "core_engine/src/types/TestPlanSchema.ts"
+    },
+    {
+      "from": "core_engine/src/config/GatekeeperValidator.ts",
+      "to": "core_engine/src/config/ScriptContractGuard.ts"
+    },
+    {
+      "from": "core_engine/src/config/GatekeeperValidator.ts",
+      "to": "core_engine/src/data/DataValidator.ts"
+    },
+    {
+      "from": "core_engine/src/config/GatekeeperValidator.ts",
+      "to": "core_engine/src/debug/RecordingLogResolver.ts"
+    },
+    {
+      "from": "core_engine/src/config/GatekeeperValidator.ts",
+      "to": "core_engine/src/types/ConfigContracts.ts"
+    },
+    {
+      "from": "core_engine/src/config/GatekeeperValidator.ts",
+      "to": "core_engine/src/types/TestPlanSchema.ts"
+    },
+    {
+      "from": "core_engine/src/config/GatekeeperValidator.ts",
+      "to": "core_engine/src/utils/logger.ts"
+    },
+    {
+      "from": "core_engine/src/config/GatekeeperValidator.ts",
+      "to": "core_engine/src/utils/PathResolver.ts"
+    },
+    {
+      "from": "core_engine/src/config/RuntimeConfigManager.ts",
+      "to": "core_engine/src/types/ConfigContracts.ts"
+    },
+    {
+      "from": "core_engine/src/correlation/CandidateScorer.ts",
+      "to": "core_engine/src/correlation/CorrelationManifest.ts"
+    },
+    {
+      "from": "core_engine/src/correlation/CandidateScorer.ts",
+      "to": "core_engine/src/correlation/LinkMatcher.ts"
+    },
+    {
+      "from": "core_engine/src/correlation/CandidateScorer.ts",
+      "to": "core_engine/src/correlation/ValueIndexer.ts"
+    },
+    {
+      "from": "core_engine/src/correlation/CorrelationEngine.ts",
+      "to": "core_engine/src/correlation/ExtractorRegistry.ts"
+    },
+    {
+      "from": "core_engine/src/correlation/CorrelationEngine.ts",
+      "to": "core_engine/src/correlation/FallbackHandler.ts"
+    },
+    {
+      "from": "core_engine/src/correlation/CorrelationEngine.ts",
+      "to": "core_engine/src/correlation/RuleProcessor.ts"
+    },
+    {
+      "from": "core_engine/src/correlation/CorrelationEngine.ts",
+      "to": "core_engine/src/utils/logger.ts"
+    },
+    {
+      "from": "core_engine/src/correlation/CorrelationScanner.ts",
+      "to": "core_engine/src/correlation/CandidateScorer.ts"
+    },
+    {
+      "from": "core_engine/src/correlation/CorrelationScanner.ts",
+      "to": "core_engine/src/correlation/CorrelationManifest.ts"
+    },
+    {
+      "from": "core_engine/src/correlation/CorrelationScanner.ts",
+      "to": "core_engine/src/correlation/ExtractorSynthesizer.ts"
+    },
+    {
+      "from": "core_engine/src/correlation/CorrelationScanner.ts",
+      "to": "core_engine/src/correlation/LinkMatcher.ts"
+    },
+    {
+      "from": "core_engine/src/correlation/CorrelationScanner.ts",
+      "to": "core_engine/src/correlation/ValueIndexer.ts"
+    },
+    {
+      "from": "core_engine/src/correlation/ExtractorSynthesizer.ts",
+      "to": "core_engine/src/correlation/CandidateScorer.ts"
+    },
+    {
+      "from": "core_engine/src/correlation/ExtractorSynthesizer.ts",
+      "to": "core_engine/src/correlation/CorrelationManifest.ts"
+    },
+    {
+      "from": "core_engine/src/correlation/FallbackHandler.ts",
+      "to": "core_engine/src/correlation/RuleProcessor.ts"
+    },
+    {
+      "from": "core_engine/src/correlation/FallbackHandler.ts",
+      "to": "core_engine/src/utils/logger.ts"
+    },
+    {
+      "from": "core_engine/src/correlation/LinkMatcher.ts",
+      "to": "core_engine/src/correlation/CorrelationManifest.ts"
+    },
+    {
+      "from": "core_engine/src/correlation/LinkMatcher.ts",
+      "to": "core_engine/src/correlation/ValueIndexer.ts"
+    },
+    {
+      "from": "core_engine/src/correlation/ScriptCorrelationWriter.ts",
+      "to": "core_engine/src/correlation/CorrelationManifest.ts"
+    },
+    {
+      "from": "core_engine/src/correlation/ValueIndexer.ts",
+      "to": "core_engine/src/correlation/CorrelationManifest.ts"
+    },
+    {
+      "from": "core_engine/src/data/DataPoolManager.ts",
+      "to": "core_engine/src/data/DataFactory.ts"
+    },
+    {
+      "from": "core_engine/src/data/DataPoolManager.ts",
+      "to": "core_engine/src/types/TestPlanSchema.ts"
+    },
+    {
+      "from": "core_engine/src/debug/DiffChecker.ts",
+      "to": "core_engine/src/debug/ExchangeLog.ts"
+    },
+    {
+      "from": "core_engine/src/debug/DiffChecker.ts",
+      "to": "core_engine/src/types/HARContracts.ts"
+    },
+    {
+      "from": "core_engine/src/debug/ExchangeLog.ts",
+      "to": "core_engine/src/recording/TransactionGrouper.ts"
+    },
+    {
+      "from": "core_engine/src/debug/ExchangeLog.ts",
+      "to": "core_engine/src/types/HARContracts.ts"
+    },
+    {
+      "from": "core_engine/src/debug/HTMLDiffReporter.ts",
+      "to": "core_engine/src/debug/DiffChecker.ts"
+    },
+    {
+      "from": "core_engine/src/debug/HTMLDiffReporter.ts",
+      "to": "core_engine/src/debug/ReplayRunner.ts"
+    },
+    {
+      "from": "core_engine/src/debug/ReplayRunner.ts",
+      "to": "core_engine/src/config/ScriptContractGuard.ts"
+    },
+    {
+      "from": "core_engine/src/debug/ReplayRunner.ts",
+      "to": "core_engine/src/debug/DiffChecker.ts"
+    },
+    {
+      "from": "core_engine/src/debug/ReplayRunner.ts",
+      "to": "core_engine/src/debug/ExchangeLog.ts"
+    },
+    {
+      "from": "core_engine/src/debug/ReplayRunner.ts",
+      "to": "core_engine/src/debug/HTMLDiffReporter.ts"
+    },
+    {
+      "from": "core_engine/src/debug/ReplayRunner.ts",
+      "to": "core_engine/src/debug/VariableInstrumenter.ts"
+    },
+    {
+      "from": "core_engine/src/debug/ReplayRunner.ts",
+      "to": "core_engine/src/execution/FileWriteSink.ts"
+    },
+    {
+      "from": "core_engine/src/debug/ReplayRunner.ts",
+      "to": "core_engine/src/execution/PipelineRunner.ts"
+    },
+    {
+      "from": "core_engine/src/debug/ReplayRunner.ts",
+      "to": "core_engine/src/scenario/ScenarioBuilder.ts"
+    },
+    {
+      "from": "core_engine/src/debug/ReplayRunner.ts",
+      "to": "core_engine/src/utils/LiveConsoleLogStream.ts"
+    },
+    {
+      "from": "core_engine/src/debug/ReplayRunner.ts",
+      "to": "core_engine/src/utils/logger.ts"
+    },
+    {
+      "from": "core_engine/src/debug/ReplayRunner.ts",
+      "to": "core_engine/src/utils/ProgressBar.ts"
+    },
+    {
+      "from": "core_engine/src/distributed/collectRun.ts",
+      "to": "core_engine/src/utils/logger.ts"
+    },
+    {
+      "from": "core_engine/src/distributed/MergedReportBuilder.ts",
+      "to": "core_engine/src/distributed/MergeEngine.ts"
+    },
+    {
+      "from": "core_engine/src/distributed/MergedReportBuilder.ts",
+      "to": "core_engine/src/reporting/Histogram.ts"
+    },
+    {
+      "from": "core_engine/src/distributed/MergedReportBuilder.ts",
+      "to": "core_engine/src/reporting/HistogramArtifactBuilder.ts"
+    },
+    {
+      "from": "core_engine/src/distributed/MergedReportBuilder.ts",
+      "to": "core_engine/src/types/ReportingContracts.ts"
+    },
+    {
+      "from": "core_engine/src/distributed/MergeEngine.ts",
+      "to": "core_engine/src/reporting/Histogram.ts"
+    },
+    {
+      "from": "core_engine/src/distributed/MergeEngine.ts",
+      "to": "core_engine/src/reporting/HistogramArtifactBuilder.ts"
+    },
+    {
+      "from": "core_engine/src/distributed/MergeEngine.ts",
+      "to": "core_engine/src/types/ReportingContracts.ts"
+    },
+    {
+      "from": "core_engine/src/distributed/runMerge.ts",
+      "to": "core_engine/src/distributed/MergedReportBuilder.ts"
+    },
+    {
+      "from": "core_engine/src/distributed/runMerge.ts",
+      "to": "core_engine/src/distributed/MergeEngine.ts"
+    },
+    {
+      "from": "core_engine/src/distributed/runMerge.ts",
+      "to": "core_engine/src/reporting/ArtifactWriter.ts"
+    },
+    {
+      "from": "core_engine/src/distributed/runMerge.ts",
+      "to": "core_engine/src/reporting/HistogramArtifactBuilder.ts"
+    },
+    {
+      "from": "core_engine/src/distributed/runMerge.ts",
+      "to": "core_engine/src/reporting/RunReportGenerator.ts"
+    },
+    {
+      "from": "core_engine/src/distributed/runMerge.ts",
+      "to": "core_engine/src/types/ReportingContracts.ts"
+    },
+    {
+      "from": "core_engine/src/distributed/runMerge.ts",
+      "to": "core_engine/src/utils/logger.ts"
+    },
+    {
+      "from": "core_engine/src/distributed/startBarrier.ts",
+      "to": "core_engine/src/utils/logger.ts"
+    },
+    {
+      "from": "core_engine/src/execution/HostMonitor.ts",
+      "to": "core_engine/src/runtime/ErrorRuntime.ts"
+    },
+    {
+      "from": "core_engine/src/execution/HostMonitor.ts",
+      "to": "core_engine/src/types/ConfigContracts.ts"
+    },
+    {
+      "from": "core_engine/src/execution/HostMonitor.ts",
+      "to": "core_engine/src/types/EventContracts.ts"
+    },
+    {
+      "from": "core_engine/src/execution/JourneyAllocator.ts",
+      "to": "core_engine/src/types/TestPlanSchema.ts"
+    },
+    {
+      "from": "core_engine/src/execution/ParallelExecutionManager.ts",
+      "to": "core_engine/src/assertions/ThresholdManager.ts"
+    },
+    {
+      "from": "core_engine/src/execution/ParallelExecutionManager.ts",
+      "to": "core_engine/src/execution/JourneyAllocator.ts"
+    },
+    {
+      "from": "core_engine/src/execution/ParallelExecutionManager.ts",
+      "to": "core_engine/src/scenario/ScenarioBuilder.ts"
+    },
+    {
+      "from": "core_engine/src/execution/ParallelExecutionManager.ts",
+      "to": "core_engine/src/types/TestPlanSchema.ts"
+    },
+    {
+      "from": "core_engine/src/execution/PipelineRunner.ts",
+      "to": "core_engine/src/execution/ParallelExecutionManager.ts"
+    },
+    {
+      "from": "core_engine/src/execution/PipelineRunner.ts",
+      "to": "core_engine/src/utils/logger.ts"
+    },
+    {
+      "from": "core_engine/src/recording/CurlAdapter.ts",
+      "to": "core_engine/src/types/HARContracts.ts"
+    },
+    {
+      "from": "core_engine/src/recording/DomainFilter.ts",
+      "to": "core_engine/src/types/HARContracts.ts"
+    },
+    {
+      "from": "core_engine/src/recording/DomainFilter.ts",
+      "to": "core_engine/src/utils/logger.ts"
+    },
+    {
+      "from": "core_engine/src/recording/HARParser.ts",
+      "to": "core_engine/src/recording/DomainFilter.ts"
+    },
+    {
+      "from": "core_engine/src/recording/HARParser.ts",
+      "to": "core_engine/src/types/HARContracts.ts"
+    },
+    {
+      "from": "core_engine/src/recording/HARParser.ts",
+      "to": "core_engine/src/utils/logger.ts"
+    },
+    {
+      "from": "core_engine/src/recording/PostmanAdapter.ts",
+      "to": "core_engine/src/recording/PostmanScriptTranslator.ts"
+    },
+    {
+      "from": "core_engine/src/recording/PostmanAdapter.ts",
+      "to": "core_engine/src/recording/TransactionGrouper.ts"
+    },
+    {
+      "from": "core_engine/src/recording/PostmanAdapter.ts",
+      "to": "core_engine/src/types/HARContracts.ts"
+    },
+    {
+      "from": "core_engine/src/recording/ScriptConverter.ts",
+      "to": "core_engine/src/recording/ScriptGenerator.ts"
+    },
+    {
+      "from": "core_engine/src/recording/ScriptGenerator.ts",
+      "to": "core_engine/src/recording/TransactionGrouper.ts"
+    },
+    {
+      "from": "core_engine/src/recording/TransactionGrouper.ts",
+      "to": "core_engine/src/types/HARContracts.ts"
+    },
+    {
+      "from": "core_engine/src/reporters/AzureReporter.ts",
+      "to": "core_engine/src/reporters/ResultTransformer.ts"
+    },
+    {
+      "from": "core_engine/src/reporters/AzureReporter.ts",
+      "to": "core_engine/src/utils/logger.ts"
+    },
+    {
+      "from": "core_engine/src/reporters/CustomUploader.ts",
+      "to": "core_engine/src/reporters/ResultTransformer.ts"
+    },
+    {
+      "from": "core_engine/src/reporters/CustomUploader.ts",
+      "to": "core_engine/src/utils/logger.ts"
+    },
+    {
+      "from": "core_engine/src/reporters/GrafanaReporter.ts",
+      "to": "core_engine/src/reporters/ResultTransformer.ts"
+    },
+    {
+      "from": "core_engine/src/reporters/GrafanaReporter.ts",
+      "to": "core_engine/src/utils/logger.ts"
+    },
+    {
+      "from": "core_engine/src/reporting/EventArtifactBuilder.ts",
+      "to": "core_engine/src/runtime/ErrorRuntime.ts"
+    },
+    {
+      "from": "core_engine/src/reporting/EventArtifactBuilder.ts",
+      "to": "core_engine/src/types/ConfigContracts.ts"
+    },
+    {
+      "from": "core_engine/src/reporting/EventArtifactBuilder.ts",
+      "to": "core_engine/src/types/EventContracts.ts"
+    },
+    {
+      "from": "core_engine/src/reporting/HistogramArtifactBuilder.ts",
+      "to": "core_engine/src/reporting/Histogram.ts"
+    },
+    {
+      "from": "core_engine/src/reporting/RunReportGenerator.ts",
+      "to": "core_engine/src/types/ReportingContracts.ts"
+    },
+    {
+      "from": "core_engine/src/reporting/RunSummaryBuilder.ts",
+      "to": "core_engine/src/types/ReportingContracts.ts"
+    },
+    {
+      "from": "core_engine/src/reporting/TimeseriesArtifactBuilder.ts",
+      "to": "core_engine/src/execution/HostMonitor.ts"
+    },
+    {
+      "from": "core_engine/src/reporting/TimeseriesArtifactBuilder.ts",
+      "to": "core_engine/src/reporting/TimeseriesStreamParser.ts"
+    },
+    {
+      "from": "core_engine/src/reporting/TimeseriesArtifactBuilder.ts",
+      "to": "core_engine/src/runtime/TimeseriesRuntime.ts"
+    },
+    {
+      "from": "core_engine/src/reporting/TimeseriesArtifactBuilder.ts",
+      "to": "core_engine/src/types/EventContracts.ts"
+    },
+    {
+      "from": "core_engine/src/reporting/TimeseriesArtifactBuilder.ts",
+      "to": "core_engine/src/types/ReportingContracts.ts"
+    },
+    {
+      "from": "core_engine/src/reporting/TransactionMetricsBuilder.ts",
+      "to": "core_engine/src/types/ReportingContracts.ts"
+    },
+    {
+      "from": "core_engine/src/runtime/ErrorRuntime.ts",
+      "to": "core_engine/src/types/ConfigContracts.ts"
+    },
+    {
+      "from": "core_engine/src/runtime/ErrorRuntime.ts",
+      "to": "core_engine/src/types/EventContracts.ts"
+    },
+    {
+      "from": "core_engine/src/runtime/LifecycleRuntime.ts",
+      "to": "core_engine/src/types/ConfigContracts.ts"
+    },
+    {
+      "from": "core_engine/src/runtime/SnapshotRuntime.ts",
+      "to": "core_engine/src/types/ConfigContracts.ts"
+    },
+    {
+      "from": "core_engine/src/runtime/SnapshotRuntime.ts",
+      "to": "core_engine/src/types/EventContracts.ts"
+    },
+    {
+      "from": "core_engine/src/runtime/TimeseriesRuntime.ts",
+      "to": "core_engine/src/types/ReportingContracts.ts"
+    },
+    {
+      "from": "core_engine/src/scenario/ExecutorFactory.ts",
+      "to": "core_engine/src/scenario/WorkloadModels.ts"
+    },
+    {
+      "from": "core_engine/src/scenario/ExecutorFactory.ts",
+      "to": "core_engine/src/types/TestPlanSchema.ts"
+    },
+    {
+      "from": "core_engine/src/scenario/ScenarioBuilder.ts",
+      "to": "core_engine/src/scenario/ExecutorFactory.ts"
+    },
+    {
+      "from": "core_engine/src/scenario/ScenarioBuilder.ts",
+      "to": "core_engine/src/types/TestPlanSchema.ts"
+    },
+    {
+      "from": "core_engine/src/scenario/TestPlanLoader.ts",
+      "to": "core_engine/src/config/SchemaValidator.ts"
+    },
+    {
+      "from": "core_engine/src/scenario/TestPlanLoader.ts",
+      "to": "core_engine/src/types/TestPlanSchema.ts"
+    },
+    {
+      "from": "core_engine/src/scenario/WorkloadModels.ts",
+      "to": "core_engine/src/types/TestPlanSchema.ts"
+    },
+    {
+      "from": "core_engine/src/types/ConfigContracts.ts",
+      "to": "core_engine/src/types/TestPlanSchema.ts"
+    },
+    {
+      "from": "core_engine/src/types/EventContracts.ts",
+      "to": "core_engine/src/types/ConfigContracts.ts"
+    },
+    {
+      "from": "core_engine/src/types/ReportingContracts.ts",
+      "to": "core_engine/src/types/EventContracts.ts"
+    },
+    {
+      "from": "core_engine/src/utils/LiveConsoleLogStream.ts",
+      "to": "core_engine/src/utils/logger.ts"
+    }
+  ],
+  "nodes": [
+    "core_engine/src/assertions/JourneyAssertionResolver.ts",
+    "core_engine/src/assertions/SLARegistry.ts",
+    "core_engine/src/assertions/ThresholdManager.ts",
+    "core_engine/src/cli/LifecyclePrompt.ts",
+    "core_engine/src/cli/config-inspect.ts",
+    "core_engine/src/cli/convert.ts",
+    "core_engine/src/cli/correlate.ts",
+    "core_engine/src/cli/docs.ts",
+    "core_engine/src/cli/features.ts",
+    "core_engine/src/cli/generate-byos.ts",
+    "core_engine/src/cli/generate.ts",
+    "core_engine/src/cli/import.ts",
+    "core_engine/src/cli/init.ts",
+    "core_engine/src/cli/interactive.ts",
+    "core_engine/src/cli/new.ts",
+    "core_engine/src/cli/run.ts",
+    "core_engine/src/cli/templates.ts",
+    "core_engine/src/cli/validate.ts",
+    "core_engine/src/config/ConfigurationManager.ts",
+    "core_engine/src/config/EnvResolver.ts",
+    "core_engine/src/config/GatekeeperValidator.ts",
+    "core_engine/src/config/RuntimeConfigManager.ts",
+    "core_engine/src/config/SchemaValidator.ts",
+    "core_engine/src/config/ScriptContractGuard.ts",
+    "core_engine/src/correlation/CandidateScorer.ts",
+    "core_engine/src/correlation/CorrelationEngine.ts",
+    "core_engine/src/correlation/CorrelationManifest.ts",
+    "core_engine/src/correlation/CorrelationScanner.ts",
+    "core_engine/src/correlation/ExtractorRegistry.ts",
+    "core_engine/src/correlation/ExtractorSynthesizer.ts",
+    "core_engine/src/correlation/FallbackHandler.ts",
+    "core_engine/src/correlation/LinkMatcher.ts",
+    "core_engine/src/correlation/RuleProcessor.ts",
+    "core_engine/src/correlation/ScriptCorrelationWriter.ts",
+    "core_engine/src/correlation/ValueIndexer.ts",
+    "core_engine/src/data/DataFactory.ts",
+    "core_engine/src/data/DataPoolManager.ts",
+    "core_engine/src/data/DataValidator.ts",
+    "core_engine/src/data/DynamicValueFactory.ts",
+    "core_engine/src/debug/DiffChecker.ts",
+    "core_engine/src/debug/ExchangeLog.ts",
+    "core_engine/src/debug/HTMLDiffReporter.ts",
+    "core_engine/src/debug/RecordingLogResolver.ts",
+    "core_engine/src/debug/ReplayRunner.ts",
+    "core_engine/src/debug/VariableInstrumenter.ts",
+    "core_engine/src/distributed/MergeEngine.ts",
+    "core_engine/src/distributed/MergedReportBuilder.ts",
+    "core_engine/src/distributed/collectRun.ts",
+    "core_engine/src/distributed/runMerge.ts",
+    "core_engine/src/distributed/startBarrier.ts",
+    "core_engine/src/engine.ts",
+    "core_engine/src/execution/FileWriteSink.ts",
+    "core_engine/src/execution/HostMonitor.ts",
+    "core_engine/src/execution/JourneyAllocator.ts",
+    "core_engine/src/execution/ParallelExecutionManager.ts",
+    "core_engine/src/execution/PipelineRunner.ts",
+    "core_engine/src/index.ts",
+    "core_engine/src/recording/CurlAdapter.ts",
+    "core_engine/src/recording/DomainFilter.ts",
+    "core_engine/src/recording/HARParser.ts",
+    "core_engine/src/recording/PostmanAdapter.ts",
+    "core_engine/src/recording/PostmanScriptTranslator.ts",
+    "core_engine/src/recording/ScriptConverter.ts",
+    "core_engine/src/recording/ScriptGenerator.ts",
+    "core_engine/src/recording/TransactionGrouper.ts",
+    "core_engine/src/reporters/AzureReporter.ts",
+    "core_engine/src/reporters/CustomUploader.ts",
+    "core_engine/src/reporters/GrafanaReporter.ts",
+    "core_engine/src/reporters/ResultTransformer.ts",
+    "core_engine/src/reporting/ArtifactWriter.ts",
+    "core_engine/src/reporting/EventArtifactBuilder.ts",
+    "core_engine/src/reporting/Histogram.ts",
+    "core_engine/src/reporting/HistogramArtifactBuilder.ts",
+    "core_engine/src/reporting/LiveEventLogWriter.ts",
+    "core_engine/src/reporting/RequestMetricLogWriter.ts",
+    "core_engine/src/reporting/RunReportGenerator.ts",
+    "core_engine/src/reporting/RunSummaryBuilder.ts",
+    "core_engine/src/reporting/TimeseriesArtifactBuilder.ts",
+    "core_engine/src/reporting/TimeseriesStreamParser.ts",
+    "core_engine/src/reporting/TransactionMetricLogWriter.ts",
+    "core_engine/src/reporting/TransactionMetricsBuilder.ts",
+    "core_engine/src/runtime/ErrorRuntime.ts",
+    "core_engine/src/runtime/LifecycleRuntime.ts",
+    "core_engine/src/runtime/MetricsRuntime.ts",
+    "core_engine/src/runtime/SnapshotRuntime.ts",
+    "core_engine/src/runtime/TimeseriesRuntime.ts",
+    "core_engine/src/scenario/ExecutorFactory.ts",
+    "core_engine/src/scenario/ScenarioBuilder.ts",
+    "core_engine/src/scenario/TestPlanLoader.ts",
+    "core_engine/src/scenario/WorkloadModels.ts",
+    "core_engine/src/types/ConfigContracts.ts",
+    "core_engine/src/types/EventContracts.ts",
+    "core_engine/src/types/HARContracts.ts",
+    "core_engine/src/types/ReportingContracts.ts",
+    "core_engine/src/types/TestPlanSchema.ts",
+    "core_engine/src/utils/LiveConsoleLogStream.ts",
+    "core_engine/src/utils/PathResolver.ts",
+    "core_engine/src/utils/ProgressBar.ts",
+    "core_engine/src/utils/autoHeaders.ts",
+    "core_engine/src/utils/dataWriter.ts",
+    "core_engine/src/utils/extract.ts",
+    "core_engine/src/utils/lifecycle.ts",
+    "core_engine/src/utils/logger.ts",
+    "core_engine/src/utils/replayLogger.ts",
+    "core_engine/src/utils/request.ts",
+    "core_engine/src/utils/session.ts",
+    "core_engine/src/utils/transaction.ts"
+  ]
+}
