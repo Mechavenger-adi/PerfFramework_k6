@@ -81,7 +81,7 @@ sequenceDiagram
   participant TM as ThresholdManager
   participant K6 as k6
   participant B as reporting builders
-  RUN->>TM: apply(plan) → thresholds + collectPercentiles
+  RUN->>TM: apply(plan), get thresholds + collectPercentiles
   RUN->>K6: run with thresholds + --summary-trend-stats
   K6-->>RUN: summary-export.json + --out json stream
   RUN->>B: build artifacts (metrics/timeseries/events/summary)

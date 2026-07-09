@@ -104,23 +104,23 @@ flowchart LR
 sequenceDiagram
   participant K6 as k6 engine
   participant LC as runJourneyLifecycle
-  participant TX as transaction()
-  K6->>LC: default() (iteration N)
+  participant TX as transaction
+  K6->>LC: default (iteration N)
   alt first iteration
-    LC->>LC: computeEndPlan(K6_PERF_PHASES)
-    LC->>LC: runSafely('init')
+    LC->>LC: computeEndPlan reads K6_PERF_PHASES
+    LC->>LC: runSafely init
   end
-  alt isEndDueBefore()
-    LC->>LC: runSafely('end'); return
+  alt isEndDueBefore
+    LC->>LC: runSafely end, then return
   end
-  LC->>TX: actionPhase → transaction('x', fn)
-  TX->>LC: gate.shouldSkipBeforeStart?
+  LC->>TX: actionPhase calls transaction
+  TX->>LC: check gate shouldSkipBeforeStart
   alt ending mid-action
-    TX-->>LC: skip (onSkip log)
+    TX-->>LC: skip and log
   else
-    TX->>TX: group+start+fn+checkrate+end
+    TX->>TX: group, start, fn, checkrate, end
   end
-  LC->>LC: isEndDueAfter() → runSafely('end')
+  LC->>LC: isEndDueAfter runs endPhase
 ```
 
 ## State Diagram
@@ -128,10 +128,10 @@ sequenceDiagram
 stateDiagram-v2
   [*] --> Uninitialized
   Uninitialized --> Active: initPhase ok
-  Active --> Active: actionPhase (per iter)
-  Active --> Ended: isEndDue* → endPhase
-  Active --> Terminated: stop_vu / JS runtime error
-  Ended --> Parked: sleep(86400)
+  Active --> Active: actionPhase per iteration
+  Active --> Ended: isEndDue runs endPhase
+  Active --> Terminated: stop_vu or JS runtime error
+  Ended --> Parked: sleep 86400
   Terminated --> Parked
   Parked --> [*]: scenario end
 ```

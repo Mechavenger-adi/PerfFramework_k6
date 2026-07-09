@@ -77,16 +77,16 @@ flowchart LR
 sequenceDiagram
   participant RR as ReplayRunner
   participant K6 as k6
-  participant RL as replayLogger (k6-side)
+  participant RL as replayLogger
   participant DC as DiffChecker
   RR->>K6: executeAsync(instrumented, 1x1)
   loop each request
     K6->>RL: logReplayExchange(req,res)
-    RL-->>RR: console "[k6-perf][replay-log] {json}"
+    RL-->>RR: console replay-log json line
   end
   RR->>RR: extractReplayEntries (dedup file paths)
   RR->>DC: compareTaggedLogs(recording, replay)
-  DC-->>RR: DiffResult[]
+  DC-->>RR: DiffResult array
   RR->>RR: HTMLDiffReporter.generateReport
 ```
 

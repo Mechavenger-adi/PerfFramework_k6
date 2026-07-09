@@ -78,7 +78,7 @@ sequenceDiagram
   participant C as caller
   participant CM as ConfigurationManager
   participant SV as SchemaValidator
-  C->>CM: resolve({env, runtime, cli})
+  C->>CM: resolve(env, runtime, cli)
   CM->>CM: clone FRAMEWORK_DEFAULTS
   CM->>CM: readJsonFile(environment)
   CM->>SV: validateRuntime(runtimeFile)

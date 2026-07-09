@@ -85,8 +85,8 @@ sequenceDiagram
   CLI->>SC: scan(exchanges)
   SC-->>CLI: CorrelationPlan (review)
   Note over CLI: user edits manifest (optional)
-  CLI->>WR: apply(script, plan, {applyLevels:{high}})
-  WR-->>CLI: rewritten script + {applied, skipped}
+  CLI->>WR: apply(script, plan, applyLevels=high)
+  WR-->>CLI: rewritten script + applied/skipped
 ```
 
 ## Design Patterns
