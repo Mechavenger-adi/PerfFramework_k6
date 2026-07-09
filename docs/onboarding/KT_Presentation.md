@@ -1,5 +1,8 @@
 # Presentation Outline: K6 Performance Framework
 
+> **⚠ Legacy KT deck.** Use for framing a talk; verify specifics against `engineering_docs/edd/` and the
+> [Mental Model](mental-model.md), which are kept current with the code.
+
 ## Slide 1: Welcome & Intro
 *   **Title:** Beyond Basic Testing: The Enterprise K6 Performance Framework
 *   **Talking Points:** 

@@ -1,5 +1,13 @@
 # K6 Performance Framework: Comprehensive Deep-Dive Guide
 
+> **⚠ Legacy KT material.** Useful structural intuition, but it predates some current contracts. For
+> authoritative, code-cited detail use [Mental Model](mental-model.md) and `engineering_docs/edd/`.
+> Known corrections: import the API from `dist/index.js` (not `dist/utils/*`); `runJourneyLifecycle`
+> takes `(store, { initPhase, actionPhase, endPhase })`; `initPhase` runs **once per VU** (not per
+> iteration); prefer `transaction()`/`k6Check()` over `startTransaction`/`endTransaction`; the
+> correlation example below is the **legacy** rule engine — new work uses smart auto-correlation
+> ([EDD-auto-correlation](../../engineering_docs/edd/EDD-auto-correlation.md)).
+
 Welcome to the detailed deep-dive of the K6 Performance Framework. This guide moves beyond high-level concepts and specifically breaks down the exact files, their core functions, and the code powering the framework. 
 
 As a mentor or a new developer, you should understand that this framework is split into **Node.js Orchestration Code** (which runs strictly before and after the test to manage everything) and **k6 Runtime Code** (which executes inside the k6 engine during the test).
@@ -56,21 +64,22 @@ As a mentor or a new developer, you should understand that this framework is spl
 *   **Key Function:** `runJourneyLifecycle(initPhase, actionPhase, endPhase)`
 *   **Code Example (Inside your Test Script):**
     ```javascript
-    import { runJourneyLifecycle } from "../../../dist/utils/lifecycle.js";
+    import { createJourneyLifecycleStore, runJourneyLifecycle } from "../../../dist/index.js";
+    const store = createJourneyLifecycleStore();
 
     function initPhase(ctx) {
-        // Runs once at the start of the VU iteration. Setup user data here.
-        ctx.user = { id: 123 }; 
+        // Runs once per VU. Setup user data here.
+        ctx.user = { id: 123 };
     }
     function actionPhase(ctx) {
-        // The timed business logic.
+        // The timed business logic (runs each iteration).
         http.get(`https://api.com/user/${ctx.user.id}`);
     }
     function endPhase(ctx) {
-        // Always executes, even if actionPhase crashed. Good for logging out.
+        // Runs once per VU, before k6 culls it. Good for logging out.
     }
     export default function () {
-        runJourneyLifecycle(initPhase, actionPhase, endPhase);
+        runJourneyLifecycle(store, { initPhase, actionPhase, endPhase });
     }
     ```
 

@@ -1,5 +1,9 @@
 # K6 Performance Framework: Low-Level Engineering Deep Dive
 
+> **⚠ Legacy KT material.** For authoritative, code-cited internals prefer the EDDs in
+> `engineering_docs/edd/` (each reverse-engineered from current source with `file:line` citations).
+> Where this deck and an EDD disagree, the EDD wins.
+
 This document is designed for engineers seeking to understand the exact mathematical, architectural, and code-level mechanisms powering the framework. It covers the inner workings of runtime lifecycle management, dynamic data slicing, correlation execution, and process orchestration.
 
 ---
