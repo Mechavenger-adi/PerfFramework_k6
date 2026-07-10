@@ -182,10 +182,20 @@ export class ScriptGenerator {
           if (req.postData?.expression) {
             script += `      body: ${req.postData.expression},\n`;
           } else {
-            const body = this.buildRequestBody(req.postData);
-            // Bodies can embed the recorded host too (form-posted return URLs,
-            // JSON callbacks) — parametrise the base origin the same way.
-            script += `      body: ${body === null ? 'null' : this.buildStringExpression(body, primaryBaseUrl)},\n`;
+            // Form-urlencoded → emit an OBJECT so k6 URL-encodes each value (a
+            // string body would be sent verbatim, decoding `+` to a space). All
+            // other content types stay a verbatim backtick string body. Bodies can
+            // embed the recorded host too (form-posted return URLs, JSON
+            // callbacks) — parametrise the base origin the same way.
+            const formObj = req.postData
+              ? this.buildFormUrlEncodedBodyObject(req.postData, primaryBaseUrl)
+              : null;
+            if (formObj !== null) {
+              script += `      body: ${formObj},\n`;
+            } else {
+              const body = this.buildRequestBody(req.postData);
+              script += `      body: ${body === null ? 'null' : this.buildStringExpression(body, primaryBaseUrl)},\n`;
+            }
           }
         }
 
@@ -297,6 +307,60 @@ export class ScriptGenerator {
     return postData.params
       .map((p) => `${encodeURIComponent(p.name)}=${encodeURIComponent(p.value ?? '')}`)
       .join('&');
+  }
+
+  /**
+   * Build an `application/x-www-form-urlencoded` body as a JS OBJECT-literal
+   * expression so k6 URL-encodes each value itself, instead of a verbatim string.
+   *
+   * Why: k6's http request handler (k6 `js/modules/k6/http/request.go`) only
+   * encodes when the body is an object — it runs it through Go's
+   * `url.Values.Encode()` (space→`+`, `+`→`%2B`, `@`→`%40`, …). A STRING body is
+   * sent byte-for-byte with no encoding, so a value like `user+name@x.com` arrives
+   * with the `+` decoded to a space server-side (form rule: `+` == space). Emitting
+   * an object matches k6's documented behavior and the k6-Studio convert path.
+   *
+   * Recorded bodies store values already percent-encoded, so each value is
+   * URL-DECODED here before emitting — k6 re-encodes, avoiding double-encoding.
+   * Data-file params substituted in later (`getUniqueItem(...)`) return raw
+   * decoded values that k6 then encodes correctly.
+   *
+   * Returns null (→ caller keeps a string body) when the request isn't
+   * form-urlencoded, has no fields, or has duplicate field names (which a plain
+   * object literal can't represent without dropping values).
+   */
+  private static buildFormUrlEncodedBodyObject(
+    postData: NonNullable<TransactionGroup['entries'][number]['postData']>,
+    primaryBaseUrl?: string,
+  ): string | null {
+    if (!/application\/x-www-form-urlencoded/i.test(postData.mimeType || '')) return null;
+
+    const decode = (s: string): string => {
+      try { return decodeURIComponent(s.replace(/\+/g, ' ')); } catch { return s; }
+    };
+
+    let pairs: { name: string; value: string }[];
+    if (postData.params && postData.params.length > 0) {
+      // HAR `params` are already decoded — use as-is.
+      pairs = postData.params.map((p) => ({ name: p.name, value: p.value ?? '' }));
+    } else if (postData.text) {
+      // Raw body text is percent-encoded — decode each half of every pair.
+      pairs = postData.text.split('&').filter(Boolean).map((kv) => {
+        const eq = kv.indexOf('=');
+        const rawName = eq >= 0 ? kv.slice(0, eq) : kv;
+        const rawVal = eq >= 0 ? kv.slice(eq + 1) : '';
+        return { name: decode(rawName), value: decode(rawVal) };
+      });
+    } else {
+      return null;
+    }
+
+    if (pairs.length === 0) return null;
+    if (new Set(pairs.map((p) => p.name)).size !== pairs.length) return null; // dup keys → string body
+
+    const obj: Record<string, string> = {};
+    for (const { name, value } of pairs) obj[name] = value;
+    return this.formatInlineObject(obj, 8, primaryBaseUrl);
   }
 
   /**
