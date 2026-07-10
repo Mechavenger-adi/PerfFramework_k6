@@ -66,6 +66,13 @@
     "usedIn": [
       "core_engine/src/cli/run.ts"
     ],
+    "var": "K6_PERF_LIVE_TABLE"
+  },
+  {
+    "templates": [],
+    "usedIn": [
+      "core_engine/src/cli/run.ts"
+    ],
     "var": "K6_PERF_MACHINE"
   },
   {
@@ -116,5 +123,12 @@
       "core_engine/src/utils/logger.ts"
     ],
     "var": "NO_COLOR"
+  },
+  {
+    "templates": [],
+    "usedIn": [
+      "core_engine/src/cli/run.ts"
+    ],
+    "var": "TERM_PROGRAM"
   }
 ]

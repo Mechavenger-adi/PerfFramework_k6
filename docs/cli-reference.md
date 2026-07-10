@@ -32,7 +32,7 @@ Running with no subcommand on a TTY launches the interactive panel; non-TTY prin
 | `features` | Discover built-in framework capabilities |
 | `config` | Configuration utilities |
 | `config inspect` | Inspect the final merged configuration resolution chain |
-| `debug` | Run a script in single-iteration debug mode and generate an HTML diff report |
+| `debug` | Run a script in debug mode (single VU) and generate an HTML diff report |
 | `run` | Execute a test plan through k6 |
 
 ## Reference
@@ -205,7 +205,7 @@ Inspect the final merged configuration resolution chain
 
 ### `debug`
 
-Run a script in single-iteration debug mode and generate an HTML diff report
+Run a script in debug mode (single VU) and generate an HTML diff report
 
 | Option | Required | Default | Description |
 |--------|----------|---------|-------------|
@@ -213,6 +213,8 @@ Run a script in single-iteration debug mode and generate an HTML diff report
 | `--recording-log <path>` | no |  | Path to the normalized recording-log JSON file |
 | `--out <path>` | no |  | Path to the HTML diff report |
 | `--replay-log <path>` | no |  | Optional path to save the captured replay-log JSON file |
+| `--iterations <n>` | no | `1` | Number of iterations to run (single VU; default 1) |
+| `--i <n>` | no |  | Alias for --iterations |
 
 ### `run`
 

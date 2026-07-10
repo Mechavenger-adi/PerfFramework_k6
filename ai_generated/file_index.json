@@ -289,7 +289,7 @@
     ],
     "importsNode": true,
     "layer": "cli",
-    "loc": 2259,
+    "loc": 2284,
     "path": "core_engine/src/cli/run.ts"
   },
   {
@@ -1186,7 +1186,7 @@
     ],
     "importsNode": false,
     "layer": "recording",
-    "loc": 371,
+    "loc": 435,
     "path": "core_engine/src/recording/ScriptGenerator.ts"
   },
   {
@@ -1660,7 +1660,7 @@
     ],
     "importsNode": true,
     "layer": "utils",
-    "loc": 124,
+    "loc": 132,
     "path": "core_engine/src/utils/LiveConsoleLogStream.ts"
   },
   {

@@ -468,7 +468,7 @@
     "files": [
       {
         "exports": [],
-        "loc": 2259,
+        "loc": 2284,
         "path": "core_engine/src/cli/run.ts"
       },
       {
@@ -846,7 +846,7 @@
           "SCRIPT_API_MODULE",
           "ScriptGenerator"
         ],
-        "loc": 371,
+        "loc": 435,
         "path": "core_engine/src/recording/ScriptGenerator.ts"
       },
       {

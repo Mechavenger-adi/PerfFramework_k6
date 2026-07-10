@@ -351,16 +351,23 @@ configCmd
 
 program
   .command('debug')
-  .description('Run a script in single-iteration debug mode and generate an HTML diff report')
+  .description('Run a script in debug mode (single VU) and generate an HTML diff report')
   .requiredOption('--script <path>', 'Path to the generated journey script')
   .option('--recording-log <path>', 'Path to the normalized recording-log JSON file')
   .option('--out <path>', 'Path to the HTML diff report', path.join('results', 'debug-diff.html'))
   .option('--replay-log <path>', 'Optional path to save the captured replay-log JSON file')
+  .option('--iterations <n>', 'Number of iterations to run (single VU; default 1)', '1')
+  .option('--i <n>', 'Alias for --iterations')
   .allowUnknownOption()
   .allowExcessArguments()
   .action(async (opts, cmd) => {
     Logger.header('k6 Performance Framework – DEBUG');
     const passthroughArgs = filterPassthroughArgs(cmd.args as string[]);
+    // Debug mode is always single-VU (ReplayRunner enforces vus=1); iterations
+    // are configurable so a script can be smoke-run a few times (e.g. to verify
+    // cookie/session persistence across iterations) without authoring a plan.
+    // Accept any of -i / --i / --iterations (--i wins if both are supplied).
+    const iterations = Math.max(1, Number.parseInt(opts.i ?? opts.iterations, 10) || 1);
 
     try {
       const resolvedRecordingLogPath = opts.recordingLog
@@ -372,7 +379,7 @@ program
         outHtmlPath: opts.out,
         replayLogPath: opts.replayLog,
         vus: 1,
-        iterations: 1,
+        iterations,
         extraK6Args: passthroughArgs,
       });
 
