@@ -47,6 +47,8 @@ import { runValidate } from './validate';
 import { runMerge } from '../distributed/runMerge';
 import { runCollect, collectRunDir } from '../distributed/collectRun';
 import { awaitScheduledStart } from '../distributed/startBarrier';
+import { runAgentCli } from '../distributed/agentServer';
+import { runProbe } from '../distributed/probe';
 import { listTemplates, showTemplate } from './templates';
 import { listFeatures } from './features';
 import { inspectConfig } from './config-inspect';
@@ -280,6 +282,37 @@ program
   .option('--run-id <id>', 'Shared runId (defaults to the run-manifest runId)')
   .action((opts) => {
     const ok = runCollect({ from: opts.from, into: opts.into, machine: opts.machine || os.hostname(), runId: opts.runId });
+    if (!ok) process.exit(1);
+  });
+
+// ---------------------------------------------
+// AGENT command (distributed / Phase-2 probe) — run on each LG so the controller
+// can verify the firewall permits the controller→agent inbound path.
+// ---------------------------------------------
+program
+  .command('agent')
+  .description('Run a minimal reachability agent on a load generator (Phase-2 firewall probe)')
+  .option('--port <port>', 'Port to listen on', '7070')
+  .option('--host <host>', 'Interface to bind (0.0.0.0 = all interfaces)', '0.0.0.0')
+  .option('--name <name>', 'Machine name reported to the controller (defaults to hostname)')
+  .option('--token <token>', 'Optional shared secret required on every request (or K6_PERF_AGENT_TOKEN)')
+  .action(async (opts) => {
+    await runAgentCli({ port: opts.port, host: opts.host, name: opts.name, token: opts.token });
+  });
+
+// ---------------------------------------------
+// PROBE command (distributed / Phase-2 probe) — run on the controller to check
+// reachability of one or more agents (the firewall go/no-go for the controller approach).
+// ---------------------------------------------
+program
+  .command('probe')
+  .description('Probe reachability of one or more distributed agents from the controller')
+  .requiredOption('--agents <list>', 'Comma-separated agent targets, e.g. host1:7070,host2:7070')
+  .option('--port <port>', 'Default port when a target omits one', '7070')
+  .option('--timeout <ms>', 'Per-agent timeout in milliseconds', '5000')
+  .option('--token <token>', 'Shared secret to send (or K6_PERF_AGENT_TOKEN)')
+  .action(async (opts) => {
+    const ok = await runProbe({ agents: opts.agents, port: opts.port, timeout: opts.timeout, token: opts.token });
     if (!ok) process.exit(1);
   });
 

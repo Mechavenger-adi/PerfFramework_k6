@@ -230,7 +230,15 @@
     },
     {
       "from": "core_engine/src/cli/run.ts",
+      "to": "core_engine/src/distributed/agentServer.ts"
+    },
+    {
+      "from": "core_engine/src/cli/run.ts",
       "to": "core_engine/src/distributed/collectRun.ts"
+    },
+    {
+      "from": "core_engine/src/cli/run.ts",
+      "to": "core_engine/src/distributed/probe.ts"
     },
     {
       "from": "core_engine/src/cli/run.ts",
@@ -545,6 +553,10 @@
       "to": "core_engine/src/utils/ProgressBar.ts"
     },
     {
+      "from": "core_engine/src/distributed/agentServer.ts",
+      "to": "core_engine/src/utils/logger.ts"
+    },
+    {
       "from": "core_engine/src/distributed/collectRun.ts",
       "to": "core_engine/src/utils/logger.ts"
     },
@@ -575,6 +587,10 @@
     {
       "from": "core_engine/src/distributed/MergeEngine.ts",
       "to": "core_engine/src/types/ReportingContracts.ts"
+    },
+    {
+      "from": "core_engine/src/distributed/probe.ts",
+      "to": "core_engine/src/utils/logger.ts"
     },
     {
       "from": "core_engine/src/distributed/runMerge.ts",
@@ -885,7 +901,9 @@
     "core_engine/src/debug/VariableInstrumenter.ts",
     "core_engine/src/distributed/MergeEngine.ts",
     "core_engine/src/distributed/MergedReportBuilder.ts",
+    "core_engine/src/distributed/agentServer.ts",
     "core_engine/src/distributed/collectRun.ts",
+    "core_engine/src/distributed/probe.ts",
     "core_engine/src/distributed/runMerge.ts",
     "core_engine/src/distributed/startBarrier.ts",
     "core_engine/src/engine.ts",

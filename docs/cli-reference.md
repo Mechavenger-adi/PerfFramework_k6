@@ -26,6 +26,8 @@ Running with no subcommand on a TTY launches the interactive panel; non-TTY prin
 | `validate` | Validate configs and test plan before execution |
 | `merge` | Merge per-machine distributed run artifacts into a single report |
 | `collect` | Copy a finished local run folder into <collectDir>/shared_<runId>/<machine>/ |
+| `agent` | Run a minimal reachability agent on a load generator (Phase-2 firewall probe) |
+| `probe` | Probe reachability of one or more distributed agents from the controller |
 | `templates` | Discover and view built-in config templates |
 | `templates list` | List all available templates |
 | `templates show <name>` | Show the content of a specific template |
@@ -161,6 +163,28 @@ Copy a finished local run folder into <collectDir>/shared_<runId>/<machine>/
 | `--into <path>` | yes |  | Shared collect base dir |
 | `--machine <name>` | no |  | Machine name (defaults to hostname) |
 | `--run-id <id>` | no |  | Shared runId (defaults to the run-manifest runId) |
+
+### `agent`
+
+Run a minimal reachability agent on a load generator (Phase-2 firewall probe)
+
+| Option | Required | Default | Description |
+|--------|----------|---------|-------------|
+| `--port <port>` | no | `7070` | Port to listen on |
+| `--host <host>` | no | `0.0.0.0` | Interface to bind (0.0.0.0 = all interfaces) |
+| `--name <name>` | no |  | Machine name reported to the controller (defaults to hostname) |
+| `--token <token>` | no |  | Optional shared secret required on every request (or K6_PERF_AGENT_TOKEN) |
+
+### `probe`
+
+Probe reachability of one or more distributed agents from the controller
+
+| Option | Required | Default | Description |
+|--------|----------|---------|-------------|
+| `--agents <list>` | yes |  | Comma-separated agent targets, e.g. host1:7070,host2:7070 |
+| `--port <port>` | no | `7070` | Default port when a target omits one |
+| `--timeout <ms>` | no | `5000` | Per-agent timeout in milliseconds |
+| `--token <token>` | no |  | Shared secret to send (or K6_PERF_AGENT_TOKEN) |
 
 ### `templates`
 

@@ -174,7 +174,15 @@
     },
     {
       "from": "core_engine/src/cli/run.ts",
+      "to": "core_engine/src/distributed/agentServer.ts"
+    },
+    {
+      "from": "core_engine/src/cli/run.ts",
       "to": "core_engine/src/distributed/collectRun.ts"
+    },
+    {
+      "from": "core_engine/src/cli/run.ts",
+      "to": "core_engine/src/distributed/probe.ts"
     },
     {
       "from": "core_engine/src/cli/run.ts",
@@ -325,6 +333,10 @@
       "to": "core_engine/src/utils/ProgressBar.ts"
     },
     {
+      "from": "core_engine/src/distributed/agentServer.ts",
+      "to": "core_engine/src/utils/logger.ts"
+    },
+    {
       "from": "core_engine/src/distributed/collectRun.ts",
       "to": "core_engine/src/utils/logger.ts"
     },
@@ -335,6 +347,10 @@
     {
       "from": "core_engine/src/distributed/MergeEngine.ts",
       "to": "core_engine/src/reporting/Histogram.ts"
+    },
+    {
+      "from": "core_engine/src/distributed/probe.ts",
+      "to": "core_engine/src/utils/logger.ts"
     },
     {
       "from": "core_engine/src/distributed/runMerge.ts",

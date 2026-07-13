@@ -34,6 +34,14 @@
   {
     "templates": [],
     "usedIn": [
+      "core_engine/src/distributed/agentServer.ts",
+      "core_engine/src/distributed/probe.ts"
+    ],
+    "var": "K6_PERF_AGENT_TOKEN"
+  },
+  {
+    "templates": [],
+    "usedIn": [
       "core_engine/src/cli/run.ts"
     ],
     "var": "K6_PERF_COLLECT_DIR"

@@ -243,7 +243,9 @@
       "core_engine/src/config/RuntimeConfigManager.ts",
       "core_engine/src/debug/RecordingLogResolver.ts",
       "core_engine/src/debug/ReplayRunner.ts",
+      "core_engine/src/distributed/agentServer.ts",
       "core_engine/src/distributed/collectRun.ts",
+      "core_engine/src/distributed/probe.ts",
       "core_engine/src/distributed/runMerge.ts",
       "core_engine/src/distributed/startBarrier.ts",
       "core_engine/src/execution/FileWriteSink.ts",
@@ -289,7 +291,7 @@
     ],
     "importsNode": true,
     "layer": "cli",
-    "loc": 2284,
+    "loc": 2317,
     "path": "core_engine/src/cli/run.ts"
   },
   {
@@ -791,6 +793,25 @@
   },
   {
     "exports": [
+      "AgentServerOptions",
+      "runAgent",
+      "runAgentCli"
+    ],
+    "imports": [
+      "core_engine/src/utils/logger.ts",
+      "child_process",
+      "crypto",
+      "fs",
+      "http",
+      "os"
+    ],
+    "importsNode": true,
+    "layer": "distributed",
+    "loc": 171,
+    "path": "core_engine/src/distributed/agentServer.ts"
+  },
+  {
+    "exports": [
       "collectRunDir",
       "runCollect",
       "sharedRunFolder"
@@ -804,6 +825,23 @@
     "layer": "distributed",
     "loc": 67,
     "path": "core_engine/src/distributed/collectRun.ts"
+  },
+  {
+    "exports": [
+      "ProbeResult",
+      "ProbeTarget",
+      "parseTarget",
+      "probeOne",
+      "runProbe"
+    ],
+    "imports": [
+      "core_engine/src/utils/logger.ts",
+      "http"
+    ],
+    "importsNode": true,
+    "layer": "distributed",
+    "loc": 175,
+    "path": "core_engine/src/distributed/probe.ts"
   },
   {
     "exports": [
