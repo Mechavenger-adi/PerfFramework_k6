@@ -612,6 +612,17 @@
   },
   {
     "headings": [
+      "Distributed Load Test — Build Progress Tracker",
+      "Pre-work / spikes",
+      "Build steps (from EDD)",
+      "Sub-tasks — Step 1 (done)"
+    ],
+    "layer": "L2",
+    "path": "engineering_docs/distributed-loadtest-progress.md",
+    "title": "Distributed Load Test — Build Progress Tracker"
+  },
+  {
+    "headings": [
       "EDD: Smart Auto-Correlation",
       "Executive Summary",
       "Problem Statement",

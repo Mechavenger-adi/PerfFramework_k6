@@ -47,6 +47,13 @@
     "var": "K6_PERF_COLLECT_DIR"
   },
   {
+    "templates": [],
+    "usedIn": [
+      "core_engine/src/cli/run.ts"
+    ],
+    "var": "K6_PERF_DISTRIBUTED"
+  },
+  {
     "templates": [
       ".env.template"
     ],
@@ -89,6 +96,13 @@
       "core_engine/src/cli/run.ts"
     ],
     "var": "K6_PERF_REQUEST_LOG"
+  },
+  {
+    "templates": [],
+    "usedIn": [
+      "core_engine/src/cli/run.ts"
+    ],
+    "var": "K6_PERF_ROLE"
   },
   {
     "templates": [],

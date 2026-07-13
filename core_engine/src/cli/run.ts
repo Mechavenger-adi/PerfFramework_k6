@@ -440,6 +440,8 @@ program
   .option('--data-root <path>', 'Root directory for data files', 'testSuites')
   .option('--debug', 'Enable debug mode (prints resolved config)')
   .option('--out <k6-output>', 'k6 --out flag value (e.g. json=results.json)')
+  .option('--distributed', 'Enable distributed mode (or set K6_PERF_DISTRIBUTED=1)')
+  .option('--role <role>', 'Distributed role: controller | agent')
   .allowUnknownOption()
   .allowExcessArguments()
   .action(async (opts, cmd) => {
@@ -455,6 +457,24 @@ program
     } catch (err) {
       Logger.fail((err as Error).message);
       process.exit(1);
+    }
+
+    // -- Distributed mode (opt-in) --------------
+    // K6_PERF_DISTRIBUTED=1 or --distributed. Resolved once into a single boolean +
+    // role so downstream (identity tags, HTML policy, forced CSV, collect) has one
+    // source of truth. Non-distributed (local) runs are completely unaffected.
+    const distributed =
+      opts.distributed === true || /^(1|true|yes)$/i.test(process.env.K6_PERF_DISTRIBUTED ?? '');
+    const distRole = (opts.role || process.env.K6_PERF_ROLE || '').toLowerCase();
+    // Shared test id — stamped as a k6 tag (distributed) and into the CSV filenames.
+    const testId = process.env.K6_PERF_TEST_ID?.trim() || `TID_${plan.name}`;
+    if (distributed) {
+      process.env.K6_PERF_DISTRIBUTED = '1'; // normalize for children/downstream
+      Logger.detail(`[distributed] mode ON${distRole ? `, role=${distRole}` : ''} · testId=${testId}`);
+      if (!process.env.K6_PERF_MACHINE)
+        Logger.warning('[distributed] K6_PERF_MACHINE not set — defaulting to hostname; set a unique name per machine.');
+      if (!process.env.K6_PERF_START_AT)
+        Logger.warning('[distributed] K6_PERF_START_AT not set — machines will not start together; ramps may not align.');
     }
 
     // -- Step 2: Resolve configs ----------------
@@ -519,8 +539,15 @@ program
     fs.mkdirSync(entryScriptDir, { recursive: true });
 
     let entryCode = '';
-    entryCode += `import { htmlReport } from "https://raw.githubusercontent.com/benc-uk/k6-reporter/main/dist/bundle.js";\n`;
-    entryCode += `import { textSummary } from "https://jslib.k6.io/k6-summary/0.0.1/index.js";\n`;
+    // In distributed mode the LG is headless: no CDN imports (air-gap safe — both
+    // benc-uk/k6-reporter and jslib.k6.io are remote) and no per-machine HTML. Only
+    // handleSummary.json (a data artifact the report/threshold logic consumes) is
+    // written; the single merged RunReport comes from the merge step. Local
+    // (non-distributed) runs keep the full HTML + textSummary behavior unchanged.
+    if (!distributed) {
+      entryCode += `import { htmlReport } from "https://raw.githubusercontent.com/benc-uk/k6-reporter/main/dist/bundle.js";\n`;
+      entryCode += `import { textSummary } from "https://jslib.k6.io/k6-summary/0.0.1/index.js";\n`;
+    }
     for (const journey of plan.user_journeys) {
       const execName = journey.name.replace(/[^a-zA-Z0-9_]/g, '_');
       const importPath = toImportSpecifier(entryScriptDir, journey.scriptPath);
@@ -528,9 +555,13 @@ program
     }
     entryCode += `\nexport function handleSummary(data) {\n`;
     entryCode += `  return {\n`;
-    entryCode += `    "${safeReportDir}/k6-reporter-summary.html": htmlReport(data),\n`;
+    if (!distributed) {
+      entryCode += `    "${safeReportDir}/k6-reporter-summary.html": htmlReport(data),\n`;
+    }
     entryCode += `    "${safeReportDir}/handleSummary.json": JSON.stringify(data),\n`;
-    entryCode += `    stdout: textSummary(data, { indent: " ", enableColors: true }),\n`;
+    if (!distributed) {
+      entryCode += `    stdout: textSummary(data, { indent: " ", enableColors: true }),\n`;
+    }
     entryCode += `  };\n`;
     entryCode += `}\n`;
 
@@ -595,7 +626,9 @@ program
     const requestLogEnabled = !/^(0|false|no)$/i.test(process.env.K6_PERF_REQUEST_LOG ?? '');
     // Per-transaction CSV log — separate toggle. Independent of the request log,
     // but shares the same vu/iter system-tag requirement.
-    const transactionLogEnabled = !/^(0|false|no)$/i.test(process.env.K6_PERF_TRANSACTION_LOG ?? '');
+    // Distributed mode forces the transaction CSV on — it is the raw carrier the
+    // merge pools for R-7 percentiles, so it must not be disabled on an LG.
+    const transactionLogEnabled = distributed || !/^(0|false|no)$/i.test(process.env.K6_PERF_TRANSACTION_LOG ?? '');
     if (requestLogEnabled || transactionLogEnabled) {
       extraArgs.push(
         '--system-tags',
@@ -608,11 +641,14 @@ program
       extraArgs.push('--out', `influxdb=${influxUrl}`);
     }
 
-    // Distributed (opt-in via K6_PERF_MACHINE): tag every metric with this machine
-    // and the shared runId so the merged report can attribute load per agent.
+    // Distributed identity tags: machine + shared runId (+ testId in distributed
+    // mode) so the merge can attribute every point to (machine, run, test). Legacy
+    // K6_PERF_MACHINE-only runs keep exactly their prior machine+runId tags.
     const distMachine = process.env.K6_PERF_MACHINE;
-    if (distMachine) {
-      extraArgs.push('--tag', `machine=${distMachine}`, '--tag', `runId=${runId}`);
+    if (distributed || distMachine) {
+      const machineName = distMachine || os.hostname();
+      extraArgs.push('--tag', `machine=${machineName}`, '--tag', `runId=${runId}`);
+      if (distributed) extraArgs.push('--tag', `testId=${testId}`);
     }
 
     // Execution provenance for the report's "How this test was invoked" panel.
@@ -678,9 +714,7 @@ program
     let transactionLog: TransactionMetricLogWriter | null = null;
     if (requestLogEnabled || transactionLogEnabled) {
       const hostName = process.env.K6_PERF_MACHINE || os.hostname();
-      // Test ID: explicit K6_PERF_TEST_ID wins (lets distributed LGs share one id,
-      // like K6_PERF_RUN_ID), else fall back to the plan-derived TID_<plan> pattern.
-      const testId = process.env.K6_PERF_TEST_ID?.trim() || `TID_${plan.name}`;
+      // testId is resolved once at action scope (used for the k6 tag + these filenames).
       const safe = (s: string) => s.replace(/[^a-zA-Z0-9_.-]/g, '_');
       if (requestLogEnabled) {
         const requestLogPath = path.join(reportDir, `${safe(testId)}_${safe(hostName)}_request_metric.csv`);
@@ -740,6 +774,7 @@ program
       plan,
       resolvedConfig,
       runStatus: runResult.status,
+      distributed,
       hostSnapshots,
       k6StartTime,
       k6EndTime,
@@ -747,8 +782,8 @@ program
       execution: executionDetails,
     });
 
-    Logger.pass('Unified report artifacts generated');
-    Logger.detail(`Unified HTML report: ${generatedArtifacts.runReportHtml}`);
+    Logger.pass(distributed ? 'Run artifacts generated (distributed: per-machine HTML suppressed)' : 'Unified report artifacts generated');
+    if (!distributed) Logger.detail(`Unified HTML report: ${generatedArtifacts.runReportHtml}`);
     Logger.detail(`Transaction metrics: ${generatedArtifacts.transactionMetricsJson}`);
     Logger.detail(`CI summary: ${generatedArtifacts.ciSummaryJson}`);
 
@@ -1255,6 +1290,8 @@ async function finalizeRunArtifacts(options: {
   plan: TestPlan;
   resolvedConfig: ResolvedConfig;
   runStatus: number;
+  /** Distributed mode: suppress the per-machine custom RunReport.html (the merge produces the single report). */
+  distributed?: boolean;
   hostSnapshots: HostSnapshot[];
   k6StartTime?: string;
   k6EndTime?: string;
@@ -1656,7 +1693,11 @@ async function finalizeRunArtifacts(options: {
     },
   };
 
-  fs.writeFileSync(runReportPath, RunReportGenerator.generate(reportBundle), 'utf-8');
+  // Distributed LGs are headless — the single merged RunReport is produced by the
+  // merge step, so skip the per-machine custom HTML here (JSON/CSV artifacts remain).
+  if (!options.distributed) {
+    fs.writeFileSync(runReportPath, RunReportGenerator.generate(reportBundle), 'utf-8');
+  }
 
   // Honor `reporting.timeseries.keepRawMetricsStream` (default true). When
   // false, the raw k6 streaming JSON is removed now that the per-bucket

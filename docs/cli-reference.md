@@ -254,4 +254,6 @@ Execute a test plan through k6
 | `--data-root <path>` | no | `testSuites` | Root directory for data files |
 | `--debug` | no |  | Enable debug mode (prints resolved config) |
 | `--out <k6-output>` | no |  | k6 --out flag value (e.g. json=results.json) |
+| `--distributed` | no |  | Enable distributed mode (or set K6_PERF_DISTRIBUTED=1) |
+| `--role <role>` | no |  | Distributed role: controller | agent |
 
