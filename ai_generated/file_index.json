@@ -291,7 +291,7 @@
     ],
     "importsNode": true,
     "layer": "cli",
-    "loc": 2317,
+    "loc": 2318,
     "path": "core_engine/src/cli/run.ts"
   },
   {
@@ -832,15 +832,17 @@
       "ProbeTarget",
       "parseTarget",
       "probeOne",
+      "probeTcp",
       "runProbe"
     ],
     "imports": [
       "core_engine/src/utils/logger.ts",
-      "http"
+      "http",
+      "net"
     ],
     "importsNode": true,
     "layer": "distributed",
-    "loc": 175,
+    "loc": 243,
     "path": "core_engine/src/distributed/probe.ts"
   },
   {

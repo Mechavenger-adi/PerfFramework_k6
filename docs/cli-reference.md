@@ -185,6 +185,7 @@ Probe reachability of one or more distributed agents from the controller
 | `--port <port>` | no | `7070` | Default port when a target omits one |
 | `--timeout <ms>` | no | `5000` | Per-agent timeout in milliseconds |
 | `--token <token>` | no |  | Shared secret to send (or K6_PERF_AGENT_TOKEN) |
+| `--tcp` | no |  | Raw TCP connect test (works on any port; no HTTP) — for firewall port discovery |
 
 ### `templates`
 

@@ -23,6 +23,7 @@
  */
 
 import * as http from 'http';
+import * as net from 'net';
 import { Logger } from '../utils/logger';
 
 const TOKEN_HEADER = 'x-k6-perf-token';
@@ -45,6 +46,8 @@ export interface ProbeResult {
   k6Version?: string | null;
   /** Human diagnosis (what the failure means for firewall clearance). */
   diagnosis: string;
+  /** TCP mode only: did the packet reach the host (connected or refused)? True → firewall permits this port. */
+  firewallAllowed?: boolean;
 }
 
 /** Parse "host:port" (port optional, defaults to 7070). */
@@ -129,8 +132,45 @@ export function probeOne(target: ProbeTarget, timeoutMs: number, token?: string)
   });
 }
 
+/**
+ * Raw TCP connect test — no HTTP, so it works on ANY port (RDP, an app port, etc.),
+ * not just agents. This is the firewall port-discovery tool: connecting proves the
+ * port is reachable; REFUSED proves the firewall LETS the packet through (host RST'd
+ * an empty port) so the port is safe to run the agent on; TIMED OUT proves the
+ * firewall drops that port. Never rejects.
+ */
+export function probeTcp(target: ProbeTarget, timeoutMs: number): Promise<ProbeResult> {
+  return new Promise((resolve) => {
+    const t0 = Date.now();
+    const socket = new net.Socket();
+    let settled = false;
+    const done = (r: ProbeResult): void => {
+      if (settled) return;
+      settled = true;
+      socket.destroy();
+      resolve(r);
+    };
+    socket.setTimeout(timeoutMs);
+    socket.once('connect', () => {
+      done({ target, reachable: true, firewallAllowed: true, rttMs: Date.now() - t0, diagnosis: `TCP connect OK — the firewall permits this port and something is listening.` });
+    });
+    socket.once('timeout', () => {
+      done({ target, reachable: false, firewallAllowed: false, rttMs: Date.now() - t0, diagnosis: diagnose('ETIMEDOUT', timeoutMs) });
+    });
+    socket.once('error', (err) => {
+      const code = (err as NodeJS.ErrnoException).code;
+      // REFUSED means the packet reached the host (firewall let it through) but the port
+      // is empty — a green light to run the agent on this port.
+      const allowed = code === 'ECONNREFUSED';
+      const hint = allowed ? ' → the firewall ALLOWS this port; it is free and safe to run the agent here.' : '';
+      done({ target, reachable: false, firewallAllowed: allowed, rttMs: Date.now() - t0, diagnosis: diagnose(code, timeoutMs) + hint });
+    });
+    socket.connect(target.port, target.host);
+  });
+}
+
 /** CLI handler for `k6-framework probe`. Returns true iff every target was reachable. */
-export async function runProbe(opts: { agents: string; port: string; timeout: string; token?: string }): Promise<boolean> {
+export async function runProbe(opts: { agents: string; port: string; timeout: string; token?: string; tcp?: boolean }): Promise<boolean> {
   const defaultPort = Number(opts.port) || 7070;
   const timeoutMs = Number(opts.timeout) || 5000;
   const token = opts.token || process.env.K6_PERF_AGENT_TOKEN;
@@ -145,9 +185,37 @@ export async function runProbe(opts: { agents: string; port: string; timeout: st
   if (targets.length === 0) { Logger.fail('[probe] no agents given — use --agents host1:7070,host2:7070'); return false; }
 
   Logger.header('k6-framework probe — controller → agents');
-  Logger.info(`[probe] probing ${targets.length} agent(s), timeout ${timeoutMs}ms, ${token ? 'with token' : 'no token'}`);
+  Logger.info(`[probe] probing ${targets.length} target(s), timeout ${timeoutMs}ms, mode ${opts.tcp ? 'raw-TCP' : 'HTTP'}${opts.tcp ? '' : token ? ', with token' : ', no token'}`);
 
-  const results = await Promise.all(targets.map((t) => probeOne(t, timeoutMs, token)));
+  const results = await Promise.all(
+    targets.map((t) => (opts.tcp ? probeTcp(t, timeoutMs) : probeOne(t, timeoutMs, token))),
+  );
+
+  // ── Raw-TCP discovery mode: report per port whether the FIREWALL permits it, ──
+  // ── distinct from whether something is listening there. ──
+  if (opts.tcp) {
+    for (const r of results) {
+      const label = `${r.target.host}:${r.target.port}`;
+      if (r.reachable) {
+        Logger.pass(`${label} — OPEN (firewall-permitted, listening) · ${r.rttMs}ms`);
+      } else if (r.firewallAllowed) {
+        Logger.warning(`${label} — FIREWALL-ALLOWED but free (nothing listening) · ${r.rttMs}ms`);
+      } else {
+        Logger.fail(`${label} — BLOCKED`);
+      }
+      Logger.detail(r.diagnosis);
+    }
+    const permitted = results.filter((r) => r.firewallAllowed);
+    const free = permitted.filter((r) => !r.reachable).map((r) => r.target.port);
+    Logger.header(`Result: ${permitted.length}/${results.length} port(s) firewall-permitted`);
+    if (permitted.length > 0) {
+      Logger.pass(`Firewall permits: ${permitted.map((r) => r.target.port).join(', ')}`);
+      if (free.length > 0) Logger.detail(`Free to bind the agent (run: agent --port ${free[0]}): ${free.join(', ')}`);
+    } else {
+      Logger.warning('No probed port is firewall-permitted (all TIMED OUT). Ask IT which ports are open server-to-server, or use §4.6 (pull-via-shared / SSH / CI).');
+    }
+    return permitted.length > 0;
+  }
 
   let allOk = true;
   for (const r of results) {

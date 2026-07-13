@@ -311,8 +311,9 @@ program
   .option('--port <port>', 'Default port when a target omits one', '7070')
   .option('--timeout <ms>', 'Per-agent timeout in milliseconds', '5000')
   .option('--token <token>', 'Shared secret to send (or K6_PERF_AGENT_TOKEN)')
+  .option('--tcp', 'Raw TCP connect test (works on any port; no HTTP) — for firewall port discovery')
   .action(async (opts) => {
-    const ok = await runProbe({ agents: opts.agents, port: opts.port, timeout: opts.timeout, token: opts.token });
+    const ok = await runProbe({ agents: opts.agents, port: opts.port, timeout: opts.timeout, token: opts.token, tcp: opts.tcp });
     if (!ok) process.exit(1);
   });
 
