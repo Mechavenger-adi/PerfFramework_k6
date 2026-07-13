@@ -150,14 +150,17 @@ the merge expects. Abort truncates artifacts → its merged report is best-effor
 result. So *stop = valid partial run that flows into the end phase; abort = kill the load, salvage what
 exists.*
 
-**Windows graceful-stop caveat (open — verification spike before coding).** Node cannot cleanly deliver
-`SIGINT` (the Ctrl-C k6 turns into a graceful shutdown) to a child on Windows, so the cross-platform route
-is k6's **local REST API** (`127.0.0.1:6565` on the LG — localhost, no firewall). **To verify:** whether
-the installed k6 (`v2.0.0` build) supports stop-with-summary via `PATCH /v1/status`.
-- **If yes** → graceful stop = one local API call.
-- **If no** → **cooperative drain**: the generated entry script checks a local stop-flag at each iteration
-  boundary and returns early once set (framework writes the flag on seeing the share marker). OS-independent,
-  fully in our control. Abort (kill) is unconditionally reliable regardless.
+**Graceful-stop mechanism — VERIFIED (spike 2026-07-14).** Node cannot cleanly deliver `SIGINT` to a child
+on Windows, so graceful stop uses k6's **local REST API** (`127.0.0.1:6565` on the LG — localhost, no
+firewall). Confirmed on the installed `v2.0.0` build: `PATCH /v1/status {"stopped":true}` stops the run
+**early and runs `handleSummary`/`teardown`** (spike observed the summary file written with `iterations:30`
+and the run ending well before its 40s duration). So **graceful stop = one local API call**; the
+cooperative-drain fallback is **not** needed.
+- **Exit code:** an API-stopped k6 exits **non-zero (observed 103)** → the framework must map that exit to
+  **STOPPED-EARLY**, not a crash/failed run.
+- **Precondition:** the k6 REST API must stay enabled (default `127.0.0.1:6565`); `PipelineRunner` must not
+  disable it, and should make the address configurable to avoid clashes if a box ever runs two k6s.
+- **abort** stays a hard child-kill (`taskkill /F /T`), unconditionally reliable, no summary.
 
 **Coordination.** `stop` carries `effectiveAt` (e.g. now + 10 s) so all LGs drain at the same wall-clock
 instant (tight merged window); `abort` is immediate (next poll). The merged report records each LG's actual
@@ -249,9 +252,9 @@ machine can read/write.
 ## Limitations
 - **Best-effort start** (shared wall-clock, no VU-init barrier) — set `START_AT` far enough ahead.
 - **No live merged percentile** this phase (per-machine p95 live; exact merged at end).
-- **Mid-test control:** `abort` (kill) is reliable but yields partial artifacts flagged INVALID;
-  **graceful `stop` mechanism is unverified** (k6 REST API vs cooperative drain — spike pending; Windows
-  can't cleanly `SIGINT` a child).
+- **Mid-test control:** `abort` (kill) is reliable but yields partial artifacts flagged INVALID; graceful
+  `stop` uses the k6 REST API `PATCH /v1/status` (**verified** — runs handleSummary; maps exit 103 →
+  STOPPED-EARLY).
 - **Shared-location dependency** (read/write from every machine); **manual share setup** this phase
   (controller-hosted share needs inbound SMB/445 from LGs; neutral share avoids it); **manual discipline**
   (consistent `runId`/`START_AT`/`testId`, correct VU split).

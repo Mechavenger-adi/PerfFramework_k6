@@ -10,7 +10,7 @@ _Last updated: 2026-07-14 (step 1 done + verified)_
 | Item | Status | Notes |
 |---|---|---|
 | Firewall validation (`agent`/`probe`/`probe --tcp`) | ✅ | Committed. Finding: port-filtering (3389 open, 7070 blocked). |
-| k6 REST-API graceful-stop spike | ⬜ | Decides step 6 stop mechanism (API `PATCH /v1/status` vs cooperative drain). |
+| k6 REST-API graceful-stop spike | ✅ | VERIFIED on k6 v2.0.0: `PATCH /v1/status {stopped:true}` stops early + runs handleSummary. Graceful stop = one API call; map exit 103 → STOPPED-EARLY; keep REST API enabled. |
 | SMB/445 controller-inbound reachability check | ⬜ | `probe --tcp <controller>:445` — precondition for controller-hosted share. |
 
 ## Build steps (from EDD)
@@ -21,7 +21,7 @@ _Last updated: 2026-07-14 (step 1 done + verified)_
 | 3 | CSV reader → R-7 pooled percentiles in `MergeEngine`; `Final_<testname>_<ts>` naming | ⬜ | Unit note: CSV sec→ms normalization. |
 | 4 | Agent live-status heartbeat + controller combined console aggregator | ⬜ | Per-machine `*.status.json`; exact counts/throughput, per-machine p95. |
 | 5 | Live Run Report regeneration + local HTTP server (configurable bind) | ⬜ | Local now; network-shareable when a port opens. |
-| 6 | Mid-test control: `control_<runId>` file + agent poll/executor + dashboard buttons + ack | ⬜🔬 | Gated by k6-REST-API spike. abort=kill; stop=graceful. |
+| 6 | Mid-test control: `control_<runId>` file + agent poll/executor + dashboard buttons + ack | ⬜ | Unblocked: abort=kill; stop=k6 REST API `PATCH /v1/status` (verified). Map exit 103→STOPPED-EARLY. |
 | 7 | `merge --wait` auto-finalize + raw-stream exclusion from collect | ⬜ | |
 | 8 | Bucketed p95-over-time in merged timeseries; manifest/`testId` validation + split-CSV guardrail; docs | ⬜ | |
 
