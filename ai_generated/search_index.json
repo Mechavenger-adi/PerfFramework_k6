@@ -685,6 +685,30 @@
   },
   {
     "headings": [
+      "EDD: Distributed Load Test (Manual / Shared-Location)",
+      "Executive Summary",
+      "Problem Statement & Constraints (discovered 2026-07-14)",
+      "Goals / Non-Goals",
+      "Roles (honest naming)",
+      "Mode Switch & Configuration",
+      "Metric Identity Tags",
+      "LG-side Behaviour in Distributed Mode",
+      "Live Monitoring (hybrid — the reliability-safe path)",
+      "Accuracy Model (histogram-parked)",
+      "End-of-run Collection & Merge",
+      "Folder Layout (on the shared location)",
+      "CLI Surface",
+      "Validation",
+      "Build Order (each independently committable; local runs untouched)",
+      "Limitations",
+      "Phase-2 Alignment (why this is not throwaway)"
+    ],
+    "layer": "L2",
+    "path": "engineering_docs/edd/EDD-distributed-loadtest.md",
+    "title": "Distributed Load Test (Manual / Shared-Location) — Engineering Design Document"
+  },
+  {
+    "headings": [
       "EDD: VU Lifecycle & Phase Envelope",
       "Executive Summary",
       "Problem Statement",
