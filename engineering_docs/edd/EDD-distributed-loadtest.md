@@ -48,8 +48,9 @@ substrate, and live dashboard become the automated controller's building blocks 
 - **Goals:** multi-machine load with a shared start time; **no inbound port**; live combined monitoring +
   a locally-served live Run Report; a single exact merged report at the end; local single-machine runs
   **unchanged**; forward-aligned so Phase-2 reuses it.
-- **Non-Goals (this phase):** true VU-init start barrier; live mid-test abort/`test.abort()`; HDR
-  histograms; controller→agent network command channel; auto-distribution of the test bundle.
+- **Non-Goals (this phase):** true VU-init start barrier; HDR histograms; controller→agent network
+  command channel; auto-distribution of the test bundle; automated share creation. (User-initiated
+  abort/stop via a shared control file **is** in scope — see Mid-test Control.)
 
 ## Roles (honest naming)
 - **agent** — an LG. Runs its slice, writes locally, pushes a light live-status file + (at end) its full
@@ -124,6 +125,63 @@ uptime). Instead:
 every few seconds) — the live view shows **per-machine p95**, clearly labelled. The **exact merged
 percentile appears only in the final report**.
 
+## Mid-test Control (Abort / Stop) — control surface via the live report
+Turns the live report from a monitor into a control surface, reusing the same outbound-only shared
+folder — no inbound port on the LGs.
+
+**Signal path.** Dashboard `[Abort]`/`[Stop]` button → controller's local HTTP server `POST /control` →
+controller writes `<share>/control_<runId>/control.json` `{action, effectiveAt, by, token?}` → each LG
+polls `control_<runId>/` every heartbeat cycle → acts → writes its state back into its status file
+(`running`/`stopping`/`aborting`/`stopped`/`aborted`) → dashboard renders per-LG **acknowledgement** and
+flags any LG that did not ack (e.g. lost share access → kill it manually). CLI fallback:
+`signal --run <share> --mode abort|stop`. Control is **namespaced by `runId`** so a stale marker can never
+leak into another run.
+
+**Two modes (the LG framework process owns the k6 child and drives the stop):**
+
+| Mode | Mechanism | k6 end-of-test | Merged report |
+|---|---|---|---|
+| **abort** | kill the k6 child (`taskkill /F /T` / `SIGKILL`) — immediate, cross-platform | `handleSummary`/`teardown` do **not** run | best-effort partial, flagged **ABORTED / INVALID** (built from CSV + json up to the kill) |
+| **stop** | graceful early end (stop scheduling, drain in-flight, run teardown + `handleSummary`) | runs normally | **valid**, flagged **STOPPED-EARLY** (metrics over the actual shorter window) |
+
+**Why stop → "go to end phase":** collect+merge needs each LG's artifacts **complete and consistent**;
+only a graceful stop produces that (it runs the normal end-of-test path), so every LG lands exactly where
+the merge expects. Abort truncates artifacts → its merged report is best-effort/invalid, not a clean early
+result. So *stop = valid partial run that flows into the end phase; abort = kill the load, salvage what
+exists.*
+
+**Windows graceful-stop caveat (open — verification spike before coding).** Node cannot cleanly deliver
+`SIGINT` (the Ctrl-C k6 turns into a graceful shutdown) to a child on Windows, so the cross-platform route
+is k6's **local REST API** (`127.0.0.1:6565` on the LG — localhost, no firewall). **To verify:** whether
+the installed k6 (`v2.0.0` build) supports stop-with-summary via `PATCH /v1/status`.
+- **If yes** → graceful stop = one local API call.
+- **If no** → **cooperative drain**: the generated entry script checks a local stop-flag at each iteration
+  boundary and returns early once set (framework writes the flag on seeing the share marker). OS-independent,
+  fully in our control. Abort (kill) is unconditionally reliable regardless.
+
+**Coordination.** `stop` carries `effectiveAt` (e.g. now + 10 s) so all LGs drain at the same wall-clock
+instant (tight merged window); `abort` is immediate (next poll). The merged report records each LG's actual
+stop time and the spread. `abort` supersedes a pending `stop`.
+
+**Minor.** Anyone with share-write could drop a marker (mitigate: runId namespace now, optional `token` in
+`control.json` later). An LG that already finished naturally ignores the marker.
+
+## Shared-Location Provisioning
+The shared folder is where live status + collected results land (§Live, §End). It is an SMB location every
+machine can read/write.
+
+- **This phase (manual):** when a machine starts as `role=controller`, the framework **suggests** the user
+  share the controller's own results directory (`K6_RESULTS_BASE_DIR`) via normal Windows folder sharing,
+  then use that shared path as `K6_PERF_COLLECT_DIR` on the LGs. Hosting the share **on the controller**
+  means the controller reads/merges **locally** (no copy-back). The framework prints the resulting UNC path
+  + the ready-to-paste `K6_PERF_COLLECT_DIR=\\<controller>\<share>` line for the LGs. It does **not** create
+  the share itself. (A neutral corporate file share both machines are clients of is an equally valid
+  alternative and avoids inbound SMB on the controller.)
+- **Dependency:** a controller-hosted share makes the controller an SMB server → **inbound 445 must be
+  reachable from the LGs.** Verify with the existing tool: `probe --tcp <controller>:445` from an LG.
+- **Phase-2 (deferred):** automate share creation on the controller (`New-SmbShare` + `icacls` grants, or
+  printed elevated commands when policy/UAC blocks it). 📝 **Not built now** — manual suggestion only.
+
 ## Accuracy Model (histogram-parked)
 - **Additive quantities** (count, pass/fail, iterations, data, errors, VUs) → **summed**; rates recomputed
   from sums; avg **count-weighted**; min/max → min/max. All **exact**, including across machines.
@@ -164,8 +222,10 @@ percentile appears only in the final report**.
 ## CLI Surface
 - **Built:** `agent` (firewall probe target), `probe` / `probe --tcp` (reachability + port discovery).
 - **This EDD adds:** `run --distributed --role agent|controller`; a controller live-monitor server
-  (`monitor --serve --host --port`, or folded into the controller role); `merge --wait --machines`;
-  `Final_<testname>_<ts>` output naming.
+  (`monitor --serve --host --port`, or folded into the controller role) with `POST /control`;
+  `signal --run <share> --mode abort|stop [--effective-at]`; `merge --wait --machines`;
+  `Final_<testname>_<ts>` output naming. Controller role **suggests** (does not create) the results-dir
+  share and prints the UNC + `K6_PERF_COLLECT_DIR` line.
 
 ## Validation
 - **Manifest agreement:** merge refuses/warns on mismatched `runId` / `scriptHash` / **`testId`**
@@ -176,17 +236,25 @@ percentile appears only in the final report**.
 
 ## Build Order (each independently committable; local runs untouched)
 1. Mode switch + role + `testId` tag + HTML policy + forced CSV.
-2. CSV reader → R-7 pooled percentiles in `MergeEngine`; `Final_<testname>_<ts>` output naming.
-3. Agent live-status heartbeat + controller combined console aggregator.
-4. Live Run Report regeneration + local HTTP server (configurable bind for future network sharing).
-5. `merge --wait` auto-finalize + raw-stream exclusion from collect.
-6. Bucketed p95-over-time in merged timeseries; manifest/`testId` validation + split-CSV guardrail; docs.
+2. Controller share **suggestion**: print the results-dir UNC + `K6_PERF_COLLECT_DIR` line for LGs
+   (manual sharing this phase); `probe --tcp <controller>:445` reachability hint.
+3. CSV reader → R-7 pooled percentiles in `MergeEngine`; `Final_<testname>_<ts>` output naming.
+4. Agent live-status heartbeat + controller combined console aggregator.
+5. Live Run Report regeneration + local HTTP server (configurable bind for future network sharing).
+6. Mid-test control: `control_<runId>` file + agent poll/executor (abort = kill; stop = graceful) +
+   dashboard buttons/`POST /control` + per-LG ack. **Gated by the k6-REST-API graceful-stop spike.**
+7. `merge --wait` auto-finalize + raw-stream exclusion from collect.
+8. Bucketed p95-over-time in merged timeseries; manifest/`testId` validation + split-CSV guardrail; docs.
 
 ## Limitations
 - **Best-effort start** (shared wall-clock, no VU-init barrier) — set `START_AT` far enough ahead.
-- **No live merged percentile / no mid-test abort** this phase.
-- **Shared-location dependency** (read/write from every machine); **manual discipline** (consistent
-  `runId`/`START_AT`/`testId`, correct VU split).
+- **No live merged percentile** this phase (per-machine p95 live; exact merged at end).
+- **Mid-test control:** `abort` (kill) is reliable but yields partial artifacts flagged INVALID;
+  **graceful `stop` mechanism is unverified** (k6 REST API vs cooperative drain — spike pending; Windows
+  can't cleanly `SIGINT` a child).
+- **Shared-location dependency** (read/write from every machine); **manual share setup** this phase
+  (controller-hosted share needs inbound SMB/445 from LGs; neutral share avoids it); **manual discipline**
+  (consistent `runId`/`START_AT`/`testId`, correct VU split).
 - **Controller contention** if it also generates load; **tail-over-SMB latency** (seconds); **CSV-pool
   ceiling** for endurance (histograms return later).
 - **Live dashboard is controller-local until a port is cleared** (view via RDP/localhost today).
