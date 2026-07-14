@@ -551,24 +551,6 @@ program
       process.exit(1);
     }
 
-    // -- Distributed mode (opt-in) --------------
-    // K6_PERF_DISTRIBUTED=1 or --distributed. Resolved once into a single boolean +
-    // role so downstream (identity tags, HTML policy, forced CSV, collect) has one
-    // source of truth. Non-distributed (local) runs are completely unaffected.
-    const distributed =
-      opts.distributed === true || /^(1|true|yes)$/i.test(process.env.K6_PERF_DISTRIBUTED ?? '');
-    const distRole = (opts.role || process.env.K6_PERF_ROLE || '').toLowerCase();
-    // Shared test id — stamped as a k6 tag (distributed) and into the CSV filenames.
-    const testId = process.env.K6_PERF_TEST_ID?.trim() || `TID_${plan.name}`;
-    if (distributed) {
-      process.env.K6_PERF_DISTRIBUTED = '1'; // normalize for children/downstream
-      Logger.detail(`[distributed] mode ON${distRole ? `, role=${distRole}` : ''} · testId=${testId}`);
-      if (!process.env.K6_PERF_MACHINE)
-        Logger.warning('[distributed] K6_PERF_MACHINE not set — defaulting to hostname; set a unique name per machine.');
-      if (!process.env.K6_PERF_START_AT)
-        Logger.warning('[distributed] K6_PERF_START_AT not set — machines will not start together; ramps may not align.');
-    }
-
     // -- Step 2: Resolve configs ----------------
     const envConfigPath =
       opts.envConfig ?? path.join('config', 'environments', `${plan.environment}.json`);
@@ -587,6 +569,25 @@ program
     } catch (err) {
       Logger.fail(`Config error: ${(err as Error).message}`);
       process.exit(1);
+    }
+
+    // -- Distributed mode (opt-in) --------------
+    // K6_PERF_DISTRIBUTED=1 (or --distributed). Resolved AFTER config resolve so values
+    // set in .env (bridged into process.env by the config layer) are honored too.
+    // One boolean + role → downstream (tags, HTML policy, forced CSV, collect, control)
+    // has a single source of truth. Non-distributed (local) runs are unaffected.
+    const distributed =
+      opts.distributed === true || /^(1|true|yes)$/i.test(process.env.K6_PERF_DISTRIBUTED ?? '');
+    const distRole = (opts.role || process.env.K6_PERF_ROLE || '').toLowerCase();
+    // Shared test id — stamped as a k6 tag (distributed), the manifest, and CSV filenames.
+    const testId = process.env.K6_PERF_TEST_ID?.trim() || `TID_${plan.name}`;
+    if (distributed) {
+      process.env.K6_PERF_DISTRIBUTED = '1'; // normalize for children/downstream
+      Logger.detail(`[distributed] mode ON${distRole ? `, role=${distRole}` : ''} · testId=${testId}`);
+      if (!process.env.K6_PERF_MACHINE)
+        Logger.warning('[distributed] K6_PERF_MACHINE not set — defaulting to hostname; set a unique name per machine.');
+      if (!process.env.K6_PERF_START_AT)
+        Logger.warning('[distributed] K6_PERF_START_AT not set — machines will not start together; ramps may not align.');
     }
 
     // Distributed controller: remind the operator how to share this machine's results
