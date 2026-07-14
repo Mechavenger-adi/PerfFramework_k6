@@ -238,6 +238,10 @@
     },
     {
       "from": "core_engine/src/cli/run.ts",
+      "to": "core_engine/src/distributed/liveDashboard.ts"
+    },
+    {
+      "from": "core_engine/src/cli/run.ts",
       "to": "core_engine/src/distributed/LiveStatusHeartbeat.ts"
     },
     {
@@ -573,6 +577,22 @@
       "to": "core_engine/src/utils/logger.ts"
     },
     {
+      "from": "core_engine/src/distributed/liveAggregate.ts",
+      "to": "core_engine/src/distributed/LiveStatusHeartbeat.ts"
+    },
+    {
+      "from": "core_engine/src/distributed/liveAggregate.ts",
+      "to": "core_engine/src/reporting/Histogram.ts"
+    },
+    {
+      "from": "core_engine/src/distributed/liveDashboard.ts",
+      "to": "core_engine/src/distributed/liveAggregate.ts"
+    },
+    {
+      "from": "core_engine/src/distributed/liveDashboard.ts",
+      "to": "core_engine/src/utils/logger.ts"
+    },
+    {
       "from": "core_engine/src/distributed/LiveStatusHeartbeat.ts",
       "to": "core_engine/src/distributed/transactionCsv.ts"
     },
@@ -614,11 +634,7 @@
     },
     {
       "from": "core_engine/src/distributed/monitor.ts",
-      "to": "core_engine/src/distributed/LiveStatusHeartbeat.ts"
-    },
-    {
-      "from": "core_engine/src/distributed/monitor.ts",
-      "to": "core_engine/src/reporting/Histogram.ts"
+      "to": "core_engine/src/distributed/liveAggregate.ts"
     },
     {
       "from": "core_engine/src/distributed/monitor.ts",
@@ -948,6 +964,8 @@
     "core_engine/src/distributed/MergedReportBuilder.ts",
     "core_engine/src/distributed/agentServer.ts",
     "core_engine/src/distributed/collectRun.ts",
+    "core_engine/src/distributed/liveAggregate.ts",
+    "core_engine/src/distributed/liveDashboard.ts",
     "core_engine/src/distributed/monitor.ts",
     "core_engine/src/distributed/probe.ts",
     "core_engine/src/distributed/runMerge.ts",

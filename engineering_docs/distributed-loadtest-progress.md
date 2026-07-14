@@ -4,7 +4,7 @@ Living status of every feature in the distributed load-test capability.
 Design: [EDD-distributed-loadtest.md](edd/EDD-distributed-loadtest.md). Status legend:
 ⬜ not started · 🟡 in progress · ✅ done · 🔬 needs verification · ⏸️ blocked/deferred.
 
-_Last updated: 2026-07-14 (steps 1–4b done + verified)_
+_Last updated: 2026-07-14 (steps 1–5 done + verified)_
 
 ## Pre-work / spikes
 | Item | Status | Notes |
@@ -21,7 +21,7 @@ _Last updated: 2026-07-14 (steps 1–4b done + verified)_
 | 3 | CSV reader → R-7 pooled percentiles in `MergeEngine`; `Final_<testname>_<ts>` naming | ✅ | Verified: single-machine merged percentiles == source exactly (p90 to the decimal); 2-machine pooling additive; `Final_WebUI_Load_Test___jpet_14_07_2026T10_19`. New: `transactionCsv.ts`. |
 | 4 | Agent live-status heartbeat + controller combined console aggregator | ✅ | Verified: agent writes `<share>/live_<runId>/<machine>.status.json` (running→done) from the txn CSV; `monitor` renders combined table, exact multi-machine sums, auto-exits when done. New: `LiveStatusHeartbeat.ts`, `monitor.ts`. |
 | 4b | Combined live percentiles via mergeable histogram in the heartbeat | ✅ | Verified: heartbeat carries per-txn `RelativeHistogram` (~1.7KB for 9 txns, bounded); monitor merges → combined avg/min/max/p90/p99 (honors plan stats, timing-only filter). 2-machine: counts additive, percentiles from merged histogram. CSV not shipped live; final stays EXACT. |
-| 5 | Live Run Report regeneration + local HTTP server (configurable bind) | ⬜ | Local now; network-shareable when a port opens. |
+| 5 | Live browser dashboard over local HTTP server (configurable bind) | ✅ | Verified: `monitor --serve` serves self-contained page polling `/data.json` (shared `aggregate()`); FLEET + combined-txn tables; `--host`/`--port` (local now, 0.0.0.0 to share). Console+browser unified via `liveAggregate.ts`. New: `liveAggregate.ts`, `liveDashboard.ts`. Full graph report stays the FINAL artifact. |
 | 6 | Mid-test control: `control_<runId>` file + agent poll/executor + dashboard buttons + ack | ⬜ | Unblocked: abort=kill; stop=k6 REST API `PATCH /v1/status` (verified). Map exit 103→STOPPED-EARLY. |
 | 7 | `merge --wait` auto-finalize + raw-stream exclusion from collect | ⬜ | |
 | 8 | Bucketed p95-over-time in merged timeseries; manifest/`testId` validation + split-CSV guardrail; docs | ⬜ | |

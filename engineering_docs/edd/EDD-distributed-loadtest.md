@@ -113,17 +113,20 @@ uptime). Instead:
   — a few KB, size independent of request volume) built from its **LOCAL** transaction CSV.
   **The transaction CSV itself is NEVER shipped live** — only this small derived snapshot is. The raw CSV
   travels to the controller once, at the end, via `collect` (for the exact final merge).
-- **Controller side:** an aggregator polls all `*.status.json`, **merges the per-transaction histograms**
-  (sum bucket counts) into a **combined live transaction table** — count · err% · avg · min · max · p90 ·
-  p95 · p99 (configurable, honors the plan's `summaryTrendStats`) — and regenerates a **live Run Report**
-  every ~5–10 s via the existing `RunReportGenerator`. Per-machine health rows sit alongside to catch a
-  lagging/saturated LG.
-- **Serving:** the controller hosts the live Run Report over a **local HTTP server** with a
-  **configurable bind host/port**. **Today** it binds locally (viewed on the controller via RDP /
-  localhost) because the port is firewall-blocked. **Future**, when a port is cleared, flipping the bind
-  host exposes a **shareable URL across the network** — this is exactly the dashboard the Phase-2
-  controller will serve, so it is built once. (A self-refreshing static copy on the share is an optional
-  fallback for viewing from other machines before a port exists.)
+- **Controller side:** a shared aggregator (`liveAggregate.aggregate()`) polls all `*.status.json`,
+  **merges the per-transaction histograms** (sum bucket counts) into a **combined live transaction table**
+  — count · err% · avg · min · max · p90 · p95 · p99 (configurable, honors the plan's `transactionStats`)
+  — plus a per-machine **FLEET** health panel to catch a lagging/saturated LG. Two front-ends share the
+  aggregate: the **console `monitor`** and the **browser dashboard** (`monitor --serve`).
+- **Serving (`monitor --serve`):** a tiny **local HTTP server** (`liveDashboard.ts`, Node built-ins) serves
+  a **self-contained page** (no external resources — air-gap/CSP safe) that polls `/data.json` (the same
+  `aggregate()`) every few seconds and re-renders the FLEET + combined-transaction tables. **Configurable
+  bind** (`--host`/`--port`): **today** it binds `127.0.0.1` (view on the controller / via RDP) because the
+  port is firewall-blocked; **when a port is cleared**, `--host 0.0.0.0` exposes a **shareable URL** — the
+  same dashboard the Phase-2 controller will serve, built once. **Note:** the live view is a purpose-built
+  dashboard (fleet + combined metrics); the **graph-laden full `RunReport` is the FINAL artifact** — the
+  heartbeats intentionally carry no timeseries, so a live full-report would have empty graphs. A live
+  throughput/percentile-over-time graph (controller samples heartbeats over time) is a possible later add.
 
 **Exact vs approximate, live:** combined **count / throughput / errors / VUs / min / max / avg** are
 **exact** (additive / count-weighted). Combined **percentiles** (p90/p95/p99/med) are read off the

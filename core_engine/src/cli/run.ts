@@ -52,6 +52,7 @@ import { runProbe } from '../distributed/probe';
 import { printControllerShareSuggestion } from '../distributed/shareSetup';
 import { LiveStatusHeartbeat } from '../distributed/LiveStatusHeartbeat';
 import { runMonitor } from '../distributed/monitor';
+import { runDashboardCli } from '../distributed/liveDashboard';
 import { listTemplates, showTemplate } from './templates';
 import { listFeatures } from './features';
 import { inspectConfig } from './config-inspect';
@@ -338,13 +339,27 @@ program
 // ---------------------------------------------
 program
   .command('monitor')
-  .description('Live-monitor a distributed run from the shared live_<runId> folder')
+  .description('Live-monitor a distributed run (console, or --serve for a browser dashboard)')
   .option('--live-dir <path>', 'Path to the live_<runId> folder')
   .option('--collect-dir <path>', 'Shared collect base dir (use with --run-id)')
   .option('--run-id <id>', 'Shared runId (use with --collect-dir)')
   .option('--interval <ms>', 'Refresh interval in milliseconds', '3000')
-  .option('--once', 'Print a single snapshot and exit')
+  .option('--once', 'Print a single snapshot and exit (console only)')
+  .option('--serve', 'Serve a live browser dashboard instead of the console view')
+  .option('--host <host>', 'Dashboard bind host (localhost now; 0.0.0.0 to share once a port is open)', '127.0.0.1')
+  .option('--port <port>', 'Dashboard port', '8787')
   .action(async (opts) => {
+    if (opts.serve) {
+      await runDashboardCli({
+        liveDir: opts.liveDir,
+        collectDir: opts.collectDir,
+        runId: opts.runId,
+        host: opts.host,
+        port: Number(opts.port) || 8787,
+        intervalMs: Number(opts.interval) || 3000,
+      });
+      return;
+    }
     const ok = await runMonitor({
       liveDir: opts.liveDir,
       collectDir: opts.collectDir,

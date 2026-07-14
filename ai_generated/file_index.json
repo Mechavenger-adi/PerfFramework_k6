@@ -245,6 +245,7 @@
       "core_engine/src/debug/ReplayRunner.ts",
       "core_engine/src/distributed/agentServer.ts",
       "core_engine/src/distributed/collectRun.ts",
+      "core_engine/src/distributed/liveDashboard.ts",
       "core_engine/src/distributed/LiveStatusHeartbeat.ts",
       "core_engine/src/distributed/monitor.ts",
       "core_engine/src/distributed/probe.ts",
@@ -294,7 +295,7 @@
     ],
     "importsNode": true,
     "layer": "cli",
-    "loc": 2421,
+    "loc": 2436,
     "path": "core_engine/src/cli/run.ts"
   },
   {
@@ -850,19 +851,52 @@
   },
   {
     "exports": [
-      "MonitorOptions",
-      "runMonitor"
+      "DEFAULT_STATS",
+      "LiveAggregate",
+      "aggregate",
+      "readSnapshots",
+      "resolveLiveDir",
+      "timingStats"
     ],
     "imports": [
       "core_engine/src/reporting/Histogram.ts",
-      "core_engine/src/utils/logger.ts",
       "core_engine/src/distributed/LiveStatusHeartbeat.ts",
       "fs",
       "path"
     ],
     "importsNode": true,
     "layer": "distributed",
-    "loc": 175,
+    "loc": 119,
+    "path": "core_engine/src/distributed/liveAggregate.ts"
+  },
+  {
+    "exports": [
+      "DashboardOptions",
+      "runDashboardCli",
+      "startDashboardServer"
+    ],
+    "imports": [
+      "core_engine/src/utils/logger.ts",
+      "core_engine/src/distributed/liveAggregate.ts",
+      "http"
+    ],
+    "importsNode": true,
+    "layer": "distributed",
+    "loc": 144,
+    "path": "core_engine/src/distributed/liveDashboard.ts"
+  },
+  {
+    "exports": [
+      "MonitorOptions",
+      "runMonitor"
+    ],
+    "imports": [
+      "core_engine/src/utils/logger.ts",
+      "core_engine/src/distributed/liveAggregate.ts"
+    ],
+    "importsNode": false,
+    "layer": "distributed",
+    "loc": 91,
     "path": "core_engine/src/distributed/monitor.ts"
   },
   {

@@ -676,7 +676,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "const",
-    "line": 2313,
+    "line": 2328,
     "name": "ERROR_EVENT_PREFIX"
   },
   "core_engine/src/cli/run.ts#FRAMEWORK_OWNED_FLAGS": {
@@ -684,7 +684,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "const",
-    "line": 952,
+    "line": 967,
     "name": "FRAMEWORK_OWNED_FLAGS"
   },
   "core_engine/src/cli/run.ts#LIVE_TXN_INTERVAL_MS": {
@@ -692,7 +692,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "const",
-    "line": 1912,
+    "line": 1927,
     "name": "LIVE_TXN_INTERVAL_MS"
   },
   "core_engine/src/cli/run.ts#LiveTxnStats": {
@@ -700,7 +700,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "interface",
-    "line": 1914,
+    "line": 1929,
     "name": "LiveTxnStats"
   },
   "core_engine/src/cli/run.ts#SNAPSHOT_EVENT_PREFIX": {
@@ -708,7 +708,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "const",
-    "line": 2312,
+    "line": 2327,
     "name": "SNAPSHOT_EVENT_PREFIX"
   },
   "core_engine/src/cli/run.ts#WARNING_EVENT_PREFIX": {
@@ -716,7 +716,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "const",
-    "line": 2314,
+    "line": 2329,
     "name": "WARNING_EVENT_PREFIX"
   },
   "core_engine/src/cli/run.ts#buildLiveTableLines": {
@@ -724,7 +724,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "Build the rendered table as a list of strings (one per row). Pure helper shared by both fixed-position and scrollback renderers.",
     "kind": "function",
-    "line": 2162,
+    "line": 2177,
     "name": "buildLiveTableLines"
   },
   "core_engine/src/cli/run.ts#buildReportAgents": {
@@ -732,7 +732,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 1792,
+    "line": 1807,
     "name": "buildReportAgents"
   },
   "core_engine/src/cli/run.ts#buildRunEnvironment": {
@@ -740,7 +740,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 1130,
+    "line": 1145,
     "name": "buildRunEnvironment"
   },
   "core_engine/src/cli/run.ts#buildRuntimeMetadataBlock": {
@@ -748,7 +748,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "Build the `runtime` block injected into K6_PERF_RUNTIME_METADATA — the single source of truth the in-script runtime (request.ts / lifecycle.ts / transaction.ts) reads for errorBehavior, thinkTime, pacing, http (timeout/redirects/throwOnError), reporting and snapshot config. Shared by the load path (buildScenarioRuntimeMetadata) AND the debug path (runJourneyDebug) so debug honors EXACTLY the same runtime settings as load. That parity is intentional: debug exists to validate script behavior and shake out load-test scenarios, so it must follow redirects, time out, pace and think-time identically to load — otherwise a script can pass in debug and fail under load purely because debug used different HTTP semantics.",
     "kind": "function",
-    "line": 1076,
+    "line": 1091,
     "name": "buildRuntimeMetadataBlock"
   },
   "core_engine/src/cli/run.ts#buildScenarioRuntimeMetadata": {
@@ -756,7 +756,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 1110,
+    "line": 1125,
     "name": "buildScenarioRuntimeMetadata"
   },
   "core_engine/src/cli/run.ts#collectUniqueTransactionNames": {
@@ -764,7 +764,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 1184,
+    "line": 1199,
     "name": "collectUniqueTransactionNames"
   },
   "core_engine/src/cli/run.ts#computeTopRequestsByP90": {
@@ -772,7 +772,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "Extract percentile numbers from a transactionStats list (e.g. [\"avg\",\"p(90)\", \"p(99)\"] → [90, 99]). Used to tell the timeseries parser which percentile lines the report should plot. p90 is always added by the parser.",
     "kind": "function",
-    "line": 1272,
+    "line": 1287,
     "name": "computeTopRequestsByP90"
   },
   "core_engine/src/cli/run.ts#configCmd": {
@@ -780,7 +780,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "const",
-    "line": 405,
+    "line": 420,
     "name": "configCmd"
   },
   "core_engine/src/cli/run.ts#extractJourneyTransactionNames": {
@@ -788,7 +788,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 1162,
+    "line": 1177,
     "name": "extractJourneyTransactionNames"
   },
   "core_engine/src/cli/run.ts#extractK6PerfEvents": {
@@ -796,7 +796,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "Wave 3: scan the mirrored run log for any `[k6-perf][*-event]` JSON payloads emitted by the k6 side (`transaction.ts` and `request.ts`) and return them as structured event lists. Used by `finalizeRunArtifacts` to merge per-iteration check failures, transaction exceptions, and snapshot- cap warnings into the same error/warning pipelines the rest of reporting consumes. Best-effort — malformed lines are skipped.",
     "kind": "function",
-    "line": 2352,
+    "line": 2367,
     "name": "extractK6PerfEvents"
   },
   "core_engine/src/cli/run.ts#extractPayloadWithPrefix": {
@@ -804,7 +804,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "Same dequote logic as snapshot extraction, parameterized on the prefix.",
     "kind": "function",
-    "line": 2377,
+    "line": 2392,
     "name": "extractPayloadWithPrefix"
   },
   "core_engine/src/cli/run.ts#extractSnapshotPayload": {
@@ -812,7 +812,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 2391,
+    "line": 2406,
     "name": "extractSnapshotPayload"
   },
   "core_engine/src/cli/run.ts#extractTransactionNamesFromSource": {
@@ -820,7 +820,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 1196,
+    "line": 1211,
     "name": "extractTransactionNamesFromSource"
   },
   "core_engine/src/cli/run.ts#filterPassthroughArgs": {
@@ -828,7 +828,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 954,
+    "line": 969,
     "name": "filterPassthroughArgs"
   },
   "core_engine/src/cli/run.ts#finalizeRunArtifacts": {
@@ -836,7 +836,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "Distributed mode: suppress the per-machine custom RunReport.html (the merge produces the single report).",
     "kind": "function",
-    "line": 1349,
+    "line": 1364,
     "name": "finalizeRunArtifacts"
   },
   "core_engine/src/cli/run.ts#formatCell": {
@@ -844,7 +844,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 1897,
+    "line": 1912,
     "name": "formatCell"
   },
   "core_engine/src/cli/run.ts#getEntryScriptDirectory": {
@@ -852,7 +852,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 997,
+    "line": 1012,
     "name": "getEntryScriptDirectory"
   },
   "core_engine/src/cli/run.ts#importCmd": {
@@ -860,7 +860,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "const",
-    "line": 200,
+    "line": 201,
     "name": "importCmd"
   },
   "core_engine/src/cli/run.ts#parseAndFlushSnapshots": {
@@ -868,7 +868,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "Reads the mirrored k6 log file, extracts snapshot events emitted during the run, and writes a consolidated snapshots.json to the report directory.",
     "kind": "function",
-    "line": 2320,
+    "line": 2335,
     "name": "parseAndFlushSnapshots"
   },
   "core_engine/src/cli/run.ts#pct": {
@@ -876,7 +876,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 1935,
+    "line": 1950,
     "name": "pct"
   },
   "core_engine/src/cli/run.ts#percentilesFromStats": {
@@ -884,7 +884,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 1337,
+    "line": 1352,
     "name": "percentilesFromStats"
   },
   "core_engine/src/cli/run.ts#prepareRunArtifacts": {
@@ -892,7 +892,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 1014,
+    "line": 1029,
     "name": "prepareRunArtifacts"
   },
   "core_engine/src/cli/run.ts#printTransactionTable": {
@@ -900,7 +900,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "Print a LoadRunner-style transaction metrics table to the console.",
     "kind": "function",
-    "line": 1803,
+    "line": 1818,
     "name": "printTransactionTable"
   },
   "core_engine/src/cli/run.ts#program": {
@@ -908,7 +908,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "const",
-    "line": 61,
+    "line": 62,
     "name": "program"
   },
   "core_engine/src/cli/run.ts#renderFixedTable": {
@@ -916,7 +916,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "Fixed-position rendering: the table lives at rows `tableTop..termRows`, frozen below k6's scroll region. Save cursor → clear table area → draw table → restore cursor, so k6's progress bar continues animating above without ever touching our table area.",
     "kind": "function",
-    "line": 2257,
+    "line": 2272,
     "name": "renderFixedTable"
   },
   "core_engine/src/cli/run.ts#renderScrollbackTable": {
@@ -924,7 +924,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "Fallback for non-TTY stdout or terminals too short for fixed positioning: just append the latest snapshot as scrollback.",
     "kind": "function",
-    "line": 2298,
+    "line": 2313,
     "name": "renderScrollbackTable"
   },
   "core_engine/src/cli/run.ts#resolveRecordingLogForStandaloneDebug": {
@@ -932,7 +932,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 985,
+    "line": 1000,
     "name": "resolveRecordingLogForStandaloneDebug"
   },
   "core_engine/src/cli/run.ts#runJourneyDebug": {
@@ -940,7 +940,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 922,
+    "line": 937,
     "name": "runJourneyDebug"
   },
   "core_engine/src/cli/run.ts#runPlanDebugMode": {
@@ -948,7 +948,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 874,
+    "line": 889,
     "name": "runPlanDebugMode"
   },
   "core_engine/src/cli/run.ts#startLiveTransactionDisplay": {
@@ -956,7 +956,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 1948,
+    "line": 1963,
     "name": "startLiveTransactionDisplay"
   },
   "core_engine/src/cli/run.ts#templatesCmd": {
@@ -964,7 +964,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "const",
-    "line": 362,
+    "line": 377,
     "name": "templatesCmd"
   },
   "core_engine/src/cli/run.ts#toImportSpecifier": {
@@ -972,7 +972,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 1009,
+    "line": 1024,
     "name": "toImportSpecifier"
   },
   "core_engine/src/cli/run.ts#writeRunManifest": {
@@ -980,7 +980,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 1216,
+    "line": 1231,
     "name": "writeRunManifest"
   },
   "core_engine/src/cli/templates.ts#listTemplates": {
@@ -2263,44 +2263,132 @@
     "line": 21,
     "name": "sharedRunFolder"
   },
-  "core_engine/src/distributed/monitor.ts#DEFAULT_STATS": {
-    "exported": false,
-    "file": "core_engine/src/distributed/monitor.ts",
+  "core_engine/src/distributed/liveAggregate.ts#DEFAULT_STATS": {
+    "exported": true,
+    "file": "core_engine/src/distributed/liveAggregate.ts",
     "jsdoc": "",
     "kind": "const",
-    "line": 27,
+    "line": 15,
     "name": "DEFAULT_STATS"
   },
-  "core_engine/src/distributed/monitor.ts#MergedTxn": {
-    "exported": false,
-    "file": "core_engine/src/distributed/monitor.ts",
+  "core_engine/src/distributed/liveAggregate.ts#LiveAggregate": {
+    "exported": true,
+    "file": "core_engine/src/distributed/liveAggregate.ts",
     "jsdoc": "",
     "kind": "interface",
-    "line": 67,
+    "line": 17,
+    "name": "LiveAggregate"
+  },
+  "core_engine/src/distributed/liveAggregate.ts#MergedTxn": {
+    "exported": false,
+    "file": "core_engine/src/distributed/liveAggregate.ts",
+    "jsdoc": "",
+    "kind": "interface",
+    "line": 73,
     "name": "MergedTxn"
+  },
+  "core_engine/src/distributed/liveAggregate.ts#aggregate": {
+    "exported": true,
+    "file": "core_engine/src/distributed/liveAggregate.ts",
+    "jsdoc": "Merge all heartbeats in `dir` into one combined live view.",
+    "kind": "function",
+    "line": 91,
+    "name": "aggregate"
+  },
+  "core_engine/src/distributed/liveAggregate.ts#mergeTransactions": {
+    "exported": false,
+    "file": "core_engine/src/distributed/liveAggregate.ts",
+    "jsdoc": "",
+    "kind": "function",
+    "line": 75,
+    "name": "mergeTransactions"
+  },
+  "core_engine/src/distributed/liveAggregate.ts#readSnapshots": {
+    "exported": true,
+    "file": "core_engine/src/distributed/liveAggregate.ts",
+    "jsdoc": "",
+    "kind": "function",
+    "line": 33,
+    "name": "readSnapshots"
+  },
+  "core_engine/src/distributed/liveAggregate.ts#resolveLiveDir": {
+    "exported": true,
+    "file": "core_engine/src/distributed/liveAggregate.ts",
+    "jsdoc": "",
+    "kind": "function",
+    "line": 27,
+    "name": "resolveLiveDir"
+  },
+  "core_engine/src/distributed/liveAggregate.ts#statToFraction": {
+    "exported": false,
+    "file": "core_engine/src/distributed/liveAggregate.ts",
+    "jsdoc": "Parse a stat label into a percentile fraction in [0,1], or null if not a percentile.",
+    "kind": "function",
+    "line": 47,
+    "name": "statToFraction"
+  },
+  "core_engine/src/distributed/liveAggregate.ts#statValue": {
+    "exported": false,
+    "file": "core_engine/src/distributed/liveAggregate.ts",
+    "jsdoc": "",
+    "kind": "function",
+    "line": 55,
+    "name": "statValue"
+  },
+  "core_engine/src/distributed/liveAggregate.ts#timingStats": {
+    "exported": true,
+    "file": "core_engine/src/distributed/liveAggregate.ts",
+    "jsdoc": "Keep only stats a response-time histogram can produce (drop count/pass/fail/std/etc).",
+    "kind": "function",
+    "line": 65,
+    "name": "timingStats"
+  },
+  "core_engine/src/distributed/liveDashboard.ts#DashboardOptions": {
+    "exported": true,
+    "file": "core_engine/src/distributed/liveDashboard.ts",
+    "jsdoc": "",
+    "kind": "interface",
+    "line": 17,
+    "name": "DashboardOptions"
+  },
+  "core_engine/src/distributed/liveDashboard.ts#page": {
+    "exported": false,
+    "file": "core_engine/src/distributed/liveDashboard.ts",
+    "jsdoc": "",
+    "kind": "function",
+    "line": 26,
+    "name": "page"
+  },
+  "core_engine/src/distributed/liveDashboard.ts#runDashboardCli": {
+    "exported": true,
+    "file": "core_engine/src/distributed/liveDashboard.ts",
+    "jsdoc": "CLI handler for `k6-framework monitor --serve`. Keeps running until interrupted.",
+    "kind": "function",
+    "line": 118,
+    "name": "runDashboardCli"
+  },
+  "core_engine/src/distributed/liveDashboard.ts#startDashboardServer": {
+    "exported": true,
+    "file": "core_engine/src/distributed/liveDashboard.ts",
+    "jsdoc": "Start the live dashboard HTTP server. Resolves once listening.",
+    "kind": "function",
+    "line": 93,
+    "name": "startDashboardServer"
   },
   "core_engine/src/distributed/monitor.ts#MonitorOptions": {
     "exported": true,
     "file": "core_engine/src/distributed/monitor.ts",
     "jsdoc": "",
     "kind": "interface",
-    "line": 19,
+    "line": 12,
     "name": "MonitorOptions"
-  },
-  "core_engine/src/distributed/monitor.ts#mergeTransactions": {
-    "exported": false,
-    "file": "core_engine/src/distributed/monitor.ts",
-    "jsdoc": "Merge per-transaction histograms + counts across all machines.",
-    "kind": "function",
-    "line": 70,
-    "name": "mergeTransactions"
   },
   "core_engine/src/distributed/monitor.ts#padL": {
     "exported": false,
     "file": "core_engine/src/distributed/monitor.ts",
     "jsdoc": "",
     "kind": "const",
-    "line": 86,
+    "line": 21,
     "name": "padL"
   },
   "core_engine/src/distributed/monitor.ts#padR": {
@@ -2308,80 +2396,24 @@
     "file": "core_engine/src/distributed/monitor.ts",
     "jsdoc": "",
     "kind": "const",
-    "line": 85,
+    "line": 20,
     "name": "padR"
-  },
-  "core_engine/src/distributed/monitor.ts#readSnapshots": {
-    "exported": false,
-    "file": "core_engine/src/distributed/monitor.ts",
-    "jsdoc": "",
-    "kind": "function",
-    "line": 35,
-    "name": "readSnapshots"
   },
   "core_engine/src/distributed/monitor.ts#render": {
     "exported": false,
     "file": "core_engine/src/distributed/monitor.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 133,
+    "line": 23,
     "name": "render"
-  },
-  "core_engine/src/distributed/monitor.ts#renderFleet": {
-    "exported": false,
-    "file": "core_engine/src/distributed/monitor.ts",
-    "jsdoc": "",
-    "kind": "function",
-    "line": 88,
-    "name": "renderFleet"
-  },
-  "core_engine/src/distributed/monitor.ts#renderTransactions": {
-    "exported": false,
-    "file": "core_engine/src/distributed/monitor.ts",
-    "jsdoc": "",
-    "kind": "function",
-    "line": 116,
-    "name": "renderTransactions"
-  },
-  "core_engine/src/distributed/monitor.ts#resolveLiveDir": {
-    "exported": false,
-    "file": "core_engine/src/distributed/monitor.ts",
-    "jsdoc": "",
-    "kind": "function",
-    "line": 29,
-    "name": "resolveLiveDir"
   },
   "core_engine/src/distributed/monitor.ts#runMonitor": {
     "exported": true,
     "file": "core_engine/src/distributed/monitor.ts",
-    "jsdoc": "CLI handler for `k6-framework monitor`. Resolves true when all machines have finished.",
+    "jsdoc": "CLI handler for `k6-framework monitor` (console). Resolves true when all machines finish.",
     "kind": "function",
-    "line": 152,
+    "line": 69,
     "name": "runMonitor"
-  },
-  "core_engine/src/distributed/monitor.ts#statToFraction": {
-    "exported": false,
-    "file": "core_engine/src/distributed/monitor.ts",
-    "jsdoc": "Parse a stat label into a percentile fraction in [0,1], or null if not a percentile.",
-    "kind": "function",
-    "line": 49,
-    "name": "statToFraction"
-  },
-  "core_engine/src/distributed/monitor.ts#statValue": {
-    "exported": false,
-    "file": "core_engine/src/distributed/monitor.ts",
-    "jsdoc": "Value of a stat label from a merged histogram (avg/min/max handled directly).",
-    "kind": "function",
-    "line": 58,
-    "name": "statValue"
-  },
-  "core_engine/src/distributed/monitor.ts#timingStats": {
-    "exported": false,
-    "file": "core_engine/src/distributed/monitor.ts",
-    "jsdoc": "Keep only stats a response-time histogram can produce (drop count/pass/fail/std/etc).",
-    "kind": "function",
-    "line": 108,
-    "name": "timingStats"
   },
   "core_engine/src/distributed/probe.ts#ProbeResult": {
     "exported": true,

@@ -29,7 +29,7 @@ Running with no subcommand on a TTY launches the interactive panel; non-TTY prin
 | `agent` | Run a minimal reachability agent on a load generator (Phase-2 firewall probe) |
 | `probe` | Probe reachability of one or more distributed agents from the controller |
 | `share-setup` | Print how to share the controller results folder for distributed collection (manual this phase) |
-| `monitor` | Live-monitor a distributed run from the shared live_<runId> folder |
+| `monitor` | Live-monitor a distributed run (console, or --serve for a browser dashboard) |
 | `templates` | Discover and view built-in config templates |
 | `templates list` | List all available templates |
 | `templates show <name>` | Show the content of a specific template |
@@ -201,7 +201,7 @@ Print how to share the controller results folder for distributed collection (man
 
 ### `monitor`
 
-Live-monitor a distributed run from the shared live_<runId> folder
+Live-monitor a distributed run (console, or --serve for a browser dashboard)
 
 | Option | Required | Default | Description |
 |--------|----------|---------|-------------|
@@ -209,7 +209,10 @@ Live-monitor a distributed run from the shared live_<runId> folder
 | `--collect-dir <path>` | no |  | Shared collect base dir (use with --run-id) |
 | `--run-id <id>` | no |  | Shared runId (use with --collect-dir) |
 | `--interval <ms>` | no | `3000` | Refresh interval in milliseconds |
-| `--once` | no |  | Print a single snapshot and exit |
+| `--once` | no |  | Print a single snapshot and exit (console only) |
+| `--serve` | no |  | Serve a live browser dashboard instead of the console view |
+| `--host <host>` | no | `127.0.0.1` | Dashboard bind host (localhost now; 0.0.0.0 to share once a port is open) |
+| `--port <port>` | no | `8787` | Dashboard port |
 
 ### `templates`
 

@@ -9,7 +9,7 @@ paginate: true
 # K6-PerfFramework
 ### Architecture at a glance
 
-**13** features · **113** source files · **16** layers · **5** deep-dive EDDs
+**13** features · **115** source files · **16** layers · **5** deep-dive EDDs
 
 *This deck is generated from the code indexes — it cannot drift.*
 
