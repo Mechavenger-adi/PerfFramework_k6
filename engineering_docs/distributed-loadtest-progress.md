@@ -4,7 +4,7 @@ Living status of every feature in the distributed load-test capability.
 Design: [EDD-distributed-loadtest.md](edd/EDD-distributed-loadtest.md). Status legend:
 ⬜ not started · 🟡 in progress · ✅ done · 🔬 needs verification · ⏸️ blocked/deferred.
 
-_Last updated: 2026-07-14 (steps 1–7 done + verified)_
+_Last updated: 2026-07-14 (ALL STEPS DONE + verified — Phase-1 manual distributed complete)_
 
 ## Pre-work / spikes
 | Item | Status | Notes |
@@ -24,7 +24,7 @@ _Last updated: 2026-07-14 (steps 1–7 done + verified)_
 | 5 | Live browser dashboard over local HTTP server (configurable bind) | ✅ | Verified: `monitor --serve` serves self-contained page polling `/data.json` (shared `aggregate()`); FLEET + combined-txn tables; `--host`/`--port` (local now, 0.0.0.0 to share). Console+browser unified via `liveAggregate.ts`. New: `liveAggregate.ts`, `liveDashboard.ts`. Full graph report stays the FINAL artifact. |
 | 6 | Mid-test control: `control_<runId>` file + agent poll/executor + dashboard buttons + ack | ✅ | Verified: `signal`/dashboard POST /control write marker; agent aborts (kill→state aborted, INVALID) or stops (k6 REST `PATCH /v1/status`→handleSummary/valid artifacts→state stopped, exit 103). Needed `--address` on k6 (this build hides the API by default). New: `control.ts`; `PipelineRunner.onChild`. |
 | 7 | `merge --wait` auto-finalize + raw-stream exclusion from collect | ✅ | Verified: collect drops `metrics-stream.json` (—`--include-raw` keeps it); `merge --wait --machines` polls `run-manifest.json` until all land then finalizes to `Final_…`. Merge succeeds on raw-excluded folders (CSV→R-7). |
-| 8 | Bucketed p95-over-time in merged timeseries; manifest/`testId` validation + split-CSV guardrail; docs | ⬜ | |
+| 8 | Config-driven per-bucket over-time stats; manifest/`testId` validation + split-CSV guardrail; docs | ✅ | Verified: merged timeseries emits `durationP<k>` for every configured percentile + `durationStd` (no hardcoded p95, exact from pooled durations); `testId` in manifest + merge validation; `npm run test:merge` CSV-pooled R-7 EXACT + histogram ≤alpha. |
 
 ## Sub-tasks — Step 1 (done)
 | Task | Status |

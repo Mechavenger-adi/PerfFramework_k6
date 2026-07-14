@@ -614,7 +614,9 @@ program
     const { reportDir, safeReportDir, runId, runManifestPath } = prepareRunArtifacts(plan, resolvedConfig);
     const scenarioRuntimeMetadata = buildScenarioRuntimeMetadata(plan, resolvedConfig, runId, safeReportDir);
     const runtimeEnv = buildRunEnvironment(plan, resolvedConfig, runId, safeReportDir, runManifestPath);
-    writeRunManifest(runManifestPath, plan, resolvedConfig, scenarioRuntimeMetadata);
+    writeRunManifest(runManifestPath, plan, resolvedConfig, scenarioRuntimeMetadata, {
+      distributed, role: distRole, machine: process.env.K6_PERF_MACHINE || os.hostname(), testId,
+    });
 
     // -- Step 5: Build k6 options ---------------
     let k6Options;
@@ -1308,11 +1310,15 @@ function writeRunManifest(
   plan: TestPlan,
   resolvedConfig: ResolvedConfig,
   scenarioMetadata: ScenarioRuntimeMetadata,
+  dist?: { distributed: boolean; role?: string; machine: string; testId: string },
 ): void {
   const reportDir = path.dirname(runManifestPath).replace(/\\/g, '/');
   const manifest = {
     runId: scenarioMetadata.runId,
     generatedAt: scenarioMetadata.generatedAt,
+    // Distributed identity — the merge validates these agree across machines.
+    testId: dist?.testId,
+    ...(dist?.distributed ? { distributed: true, role: dist.role || undefined, machine: dist.machine } : {}),
     plan: {
       name: plan.name,
       environment: plan.environment,

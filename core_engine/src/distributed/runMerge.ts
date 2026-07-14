@@ -118,7 +118,7 @@ export async function runMerge(options: MergeCliOptions): Promise<boolean> {
 
   const machineArtifacts: MachineArtifacts[] = [];
   const machineTimeseries: MachineTimeseries[] = [];
-  const manifests: Array<{ machine: string; runId?: string; scriptHash?: string; plan?: { name?: string; environment?: string; executionMode?: string } }> = [];
+  const manifests: Array<{ machine: string; runId?: string; testId?: string; scriptHash?: string; plan?: { name?: string; environment?: string; executionMode?: string } }> = [];
 
   for (const dir of machineDirs) {
     const machineName = path.basename(dir);
@@ -126,7 +126,7 @@ export async function runMerge(options: MergeCliOptions): Promise<boolean> {
     const hist = readJson<HistogramArtifact>(path.join(dir, 'metrics-histogram.json'));
     const ci = readJson<CiSummary>(path.join(dir, 'ci-summary.json'));
     const ts = readJson<TimeSeriesFile>(path.join(dir, 'timeseries.json'));
-    const manifest = readJson<{ runId?: string; scriptHash?: string; plan?: { name?: string; environment?: string; executionMode?: string } }>(path.join(dir, 'run-manifest.json'));
+    const manifest = readJson<{ runId?: string; testId?: string; scriptHash?: string; plan?: { name?: string; environment?: string; executionMode?: string } }>(path.join(dir, 'run-manifest.json'));
 
     // Raw transaction CSV → exact (R-7) pooled percentiles (histogram-parked phase).
     const csvPath = findTransactionCsv(dir);
@@ -143,7 +143,7 @@ export async function runMerge(options: MergeCliOptions): Promise<boolean> {
       errors: readNdjson(path.join(dir, 'errors.ndjson')),
       warnings: readNdjson(path.join(dir, 'warnings.ndjson')),
     });
-    manifests.push({ machine: machineName, runId: manifest?.runId, scriptHash: manifest?.scriptHash, plan: manifest?.plan });
+    manifests.push({ machine: machineName, runId: manifest?.runId, testId: manifest?.testId, scriptHash: manifest?.scriptHash, plan: manifest?.plan });
   }
 
   // ── Pre-merge validation (design §6.2). ──
@@ -202,11 +202,13 @@ export async function runMerge(options: MergeCliOptions): Promise<boolean> {
 }
 
 function validateManifests(
-  manifests: Array<{ machine: string; runId?: string; scriptHash?: string }>,
+  manifests: Array<{ machine: string; runId?: string; testId?: string; scriptHash?: string }>,
 ): string[] {
   const warnings: string[] = [];
   const runIds = new Set(manifests.map((m) => m.runId).filter(Boolean));
   if (runIds.size > 1) warnings.push(`machines report different runIds (${[...runIds].join(', ')}) — are you merging the same run?`);
+  const testIds = new Set(manifests.map((m) => m.testId).filter(Boolean));
+  if (testIds.size > 1) warnings.push(`machines report different testIds (${[...testIds].join(', ')}) — are these the same test?`);
   const hashes = new Set(manifests.map((m) => m.scriptHash).filter(Boolean));
   if (hashes.size > 1) warnings.push(`machines report different scriptHashes — scripts may differ across agents`);
   return warnings;

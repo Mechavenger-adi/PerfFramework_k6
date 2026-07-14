@@ -297,7 +297,7 @@
     ],
     "importsNode": true,
     "layer": "cli",
-    "loc": 2511,
+    "loc": 2517,
     "path": "core_engine/src/cli/run.ts"
   },
   {
@@ -813,7 +813,7 @@
     ],
     "importsNode": false,
     "layer": "distributed",
-    "loc": 215,
+    "loc": 232,
     "path": "core_engine/src/distributed/MergedReportBuilder.ts"
   },
   {
@@ -964,7 +964,7 @@
     ],
     "importsNode": true,
     "layer": "distributed",
-    "loc": 214,
+    "loc": 216,
     "path": "core_engine/src/distributed/runMerge.ts"
   },
   {

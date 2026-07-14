@@ -34,12 +34,24 @@ export interface MergedReportInput {
   transactionStats?: string[];
 }
 
+/** Percentiles to emit per bucket: fixed p90 ∪ every percentile in the configured stats. */
+function percentilesFrom(stats: string[]): number[] {
+  const out = new Set<number>([90]); // p90 is always generated (fixed base metric)
+  for (const s of stats) {
+    const t = s.trim().toLowerCase();
+    if (t === 'med' || t === 'median') { out.add(50); continue; }
+    const m = /^p\(?(\d+(?:\.\d+)?)\)?$/.exec(t);
+    if (m) { const n = Number(m[1]); if (n > 0 && n < 100) out.add(n); }
+  }
+  return [...out].sort((a, b) => a - b);
+}
+
 export class MergedReportBuilder {
   static build(input: MergedReportInput): { bundle: ReportBundle; timeseries: TimeSeriesFile } {
     const counterBucket = input.counterBucketSeconds ?? 2;
     const tsFiles = input.machines.map((m) => m.timeseries).filter((t): t is TimeSeriesFile => !!t);
 
-    const timeseries = this.mergeTimeseries(tsFiles, input.merge.histogram, counterBucket);
+    const timeseries = this.mergeTimeseries(tsFiles, input.merge.histogram, counterBucket, input.transactionStats ?? input.merge.transactionMetrics.stats ?? []);
     const bundle = this.assembleBundle(input, timeseries);
     return { bundle, timeseries };
   }
@@ -48,7 +60,10 @@ export class MergedReportBuilder {
     files: TimeSeriesFile[],
     mergedHist: HistogramArtifact | null,
     counterBucket: number,
+    stats: string[],
   ): TimeSeriesFile {
+    // Fixed base (min/avg/max/std) + every configured percentile → over-time graph lines.
+    const pcts = percentilesFrom(stats);
     const overview = new Map<string, TimeSeriesPoint>();
     const txns: Record<string, Map<string, TimeSeriesPoint & { _durations: number[] }>> = {};
     const events: TimeSeriesFile['series']['events'] = [];
@@ -118,12 +133,11 @@ export class MergedReportBuilder {
       acc.httpDurationAvg = w > 0 ? (acc as Record<string, number>)._durAvgW / w : 0;
       if (acc.httpDurationMin === Infinity) acc.httpDurationMin = 0;
       if (acc.httpDurationMax === -Infinity) acc.httpDurationMax = 0;
-      // Exact percentiles from the merged histogram bucket aligned to this ts (10s grid).
+      // Percentiles from the merged histogram bucket aligned to this ts (≤0.1%).
+      // One field per configured percentile so every over-time line has data.
       const hist = this.histForTs(histOverview, ts, mergedHist?.bucketSeconds ?? 10);
       if (hist && hist.count > 0) {
-        acc.httpDurationP90 = hist.valueAtPercentile(0.9);
-        acc.httpDurationP95 = hist.valueAtPercentile(0.95);
-        acc.httpDurationP99 = hist.valueAtPercentile(0.99);
+        for (const p of pcts) (acc as Record<string, number>)[`httpDurationP${p}`] = hist.valueAtPercentile(p / 100);
       }
       delete (acc as Record<string, unknown>)._durAvgW;
       delete (acc as Record<string, unknown>)._durW;
@@ -141,13 +155,16 @@ export class MergedReportBuilder {
           ts, count: acc.count, pass: acc.pass, fail: acc.fail, durations: ds,
         };
         if (sorted.length > 0) {
-          point.durationAvg = sorted.reduce((s, v) => s + v, 0) / sorted.length;
+          const mean = sorted.reduce((s, v) => s + v, 0) / sorted.length;
+          point.durationAvg = mean;
           point.durationMin = sorted[0];
           point.durationMax = sorted[sorted.length - 1];
-          point.durationP90 = percentileR7(sorted, 0.9, true);
-          point.durationP95 = percentileR7(sorted, 0.95, true);
-          point.durationP99 = percentileR7(sorted, 0.99, true);
+          // std (population, matches k6) — a fixed base metric, exact from raw.
+          point.durationStd = Math.sqrt(sorted.reduce((s, v) => s + (v - mean) * (v - mean), 0) / sorted.length);
+          // One field per configured percentile (fixed p90 ∪ runtime stats), exact R-7.
+          for (const p of pcts) (point as Record<string, number>)[`durationP${p}`] = percentileR7(sorted, p / 100, true);
           point.avg = point.durationAvg; point.min = point.durationMin; point.max = point.durationMax;
+          point.std = point.durationStd;
         }
         pts.push(point);
       }

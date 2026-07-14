@@ -128,6 +128,30 @@ for (const name of txnNames) {
   }
 }
 
+// ── Guardrail: the CSV-pooled R-7 path must be EXACT (tolerance ~0) ──
+// Same split, but feed each machine's raw response times as transactionRaw (what the
+// transaction CSV carries). Pooling raw + R-7 == the single-machine baseline exactly.
+console.log('\n── CSV-pooled R-7 (exact) ──');
+const rawMachines: MachineArtifacts[] = machineData.map((md, i) => ({
+  machineName: `lg-${i}`,
+  transactionMetrics: buildTxnMetrics(md),
+  transactionRaw: Object.fromEntries(Object.entries(md).map(([name, d]) => [name, d.values])),
+  ciSummary: { ...ciTemplate },
+}));
+const rawResult = MergeEngine.merge(rawMachines, { stats: STATS });
+for (const name of txnNames) {
+  const row = rawResult.transactionMetrics.transactions.find((r) => r.transaction === name)!;
+  const full = fullByTxn[name];
+  for (const p of [0.5, 0.9, 0.95, 0.99]) {
+    const exact = percentileR7(full.values, p);
+    const got = row[`p(${p * 100})`] ?? (p === 0.5 ? row['med'] : undefined);
+    const val = typeof got === 'number' ? got : NaN;
+    const ok = Math.abs(val - exact) < 1e-6; // EXACT, not just within alpha
+    if (!ok) failures++;
+    console.log(`${ok ? 'PASS' : 'FAIL'}  ${name} p${p * 100} (CSV R-7): merged=${val.toFixed(4)} exact=${exact.toFixed(4)} ${ok ? 'EXACT' : 'DIFF'}`);
+  }
+}
+
 // CI summary: checkout ~2% fail < 5% budget → passed; failure rate recomputed.
 const totalFail = txnNames.reduce((s, n) => s + fullByTxn[n].fail, 0);
 const totalTxn = txnNames.reduce((s, n) => s + fullByTxn[n].values.length, 0);

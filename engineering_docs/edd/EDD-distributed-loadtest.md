@@ -263,7 +263,9 @@ final is for deciding.
 6. Mid-test control: `control_<runId>` file + agent poll/executor (abort = kill; stop = graceful) +
    dashboard buttons/`POST /control` + per-LG ack. **Gated by the k6-REST-API graceful-stop spike.**
 7. `merge --wait` auto-finalize + raw-stream exclusion from collect.
-8. Bucketed p95-over-time in merged timeseries; manifest/`testId` validation + split-CSV guardrail; docs.
+8. Config-driven per-bucket over-time stats in the merged timeseries (min/avg/max/std + **every**
+   configured percentile, not just p95 — exact from pooled `durations`); manifest/`testId` validation +
+   split-CSV guardrail; docs.
 
 ## Limitations
 - **Best-effort start** (shared wall-clock, no VU-init barrier) — set `START_AT` far enough ahead.
