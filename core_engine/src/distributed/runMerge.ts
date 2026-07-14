@@ -138,10 +138,12 @@ export async function runMerge(options: MergeCliOptions): Promise<boolean> {
     }
 
     machineArtifacts.push({ machineName, transactionMetrics: tm, histogram: hist, ciSummary: ci, transactionRaw });
+    const sysMetrics = readJson<{ snapshots?: Array<Record<string, unknown>> }>(path.join(dir, 'system-metrics.json'));
     machineTimeseries.push({
       machineName, timeseries: ts,
       errors: readNdjson(path.join(dir, 'errors.ndjson')),
       warnings: readNdjson(path.join(dir, 'warnings.ndjson')),
+      hostSnapshots: sysMetrics?.snapshots ?? [],
     });
     manifests.push({ machine: machineName, runId: manifest?.runId, testId: manifest?.testId, scriptHash: manifest?.scriptHash, plan: manifest?.plan });
   }

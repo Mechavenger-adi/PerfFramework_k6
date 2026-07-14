@@ -11,6 +11,22 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { RelativeHistogram } from '../reporting/Histogram';
 import { LiveStatusSnapshot } from './LiveStatusHeartbeat';
+import { HostMonitor } from '../execution/HostMonitor';
+
+// ── Controller's own host resources — sampled on a cached cadence so the (sync)
+// aggregate/render never blocks on the ~250ms CPU read. ──
+let ctrlHost = { cpu: 0, mem: 0 };
+let ctrlTimer: NodeJS.Timeout | null = null;
+export function startControllerHostSampling(intervalMs = 4000): void {
+  if (ctrlTimer) return;
+  const tick = async (): Promise<void> => {
+    try { const s = await HostMonitor.captureSnapshot(); ctrlHost = { cpu: s.cpuPercent, mem: s.memoryPercent }; } catch { /* never break monitoring */ }
+  };
+  void tick();
+  ctrlTimer = setInterval(() => void tick(), intervalMs);
+  ctrlTimer.unref?.();
+}
+export function controllerHost(): { cpu: number; mem: number } { return ctrlHost; }
 
 export const DEFAULT_STATS = ['avg', 'min', 'max', 'p(90)', 'p(95)', 'p(99)'];
 
@@ -19,9 +35,11 @@ export interface LiveAggregate {
   allDone: boolean;
   machineCount: number;
   stats: string[];
-  fleet: Array<{ machine: string; state: string; elapsedSec: number; vus: number; txns: number; errorRate: number; tps: number }>;
+  fleet: Array<{ machine: string; state: string; elapsedSec: number; vus: number; txns: number; errorRate: number; tps: number; cpu: number; mem: number }>;
   totals: { vus: number; txns: number; errorRate: number; tps: number };
   transactions: Array<{ name: string; count: number; fail: number; errPct: number; values: Record<string, number> }>;
+  /** The controller's own host resources (filled in by the monitor/dashboard). */
+  controller?: { cpu: number; mem: number };
 }
 
 export function resolveLiveDir(o: { liveDir?: string; collectDir?: string; runId?: string }): string | null {
@@ -124,6 +142,7 @@ export function aggregate(dir: string): LiveAggregate {
   const fleet = [...snaps].sort((a, b) => a.machine.localeCompare(b.machine)).map((s) => ({
     machine: s.machine, state: s.state, elapsedSec: s.elapsedSec, vus: s.currentVus,
     txns: s.transactionsTotal, errorRate: s.errorRate, tps: s.throughputTps,
+    cpu: s.host?.cpu ?? 0, mem: s.host?.mem ?? 0,
   }));
 
   let vus = 0; let txns = 0; let fail = 0; let tps = 0;

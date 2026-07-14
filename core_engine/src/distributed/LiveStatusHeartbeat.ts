@@ -16,6 +16,7 @@ import { Logger } from '../utils/logger';
 import { RelativeHistogram, HistogramJSON } from '../reporting/Histogram';
 import { readTransactionCsvStats } from './transactionCsv';
 import { fetchK6Vus } from './control';
+import { HostMonitor } from '../execution/HostMonitor';
 
 export type LiveState = 'running' | 'stopping' | 'aborting' | 'done' | 'stopped' | 'aborted';
 
@@ -33,6 +34,8 @@ export interface LiveStatusSnapshot {
   errorRate: number;
   /** Windowed (current) transaction throughput, txn/s. */
   throughputTps: number;
+  /** This machine's host resource utilisation (%). */
+  host: { cpu: number; mem: number };
   /** Configured stat set (from the plan) so the monitor renders the same columns. */
   stats: string[];
   /**
@@ -63,6 +66,7 @@ export class LiveStatusHeartbeat {
   private prevMs = Date.now();
   private state: LiveState = 'running';
   private vusCache = 0; // real active VU count from k6's REST API (refreshed each tick)
+  private hostCache = { cpu: 0, mem: 0 }; // host CPU/mem % (refreshed each tick)
   private readonly statusPath: string;
 
   constructor(private readonly opts: HeartbeatOptions) {
@@ -74,16 +78,20 @@ export class LiveStatusHeartbeat {
     this.startMs = Date.now();
     this.prevMs = this.startMs;
     this.state = 'running';
-    void this.refreshVus();
+    void this.refresh();
     this.write(this.state);
-    this.timer = setInterval(() => { void this.refreshVus(); this.write(this.state); }, this.opts.intervalMs ?? 4000);
+    this.timer = setInterval(() => { void this.refresh(); this.write(this.state); }, this.opts.intervalMs ?? 4000);
     if (this.timer.unref) this.timer.unref();
   }
 
-  /** Refresh the real active-VU count from k6's REST API (best-effort; keeps last good value). */
-  private async refreshVus(): Promise<void> {
+  /** Refresh active VUs (k6 API) + host CPU/mem (best-effort; keep last good values). */
+  private async refresh(): Promise<void> {
     const v = await fetchK6Vus();
     if (v !== null) this.vusCache = v;
+    try {
+      const s = await HostMonitor.captureSnapshot();
+      this.hostCache = { cpu: s.cpuPercent, mem: s.memoryPercent };
+    } catch { /* monitoring must never break the heartbeat */ }
   }
 
   /** Reflect a control transition (e.g. 'stopping'/'aborting') immediately. */
@@ -129,6 +137,7 @@ export class LiveStatusHeartbeat {
         failTotal: stats.totalFail,
         errorRate: stats.totalCount ? (stats.totalFail / stats.totalCount) * 100 : 0,
         throughputTps,
+        host: this.hostCache,
         stats: this.opts.stats ?? [],
         transactions,
       };

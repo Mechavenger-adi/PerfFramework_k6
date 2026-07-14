@@ -7,7 +7,7 @@
  */
 
 import { Logger, ansi } from '../utils/logger';
-import { aggregate, resolveRunContext, LiveAggregate } from './liveAggregate';
+import { aggregate, resolveRunContext, LiveAggregate, startControllerHostSampling, controllerHost } from './liveAggregate';
 import { runMerge } from './runMerge';
 
 export interface MonitorOptions {
@@ -36,8 +36,8 @@ function render(agg: LiveAggregate, dir: string): string {
     return out.join('\n') + '\n';
   }
 
-  // ── FLEET ──
-  const fhead = `${padR('MACHINE', 14)} ${padR('STATE', 9)} ${padL('ELAPSED', 8)} ${padL('VUs', 5)} ${padL('TXNS', 8)} ${padL('ERR%', 7)} ${padL('TPS', 8)}`;
+  // ── FLEET (incl. host CPU/MEM) ──
+  const fhead = `${padR('MACHINE', 14)} ${padR('STATE', 9)} ${padL('ELAPSED', 8)} ${padL('VUs', 5)} ${padL('TXNS', 8)} ${padL('ERR%', 7)} ${padL('TPS', 8)} ${padL('CPU%', 6)} ${padL('MEM%', 6)}`;
   out.push(`${ansi.bold}FLEET${ansi.reset}`);
   out.push(`${ansi.bold}${fhead}${ansi.reset}`);
   out.push('─'.repeat(fhead.length));
@@ -45,11 +45,14 @@ function render(agg: LiveAggregate, dir: string): string {
     const c = m.state === 'running' ? ansi.green : m.state === 'aborted' ? ansi.red : m.state === 'stopped' ? ansi.yellow : ansi.dim;
     out.push(
       `${padR(m.machine, 14)} ${c}${padR(m.state, 9)}${ansi.reset} ${padL(`${m.elapsedSec}s`, 8)} ${padL(String(m.vus), 5)} ` +
-      `${padL(String(m.txns), 8)} ${padL(m.errorRate.toFixed(1), 7)} ${padL(m.tps.toFixed(1), 8)}`,
+      `${padL(String(m.txns), 8)} ${padL(m.errorRate.toFixed(1), 7)} ${padL(m.tps.toFixed(1), 8)} ${padL(m.cpu.toFixed(0), 6)} ${padL(m.mem.toFixed(0), 6)}`,
     );
   }
   out.push('─'.repeat(fhead.length));
   out.push(`${ansi.bold}${padR('TOTAL', 14)} ${padR('', 9)} ${padL('', 8)} ${padL(String(agg.totals.vus), 5)} ${padL(String(agg.totals.txns), 8)} ${padL(agg.totals.errorRate.toFixed(1), 7)} ${padL(agg.totals.tps.toFixed(1), 8)}${ansi.reset}`);
+  if (agg.controller) {
+    out.push(`${ansi.dim}${padR('controller', 14)} ${padR('(monitor)', 9)} ${padL('', 8)} ${padL('', 5)} ${padL('', 8)} ${padL('', 7)} ${padL('', 8)} ${padL(agg.controller.cpu.toFixed(0), 6)} ${padL(agg.controller.mem.toFixed(0), 6)}${ansi.reset}`);
+  }
 
   // ── COMBINED TRANSACTIONS ──
   out.push('');
@@ -78,6 +81,7 @@ export async function runMonitor(o: MonitorOptions): Promise<boolean> {
   }
   const intervalMs = o.intervalMs ?? 3000;
   const autoMerge = o.autoMerge !== false;
+  startControllerHostSampling(); // controller's own CPU/mem
 
   return new Promise<boolean>((resolve) => {
     let timer: NodeJS.Timeout | null = null;
@@ -86,6 +90,7 @@ export async function runMonitor(o: MonitorOptions): Promise<boolean> {
     const tick = async (): Promise<void> => {
       if (ended) return;
       const agg = aggregate(ctx.liveDir);
+      agg.controller = controllerHost();
       process.stdout.write('\x1b[2J\x1b[H');
       process.stdout.write(render(agg, ctx.liveDir));
       if (o.once) { finish(true); return; }

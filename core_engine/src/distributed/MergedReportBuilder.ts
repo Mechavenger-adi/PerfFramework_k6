@@ -23,6 +23,8 @@ export interface MachineTimeseries {
   timeseries?: TimeSeriesFile;
   errors?: Array<Record<string, unknown>>;
   warnings?: Array<Record<string, unknown>>;
+  /** Host CPU/mem snapshots from this machine's system-metrics.json (for the System tab). */
+  hostSnapshots?: Array<Record<string, unknown>>;
 }
 
 export interface MergedReportInput {
@@ -199,6 +201,7 @@ export class MergedReportBuilder {
 
     const allErrors = input.machines.flatMap((m) => m.errors ?? []);
     const allWarnings = input.machines.flatMap((m) => m.warnings ?? []);
+    const allSnapshots = input.machines.flatMap((m) => m.hostSnapshots ?? []);
 
     return {
       meta: {
@@ -224,8 +227,8 @@ export class MergedReportBuilder {
       timeseries,
       errors: allErrors,
       warnings: allWarnings,
-      snapshots: [],
-      system: { agents: [], machines: merge.machines },
+      snapshots: allSnapshots,
+      system: { agents: [], machines: merge.machines, snapshots: allSnapshots },
     };
   }
 }

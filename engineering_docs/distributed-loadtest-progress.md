@@ -32,8 +32,8 @@ _Last updated: 2026-07-14 (ALL STEPS DONE + verified — Phase-1 manual distribu
 |---|---|---|---|
 | VU-fix | Live VUs = real active count (k6 REST API) | ✅ | Was reading the CSV VU-id column (bounced 1→N); now `/v1/status` `vus`. Verified steady at 3. |
 | L1 | Live VUs + failure-rate over-time graph (dashboard) | ✅ | Inline dual-axis SVG (no libs); client accumulates `/data.json` totals per poll. |
-| L2 | Host resources: live per-machine CPU/mem (LGs + controller) + final-report resource graphs | ⬜ next | Heartbeat `host{cpu,mem}` via HostMonitor; controller self-samples; merge reads `system-metrics.json`. |
-| L3 | Live errors/warnings to controller | ⬜ | Heartbeat error/warn counts + recent samples; dashboard panel. Final report already has them. |
+| L2 | Host resources: live per-machine CPU/mem (LGs + controller) + final-report resource graphs | ✅ | Verified: heartbeat `host{cpu,mem}`; dashboard Resources panel + `controller` row (self-sampled); console FLEET CPU%/MEM% cols; merge reads `system-metrics.json` → report embeds snapshots (56 cpuPercent). |
+| L3 | Live errors/warnings to controller | ⬜ next | Heartbeat error/warn counts + recent samples; dashboard panel. Final report already has them. |
 
 ## Sub-tasks — Step 1 (done)
 | Task | Status |

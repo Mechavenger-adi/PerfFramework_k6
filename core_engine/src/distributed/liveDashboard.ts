@@ -13,7 +13,7 @@
 import * as http from 'http';
 import * as path from 'path';
 import { Logger } from '../utils/logger';
-import { aggregate, resolveRunContext, findLatestFinalReport } from './liveAggregate';
+import { aggregate, resolveRunContext, findLatestFinalReport, startControllerHostSampling, controllerHost } from './liveAggregate';
 import { writeControl, ControlAction } from './control';
 import { runMerge } from './runMerge';
 
@@ -85,6 +85,7 @@ function page(intervalMs: number): string {
     <div class="legend"><span><i style="background:#38bdf8"></i>Active VUs</span><span><i style="background:#f87171"></i>Failure %</span></div>
   </div>
   <h2>Fleet</h2><div class="scroll"><table id="fleet"></table></div>
+  <h2>Host resources</h2><div class="scroll"><table id="resources"></table></div>
   <h2>Combined transactions</h2><div class="scroll"><table id="txns"></table></div>
   <div class="note">Percentiles are histogram-based (≤0.1%); the bit-exact numbers are in the final report. Counts, throughput, min, max and avg are exact.</div>
 </main>
@@ -143,6 +144,12 @@ async function tick(){
   for(const m of d.fleet){ f+='<tr><td>'+esc(m.machine)+'</td><td class="st-'+esc(m.state)+'">'+esc(m.state)+'</td><td>'+m.elapsedSec+'s</td><td>'+m.vus+'</td><td>'+m.txns+'</td><td>'+n1(m.errorRate)+'</td><td>'+n1(m.tps)+'</td></tr>'; }
   f+='</tbody><tfoot><tr><td>TOTAL</td><td></td><td></td><td>'+d.totals.vus+'</td><td>'+d.totals.txns+'</td><td>'+n1(d.totals.errorRate)+'</td><td>'+n1(d.totals.tps)+'</td></tr></tfoot>';
   document.getElementById('fleet').innerHTML=f;
+  // host resources (LGs + controller)
+  let r='<thead><tr><th>Machine</th><th>CPU %</th><th>Memory %</th></tr></thead><tbody>';
+  for(const m of d.fleet){ r+='<tr><td>'+esc(m.machine)+'</td><td>'+n1(m.cpu)+'</td><td>'+n1(m.mem)+'</td></tr>'; }
+  if(d.controller){ r+='<tr><td>controller (this)</td><td>'+n1(d.controller.cpu)+'</td><td>'+n1(d.controller.mem)+'</td></tr>'; }
+  r+='</tbody>';
+  document.getElementById('resources').innerHTML=r;
   // transactions
   let t='<thead><tr><th>Transaction</th><th>Count</th><th>Err%</th>';
   for(const st of d.stats) t+='<th>'+esc(st)+'</th>';
@@ -160,6 +167,7 @@ export function startDashboardServer(
   o: { dir: string; host: string; port: number; intervalMs: number; sharedDir?: string; runId?: string; autoMerge?: boolean; mergeTimeoutSec?: number },
 ): Promise<http.Server> {
   const html = page(o.intervalMs);
+  startControllerHostSampling(); // controller's own CPU/mem for the Resources panel
   // Control dir is the sibling of live_<runId>: control_<runId>.
   const base = path.basename(o.dir);
   const runId = o.runId || (base.startsWith('live_') ? base.slice('live_'.length) : '');
@@ -203,7 +211,7 @@ export function startDashboardServer(
       return;
     }
     if (url === '/data.json') {
-      const body = JSON.stringify({ ...aggregate(o.dir), merge: { state: mergeState, report: finalReport } });
+      const body = JSON.stringify({ ...aggregate(o.dir), controller: controllerHost(), merge: { state: mergeState, report: finalReport } });
       res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
       res.end(body);
       return;
