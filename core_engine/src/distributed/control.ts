@@ -60,6 +60,29 @@ export function killProcessTree(pid: number): void {
   }
 }
 
+/** Read the CURRENT active VU count from k6's local REST API (/v1/status). Null if unreachable. */
+export function fetchK6Vus(address = process.env.K6_PERF_K6_API || '127.0.0.1:6565'): Promise<number | null> {
+  return new Promise((resolve) => {
+    const [host, portStr] = address.split(':');
+    const req = http.get(
+      { host: host || '127.0.0.1', port: Number(portStr) || 6565, path: '/v1/status', timeout: 2000 },
+      (res) => {
+        const chunks: Buffer[] = [];
+        res.on('data', (c: Buffer) => chunks.push(c));
+        res.on('end', () => {
+          try {
+            const j = JSON.parse(Buffer.concat(chunks).toString('utf-8')) as { data?: { attributes?: { vus?: number } } };
+            const vus = j?.data?.attributes?.vus;
+            resolve(typeof vus === 'number' ? vus : null);
+          } catch { resolve(null); }
+        });
+      },
+    );
+    req.on('error', () => resolve(null));
+    req.on('timeout', () => { req.destroy(); resolve(null); });
+  });
+}
+
 /** Graceful stop via k6's local REST API. Resolves true on 2xx/3xx. Never throws. */
 export function k6ApiStop(address = process.env.K6_PERF_K6_API || '127.0.0.1:6565'): Promise<boolean> {
   return new Promise((resolve) => {

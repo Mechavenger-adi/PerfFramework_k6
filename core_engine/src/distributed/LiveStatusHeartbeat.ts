@@ -15,6 +15,7 @@ import * as path from 'path';
 import { Logger } from '../utils/logger';
 import { RelativeHistogram, HistogramJSON } from '../reporting/Histogram';
 import { readTransactionCsvStats } from './transactionCsv';
+import { fetchK6Vus } from './control';
 
 export type LiveState = 'running' | 'stopping' | 'aborting' | 'done' | 'stopped' | 'aborted';
 
@@ -61,6 +62,7 @@ export class LiveStatusHeartbeat {
   private prevCount = 0;
   private prevMs = Date.now();
   private state: LiveState = 'running';
+  private vusCache = 0; // real active VU count from k6's REST API (refreshed each tick)
   private readonly statusPath: string;
 
   constructor(private readonly opts: HeartbeatOptions) {
@@ -72,9 +74,16 @@ export class LiveStatusHeartbeat {
     this.startMs = Date.now();
     this.prevMs = this.startMs;
     this.state = 'running';
+    void this.refreshVus();
     this.write(this.state);
-    this.timer = setInterval(() => this.write(this.state), this.opts.intervalMs ?? 4000);
+    this.timer = setInterval(() => { void this.refreshVus(); this.write(this.state); }, this.opts.intervalMs ?? 4000);
     if (this.timer.unref) this.timer.unref();
+  }
+
+  /** Refresh the real active-VU count from k6's REST API (best-effort; keeps last good value). */
+  private async refreshVus(): Promise<void> {
+    const v = await fetchK6Vus();
+    if (v !== null) this.vusCache = v;
   }
 
   /** Reflect a control transition (e.g. 'stopping'/'aborting') immediately. */
@@ -115,7 +124,7 @@ export class LiveStatusHeartbeat {
         updatedAt: new Date().toISOString(),
         state,
         elapsedSec: Math.round(elapsedSec),
-        currentVus: stats.lastVus,
+        currentVus: this.vusCache, // real active VUs from k6's REST API (not the CSV VU-id column)
         transactionsTotal: stats.totalCount,
         failTotal: stats.totalFail,
         errorRate: stats.totalCount ? (stats.totalFail / stats.totalCount) * 100 : 0,
