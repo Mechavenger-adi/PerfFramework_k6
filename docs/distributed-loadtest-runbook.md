@@ -136,6 +136,17 @@ $env:K6_PERF_MACHINE="lg-a"; $env:K6_PERF_COLLECT_DIR="\\CTRL01\k6results"
 npm run cli -- run --plan config/test_plans/load_test.json --distributed --role agent
 ```
 
+**npm shortcuts** (append your own flags after `--`):
+| Script | Expands to |
+|---|---|
+| `npm run dist:agent` | `run --plan config/test_plans/load_test.json --distributed --role agent` |
+| `npm run dist:controller -- --collect-dir <share> --run-id <id> --port 8787` | `monitor --serve …` (live dashboard + auto-merge) |
+| `npm run dist:monitor -- --collect-dir <share> --run-id <id>` | `monitor …` (console) |
+| `npm run dist:merge -- --wait --machines lg-a,lg-b --run-dir <share>/shared_<id>` | `merge …` |
+| `npm run dist:share -- --host <ctrl>` | `share-setup …` |
+| `npm run dist:signal -- --collect-dir <share> --run-id <id> --mode stop\|abort` | `signal …` |
+| `npm run dist:probe -- --tcp --agents <host>:445` | `probe …` |
+
 ---
 
 ## Monitoring & control (during the run)
