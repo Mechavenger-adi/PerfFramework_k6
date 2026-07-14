@@ -707,7 +707,7 @@
       "Live Monitoring (hybrid — the reliability-safe path)",
       "Mid-test Control (Abort / Stop) — control surface via the live report",
       "Shared-Location Provisioning",
-      "Accuracy Model (histogram-parked)",
+      "Accuracy Model (live = histogram ≤0.1%, final = EXACT)",
       "End-of-run Collection & Merge",
       "Folder Layout (on the shared location)",
       "CLI Surface",

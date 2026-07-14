@@ -107,12 +107,17 @@ Every metric point carries the identity needed to merge unambiguously — inject
 ## Live Monitoring (hybrid — the reliability-safe path)
 LGs never write the raw firehose to the share (it perturbs the test and couples run success to share
 uptime). Instead:
-- **Agent side:** a local tailer derives a small `<share>/live_<runId>/<machine>.status.json` every
-  ~3–5 s (its **own** file — no shared-file concurrency, same safety as `collect`): throughput, error
-  rate, VUs, iterations, count-weighted avg, its own p95, progress.
-- **Controller side:** an aggregator polls all `*.status.json` and renders a **combined live console
-  table**, and regenerates a **live Run Report** every ~5–10 s by feeding the live-aggregated (partial)
-  `ReportBundle` to the existing `RunReportGenerator`.
+- **Agent side:** every ~4 s the LG writes a small `<share>/live_<runId>/<machine>.status.json` (its
+  **own** file — no shared-file concurrency, same safety as `collect`) carrying machine health (state,
+  VUs, throughput, error rate) **plus a compact, mergeable per-transaction histogram** (`RelativeHistogram`
+  — a few KB, size independent of request volume) built from its **LOCAL** transaction CSV.
+  **The transaction CSV itself is NEVER shipped live** — only this small derived snapshot is. The raw CSV
+  travels to the controller once, at the end, via `collect` (for the exact final merge).
+- **Controller side:** an aggregator polls all `*.status.json`, **merges the per-transaction histograms**
+  (sum bucket counts) into a **combined live transaction table** — count · err% · avg · min · max · p90 ·
+  p95 · p99 (configurable, honors the plan's `summaryTrendStats`) — and regenerates a **live Run Report**
+  every ~5–10 s via the existing `RunReportGenerator`. Per-machine health rows sit alongside to catch a
+  lagging/saturated LG.
 - **Serving:** the controller hosts the live Run Report over a **local HTTP server** with a
   **configurable bind host/port**. **Today** it binds locally (viewed on the controller via RDP /
   localhost) because the port is firewall-blocked. **Future**, when a port is cleared, flipping the bind
@@ -120,10 +125,12 @@ uptime). Instead:
   controller will serve, so it is built once. (A self-refreshing static copy on the share is an optional
   fallback for viewing from other machines before a port exists.)
 
-**Exact vs approximate, live:** combined **throughput / error rate / VUs / iterations / avg** are
-**exact** (additive across machines). A true **merged p95 is not computed live** (raw pooling is too heavy
-every few seconds) — the live view shows **per-machine p95**, clearly labelled. The **exact merged
-percentile appears only in the final report**.
+**Exact vs approximate, live:** combined **count / throughput / errors / VUs / min / max / avg** are
+**exact** (additive / count-weighted). Combined **percentiles** (p90/p95/p99/med) are read off the
+**merged histogram** → **≤0.1%** (below measurement noise), computed cheaply each tick — not by the
+(wrong) averaging of per-machine percentiles. **Why histogram, not raw, live:** raw pooling grows without
+bound with request volume; the histogram is a few KB regardless. **The bit-exact percentiles are the FINAL
+report's** (CSV→R-7, next section), never the live view's.
 
 ## Mid-test Control (Abort / Stop) — control surface via the live report
 Turns the live report from a monitor into a control surface, reusing the same outbound-only shared
@@ -185,7 +192,12 @@ machine can read/write.
 - **Phase-2 (deferred):** automate share creation on the controller (`New-SmbShare` + `icacls` grants, or
   printed elevated commands when policy/UAC blocks it). 📝 **Not built now** — manual suggestion only.
 
-## Accuracy Model (histogram-parked)
+## Accuracy Model (live = histogram ≤0.1%, final = EXACT)
+**The final `Final_<testname>_<ts>` report is EXACT.** Live monitoring is histogram-based (≤0.1%
+percentiles) for speed and bounded transport; the final report re-derives every headline from the raw
+CSVs, so the numbers you sign off on are **bit-identical to a single big machine**. Live is for watching;
+final is for deciding.
+
 - **Additive quantities** (count, pass/fail, iterations, data, errors, VUs) → **summed**; rates recomputed
   from sums; avg **count-weighted**; min/max → min/max. All **exact**, including across machines.
 - **Percentiles (p90/p95/med/p99):** the merge **pools the per-machine transaction CSV** raw response
@@ -251,7 +263,9 @@ machine can read/write.
 
 ## Limitations
 - **Best-effort start** (shared wall-clock, no VU-init barrier) — set `START_AT` far enough ahead.
-- **No live merged percentile** this phase (per-machine p95 live; exact merged at end).
+- **Live merged percentiles are histogram-based (≤0.1%)**; the bit-exact percentiles are the final
+  report's (CSV→R-7). Live histogram is rebuilt from the local CSV each tick — O(N), fine for normal runs;
+  extreme-volume endurance needs incremental histogram updates or the DB sink (deferred).
 - **Mid-test control:** `abort` (kill) is reliable but yields partial artifacts flagged INVALID; graceful
   `stop` uses the k6 REST API `PATCH /v1/status` (**verified** — runs handleSummary; maps exit 103 →
   STOPPED-EARLY).
