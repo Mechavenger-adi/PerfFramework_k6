@@ -245,6 +245,8 @@
       "core_engine/src/debug/ReplayRunner.ts",
       "core_engine/src/distributed/agentServer.ts",
       "core_engine/src/distributed/collectRun.ts",
+      "core_engine/src/distributed/LiveStatusHeartbeat.ts",
+      "core_engine/src/distributed/monitor.ts",
       "core_engine/src/distributed/probe.ts",
       "core_engine/src/distributed/runMerge.ts",
       "core_engine/src/distributed/shareSetup.ts",
@@ -292,7 +294,7 @@
     ],
     "importsNode": true,
     "layer": "cli",
-    "loc": 2379,
+    "loc": 2420,
     "path": "core_engine/src/cli/run.ts"
   },
   {
@@ -760,6 +762,25 @@
   },
   {
     "exports": [
+      "HeartbeatOptions",
+      "LiveState",
+      "LiveStatusHeartbeat",
+      "LiveStatusSnapshot"
+    ],
+    "imports": [
+      "core_engine/src/reporting/Histogram.ts",
+      "core_engine/src/utils/logger.ts",
+      "core_engine/src/distributed/transactionCsv.ts",
+      "fs",
+      "path"
+    ],
+    "importsNode": true,
+    "layer": "distributed",
+    "loc": 112,
+    "path": "core_engine/src/distributed/LiveStatusHeartbeat.ts"
+  },
+  {
+    "exports": [
       "MachineArtifacts",
       "MergeEngine",
       "MergeOptions",
@@ -826,6 +847,22 @@
     "layer": "distributed",
     "loc": 67,
     "path": "core_engine/src/distributed/collectRun.ts"
+  },
+  {
+    "exports": [
+      "MonitorOptions",
+      "runMonitor"
+    ],
+    "imports": [
+      "core_engine/src/utils/logger.ts",
+      "core_engine/src/distributed/LiveStatusHeartbeat.ts",
+      "fs",
+      "path"
+    ],
+    "importsNode": true,
+    "layer": "distributed",
+    "loc": 112,
+    "path": "core_engine/src/distributed/monitor.ts"
   },
   {
     "exports": [
@@ -897,15 +934,17 @@
   },
   {
     "exports": [
+      "TransactionCsvStats",
       "findTransactionCsv",
-      "readTransactionCsvRaw"
+      "readTransactionCsvRaw",
+      "readTransactionCsvStats"
     ],
     "imports": [
       "fs"
     ],
     "importsNode": true,
     "layer": "distributed",
-    "loc": 73,
+    "loc": 121,
     "path": "core_engine/src/distributed/transactionCsv.ts"
   },
   {

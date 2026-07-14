@@ -238,6 +238,14 @@
     },
     {
       "from": "core_engine/src/cli/run.ts",
+      "to": "core_engine/src/distributed/LiveStatusHeartbeat.ts"
+    },
+    {
+      "from": "core_engine/src/cli/run.ts",
+      "to": "core_engine/src/distributed/monitor.ts"
+    },
+    {
+      "from": "core_engine/src/cli/run.ts",
       "to": "core_engine/src/distributed/probe.ts"
     },
     {
@@ -565,6 +573,18 @@
       "to": "core_engine/src/utils/logger.ts"
     },
     {
+      "from": "core_engine/src/distributed/LiveStatusHeartbeat.ts",
+      "to": "core_engine/src/distributed/transactionCsv.ts"
+    },
+    {
+      "from": "core_engine/src/distributed/LiveStatusHeartbeat.ts",
+      "to": "core_engine/src/reporting/Histogram.ts"
+    },
+    {
+      "from": "core_engine/src/distributed/LiveStatusHeartbeat.ts",
+      "to": "core_engine/src/utils/logger.ts"
+    },
+    {
       "from": "core_engine/src/distributed/MergedReportBuilder.ts",
       "to": "core_engine/src/distributed/MergeEngine.ts"
     },
@@ -591,6 +611,14 @@
     {
       "from": "core_engine/src/distributed/MergeEngine.ts",
       "to": "core_engine/src/types/ReportingContracts.ts"
+    },
+    {
+      "from": "core_engine/src/distributed/monitor.ts",
+      "to": "core_engine/src/distributed/LiveStatusHeartbeat.ts"
+    },
+    {
+      "from": "core_engine/src/distributed/monitor.ts",
+      "to": "core_engine/src/utils/logger.ts"
     },
     {
       "from": "core_engine/src/distributed/probe.ts",
@@ -911,10 +939,12 @@
     "core_engine/src/debug/RecordingLogResolver.ts",
     "core_engine/src/debug/ReplayRunner.ts",
     "core_engine/src/debug/VariableInstrumenter.ts",
+    "core_engine/src/distributed/LiveStatusHeartbeat.ts",
     "core_engine/src/distributed/MergeEngine.ts",
     "core_engine/src/distributed/MergedReportBuilder.ts",
     "core_engine/src/distributed/agentServer.ts",
     "core_engine/src/distributed/collectRun.ts",
+    "core_engine/src/distributed/monitor.ts",
     "core_engine/src/distributed/probe.ts",
     "core_engine/src/distributed/runMerge.ts",
     "core_engine/src/distributed/shareSetup.ts",

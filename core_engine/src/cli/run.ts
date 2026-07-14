@@ -50,6 +50,8 @@ import { awaitScheduledStart } from '../distributed/startBarrier';
 import { runAgentCli } from '../distributed/agentServer';
 import { runProbe } from '../distributed/probe';
 import { printControllerShareSuggestion } from '../distributed/shareSetup';
+import { LiveStatusHeartbeat } from '../distributed/LiveStatusHeartbeat';
+import { runMonitor } from '../distributed/monitor';
 import { listTemplates, showTemplate } from './templates';
 import { listFeatures } from './features';
 import { inspectConfig } from './config-inspect';
@@ -329,6 +331,28 @@ program
   .option('--host <host>', 'Controller hostname/IP shown in the UNC path (default: hostname)')
   .action((opts) => {
     printControllerShareSuggestion({ resultsDir: opts.resultsDir, shareName: opts.shareName, host: opts.host });
+  });
+
+// ---------------------------------------------
+// MONITOR command (distributed) — combined live view from the shared heartbeats
+// ---------------------------------------------
+program
+  .command('monitor')
+  .description('Live-monitor a distributed run from the shared live_<runId> folder')
+  .option('--live-dir <path>', 'Path to the live_<runId> folder')
+  .option('--collect-dir <path>', 'Shared collect base dir (use with --run-id)')
+  .option('--run-id <id>', 'Shared runId (use with --collect-dir)')
+  .option('--interval <ms>', 'Refresh interval in milliseconds', '3000')
+  .option('--once', 'Print a single snapshot and exit')
+  .action(async (opts) => {
+    const ok = await runMonitor({
+      liveDir: opts.liveDir,
+      collectDir: opts.collectDir,
+      runId: opts.runId,
+      intervalMs: Number(opts.interval) || 3000,
+      once: opts.once,
+    });
+    if (!ok) process.exit(1);
   });
 
 // ---------------------------------------------
@@ -732,6 +756,7 @@ program
     // K6_PERF_REQUEST_LOG toggle that enables the vu/iter system tags above.
     let requestLog: RequestMetricLogWriter | null = null;
     let transactionLog: TransactionMetricLogWriter | null = null;
+    let liveHeartbeat: LiveStatusHeartbeat | null = null;
     if (requestLogEnabled || transactionLogEnabled) {
       const hostName = process.env.K6_PERF_MACHINE || os.hostname();
       // testId is resolved once at action scope (used for the k6 tag + these filenames).
@@ -745,6 +770,20 @@ program
         const transactionLogPath = path.join(reportDir, `${safe(testId)}_${safe(hostName)}_transaction_metric.csv`);
         transactionLog = new TransactionMetricLogWriter(metricsStreamPath, transactionLogPath, { testId, hostName });
         transactionLog.start();
+        // Distributed live heartbeat: push a light status file to the share so the
+        // controller's `monitor` can render a combined live view. Needs a share.
+        if (distributed) {
+          const collectDir = process.env.K6_PERF_COLLECT_DIR;
+          if (collectDir) {
+            liveHeartbeat = new LiveStatusHeartbeat({
+              machine: hostName, runId, testId, csvPath: transactionLogPath,
+              liveDir: path.join(path.resolve(collectDir), `live_${runId}`),
+            });
+            liveHeartbeat.start();
+          } else {
+            Logger.warning('[distributed] K6_PERF_COLLECT_DIR not set — live status heartbeat disabled (no share to write to).');
+          }
+        }
       }
     }
     try {
@@ -762,6 +801,8 @@ program
     } finally {
       liveConsole.stop();
       if (liveDisplay) liveDisplay.stop();
+      // Final heartbeat (state refinement to stopped/aborted arrives in step 6).
+      if (liveHeartbeat) liveHeartbeat.stop('done');
       if (requestLog) {
         requestLog.stop(); // final sweep flushes samples written after the last poll
         Logger.detail(`Per-request log: ${requestLog.rowCount} request(s) → ${path.basename(requestLog.path)}`);

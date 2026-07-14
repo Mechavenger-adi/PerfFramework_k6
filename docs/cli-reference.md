@@ -29,6 +29,7 @@ Running with no subcommand on a TTY launches the interactive panel; non-TTY prin
 | `agent` | Run a minimal reachability agent on a load generator (Phase-2 firewall probe) |
 | `probe` | Probe reachability of one or more distributed agents from the controller |
 | `share-setup` | Print how to share the controller results folder for distributed collection (manual this phase) |
+| `monitor` | Live-monitor a distributed run from the shared live_<runId> folder |
 | `templates` | Discover and view built-in config templates |
 | `templates list` | List all available templates |
 | `templates show <name>` | Show the content of a specific template |
@@ -197,6 +198,18 @@ Print how to share the controller results folder for distributed collection (man
 | `--results-dir <path>` | no |  | Results base dir to share (default: K6_RESULTS_BASE_DIR or results) |
 | `--share-name <name>` | no | `k6results` | Windows share name to suggest |
 | `--host <host>` | no |  | Controller hostname/IP shown in the UNC path (default: hostname) |
+
+### `monitor`
+
+Live-monitor a distributed run from the shared live_<runId> folder
+
+| Option | Required | Default | Description |
+|--------|----------|---------|-------------|
+| `--live-dir <path>` | no |  | Path to the live_<runId> folder |
+| `--collect-dir <path>` | no |  | Shared collect base dir (use with --run-id) |
+| `--run-id <id>` | no |  | Shared runId (use with --collect-dir) |
+| `--interval <ms>` | no | `3000` | Refresh interval in milliseconds |
+| `--once` | no |  | Print a single snapshot and exit |
 
 ### `templates`
 
