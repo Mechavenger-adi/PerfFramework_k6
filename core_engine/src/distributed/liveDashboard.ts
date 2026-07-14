@@ -62,6 +62,10 @@ function page(intervalMs: number): string {
   .mergebar.done{ background:rgba(74,222,128,.14); color:var(--run); }
   .mergebar.failed{ background:rgba(248,113,113,.14); color:var(--abort); }
   .mergebar a{ color:inherit; }
+  .chartwrap{ background:var(--card); border:1px solid var(--line); border-radius:10px; padding:10px 12px 6px; }
+  svg.chart{ width:100%; height:auto; display:block; }
+  .legend{ display:flex; gap:16px; font-size:12px; color:var(--dim); margin:6px 2px 0; }
+  .legend i{ display:inline-block; width:12px; height:3px; border-radius:2px; margin-right:6px; vertical-align:middle; }
 </style></head><body>
 <header>
   <h1>k6 · distributed live monitor</h1>
@@ -75,6 +79,11 @@ function page(intervalMs: number): string {
 <div id="mergebar" class="mergebar" style="display:none"></div>
 <main>
   <div class="cards" id="kpis"></div>
+  <h2>VUs &amp; failure rate — over time</h2>
+  <div class="chartwrap">
+    <svg id="chart" class="chart" viewBox="0 0 1000 300" preserveAspectRatio="xMidYMid meet"></svg>
+    <div class="legend"><span><i style="background:#38bdf8"></i>Active VUs</span><span><i style="background:#f87171"></i>Failure %</span></div>
+  </div>
   <h2>Fleet</h2><div class="scroll"><table id="fleet"></table></div>
   <h2>Combined transactions</h2><div class="scroll"><table id="txns"></table></div>
   <div class="note">Percentiles are histogram-based (≤0.1%); the bit-exact numbers are in the final report. Counts, throughput, min, max and avg are exact.</div>
@@ -91,6 +100,25 @@ document.getElementById('btn-abort').onclick=()=>{ if(confirm('ABORT now?\\nk6 i
 const n0 = x => (x==null?'-':Number(x).toFixed(0));
 const n1 = x => (x==null?'-':Number(x).toFixed(1));
 function kpi(l,v){ return '<div class="kpi"><div class="v">'+v+'</div><div class="l">'+l+'</div></div>'; }
+const hist=[]; const MAXPTS=600;
+function drawChart(){
+  const svg=document.getElementById('chart'); if(!svg) return;
+  const W=1000,H=300,mL=46,mR=46,mT=14,mB=26, pw=W-mL-mR, ph=H-mT-mB, axis='#8a93a6';
+  if(hist.length<2){ svg.innerHTML='<text x="500" y="150" fill="'+axis+'" text-anchor="middle" font-size="14">collecting…</text>'; return; }
+  const t0=hist[0].t, t1=hist[hist.length-1].t, tr=Math.max(1,t1-t0);
+  const maxV=Math.max(1,...hist.map(p=>p.vus)), maxE=Math.max(1,...hist.map(p=>p.err));
+  const X=t=>mL+((t-t0)/tr)*pw, YV=v=>mT+ph-(v/maxV)*ph, YE=e=>mT+ph-(e/maxE)*ph;
+  let g='';
+  for(let i=0;i<=4;i++){ const y=mT+ph*(i/4);
+    g+='<line x1="'+mL+'" y1="'+y+'" x2="'+(W-mR)+'" y2="'+y+'" stroke="'+axis+'" stroke-opacity="0.15"/>';
+    g+='<text x="'+(mL-6)+'" y="'+(y+3)+'" fill="#38bdf8" text-anchor="end" font-size="11">'+(maxV*(1-i/4)).toFixed(0)+'</text>';
+    g+='<text x="'+(W-mR+6)+'" y="'+(y+3)+'" fill="#f87171" text-anchor="start" font-size="11">'+(maxE*(1-i/4)).toFixed(1)+'</text>';
+  }
+  g+='<text x="'+mL+'" y="'+(H-8)+'" fill="'+axis+'" font-size="11">0s</text>';
+  g+='<text x="'+(W-mR)+'" y="'+(H-8)+'" fill="'+axis+'" text-anchor="end" font-size="11">'+Math.round(tr/1000)+'s</text>';
+  const poly=(fy,color)=>'<polyline fill="none" stroke="'+color+'" stroke-width="2" points="'+hist.map(p=>X(p.t).toFixed(1)+','+fy(p).toFixed(1)).join(' ')+'"/>';
+  svg.innerHTML=g+poly(p=>YV(p.vus),'#38bdf8')+poly(p=>YE(p.err),'#f87171');
+}
 async function tick(){
   let d; try { d = await (await fetch('data.json',{cache:'no-store'})).json(); } catch(e){ return; }
   const badge=document.getElementById('badge');
@@ -106,6 +134,10 @@ async function tick(){
   document.getElementById('meta').textContent = d.machineCount+' machine(s) · updated '+new Date(d.updatedAt).toLocaleTimeString();
   document.getElementById('kpis').innerHTML =
     kpi('VUs',d.totals.vus)+kpi('Transactions',d.totals.txns)+kpi('Throughput/s',n1(d.totals.tps))+kpi('Error %',n1(d.totals.errorRate));
+  // VUs + failure-rate over time
+  hist.push({t:Date.now(), vus:Number(d.totals.vus)||0, err:Number(d.totals.errorRate)||0});
+  if(hist.length>MAXPTS) hist.shift();
+  drawChart();
   // fleet
   let f='<thead><tr><th>Machine</th><th>State</th><th>Elapsed</th><th>VUs</th><th>Txns</th><th>Err%</th><th>TPS</th></tr></thead><tbody>';
   for(const m of d.fleet){ f+='<tr><td>'+esc(m.machine)+'</td><td class="st-'+esc(m.state)+'">'+esc(m.state)+'</td><td>'+m.elapsedSec+'s</td><td>'+m.vus+'</td><td>'+m.txns+'</td><td>'+n1(m.errorRate)+'</td><td>'+n1(m.tps)+'</td></tr>'; }
