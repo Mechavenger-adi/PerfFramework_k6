@@ -71,13 +71,56 @@ export declare class ScriptGenerator {
     static deriveRequestName(method: string, url: string, counters: Map<string, number>): string;
     /**
      * Returns the URL expression to embed directly in the generated script (no extra quoting needed).
-     * Same-domain paths become `${env.baseUrl}/path` template literals so request() receives an
-     * absolute URL; different-domain URLs are kept as JSON string literals.
+     * Every URL is emitted as a backtick template literal for a uniform style (matching the k6
+     * recorder). Same-origin URLs collapse to `${env.baseUrl}/path`; different-domain URLs stay
+     * absolute (still backticked). Base-origin substitution and escaping are shared with
+     * buildStringExpression.
      */
     private static buildUrlExpression;
     private static buildRequestBody;
-    /** Inline-format a plain object as a JS object literal at the given indent level. */
+    /**
+     * Build an `application/x-www-form-urlencoded` body as a JS OBJECT-literal
+     * expression so k6 URL-encodes each value itself, instead of a verbatim string.
+     *
+     * Why: k6's http request handler (k6 `js/modules/k6/http/request.go`) only
+     * encodes when the body is an object — it runs it through Go's
+     * `url.Values.Encode()` (space→`+`, `+`→`%2B`, `@`→`%40`, …). A STRING body is
+     * sent byte-for-byte with no encoding, so a value like `user+name@x.com` arrives
+     * with the `+` decoded to a space server-side (form rule: `+` == space). Emitting
+     * an object matches k6's documented behavior and the k6-Studio convert path.
+     *
+     * Recorded bodies store values already percent-encoded, so each value is
+     * URL-DECODED here before emitting — k6 re-encodes, avoiding double-encoding.
+     * Data-file params substituted in later (`getUniqueItem(...)`) return raw
+     * decoded values that k6 then encodes correctly.
+     *
+     * Returns null (→ caller keeps a string body) when the request isn't
+     * form-urlencoded, has no fields, or has duplicate field names (which a plain
+     * object literal can't represent without dropping values).
+     */
+    private static buildFormUrlEncodedBodyObject;
+    /**
+     * Inline-format a plain object as a JS object literal at the given indent level.
+     * Values are emitted via buildStringExpression — every value becomes a backtick
+     * template literal (uniform recorder-style output), with any occurrence of the
+     * primary base origin (e.g. in `referer` / `origin` headers) parametrised to
+     * `${env.baseUrl}` instead of hardcoding the recorded host. Keys keep their
+     * shape: bare identifiers stay unquoted, others are JSON-quoted.
+     */
     private static formatInlineObject;
+    /** Escape a raw string so it is safe to embed inside a `...` template literal. */
+    private static escapeForTemplate;
+    /**
+     * Emit a recorded string value (header value, body, URL) as a backtick
+     * template literal — uniform recorder-style output. When it contains the
+     * primary base origin, those occurrences are rewritten to `${env.baseUrl}` so
+     * the value tracks the parametrised base URL rather than pinning the recorded
+     * host (the same substitution buildUrlExpression applies to the request URL).
+     *
+     * Public so the convert path (ScriptConverter) emits metadata values in the
+     * same uniform backtick style.
+     */
+    static buildStringExpression(value: string, primaryBaseUrl?: string): string;
     /** Extract unique origin URLs (protocol+host) from all HAR entries in all groups. */
     private static extractBaseUrls;
 }

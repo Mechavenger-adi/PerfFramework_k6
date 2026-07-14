@@ -222,6 +222,11 @@ K6_RESULTS_BASE_DIR=./testSuites/results
 # Uncomment to stream metrics to InfluxDB (PowerBI/Grafana).
 # K6_INFLUXDB_URL=http://localhost:8086/k6
 
+# Test ID stamped into the metric CSV logs below (filename prefix + testId column).
+# Unset = derived from the plan name as TID_<plan>. Set the same value on every
+# machine to share one test ID across a distributed run.
+# K6_PERF_TEST_ID=TID_checkout_smoke
+
 # Per-request CSV log (<testId>_<host>_request_metric.csv) — one row per HTTP
 # request, written live to the run report dir. isError is checks-first (a passing
 # check wins even over a >=400 status; falls back to the status when unchecked).
@@ -230,7 +235,8 @@ K6_RESULTS_BASE_DIR=./testSuites/results
 
 # Per-transaction CSV log (<testId>_<host>_transaction_metric.csv) — one row per
 # transaction iteration; IsPass mirrors the transaction's checkrate (checks-first
-# + fallback). ON by default; set to 0 to disable.
+# + fallback) and responsetime is the transaction's own duration (seconds).
+# ON by default; set to 0 to disable.
 # K6_PERF_TRANSACTION_LOG=0
 
 # Emit a mergeable per-machine latency histogram (metrics-histogram.json).

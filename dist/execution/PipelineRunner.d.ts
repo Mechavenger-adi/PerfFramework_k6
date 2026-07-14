@@ -3,6 +3,7 @@
  * Phase 1 – Spawns the k6 process with the resolved options object.
  * Writes generated options to a temp JS file and passes it to k6.
  */
+import * as childProcess from 'child_process';
 import { K6Options } from './ParallelExecutionManager';
 export interface RunOptions {
     /** Path to the k6 test script (entry point) */
@@ -29,6 +30,8 @@ export interface RunOptions {
     reportDir?: string;
     /** Path to the generated run-manifest.json */
     runManifestPath?: string;
+    /** Called with the spawned k6 child (async path only) so callers can abort/stop it. */
+    onChild?: (child: childProcess.ChildProcess) => void;
 }
 export interface PipelineRunResult {
     status: number;

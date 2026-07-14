@@ -101,11 +101,11 @@ class ScriptGenerator {
                 // request itself. request() surfaces this as k6's `name` tag so
                 // per-request metrics group under it instead of the raw URL.
                 const nameTag = entryNames?.get(req.id) ?? this.deriveRequestName(method, req.url, nameCounters);
-                script += `      name: ${JSON.stringify(nameTag)},\n`;
+                script += `      name: ${this.buildStringExpression(nameTag)},\n`;
                 if (hasHeaders) {
                     const headersObj = {};
                     req.headers.forEach((h) => { headersObj[h.name] = h.value; });
-                    script += `      headers: ${this.formatInlineObject(headersObj, 6)},\n`;
+                    script += `      headers: ${this.formatInlineObject(headersObj, 6, primaryBaseUrl)},\n`;
                 }
                 if (hasBody) {
                     // `postData.expression` (when set) means "emit raw — this references
@@ -115,13 +115,26 @@ class ScriptGenerator {
                         script += `      body: ${req.postData.expression},\n`;
                     }
                     else {
-                        const body = this.buildRequestBody(req.postData);
-                        script += `      body: ${JSON.stringify(body)},\n`;
+                        // Form-urlencoded → emit an OBJECT so k6 URL-encodes each value (a
+                        // string body would be sent verbatim, decoding `+` to a space). All
+                        // other content types stay a verbatim backtick string body. Bodies can
+                        // embed the recorded host too (form-posted return URLs, JSON
+                        // callbacks) — parametrise the base origin the same way.
+                        const formObj = req.postData
+                            ? this.buildFormUrlEncodedBodyObject(req.postData, primaryBaseUrl)
+                            : null;
+                        if (formObj !== null) {
+                            script += `      body: ${formObj},\n`;
+                        }
+                        else {
+                            const body = this.buildRequestBody(req.postData);
+                            script += `      body: ${body === null ? 'null' : this.buildStringExpression(body, primaryBaseUrl)},\n`;
+                        }
                     }
                 }
                 script += `      replay: {\n`;
-                script += `        id: ${JSON.stringify(sequentialId)},\n`;
-                script += `        recordingStartedAt: ${JSON.stringify(req.startedDateTime)},\n`;
+                script += `        id: ${this.buildStringExpression(sequentialId)},\n`;
+                script += `        recordingStartedAt: ${this.buildStringExpression(req.startedDateTime)},\n`;
                 script += `      },\n`;
                 script += `    });\n`;
                 script += `    k6Check(${responseName}, {\n`;
@@ -187,25 +200,27 @@ class ScriptGenerator {
     }
     /**
      * Returns the URL expression to embed directly in the generated script (no extra quoting needed).
-     * Same-domain paths become `${env.baseUrl}/path` template literals so request() receives an
-     * absolute URL; different-domain URLs are kept as JSON string literals.
+     * Every URL is emitted as a backtick template literal for a uniform style (matching the k6
+     * recorder). Same-origin URLs collapse to `${env.baseUrl}/path`; different-domain URLs stay
+     * absolute (still backticked). Base-origin substitution and escaping are shared with
+     * buildStringExpression.
      */
     static buildUrlExpression(absoluteUrl, primaryBaseUrl) {
-        if (!primaryBaseUrl) {
-            return JSON.stringify(absoluteUrl);
-        }
-        try {
-            const parsed = new URL(absoluteUrl);
-            const normalizedOrigin = parsed.origin + '/';
-            if (normalizedOrigin === primaryBaseUrl) {
-                const path = parsed.pathname + (parsed.search || '') + (parsed.hash || '');
-                return `\`\${env.baseUrl}${path}\``;
+        if (primaryBaseUrl) {
+            try {
+                const parsed = new URL(absoluteUrl);
+                // Exact-origin match → collapse to the parametrised base plus the path,
+                // avoiding any substring false-positive on the raw origin.
+                if (parsed.origin + '/' === primaryBaseUrl) {
+                    const path = parsed.pathname + (parsed.search || '') + (parsed.hash || '');
+                    return '`${env.baseUrl}' + this.escapeForTemplate(path) + '`';
+                }
             }
-            return JSON.stringify(absoluteUrl);
+            catch { /* fall through to the generic literal */ }
         }
-        catch {
-            return JSON.stringify(absoluteUrl);
-        }
+        // Cross-domain or no base: uniform backtick literal (substitutes the base
+        // origin too, though a different-origin URL won't contain it).
+        return this.buildStringExpression(absoluteUrl, primaryBaseUrl);
     }
     static buildRequestBody(postData) {
         if (!postData)
@@ -220,8 +235,72 @@ class ScriptGenerator {
             .map((p) => `${encodeURIComponent(p.name)}=${encodeURIComponent(p.value ?? '')}`)
             .join('&');
     }
-    /** Inline-format a plain object as a JS object literal at the given indent level. */
-    static formatInlineObject(obj, indent) {
+    /**
+     * Build an `application/x-www-form-urlencoded` body as a JS OBJECT-literal
+     * expression so k6 URL-encodes each value itself, instead of a verbatim string.
+     *
+     * Why: k6's http request handler (k6 `js/modules/k6/http/request.go`) only
+     * encodes when the body is an object — it runs it through Go's
+     * `url.Values.Encode()` (space→`+`, `+`→`%2B`, `@`→`%40`, …). A STRING body is
+     * sent byte-for-byte with no encoding, so a value like `user+name@x.com` arrives
+     * with the `+` decoded to a space server-side (form rule: `+` == space). Emitting
+     * an object matches k6's documented behavior and the k6-Studio convert path.
+     *
+     * Recorded bodies store values already percent-encoded, so each value is
+     * URL-DECODED here before emitting — k6 re-encodes, avoiding double-encoding.
+     * Data-file params substituted in later (`getUniqueItem(...)`) return raw
+     * decoded values that k6 then encodes correctly.
+     *
+     * Returns null (→ caller keeps a string body) when the request isn't
+     * form-urlencoded, has no fields, or has duplicate field names (which a plain
+     * object literal can't represent without dropping values).
+     */
+    static buildFormUrlEncodedBodyObject(postData, primaryBaseUrl) {
+        if (!/application\/x-www-form-urlencoded/i.test(postData.mimeType || ''))
+            return null;
+        const decode = (s) => {
+            try {
+                return decodeURIComponent(s.replace(/\+/g, ' '));
+            }
+            catch {
+                return s;
+            }
+        };
+        let pairs;
+        if (postData.params && postData.params.length > 0) {
+            // HAR `params` are already decoded — use as-is.
+            pairs = postData.params.map((p) => ({ name: p.name, value: p.value ?? '' }));
+        }
+        else if (postData.text) {
+            // Raw body text is percent-encoded — decode each half of every pair.
+            pairs = postData.text.split('&').filter(Boolean).map((kv) => {
+                const eq = kv.indexOf('=');
+                const rawName = eq >= 0 ? kv.slice(0, eq) : kv;
+                const rawVal = eq >= 0 ? kv.slice(eq + 1) : '';
+                return { name: decode(rawName), value: decode(rawVal) };
+            });
+        }
+        else {
+            return null;
+        }
+        if (pairs.length === 0)
+            return null;
+        if (new Set(pairs.map((p) => p.name)).size !== pairs.length)
+            return null; // dup keys → string body
+        const obj = {};
+        for (const { name, value } of pairs)
+            obj[name] = value;
+        return this.formatInlineObject(obj, 8, primaryBaseUrl);
+    }
+    /**
+     * Inline-format a plain object as a JS object literal at the given indent level.
+     * Values are emitted via buildStringExpression — every value becomes a backtick
+     * template literal (uniform recorder-style output), with any occurrence of the
+     * primary base origin (e.g. in `referer` / `origin` headers) parametrised to
+     * `${env.baseUrl}` instead of hardcoding the recorded host. Keys keep their
+     * shape: bare identifiers stay unquoted, others are JSON-quoted.
+     */
+    static formatInlineObject(obj, indent, primaryBaseUrl) {
         const pad = ' '.repeat(indent);
         const closePad = ' '.repeat(indent - 2);
         const entries = Object.entries(obj);
@@ -229,9 +308,39 @@ class ScriptGenerator {
             return '{}';
         const lines = entries.map(([k, v]) => {
             const key = /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(k) ? k : JSON.stringify(k);
-            return `${pad}${key}: ${JSON.stringify(v)}`;
+            return `${pad}${key}: ${this.buildStringExpression(v, primaryBaseUrl)}`;
         });
         return `{\n${lines.join(',\n')},\n${closePad}}`;
+    }
+    /** Escape a raw string so it is safe to embed inside a `...` template literal. */
+    static escapeForTemplate(s) {
+        return s
+            .replace(/\\/g, '\\\\')
+            .replace(/`/g, '\\`')
+            .replace(/\$\{/g, '\\${');
+    }
+    /**
+     * Emit a recorded string value (header value, body, URL) as a backtick
+     * template literal — uniform recorder-style output. When it contains the
+     * primary base origin, those occurrences are rewritten to `${env.baseUrl}` so
+     * the value tracks the parametrised base URL rather than pinning the recorded
+     * host (the same substitution buildUrlExpression applies to the request URL).
+     *
+     * Public so the convert path (ScriptConverter) emits metadata values in the
+     * same uniform backtick style.
+     */
+    static buildStringExpression(value, primaryBaseUrl) {
+        // Escape for a template literal FIRST, then substitute — the origin has no
+        // backtick/`${`, so splitting the escaped string on it is still safe.
+        let escaped = this.escapeForTemplate(value);
+        if (primaryBaseUrl) {
+            // env.baseUrl carries no trailing slash (see fallbackUrl in generate()),
+            // so match the bare origin and let any retained path/query follow it.
+            const origin = primaryBaseUrl.replace(/\/+$/, '');
+            if (origin)
+                escaped = escaped.split(origin).join('${env.baseUrl}');
+        }
+        return '`' + escaped + '`';
     }
     /** Extract unique origin URLs (protocol+host) from all HAR entries in all groups. */
     static extractBaseUrls(groups) {

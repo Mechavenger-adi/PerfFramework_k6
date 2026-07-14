@@ -77,6 +77,13 @@ const validate_1 = require("./validate");
 const runMerge_1 = require("../distributed/runMerge");
 const collectRun_1 = require("../distributed/collectRun");
 const startBarrier_1 = require("../distributed/startBarrier");
+const agentServer_1 = require("../distributed/agentServer");
+const probe_1 = require("../distributed/probe");
+const shareSetup_1 = require("../distributed/shareSetup");
+const LiveStatusHeartbeat_1 = require("../distributed/LiveStatusHeartbeat");
+const monitor_1 = require("../distributed/monitor");
+const liveDashboard_1 = require("../distributed/liveDashboard");
+const control_1 = require("../distributed/control");
 const templates_1 = require("./templates");
 const features_1 = require("./features");
 const config_inspect_1 = require("./config-inspect");
@@ -266,9 +273,20 @@ program
     .command('merge')
     .description('Merge per-machine distributed run artifacts into a single report')
     .requiredOption('--run-dir <path>', 'Shared run dir containing <machineName>/ subfolders for one runId')
-    .option('--out <path>', 'Output dir for the merged result (default: <run-dir>/_merged)')
-    .action((opts) => {
-    const passed = (0, runMerge_1.runMerge)({ runDir: opts.runDir, out: opts.out });
+    .option('--out <path>', 'Output dir for the merged result (default: <run-dir>/Final_<testname>_<ts>)')
+    .option('--wait', 'Block until all --machines have collected in, then merge (auto-finalize)')
+    .option('--machines <list>', 'Comma-separated machine names to wait for (with --wait)')
+    .option('--poll <sec>', 'Poll interval while waiting', '5')
+    .option('--wait-timeout <sec>', 'Max seconds to wait before giving up', '600')
+    .action(async (opts) => {
+    const passed = await (0, runMerge_1.runMerge)({
+        runDir: opts.runDir,
+        out: opts.out,
+        wait: opts.wait,
+        machines: opts.machines ? String(opts.machines).split(',').map((s) => s.trim()).filter(Boolean) : undefined,
+        pollSec: Number(opts.poll) || 5,
+        waitTimeoutSec: Number(opts.waitTimeout) || 600,
+    });
     if (!passed)
         process.exit(1);
 });
@@ -282,10 +300,118 @@ program
     .requiredOption('--into <path>', 'Shared collect base dir')
     .option('--machine <name>', 'Machine name (defaults to hostname)')
     .option('--run-id <id>', 'Shared runId (defaults to the run-manifest runId)')
+    .option('--include-raw', 'Also copy the large raw metrics-stream.json (excluded by default)')
     .action((opts) => {
-    const ok = (0, collectRun_1.runCollect)({ from: opts.from, into: opts.into, machine: opts.machine || os.hostname(), runId: opts.runId });
+    const ok = (0, collectRun_1.runCollect)({ from: opts.from, into: opts.into, machine: opts.machine || os.hostname(), runId: opts.runId, includeRaw: opts.includeRaw });
     if (!ok)
         process.exit(1);
+});
+// ---------------------------------------------
+// AGENT command (distributed / Phase-2 probe) — run on each LG so the controller
+// can verify the firewall permits the controller→agent inbound path.
+// ---------------------------------------------
+program
+    .command('agent')
+    .description('Run a minimal reachability agent on a load generator (Phase-2 firewall probe)')
+    .option('--port <port>', 'Port to listen on', '7070')
+    .option('--host <host>', 'Interface to bind (0.0.0.0 = all interfaces)', '0.0.0.0')
+    .option('--name <name>', 'Machine name reported to the controller (defaults to hostname)')
+    .option('--token <token>', 'Optional shared secret required on every request (or K6_PERF_AGENT_TOKEN)')
+    .action(async (opts) => {
+    await (0, agentServer_1.runAgentCli)({ port: opts.port, host: opts.host, name: opts.name, token: opts.token });
+});
+// ---------------------------------------------
+// PROBE command (distributed / Phase-2 probe) — run on the controller to check
+// reachability of one or more agents (the firewall go/no-go for the controller approach).
+// ---------------------------------------------
+program
+    .command('probe')
+    .description('Probe reachability of one or more distributed agents from the controller')
+    .requiredOption('--agents <list>', 'Comma-separated agent targets, e.g. host1:7070,host2:7070')
+    .option('--port <port>', 'Default port when a target omits one', '7070')
+    .option('--timeout <ms>', 'Per-agent timeout in milliseconds', '5000')
+    .option('--token <token>', 'Shared secret to send (or K6_PERF_AGENT_TOKEN)')
+    .option('--tcp', 'Raw TCP connect test (works on any port; no HTTP) — for firewall port discovery')
+    .action(async (opts) => {
+    const ok = await (0, probe_1.runProbe)({ agents: opts.agents, port: opts.port, timeout: opts.timeout, token: opts.token, tcp: opts.tcp });
+    if (!ok)
+        process.exit(1);
+});
+// ---------------------------------------------
+// SHARE-SETUP command (distributed) — print how to share the controller results dir
+// ---------------------------------------------
+program
+    .command('share-setup')
+    .description('Print how to share the controller results folder for distributed collection (manual this phase)')
+    .option('--results-dir <path>', 'Results base dir to share (default: K6_RESULTS_BASE_DIR or results)')
+    .option('--share-name <name>', 'Windows share name to suggest', 'k6results')
+    .option('--host <host>', 'Controller hostname/IP shown in the UNC path (default: hostname)')
+    .action((opts) => {
+    (0, shareSetup_1.printControllerShareSuggestion)({ resultsDir: opts.resultsDir, shareName: opts.shareName, host: opts.host });
+});
+// ---------------------------------------------
+// MONITOR command (distributed) — combined live view from the shared heartbeats
+// ---------------------------------------------
+program
+    .command('monitor')
+    .description('Live-monitor a distributed run (console, or --serve for a browser dashboard)')
+    .option('--live-dir <path>', 'Path to the live_<runId> folder')
+    .option('--collect-dir <path>', 'Shared collect base dir (use with --run-id)')
+    .option('--run-id <id>', 'Shared runId (use with --collect-dir)')
+    .option('--interval <ms>', 'Refresh interval in milliseconds', '3000')
+    .option('--once', 'Print a single snapshot and exit (console only)')
+    .option('--serve', 'Serve a live browser dashboard instead of the console view')
+    .option('--host <host>', 'Dashboard bind host (localhost now; 0.0.0.0 to share once a port is open)', '127.0.0.1')
+    .option('--port <port>', 'Dashboard port', '8787')
+    .action(async (opts) => {
+    if (opts.serve) {
+        await (0, liveDashboard_1.runDashboardCli)({
+            liveDir: opts.liveDir,
+            collectDir: opts.collectDir,
+            runId: opts.runId,
+            host: opts.host,
+            port: Number(opts.port) || 8787,
+            intervalMs: Number(opts.interval) || 3000,
+        });
+        return;
+    }
+    const ok = await (0, monitor_1.runMonitor)({
+        liveDir: opts.liveDir,
+        collectDir: opts.collectDir,
+        runId: opts.runId,
+        intervalMs: Number(opts.interval) || 3000,
+        once: opts.once,
+    });
+    if (!ok)
+        process.exit(1);
+});
+// ---------------------------------------------
+// SIGNAL command (distributed) — send an abort/stop to a running distributed run
+// ---------------------------------------------
+program
+    .command('signal')
+    .description('Send abort/stop to a running distributed run (writes control_<runId>/control.json)')
+    .requiredOption('--mode <mode>', 'abort | stop')
+    .option('--collect-dir <path>', 'Shared collect base dir (use with --run-id)')
+    .option('--run-id <id>', 'Shared runId (use with --collect-dir)')
+    .option('--control-dir <path>', 'Explicit control_<runId> dir (alternative to --collect-dir/--run-id)')
+    .option('--effective-at <sec>', 'stop only: seconds from now to drain together', '10')
+    .action((opts) => {
+    if (opts.mode !== 'abort' && opts.mode !== 'stop') {
+        logger_1.Logger.fail('[signal] --mode must be abort or stop');
+        process.exit(1);
+    }
+    const dir = opts.controlDir
+        || (opts.collectDir && opts.runId ? (0, control_1.controlDirFor)(opts.collectDir, opts.runId) : null);
+    if (!dir) {
+        logger_1.Logger.fail('[signal] provide --control-dir, or --collect-dir together with --run-id');
+        process.exit(1);
+    }
+    const effectiveAt = opts.mode === 'stop'
+        ? new Date(Date.now() + (Number(opts.effectiveAt) || 10) * 1000).toISOString()
+        : undefined;
+    const p = (0, control_1.writeControl)(dir, { action: opts.mode, effectiveAt, by: 'cli' });
+    logger_1.Logger.pass(`[signal] ${opts.mode}${effectiveAt ? ` (effective ${effectiveAt})` : ''} → ${p}`);
 });
 // ---------------------------------------------
 // TEMPLATES command
@@ -345,16 +471,23 @@ configCmd
 // ---------------------------------------------
 program
     .command('debug')
-    .description('Run a script in single-iteration debug mode and generate an HTML diff report')
+    .description('Run a script in debug mode (single VU) and generate an HTML diff report')
     .requiredOption('--script <path>', 'Path to the generated journey script')
     .option('--recording-log <path>', 'Path to the normalized recording-log JSON file')
     .option('--out <path>', 'Path to the HTML diff report', path.join('results', 'debug-diff.html'))
     .option('--replay-log <path>', 'Optional path to save the captured replay-log JSON file')
+    .option('--iterations <n>', 'Number of iterations to run (single VU; default 1)', '1')
+    .option('--i <n>', 'Alias for --iterations')
     .allowUnknownOption()
     .allowExcessArguments()
     .action(async (opts, cmd) => {
     logger_1.Logger.header('k6 Performance Framework – DEBUG');
     const passthroughArgs = filterPassthroughArgs(cmd.args);
+    // Debug mode is always single-VU (ReplayRunner enforces vus=1); iterations
+    // are configurable so a script can be smoke-run a few times (e.g. to verify
+    // cookie/session persistence across iterations) without authoring a plan.
+    // Accept any of -i / --i / --iterations (--i wins if both are supplied).
+    const iterations = Math.max(1, Number.parseInt(opts.i ?? opts.iterations, 10) || 1);
     try {
         const resolvedRecordingLogPath = opts.recordingLog
             ? opts.recordingLog
@@ -365,7 +498,7 @@ program
             outHtmlPath: opts.out,
             replayLogPath: opts.replayLog,
             vus: 1,
-            iterations: 1,
+            iterations,
             extraK6Args: passthroughArgs,
         });
         logger_1.Logger.pass(`Replay log saved: ${result.replayLogPath}`);
@@ -390,6 +523,8 @@ program
     .option('--data-root <path>', 'Root directory for data files', 'testSuites')
     .option('--debug', 'Enable debug mode (prints resolved config)')
     .option('--out <k6-output>', 'k6 --out flag value (e.g. json=results.json)')
+    .option('--distributed', 'Enable distributed mode (or set K6_PERF_DISTRIBUTED=1)')
+    .option('--role <role>', 'Distributed role: controller | agent')
     .allowUnknownOption()
     .allowExcessArguments()
     .action(async (opts, cmd) => {
@@ -405,6 +540,22 @@ program
     catch (err) {
         logger_1.Logger.fail(err.message);
         process.exit(1);
+    }
+    // -- Distributed mode (opt-in) --------------
+    // K6_PERF_DISTRIBUTED=1 or --distributed. Resolved once into a single boolean +
+    // role so downstream (identity tags, HTML policy, forced CSV, collect) has one
+    // source of truth. Non-distributed (local) runs are completely unaffected.
+    const distributed = opts.distributed === true || /^(1|true|yes)$/i.test(process.env.K6_PERF_DISTRIBUTED ?? '');
+    const distRole = (opts.role || process.env.K6_PERF_ROLE || '').toLowerCase();
+    // Shared test id — stamped as a k6 tag (distributed) and into the CSV filenames.
+    const testId = process.env.K6_PERF_TEST_ID?.trim() || `TID_${plan.name}`;
+    if (distributed) {
+        process.env.K6_PERF_DISTRIBUTED = '1'; // normalize for children/downstream
+        logger_1.Logger.detail(`[distributed] mode ON${distRole ? `, role=${distRole}` : ''} · testId=${testId}`);
+        if (!process.env.K6_PERF_MACHINE)
+            logger_1.Logger.warning('[distributed] K6_PERF_MACHINE not set — defaulting to hostname; set a unique name per machine.');
+        if (!process.env.K6_PERF_START_AT)
+            logger_1.Logger.warning('[distributed] K6_PERF_START_AT not set — machines will not start together; ramps may not align.');
     }
     // -- Step 2: Resolve configs ----------------
     const envConfigPath = opts.envConfig ?? path.join('config', 'environments', `${plan.environment}.json`);
@@ -424,6 +575,11 @@ program
         logger_1.Logger.fail(`Config error: ${err.message}`);
         process.exit(1);
     }
+    // Distributed controller: remind the operator how to share this machine's results
+    // folder so LGs can collect into it (manual this phase — see EDD §Shared-Location).
+    if (distributed && distRole === 'controller') {
+        (0, shareSetup_1.printControllerShareSuggestion)({ resultsDir: resolvedConfig.secrets['K6_RESULTS_BASE_DIR'] });
+    }
     // -- Step 3: Gatekeeper pre-flight ----------
     const gatekeeper = new GatekeeperValidator_1.GatekeeperValidator();
     const preflight = gatekeeper.validate(resolvedConfig, plan, opts.dataRoot);
@@ -440,7 +596,9 @@ program
     const { reportDir, safeReportDir, runId, runManifestPath } = prepareRunArtifacts(plan, resolvedConfig);
     const scenarioRuntimeMetadata = buildScenarioRuntimeMetadata(plan, resolvedConfig, runId, safeReportDir);
     const runtimeEnv = buildRunEnvironment(plan, resolvedConfig, runId, safeReportDir, runManifestPath);
-    writeRunManifest(runManifestPath, plan, resolvedConfig, scenarioRuntimeMetadata);
+    writeRunManifest(runManifestPath, plan, resolvedConfig, scenarioRuntimeMetadata, {
+        distributed, role: distRole, machine: process.env.K6_PERF_MACHINE || os.hostname(), testId,
+    });
     // -- Step 5: Build k6 options ---------------
     let k6Options;
     try {
@@ -460,8 +618,15 @@ program
     const entryScriptDir = getEntryScriptDirectory(plan.user_journeys);
     fs.mkdirSync(entryScriptDir, { recursive: true });
     let entryCode = '';
-    entryCode += `import { htmlReport } from "https://raw.githubusercontent.com/benc-uk/k6-reporter/main/dist/bundle.js";\n`;
-    entryCode += `import { textSummary } from "https://jslib.k6.io/k6-summary/0.0.1/index.js";\n`;
+    // In distributed mode the LG is headless: no CDN imports (air-gap safe — both
+    // benc-uk/k6-reporter and jslib.k6.io are remote) and no per-machine HTML. Only
+    // handleSummary.json (a data artifact the report/threshold logic consumes) is
+    // written; the single merged RunReport comes from the merge step. Local
+    // (non-distributed) runs keep the full HTML + textSummary behavior unchanged.
+    if (!distributed) {
+        entryCode += `import { htmlReport } from "https://raw.githubusercontent.com/benc-uk/k6-reporter/main/dist/bundle.js";\n`;
+        entryCode += `import { textSummary } from "https://jslib.k6.io/k6-summary/0.0.1/index.js";\n`;
+    }
     for (const journey of plan.user_journeys) {
         const execName = journey.name.replace(/[^a-zA-Z0-9_]/g, '_');
         const importPath = toImportSpecifier(entryScriptDir, journey.scriptPath);
@@ -469,9 +634,13 @@ program
     }
     entryCode += `\nexport function handleSummary(data) {\n`;
     entryCode += `  return {\n`;
-    entryCode += `    "${safeReportDir}/k6-reporter-summary.html": htmlReport(data),\n`;
+    if (!distributed) {
+        entryCode += `    "${safeReportDir}/k6-reporter-summary.html": htmlReport(data),\n`;
+    }
     entryCode += `    "${safeReportDir}/handleSummary.json": JSON.stringify(data),\n`;
-    entryCode += `    stdout: textSummary(data, { indent: " ", enableColors: true }),\n`;
+    if (!distributed) {
+        entryCode += `    stdout: textSummary(data, { indent: " ", enableColors: true }),\n`;
+    }
     entryCode += `  };\n`;
     entryCode += `}\n`;
     const entryScriptPath = path.join(entryScriptDir, `.k6-perf-entry-${runId.replace(/[^a-zA-Z0-9_]/g, '_')}.js`);
@@ -527,7 +696,9 @@ program
     const requestLogEnabled = !/^(0|false|no)$/i.test(process.env.K6_PERF_REQUEST_LOG ?? '');
     // Per-transaction CSV log — separate toggle. Independent of the request log,
     // but shares the same vu/iter system-tag requirement.
-    const transactionLogEnabled = !/^(0|false|no)$/i.test(process.env.K6_PERF_TRANSACTION_LOG ?? '');
+    // Distributed mode forces the transaction CSV on — it is the raw carrier the
+    // merge pools for R-7 percentiles, so it must not be disabled on an LG.
+    const transactionLogEnabled = distributed || !/^(0|false|no)$/i.test(process.env.K6_PERF_TRANSACTION_LOG ?? '');
     if (requestLogEnabled || transactionLogEnabled) {
         extraArgs.push('--system-tags', 'proto,subproto,status,method,url,name,group,check,error,error_code,tls_version,scenario,service,expected_response,vu,iter');
     }
@@ -535,11 +706,19 @@ program
     if (influxUrl) {
         extraArgs.push('--out', `influxdb=${influxUrl}`);
     }
-    // Distributed (opt-in via K6_PERF_MACHINE): tag every metric with this machine
-    // and the shared runId so the merged report can attribute load per agent.
+    // Distributed identity tags: machine + shared runId (+ testId in distributed
+    // mode) so the merge can attribute every point to (machine, run, test). Legacy
+    // K6_PERF_MACHINE-only runs keep exactly their prior machine+runId tags.
     const distMachine = process.env.K6_PERF_MACHINE;
-    if (distMachine) {
-        extraArgs.push('--tag', `machine=${distMachine}`, '--tag', `runId=${runId}`);
+    if (distributed || distMachine) {
+        const machineName = distMachine || os.hostname();
+        extraArgs.push('--tag', `machine=${machineName}`, '--tag', `runId=${runId}`);
+        if (distributed) {
+            extraArgs.push('--tag', `testId=${testId}`);
+            // Enable k6's local REST API so mid-test graceful stop can PATCH /v1/status.
+            // (This k6 build does not expose it by default.) Same address k6ApiStop uses.
+            extraArgs.push('--address', process.env.K6_PERF_K6_API || '127.0.0.1:6565');
+        }
     }
     // Execution provenance for the report's "How this test was invoked" panel.
     // Captures the three pieces the framework assembles to drive k6: the exact
@@ -596,9 +775,13 @@ program
     // K6_PERF_REQUEST_LOG toggle that enables the vu/iter system tags above.
     let requestLog = null;
     let transactionLog = null;
+    let liveHeartbeat = null;
+    let controlWatcher = null;
+    let k6Child = null;
+    let controlResult = null;
     if (requestLogEnabled || transactionLogEnabled) {
         const hostName = process.env.K6_PERF_MACHINE || os.hostname();
-        const testId = `TID_${plan.name}`;
+        // testId is resolved once at action scope (used for the k6 tag + these filenames).
         const safe = (s) => s.replace(/[^a-zA-Z0-9_.-]/g, '_');
         if (requestLogEnabled) {
             const requestLogPath = path.join(reportDir, `${safe(testId)}_${safe(hostName)}_request_metric.csv`);
@@ -609,6 +792,47 @@ program
             const transactionLogPath = path.join(reportDir, `${safe(testId)}_${safe(hostName)}_transaction_metric.csv`);
             transactionLog = new TransactionMetricLogWriter_1.TransactionMetricLogWriter(metricsStreamPath, transactionLogPath, { testId, hostName });
             transactionLog.start();
+            // Distributed live heartbeat: push a light status file to the share so the
+            // controller's `monitor` can render a combined live view. Needs a share.
+            if (distributed) {
+                const collectDir = process.env.K6_PERF_COLLECT_DIR;
+                if (collectDir) {
+                    liveHeartbeat = new LiveStatusHeartbeat_1.LiveStatusHeartbeat({
+                        machine: hostName, runId, testId, csvPath: transactionLogPath,
+                        liveDir: path.join(path.resolve(collectDir), `live_${runId}`),
+                        stats: resolvedConfig.runtime.reporting.transactionStats,
+                    });
+                    liveHeartbeat.start();
+                    // Mid-test control: poll <share>/control_<runId>/control.json and act.
+                    controlWatcher = new control_1.ControlWatcher({
+                        controlDir: (0, control_1.controlDirFor)(collectDir, runId),
+                        onAbort: () => {
+                            controlResult = 'aborted';
+                            logger_1.Logger.warning('[control] ABORT received — terminating k6 now');
+                            liveHeartbeat?.setState('aborting');
+                            if (k6Child?.pid)
+                                (0, control_1.killProcessTree)(k6Child.pid);
+                        },
+                        onStop: (effMs) => {
+                            const waitMs = Math.max(0, effMs - Date.now());
+                            logger_1.Logger.warning(`[control] STOP received — graceful stop in ${Math.round(waitMs / 1000)}s`);
+                            liveHeartbeat?.setState('stopping');
+                            setTimeout(async () => {
+                                controlResult = 'stopped';
+                                const ok = await (0, control_1.k6ApiStop)();
+                                if (!ok && k6Child?.pid) {
+                                    logger_1.Logger.warning('[control] k6 REST stop failed — killing k6');
+                                    (0, control_1.killProcessTree)(k6Child.pid);
+                                }
+                            }, waitMs);
+                        },
+                    });
+                    controlWatcher.start();
+                }
+                else {
+                    logger_1.Logger.warning('[distributed] K6_PERF_COLLECT_DIR not set — live status heartbeat disabled (no share to write to).');
+                }
+            }
         }
     }
     try {
@@ -622,12 +846,18 @@ program
             reportDir,
             runId,
             runManifestPath,
+            onChild: (c) => { k6Child = c; },
         });
     }
     finally {
         liveConsole.stop();
         if (liveDisplay)
             liveDisplay.stop();
+        if (controlWatcher)
+            controlWatcher.stop();
+        // Final heartbeat state reflects any mid-test control action.
+        if (liveHeartbeat)
+            liveHeartbeat.stop(controlResult === 'aborted' ? 'aborted' : controlResult === 'stopped' ? 'stopped' : 'done');
         if (requestLog) {
             requestLog.stop(); // final sweep flushes samples written after the last poll
             logger_1.Logger.detail(`Per-request log: ${requestLog.rowCount} request(s) → ${path.basename(requestLog.path)}`);
@@ -653,20 +883,26 @@ program
         process.removeListener('SIGTERM', forceExitHandler);
     }
     const k6EndTime = new Date().toISOString();
+    if (controlResult === 'stopped')
+        logger_1.Logger.warning('Run STOPPED early (graceful) — report reflects the shorter window (STOPPED-EARLY).');
+    else if (controlResult === 'aborted')
+        logger_1.Logger.warning('Run ABORTED — artifacts are partial (INVALID).');
     const generatedArtifacts = await finalizeRunArtifacts({
         runId,
         reportDir,
         plan,
         resolvedConfig,
         runStatus: runResult.status,
+        distributed,
         hostSnapshots,
         k6StartTime,
         k6EndTime,
         transactionNames: txnNamesForLive,
         execution: executionDetails,
     });
-    logger_1.Logger.pass('Unified report artifacts generated');
-    logger_1.Logger.detail(`Unified HTML report: ${generatedArtifacts.runReportHtml}`);
+    logger_1.Logger.pass(distributed ? 'Run artifacts generated (distributed: per-machine HTML suppressed)' : 'Unified report artifacts generated');
+    if (!distributed)
+        logger_1.Logger.detail(`Unified HTML report: ${generatedArtifacts.runReportHtml}`);
     logger_1.Logger.detail(`Transaction metrics: ${generatedArtifacts.transactionMetricsJson}`);
     logger_1.Logger.detail(`CI summary: ${generatedArtifacts.ciSummaryJson}`);
     if (generatedArtifacts.transactionMetrics) {
@@ -823,9 +1059,20 @@ function prepareRunArtifacts(plan, resolvedConfig) {
     //   2. derived from the shared K6_PERF_START_AT (already identical on all machines,
     //      so the runId falls out identically with no extra coordination), else
     //   3. a fresh timestamped id (single-machine / non-distributed).
-    const startAtDigits = (process.env.K6_PERF_START_AT || '').replace(/[^0-9]/g, '').slice(0, 14);
+    // Normalize the shared start time into the same ISO-underscore shape used by the
+    // fallback timestamp so both branches yield the same folder pattern. Parsing then
+    // re-serializing to ISO also canonicalizes it (UTC, ms), so every machine derives
+    // an identical runId regardless of how the operator wrote K6_PERF_START_AT.
+    // Only derive the runId from K6_PERF_START_AT while it is still upcoming: once
+    // that instant has passed the start barrier no longer waits, so reusing the
+    // stale scheduled time would collide every subsequent run into one folder.
+    // A past start time therefore falls through to the fresh current-time id below.
+    const startAtMs = Date.parse(process.env.K6_PERF_START_AT || '');
+    const startAtId = Number.isFinite(startAtMs) && startAtMs >= Date.now()
+        ? `Run_${new Date(startAtMs).toISOString().replace(/[-:.]/g, '_')}`
+        : null;
     const runId = process.env.K6_PERF_RUN_ID
-        || (startAtDigits.length >= 8 ? `Run_${startAtDigits}` : null)
+        || startAtId
         || (override ? 'Run_latest' : `Run_${new Date().toISOString().replace(/[-:.]/g, '_')}`);
     // Use resolve (not join) so an absolute K6_RESULTS_BASE_DIR is honored as-is;
     // a relative value still resolves against the framework cwd.
@@ -966,11 +1213,14 @@ function extractTransactionNamesFromSource(source) {
     }
     return [...matches];
 }
-function writeRunManifest(runManifestPath, plan, resolvedConfig, scenarioMetadata) {
+function writeRunManifest(runManifestPath, plan, resolvedConfig, scenarioMetadata, dist) {
     const reportDir = path.dirname(runManifestPath).replace(/\\/g, '/');
     const manifest = {
         runId: scenarioMetadata.runId,
         generatedAt: scenarioMetadata.generatedAt,
+        // Distributed identity — the merge validates these agree across machines.
+        testId: dist?.testId,
+        ...(dist?.distributed ? { distributed: true, role: dist.role || undefined, machine: dist.machine } : {}),
         plan: {
             name: plan.name,
             environment: plan.environment,
@@ -1424,7 +1674,11 @@ async function finalizeRunArtifacts(options) {
             snapshots: options.hostSnapshots,
         },
     };
-    fs.writeFileSync(runReportPath, RunReportGenerator_1.RunReportGenerator.generate(reportBundle), 'utf-8');
+    // Distributed LGs are headless — the single merged RunReport is produced by the
+    // merge step, so skip the per-machine custom HTML here (JSON/CSV artifacts remain).
+    if (!options.distributed) {
+        fs.writeFileSync(runReportPath, RunReportGenerator_1.RunReportGenerator.generate(reportBundle), 'utf-8');
+    }
     // Honor `reporting.timeseries.keepRawMetricsStream` (default true). When
     // false, the raw k6 streaming JSON is removed now that the per-bucket
     // time-series artifact has been derived from it. Useful for CI runs
@@ -1584,6 +1838,20 @@ function startLiveTransactionDisplay(metricsStreamPath, transactionNames, transa
     let metricsOffset = 0;
     const isTTY = process.stdout.isTTY === true;
     const useColor = isTTY && !process.env.NO_COLOR;
+    // Live-table display mode. The fixed scroll-region table (below) relies on ANSI
+    // DECSTBM (`\x1b[1;Nr`) + absolute cursor positioning, which xterm.js/ConPTY
+    // terminals — notably the VS Code integrated terminal — mishandle: the table
+    // area flickers/blanks as it fights k6's sub-second progress-bar redraws.
+    // Modes via env K6_PERF_LIVE_TABLE:
+    //   off        → no live table (the final table still prints after the run)
+    //   scrollback → append the table to scrollback each tick (stable, no scroll region)
+    //   fixed      → force the scroll-region table even in editor terminals
+    //   (unset)    → auto: fixed on a real TTY, scrollback in the VS Code terminal
+    const liveTableMode = (process.env.K6_PERF_LIVE_TABLE || '').trim().toLowerCase();
+    if (liveTableMode === 'off') {
+        return { stop: () => { } };
+    }
+    const editorTerminal = process.env.TERM_PROGRAM === 'vscode';
     // Reserve the bottom of the terminal for the live table; confine k6's
     // output (banner + animated progress bar) to the top region via an ANSI
     // scroll region. The two never overlap. Falls back to scrollback printing
@@ -1594,8 +1862,11 @@ function startLiveTransactionDisplay(metricsStreamPath, transactionNames, transa
     // title + top border + header row + header separator + N data rows + bottom border
     const tableRows = transactionNames.length + 5;
     let termRows = process.stdout.rows || 40;
-    // k6 needs at least ~12 rows for its banner + progress bar to remain readable
-    let useFixedTable = isTTY && termRows >= tableRows + 12;
+    // k6 needs at least ~12 rows for its banner + progress bar to remain readable.
+    // Editor terminals (VS Code) flicker with the scroll-region table, so default
+    // them to scrollback unless the user forces `fixed`.
+    let useFixedTable = isTTY && termRows >= tableRows + 12
+        && (liveTableMode === 'fixed' || (liveTableMode !== 'scrollback' && !editorTerminal));
     let tableTop = useFixedTable ? termRows - tableRows + 1 : 0;
     let scrollRegionSet = false;
     function recomputeLayout() {

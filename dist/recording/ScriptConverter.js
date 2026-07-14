@@ -648,7 +648,7 @@ class ScriptConverter {
         // so the path segment is clean.
         if (nameCounters) {
             const nameTag = ScriptGenerator_1.ScriptGenerator.deriveRequestName(m, url, nameCounters);
-            s += `${inner}name: ${JSON.stringify(nameTag)},\n`;
+            s += `${inner}name: ${ScriptGenerator_1.ScriptGenerator.buildStringExpression(nameTag)},\n`;
         }
         // Headers — extract from paramsStr if present
         let headersStr = null;
@@ -671,7 +671,7 @@ class ScriptConverter {
             s += `${inner}body: ${body},\n`;
         }
         // Replay metadata for debug diff tracing
-        s += `${inner}replay: { id: ${JSON.stringify(entryId)}, recordingStartedAt: 'converted' },\n`;
+        s += `${inner}replay: { id: ${ScriptGenerator_1.ScriptGenerator.buildStringExpression(entryId)}, recordingStartedAt: \`converted\` },\n`;
         // Auto-detect template-literal variables used in url/body/headers and inject
         // them as `variables: { ... }` so the runtime can register their current
         // values into the replay variable registry at the moment of the call.

@@ -196,6 +196,8 @@ class PipelineRunner {
                     ...env,
                 },
             });
+            if (options.onChild)
+                options.onChild(child);
             let stdout = '';
             let stderr = '';
             const stdoutBuf = { val: '' };
