@@ -140,6 +140,13 @@
   {
     "templates": [],
     "usedIn": [
+      "core_engine/src/distributed/shareSetup.ts"
+    ],
+    "var": "K6_RESULTS_BASE_DIR"
+  },
+  {
+    "templates": [],
+    "usedIn": [
       "core_engine/src/cli/run.ts",
       "core_engine/src/utils/ProgressBar.ts",
       "core_engine/src/utils/logger.ts"

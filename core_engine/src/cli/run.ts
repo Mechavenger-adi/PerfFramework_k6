@@ -49,6 +49,7 @@ import { runCollect, collectRunDir } from '../distributed/collectRun';
 import { awaitScheduledStart } from '../distributed/startBarrier';
 import { runAgentCli } from '../distributed/agentServer';
 import { runProbe } from '../distributed/probe';
+import { printControllerShareSuggestion } from '../distributed/shareSetup';
 import { listTemplates, showTemplate } from './templates';
 import { listFeatures } from './features';
 import { inspectConfig } from './config-inspect';
@@ -318,6 +319,19 @@ program
   });
 
 // ---------------------------------------------
+// SHARE-SETUP command (distributed) — print how to share the controller results dir
+// ---------------------------------------------
+program
+  .command('share-setup')
+  .description('Print how to share the controller results folder for distributed collection (manual this phase)')
+  .option('--results-dir <path>', 'Results base dir to share (default: K6_RESULTS_BASE_DIR or results)')
+  .option('--share-name <name>', 'Windows share name to suggest', 'k6results')
+  .option('--host <host>', 'Controller hostname/IP shown in the UNC path (default: hostname)')
+  .action((opts) => {
+    printControllerShareSuggestion({ resultsDir: opts.resultsDir, shareName: opts.shareName, host: opts.host });
+  });
+
+// ---------------------------------------------
 // TEMPLATES command
 // ---------------------------------------------
 
@@ -495,6 +509,12 @@ program
     } catch (err) {
       Logger.fail(`Config error: ${(err as Error).message}`);
       process.exit(1);
+    }
+
+    // Distributed controller: remind the operator how to share this machine's results
+    // folder so LGs can collect into it (manual this phase — see EDD §Shared-Location).
+    if (distributed && distRole === 'controller') {
+      printControllerShareSuggestion({ resultsDir: resolvedConfig.secrets['K6_RESULTS_BASE_DIR'] });
     }
 
     // -- Step 3: Gatekeeper pre-flight ----------

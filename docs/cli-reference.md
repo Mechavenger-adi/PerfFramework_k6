@@ -28,6 +28,7 @@ Running with no subcommand on a TTY launches the interactive panel; non-TTY prin
 | `collect` | Copy a finished local run folder into <collectDir>/shared_<runId>/<machine>/ |
 | `agent` | Run a minimal reachability agent on a load generator (Phase-2 firewall probe) |
 | `probe` | Probe reachability of one or more distributed agents from the controller |
+| `share-setup` | Print how to share the controller results folder for distributed collection (manual this phase) |
 | `templates` | Discover and view built-in config templates |
 | `templates list` | List all available templates |
 | `templates show <name>` | Show the content of a specific template |
@@ -186,6 +187,16 @@ Probe reachability of one or more distributed agents from the controller
 | `--timeout <ms>` | no | `5000` | Per-agent timeout in milliseconds |
 | `--token <token>` | no |  | Shared secret to send (or K6_PERF_AGENT_TOKEN) |
 | `--tcp` | no |  | Raw TCP connect test (works on any port; no HTTP) — for firewall port discovery |
+
+### `share-setup`
+
+Print how to share the controller results folder for distributed collection (manual this phase)
+
+| Option | Required | Default | Description |
+|--------|----------|---------|-------------|
+| `--results-dir <path>` | no |  | Results base dir to share (default: K6_RESULTS_BASE_DIR or results) |
+| `--share-name <name>` | no | `k6results` | Windows share name to suggest |
+| `--host <host>` | no |  | Controller hostname/IP shown in the UNC path (default: hostname) |
 
 ### `templates`
 

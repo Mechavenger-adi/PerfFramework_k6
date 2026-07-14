@@ -246,6 +246,10 @@
     },
     {
       "from": "core_engine/src/cli/run.ts",
+      "to": "core_engine/src/distributed/shareSetup.ts"
+    },
+    {
+      "from": "core_engine/src/cli/run.ts",
       "to": "core_engine/src/distributed/startBarrier.ts"
     },
     {
@@ -621,6 +625,10 @@
       "to": "core_engine/src/utils/logger.ts"
     },
     {
+      "from": "core_engine/src/distributed/shareSetup.ts",
+      "to": "core_engine/src/utils/logger.ts"
+    },
+    {
       "from": "core_engine/src/distributed/startBarrier.ts",
       "to": "core_engine/src/utils/logger.ts"
     },
@@ -905,6 +913,7 @@
     "core_engine/src/distributed/collectRun.ts",
     "core_engine/src/distributed/probe.ts",
     "core_engine/src/distributed/runMerge.ts",
+    "core_engine/src/distributed/shareSetup.ts",
     "core_engine/src/distributed/startBarrier.ts",
     "core_engine/src/engine.ts",
     "core_engine/src/execution/FileWriteSink.ts",

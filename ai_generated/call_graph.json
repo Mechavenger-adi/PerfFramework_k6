@@ -190,6 +190,10 @@
     },
     {
       "from": "core_engine/src/cli/run.ts",
+      "to": "core_engine/src/distributed/shareSetup.ts"
+    },
+    {
+      "from": "core_engine/src/cli/run.ts",
       "to": "core_engine/src/distributed/startBarrier.ts"
     },
     {
@@ -370,6 +374,10 @@
     },
     {
       "from": "core_engine/src/distributed/runMerge.ts",
+      "to": "core_engine/src/utils/logger.ts"
+    },
+    {
+      "from": "core_engine/src/distributed/shareSetup.ts",
       "to": "core_engine/src/utils/logger.ts"
     },
     {

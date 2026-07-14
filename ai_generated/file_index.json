@@ -247,6 +247,7 @@
       "core_engine/src/distributed/collectRun.ts",
       "core_engine/src/distributed/probe.ts",
       "core_engine/src/distributed/runMerge.ts",
+      "core_engine/src/distributed/shareSetup.ts",
       "core_engine/src/distributed/startBarrier.ts",
       "core_engine/src/execution/FileWriteSink.ts",
       "core_engine/src/execution/HostMonitor.ts",
@@ -291,7 +292,7 @@
     ],
     "importsNode": true,
     "layer": "cli",
-    "loc": 2359,
+    "loc": 2379,
     "path": "core_engine/src/cli/run.ts"
   },
   {
@@ -864,6 +865,22 @@
     "layer": "distributed",
     "loc": 157,
     "path": "core_engine/src/distributed/runMerge.ts"
+  },
+  {
+    "exports": [
+      "ShareSuggestionOptions",
+      "printControllerShareSuggestion",
+      "resolveResultsBaseDir"
+    ],
+    "imports": [
+      "core_engine/src/utils/logger.ts",
+      "os",
+      "path"
+    ],
+    "importsNode": true,
+    "layer": "distributed",
+    "loc": 52,
+    "path": "core_engine/src/distributed/shareSetup.ts"
   },
   {
     "exports": [
