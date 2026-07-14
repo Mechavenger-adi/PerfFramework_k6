@@ -16,11 +16,11 @@ run and a debug diff report, then explains how the pieces fit.
 - [Troubleshooting](../troubleshooting.md) · [FAQ](../faq.md)
 - [Framework Atlas](../../FrameworkAtlas.md) — find which files own a feature
 
-## Legacy knowledge-transfer decks
-The `KT_*` files below are earlier knowledge-transfer material. They give useful structural intuition but
-predate some current contracts — **where they conflict with the [Mental Model](mental-model.md) or the
-`engineering_docs/edd/` documents, the latter are authoritative** (each EDD is reverse-engineered from the
-code with `file:line` citations).
+## Knowledge-transfer decks
+The `KT_*` files below are longer-form knowledge-transfer material, refreshed 2026-07-13 to match the
+current code. Use them for structural intuition and for running a session; for the definitive,
+`file:line`-cited version of any detail, the [Mental Model](mental-model.md) and the
+`engineering_docs/edd/` documents remain authoritative (each EDD is reverse-engineered from the code).
 - [KT Guide](KT_Guide.md) — file-by-file deep dive
-- [KT Low-Level Deep Dive](KT_Low_Level_Deep_Dive.md)
-- [KT Presentation](KT_Presentation.md)
+- [KT Low-Level Deep Dive](KT_Low_Level_Deep_Dive.md) — mechanisms & math
+- [KT Presentation](KT_Presentation.md) — slide outline for a talk
