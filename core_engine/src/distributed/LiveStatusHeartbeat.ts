@@ -20,6 +20,21 @@ import { HostMonitor } from '../execution/HostMonitor';
 
 export type LiveState = 'running' | 'stopping' | 'aborting' | 'done' | 'stopped' | 'aborted';
 
+/** Count lines in an ndjson file + the last `n` as short messages. Best-effort. */
+function tailNdjson(file: string, n: number): { count: number; recent: string[] } {
+  try {
+    if (!fs.existsSync(file)) return { count: 0, recent: [] };
+    const lines = fs.readFileSync(file, 'utf-8').split(/\r?\n/).filter((l) => l.trim().length > 0);
+    const recent = lines.slice(-n).map((l) => {
+      try {
+        const o = JSON.parse(l) as Record<string, unknown>;
+        return String(o.message ?? o.msg ?? o.error ?? o.type ?? l).slice(0, 160);
+      } catch { return l.slice(0, 160); }
+    });
+    return { count: lines.length, recent };
+  } catch { return { count: 0, recent: [] }; }
+}
+
 export interface LiveStatusSnapshot {
   schemaVersion: 1;
   machine: string;
@@ -36,6 +51,10 @@ export interface LiveStatusSnapshot {
   throughputTps: number;
   /** This machine's host resource utilisation (%). */
   host: { cpu: number; mem: number };
+  errorCount: number;
+  warnCount: number;
+  recentErrors: string[];
+  recentWarnings: string[];
   /** Configured stat set (from the plan) so the monitor renders the same columns. */
   stats: string[];
   /**
@@ -109,6 +128,9 @@ export class LiveStatusHeartbeat {
   private write(state: LiveState): void {
     try {
       const stats = readTransactionCsvStats(this.opts.csvPath);
+      const reportDir = path.dirname(this.opts.csvPath);
+      const errs = tailNdjson(path.join(reportDir, 'errors.ndjson'), 3);
+      const warns = tailNdjson(path.join(reportDir, 'warnings.ndjson'), 3);
       const now = Date.now();
       const elapsedSec = Math.max(0.001, (now - this.startMs) / 1000);
       const dt = Math.max(0.001, (now - this.prevMs) / 1000);
@@ -138,6 +160,10 @@ export class LiveStatusHeartbeat {
         errorRate: stats.totalCount ? (stats.totalFail / stats.totalCount) * 100 : 0,
         throughputTps,
         host: this.hostCache,
+        errorCount: errs.count,
+        warnCount: warns.count,
+        recentErrors: errs.recent,
+        recentWarnings: warns.recent,
         stats: this.opts.stats ?? [],
         transactions,
       };

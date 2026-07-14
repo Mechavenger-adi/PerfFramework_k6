@@ -38,6 +38,13 @@ export interface LiveAggregate {
   fleet: Array<{ machine: string; state: string; elapsedSec: number; vus: number; txns: number; errorRate: number; tps: number; cpu: number; mem: number }>;
   totals: { vus: number; txns: number; errorRate: number; tps: number };
   transactions: Array<{ name: string; count: number; fail: number; errPct: number; values: Record<string, number> }>;
+  /** Combined errors/warnings across machines: totals + recent messages (machine-tagged). */
+  events: {
+    errorCount: number;
+    warnCount: number;
+    recentErrors: Array<{ machine: string; msg: string }>;
+    recentWarnings: Array<{ machine: string; msg: string }>;
+  };
   /** The controller's own host resources (filled in by the monitor/dashboard). */
   controller?: { cpu: number; mem: number };
 }
@@ -146,7 +153,16 @@ export function aggregate(dir: string): LiveAggregate {
   }));
 
   let vus = 0; let txns = 0; let fail = 0; let tps = 0;
-  for (const s of snaps) { vus += s.currentVus; txns += s.transactionsTotal; fail += s.failTotal; tps += s.throughputTps; }
+  let errorCount = 0; let warnCount = 0;
+  const recentErrors: Array<{ machine: string; msg: string }> = [];
+  const recentWarnings: Array<{ machine: string; msg: string }> = [];
+  for (const s of snaps) {
+    vus += s.currentVus; txns += s.transactionsTotal; fail += s.failTotal; tps += s.throughputTps;
+    errorCount += s.errorCount ?? 0;
+    warnCount += s.warnCount ?? 0;
+    for (const m of s.recentErrors ?? []) recentErrors.push({ machine: s.machine, msg: m });
+    for (const m of s.recentWarnings ?? []) recentWarnings.push({ machine: s.machine, msg: m });
+  }
 
   const transactions = mergeTransactions(snaps).map((t) => {
     const values: Record<string, number> = {};
@@ -162,5 +178,6 @@ export function aggregate(dir: string): LiveAggregate {
     fleet,
     totals: { vus, txns, errorRate: txns ? (fail / txns) * 100 : 0, tps },
     transactions,
+    events: { errorCount, warnCount, recentErrors: recentErrors.slice(-8), recentWarnings: recentWarnings.slice(-8) },
   };
 }

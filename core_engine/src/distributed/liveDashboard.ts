@@ -66,6 +66,10 @@ function page(intervalMs: number): string {
   svg.chart{ width:100%; height:auto; display:block; }
   .legend{ display:flex; gap:16px; font-size:12px; color:var(--dim); margin:6px 2px 0; }
   .legend i{ display:inline-block; width:12px; height:3px; border-radius:2px; margin-right:6px; vertical-align:middle; }
+  .events{ display:flex; flex-direction:column; gap:4px; }
+  .ev{ font-size:12px; padding:5px 9px; border-radius:6px; border:1px solid var(--line); background:var(--card); white-space:pre-wrap; }
+  .ev.err{ border-left:3px solid var(--abort); } .ev.warn{ border-left:3px solid var(--stop); } .ev.none{ color:var(--dim); }
+  .ev b{ color:var(--dim); font-weight:600; margin-right:6px; }
 </style></head><body>
 <header>
   <h1>k6 · distributed live monitor</h1>
@@ -87,6 +91,7 @@ function page(intervalMs: number): string {
   <h2>Fleet</h2><div class="scroll"><table id="fleet"></table></div>
   <h2>Host resources</h2><div class="scroll"><table id="resources"></table></div>
   <h2>Combined transactions</h2><div class="scroll"><table id="txns"></table></div>
+  <h2>Errors &amp; warnings</h2><div id="events" class="events"></div>
   <div class="note">Percentiles are histogram-based (≤0.1%); the bit-exact numbers are in the final report. Counts, throughput, min, max and avg are exact.</div>
 </main>
 <script>
@@ -133,8 +138,9 @@ async function tick(){
     else mb.textContent='⚠️ Auto-merge failed — run merge manually.';
   }
   document.getElementById('meta').textContent = d.machineCount+' machine(s) · updated '+new Date(d.updatedAt).toLocaleTimeString();
+  const ev=d.events||{errorCount:0,warnCount:0,recentErrors:[],recentWarnings:[]};
   document.getElementById('kpis').innerHTML =
-    kpi('VUs',d.totals.vus)+kpi('Transactions',d.totals.txns)+kpi('Throughput/s',n1(d.totals.tps))+kpi('Error %',n1(d.totals.errorRate));
+    kpi('VUs',d.totals.vus)+kpi('Transactions',d.totals.txns)+kpi('Throughput/s',n1(d.totals.tps))+kpi('Error %',n1(d.totals.errorRate))+kpi('Errors',ev.errorCount)+kpi('Warnings',ev.warnCount);
   // VUs + failure-rate over time
   hist.push({t:Date.now(), vus:Number(d.totals.vus)||0, err:Number(d.totals.errorRate)||0});
   if(hist.length>MAXPTS) hist.shift();
@@ -157,6 +163,11 @@ async function tick(){
   for(const r of d.transactions){ t+='<tr><td>'+esc(r.name)+'</td><td>'+r.count+'</td><td>'+n1(r.errPct)+'</td>'; for(const st of d.stats) t+='<td>'+n0(r.values[st])+'</td>'; t+='</tr>'; }
   t+='</tbody>';
   document.getElementById('txns').innerHTML=t;
+  // errors & warnings (combined, machine-tagged)
+  const evRows=(arr,cls)=>arr.map(e=>'<div class="ev '+cls+'"><b>'+esc(e.machine)+'</b>'+esc(e.msg)+'</div>').join('');
+  let evHtml=evRows(ev.recentErrors||[],'err')+evRows(ev.recentWarnings||[],'warn');
+  if(!evHtml) evHtml='<div class="ev none">no errors or warnings</div>';
+  document.getElementById('events').innerHTML=evHtml;
 }
 tick(); setInterval(tick, INTERVAL);
 </script></body></html>`;
@@ -243,8 +254,11 @@ export async function runDashboardCli(o: DashboardOptions): Promise<void> {
       sharedDir: ctx.sharedDir, runId: ctx.runId, autoMerge: o.autoMerge, mergeTimeoutSec: o.mergeTimeoutSec,
     });
     const viewHost = o.host === '0.0.0.0' || o.host === '' ? 'localhost' : o.host;
+    const url = `http://${viewHost}:${o.port}/`;
+    // OSC 8 hyperlink → clickable in modern terminals (VS Code, Windows Terminal, iTerm).
+    const clickable = `\x1b]8;;${url}\x07${url}\x1b]8;;\x07`;
     Logger.header('k6-framework — distributed live dashboard');
-    Logger.pass(`Serving at http://${viewHost}:${o.port}/`);
+    Logger.pass(`Serving at ${clickable}`);
     Logger.detail(`Live dir: ${ctx.liveDir}`);
     Logger.detail(o.autoMerge === false ? 'Auto-merge: off (run `merge` manually).' : 'Auto-merge: on — the final report builds automatically when all machines finish.');
     if (o.host === '0.0.0.0') Logger.detail('Bound to all interfaces — shareable across the network once the firewall port is open.');
