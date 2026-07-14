@@ -893,7 +893,7 @@ program
         reportDir,
         runId,
         runManifestPath,
-        onChild: (c) => { k6Child = c; },
+        onChild: (c: ChildProcess) => { k6Child = c; },
       });
     } finally {
       liveConsole.stop();

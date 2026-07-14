@@ -155,7 +155,7 @@ export function startDashboardServer(
     const url = (req.url || '/').split('?')[0];
     if (req.method === 'POST' && url === '/control') {
       let body = '';
-      req.on('data', (c) => { body += c; if (body.length > 4096) req.destroy(); });
+      req.on('data', (c: Buffer) => { body += c; if (body.length > 4096) req.destroy(); });
       req.on('end', () => {
         try {
           const { action, effectiveAt } = JSON.parse(body || '{}') as { action?: ControlAction; effectiveAt?: string };
