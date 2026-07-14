@@ -16,7 +16,7 @@ import { Logger } from '../utils/logger';
 import { RelativeHistogram, HistogramJSON } from '../reporting/Histogram';
 import { readTransactionCsvStats } from './transactionCsv';
 
-export type LiveState = 'running' | 'done' | 'stopped' | 'aborted';
+export type LiveState = 'running' | 'stopping' | 'aborting' | 'done' | 'stopped' | 'aborted';
 
 export interface LiveStatusSnapshot {
   schemaVersion: 1;
@@ -60,6 +60,7 @@ export class LiveStatusHeartbeat {
   private startMs = Date.now();
   private prevCount = 0;
   private prevMs = Date.now();
+  private state: LiveState = 'running';
   private readonly statusPath: string;
 
   constructor(private readonly opts: HeartbeatOptions) {
@@ -70,14 +71,22 @@ export class LiveStatusHeartbeat {
     try { fs.mkdirSync(this.opts.liveDir, { recursive: true }); } catch { /* best-effort */ }
     this.startMs = Date.now();
     this.prevMs = this.startMs;
-    this.write('running');
-    this.timer = setInterval(() => this.write('running'), this.opts.intervalMs ?? 4000);
+    this.state = 'running';
+    this.write(this.state);
+    this.timer = setInterval(() => this.write(this.state), this.opts.intervalMs ?? 4000);
     if (this.timer.unref) this.timer.unref();
   }
 
-  stop(state: LiveState = 'done'): void {
-    if (this.timer) { clearInterval(this.timer); this.timer = null; }
+  /** Reflect a control transition (e.g. 'stopping'/'aborting') immediately. */
+  setState(state: LiveState): void {
+    this.state = state;
     this.write(state);
+  }
+
+  stop(state?: LiveState): void {
+    if (this.timer) { clearInterval(this.timer); this.timer = null; }
+    this.state = state ?? this.state;
+    this.write(this.state);
   }
 
   private write(state: LiveState): void {

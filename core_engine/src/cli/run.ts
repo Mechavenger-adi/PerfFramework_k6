@@ -50,9 +50,11 @@ import { awaitScheduledStart } from '../distributed/startBarrier';
 import { runAgentCli } from '../distributed/agentServer';
 import { runProbe } from '../distributed/probe';
 import { printControllerShareSuggestion } from '../distributed/shareSetup';
+import type { ChildProcess } from 'child_process';
 import { LiveStatusHeartbeat } from '../distributed/LiveStatusHeartbeat';
 import { runMonitor } from '../distributed/monitor';
 import { runDashboardCli } from '../distributed/liveDashboard';
+import { ControlWatcher, controlDirFor, killProcessTree, k6ApiStop, writeControl } from '../distributed/control';
 import { listTemplates, showTemplate } from './templates';
 import { listFeatures } from './features';
 import { inspectConfig } from './config-inspect';
@@ -368,6 +370,31 @@ program
       once: opts.once,
     });
     if (!ok) process.exit(1);
+  });
+
+// ---------------------------------------------
+// SIGNAL command (distributed) — send an abort/stop to a running distributed run
+// ---------------------------------------------
+program
+  .command('signal')
+  .description('Send abort/stop to a running distributed run (writes control_<runId>/control.json)')
+  .requiredOption('--mode <mode>', 'abort | stop')
+  .option('--collect-dir <path>', 'Shared collect base dir (use with --run-id)')
+  .option('--run-id <id>', 'Shared runId (use with --collect-dir)')
+  .option('--control-dir <path>', 'Explicit control_<runId> dir (alternative to --collect-dir/--run-id)')
+  .option('--effective-at <sec>', 'stop only: seconds from now to drain together', '10')
+  .action((opts) => {
+    if (opts.mode !== 'abort' && opts.mode !== 'stop') {
+      Logger.fail('[signal] --mode must be abort or stop'); process.exit(1);
+    }
+    const dir = opts.controlDir
+      || (opts.collectDir && opts.runId ? controlDirFor(opts.collectDir, opts.runId) : null);
+    if (!dir) { Logger.fail('[signal] provide --control-dir, or --collect-dir together with --run-id'); process.exit(1); }
+    const effectiveAt = opts.mode === 'stop'
+      ? new Date(Date.now() + (Number(opts.effectiveAt) || 10) * 1000).toISOString()
+      : undefined;
+    const p = writeControl(dir, { action: opts.mode, effectiveAt, by: 'cli' });
+    Logger.pass(`[signal] ${opts.mode}${effectiveAt ? ` (effective ${effectiveAt})` : ''} → ${p}`);
   });
 
 // ---------------------------------------------
@@ -707,7 +734,12 @@ program
     if (distributed || distMachine) {
       const machineName = distMachine || os.hostname();
       extraArgs.push('--tag', `machine=${machineName}`, '--tag', `runId=${runId}`);
-      if (distributed) extraArgs.push('--tag', `testId=${testId}`);
+      if (distributed) {
+        extraArgs.push('--tag', `testId=${testId}`);
+        // Enable k6's local REST API so mid-test graceful stop can PATCH /v1/status.
+        // (This k6 build does not expose it by default.) Same address k6ApiStop uses.
+        extraArgs.push('--address', process.env.K6_PERF_K6_API || '127.0.0.1:6565');
+      }
     }
 
     // Execution provenance for the report's "How this test was invoked" panel.
@@ -772,6 +804,9 @@ program
     let requestLog: RequestMetricLogWriter | null = null;
     let transactionLog: TransactionMetricLogWriter | null = null;
     let liveHeartbeat: LiveStatusHeartbeat | null = null;
+    let controlWatcher: ControlWatcher | null = null;
+    let k6Child: ChildProcess | null = null;
+    let controlResult: 'aborted' | 'stopped' | null = null;
     if (requestLogEnabled || transactionLogEnabled) {
       const hostName = process.env.K6_PERF_MACHINE || os.hostname();
       // testId is resolved once at action scope (used for the k6 tag + these filenames).
@@ -796,6 +831,30 @@ program
               stats: resolvedConfig.runtime.reporting.transactionStats,
             });
             liveHeartbeat.start();
+            // Mid-test control: poll <share>/control_<runId>/control.json and act.
+            controlWatcher = new ControlWatcher({
+              controlDir: controlDirFor(collectDir, runId),
+              onAbort: () => {
+                controlResult = 'aborted';
+                Logger.warning('[control] ABORT received — terminating k6 now');
+                liveHeartbeat?.setState('aborting');
+                if (k6Child?.pid) killProcessTree(k6Child.pid);
+              },
+              onStop: (effMs) => {
+                const waitMs = Math.max(0, effMs - Date.now());
+                Logger.warning(`[control] STOP received — graceful stop in ${Math.round(waitMs / 1000)}s`);
+                liveHeartbeat?.setState('stopping');
+                setTimeout(async () => {
+                  controlResult = 'stopped';
+                  const ok = await k6ApiStop();
+                  if (!ok && k6Child?.pid) {
+                    Logger.warning('[control] k6 REST stop failed — killing k6');
+                    killProcessTree(k6Child.pid);
+                  }
+                }, waitMs);
+              },
+            });
+            controlWatcher.start();
           } else {
             Logger.warning('[distributed] K6_PERF_COLLECT_DIR not set — live status heartbeat disabled (no share to write to).');
           }
@@ -813,12 +872,14 @@ program
         reportDir,
         runId,
         runManifestPath,
+        onChild: (c) => { k6Child = c; },
       });
     } finally {
       liveConsole.stop();
       if (liveDisplay) liveDisplay.stop();
-      // Final heartbeat (state refinement to stopped/aborted arrives in step 6).
-      if (liveHeartbeat) liveHeartbeat.stop('done');
+      if (controlWatcher) controlWatcher.stop();
+      // Final heartbeat state reflects any mid-test control action.
+      if (liveHeartbeat) liveHeartbeat.stop(controlResult === 'aborted' ? 'aborted' : controlResult === 'stopped' ? 'stopped' : 'done');
       if (requestLog) {
         requestLog.stop(); // final sweep flushes samples written after the last poll
         Logger.detail(`Per-request log: ${requestLog.rowCount} request(s) → ${path.basename(requestLog.path)}`);
@@ -844,6 +905,8 @@ program
       process.removeListener('SIGTERM', forceExitHandler);
     }
     const k6EndTime = new Date().toISOString();
+    if (controlResult === 'stopped') Logger.warning('Run STOPPED early (graceful) — report reflects the shorter window (STOPPED-EARLY).');
+    else if (controlResult === 'aborted') Logger.warning('Run ABORTED — artifacts are partial (INVALID).');
 
     const generatedArtifacts = await finalizeRunArtifacts({
       runId,

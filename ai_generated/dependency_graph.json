@@ -238,6 +238,10 @@
     },
     {
       "from": "core_engine/src/cli/run.ts",
+      "to": "core_engine/src/distributed/control.ts"
+    },
+    {
+      "from": "core_engine/src/cli/run.ts",
       "to": "core_engine/src/distributed/liveDashboard.ts"
     },
     {
@@ -577,12 +581,20 @@
       "to": "core_engine/src/utils/logger.ts"
     },
     {
+      "from": "core_engine/src/distributed/control.ts",
+      "to": "core_engine/src/utils/logger.ts"
+    },
+    {
       "from": "core_engine/src/distributed/liveAggregate.ts",
       "to": "core_engine/src/distributed/LiveStatusHeartbeat.ts"
     },
     {
       "from": "core_engine/src/distributed/liveAggregate.ts",
       "to": "core_engine/src/reporting/Histogram.ts"
+    },
+    {
+      "from": "core_engine/src/distributed/liveDashboard.ts",
+      "to": "core_engine/src/distributed/control.ts"
     },
     {
       "from": "core_engine/src/distributed/liveDashboard.ts",
@@ -964,6 +976,7 @@
     "core_engine/src/distributed/MergedReportBuilder.ts",
     "core_engine/src/distributed/agentServer.ts",
     "core_engine/src/distributed/collectRun.ts",
+    "core_engine/src/distributed/control.ts",
     "core_engine/src/distributed/liveAggregate.ts",
     "core_engine/src/distributed/liveDashboard.ts",
     "core_engine/src/distributed/monitor.ts",

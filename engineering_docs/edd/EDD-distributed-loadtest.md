@@ -168,8 +168,9 @@ and the run ending well before its 40s duration). So **graceful stop = one local
 cooperative-drain fallback is **not** needed.
 - **Exit code:** an API-stopped k6 exits **non-zero (observed 103)** → the framework must map that exit to
   **STOPPED-EARLY**, not a crash/failed run.
-- **Precondition:** the k6 REST API must stay enabled (default `127.0.0.1:6565`); `PipelineRunner` must not
-  disable it, and should make the address configurable to avoid clashes if a box ever runs two k6s.
+- **Precondition (implemented):** this k6 build does **not** expose the REST API by default, so a
+  distributed run now passes `--address 127.0.0.1:6565` (override `K6_PERF_K6_API`); `k6ApiStop` targets the
+  same address. Without it, graceful stop falls back to a kill.
 - **abort** stays a hard child-kill (`taskkill /F /T`), unconditionally reliable, no summary.
 
 **Coordination.** `stop` carries `effectiveAt` (e.g. now + 10 s) so all LGs drain at the same wall-clock

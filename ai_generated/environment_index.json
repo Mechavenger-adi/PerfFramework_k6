@@ -79,6 +79,14 @@
   {
     "templates": [],
     "usedIn": [
+      "core_engine/src/cli/run.ts",
+      "core_engine/src/distributed/control.ts"
+    ],
+    "var": "K6_PERF_K6_API"
+  },
+  {
+    "templates": [],
+    "usedIn": [
       "core_engine/src/cli/run.ts"
     ],
     "var": "K6_PERF_LIVE_TABLE"

@@ -35,6 +35,8 @@ export interface RunOptions {
   reportDir?: string;
   /** Path to the generated run-manifest.json */
   runManifestPath?: string;
+  /** Called with the spawned k6 child (async path only) so callers can abort/stop it. */
+  onChild?: (child: childProcess.ChildProcess) => void;
 }
 
 export interface PipelineRunResult {
@@ -241,6 +243,7 @@ export class PipelineRunner {
           ...env,
         },
       });
+      if (options.onChild) options.onChild(child);
 
       let stdout = '';
       let stderr = '';

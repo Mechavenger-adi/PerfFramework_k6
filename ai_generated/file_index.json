@@ -245,6 +245,7 @@
       "core_engine/src/debug/ReplayRunner.ts",
       "core_engine/src/distributed/agentServer.ts",
       "core_engine/src/distributed/collectRun.ts",
+      "core_engine/src/distributed/control.ts",
       "core_engine/src/distributed/liveDashboard.ts",
       "core_engine/src/distributed/LiveStatusHeartbeat.ts",
       "core_engine/src/distributed/monitor.ts",
@@ -287,6 +288,7 @@
       "core_engine/src/cli/new.ts",
       "core_engine/src/cli/templates.ts",
       "core_engine/src/cli/validate.ts",
+      "child_process",
       "commander",
       "fs",
       "os",
@@ -295,7 +297,7 @@
     ],
     "importsNode": true,
     "layer": "cli",
-    "loc": 2436,
+    "loc": 2499,
     "path": "core_engine/src/cli/run.ts"
   },
   {
@@ -777,7 +779,7 @@
     ],
     "importsNode": true,
     "layer": "distributed",
-    "loc": 126,
+    "loc": 135,
     "path": "core_engine/src/distributed/LiveStatusHeartbeat.ts"
   },
   {
@@ -851,6 +853,30 @@
   },
   {
     "exports": [
+      "ControlAction",
+      "ControlFile",
+      "ControlWatcher",
+      "ControlWatcherOptions",
+      "controlDirFor",
+      "k6ApiStop",
+      "killProcessTree",
+      "readControl",
+      "writeControl"
+    ],
+    "imports": [
+      "core_engine/src/utils/logger.ts",
+      "child_process",
+      "fs",
+      "http",
+      "path"
+    ],
+    "importsNode": true,
+    "layer": "distributed",
+    "loc": 118,
+    "path": "core_engine/src/distributed/control.ts"
+  },
+  {
+    "exports": [
       "DEFAULT_STATS",
       "LiveAggregate",
       "aggregate",
@@ -877,12 +903,14 @@
     ],
     "imports": [
       "core_engine/src/utils/logger.ts",
+      "core_engine/src/distributed/control.ts",
       "core_engine/src/distributed/liveAggregate.ts",
-      "http"
+      "http",
+      "path"
     ],
     "importsNode": true,
     "layer": "distributed",
-    "loc": 144,
+    "loc": 183,
     "path": "core_engine/src/distributed/liveDashboard.ts"
   },
   {
@@ -1171,7 +1199,7 @@
     ],
     "importsNode": true,
     "layer": "execution",
-    "loc": 330,
+    "loc": 333,
     "path": "core_engine/src/execution/PipelineRunner.ts"
   },
   {

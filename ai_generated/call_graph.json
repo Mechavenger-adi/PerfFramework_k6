@@ -182,6 +182,10 @@
     },
     {
       "from": "core_engine/src/cli/run.ts",
+      "to": "core_engine/src/distributed/control.ts"
+    },
+    {
+      "from": "core_engine/src/cli/run.ts",
       "to": "core_engine/src/distributed/liveDashboard.ts"
     },
     {
@@ -353,8 +357,16 @@
       "to": "core_engine/src/utils/logger.ts"
     },
     {
+      "from": "core_engine/src/distributed/control.ts",
+      "to": "core_engine/src/utils/logger.ts"
+    },
+    {
       "from": "core_engine/src/distributed/liveAggregate.ts",
       "to": "core_engine/src/reporting/Histogram.ts"
+    },
+    {
+      "from": "core_engine/src/distributed/liveDashboard.ts",
+      "to": "core_engine/src/distributed/control.ts"
     },
     {
       "from": "core_engine/src/distributed/liveDashboard.ts",

@@ -30,6 +30,7 @@ Running with no subcommand on a TTY launches the interactive panel; non-TTY prin
 | `probe` | Probe reachability of one or more distributed agents from the controller |
 | `share-setup` | Print how to share the controller results folder for distributed collection (manual this phase) |
 | `monitor` | Live-monitor a distributed run (console, or --serve for a browser dashboard) |
+| `signal` | Send abort/stop to a running distributed run (writes control_<runId>/control.json) |
 | `templates` | Discover and view built-in config templates |
 | `templates list` | List all available templates |
 | `templates show <name>` | Show the content of a specific template |
@@ -213,6 +214,18 @@ Live-monitor a distributed run (console, or --serve for a browser dashboard)
 | `--serve` | no |  | Serve a live browser dashboard instead of the console view |
 | `--host <host>` | no | `127.0.0.1` | Dashboard bind host (localhost now; 0.0.0.0 to share once a port is open) |
 | `--port <port>` | no | `8787` | Dashboard port |
+
+### `signal`
+
+Send abort/stop to a running distributed run (writes control_<runId>/control.json)
+
+| Option | Required | Default | Description |
+|--------|----------|---------|-------------|
+| `--mode <mode>` | yes |  | abort | stop |
+| `--collect-dir <path>` | no |  | Shared collect base dir (use with --run-id) |
+| `--run-id <id>` | no |  | Shared runId (use with --collect-dir) |
+| `--control-dir <path>` | no |  | Explicit control_<runId> dir (alternative to --collect-dir/--run-id) |
+| `--effective-at <sec>` | no | `10` | stop only: seconds from now to drain together |
 
 ### `templates`
 

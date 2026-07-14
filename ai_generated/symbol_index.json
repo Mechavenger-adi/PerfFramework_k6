@@ -676,7 +676,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "const",
-    "line": 2328,
+    "line": 2391,
     "name": "ERROR_EVENT_PREFIX"
   },
   "core_engine/src/cli/run.ts#FRAMEWORK_OWNED_FLAGS": {
@@ -684,7 +684,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "const",
-    "line": 967,
+    "line": 1030,
     "name": "FRAMEWORK_OWNED_FLAGS"
   },
   "core_engine/src/cli/run.ts#LIVE_TXN_INTERVAL_MS": {
@@ -692,7 +692,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "const",
-    "line": 1927,
+    "line": 1990,
     "name": "LIVE_TXN_INTERVAL_MS"
   },
   "core_engine/src/cli/run.ts#LiveTxnStats": {
@@ -700,7 +700,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "interface",
-    "line": 1929,
+    "line": 1992,
     "name": "LiveTxnStats"
   },
   "core_engine/src/cli/run.ts#SNAPSHOT_EVENT_PREFIX": {
@@ -708,7 +708,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "const",
-    "line": 2327,
+    "line": 2390,
     "name": "SNAPSHOT_EVENT_PREFIX"
   },
   "core_engine/src/cli/run.ts#WARNING_EVENT_PREFIX": {
@@ -716,7 +716,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "const",
-    "line": 2329,
+    "line": 2392,
     "name": "WARNING_EVENT_PREFIX"
   },
   "core_engine/src/cli/run.ts#buildLiveTableLines": {
@@ -724,7 +724,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "Build the rendered table as a list of strings (one per row). Pure helper shared by both fixed-position and scrollback renderers.",
     "kind": "function",
-    "line": 2177,
+    "line": 2240,
     "name": "buildLiveTableLines"
   },
   "core_engine/src/cli/run.ts#buildReportAgents": {
@@ -732,7 +732,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 1807,
+    "line": 1870,
     "name": "buildReportAgents"
   },
   "core_engine/src/cli/run.ts#buildRunEnvironment": {
@@ -740,7 +740,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 1145,
+    "line": 1208,
     "name": "buildRunEnvironment"
   },
   "core_engine/src/cli/run.ts#buildRuntimeMetadataBlock": {
@@ -748,7 +748,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "Build the `runtime` block injected into K6_PERF_RUNTIME_METADATA — the single source of truth the in-script runtime (request.ts / lifecycle.ts / transaction.ts) reads for errorBehavior, thinkTime, pacing, http (timeout/redirects/throwOnError), reporting and snapshot config. Shared by the load path (buildScenarioRuntimeMetadata) AND the debug path (runJourneyDebug) so debug honors EXACTLY the same runtime settings as load. That parity is intentional: debug exists to validate script behavior and shake out load-test scenarios, so it must follow redirects, time out, pace and think-time identically to load — otherwise a script can pass in debug and fail under load purely because debug used different HTTP semantics.",
     "kind": "function",
-    "line": 1091,
+    "line": 1154,
     "name": "buildRuntimeMetadataBlock"
   },
   "core_engine/src/cli/run.ts#buildScenarioRuntimeMetadata": {
@@ -756,7 +756,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 1125,
+    "line": 1188,
     "name": "buildScenarioRuntimeMetadata"
   },
   "core_engine/src/cli/run.ts#collectUniqueTransactionNames": {
@@ -764,7 +764,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 1199,
+    "line": 1262,
     "name": "collectUniqueTransactionNames"
   },
   "core_engine/src/cli/run.ts#computeTopRequestsByP90": {
@@ -772,7 +772,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "Extract percentile numbers from a transactionStats list (e.g. [\"avg\",\"p(90)\", \"p(99)\"] → [90, 99]). Used to tell the timeseries parser which percentile lines the report should plot. p90 is always added by the parser.",
     "kind": "function",
-    "line": 1287,
+    "line": 1350,
     "name": "computeTopRequestsByP90"
   },
   "core_engine/src/cli/run.ts#configCmd": {
@@ -780,7 +780,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "const",
-    "line": 420,
+    "line": 447,
     "name": "configCmd"
   },
   "core_engine/src/cli/run.ts#extractJourneyTransactionNames": {
@@ -788,7 +788,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 1177,
+    "line": 1240,
     "name": "extractJourneyTransactionNames"
   },
   "core_engine/src/cli/run.ts#extractK6PerfEvents": {
@@ -796,7 +796,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "Wave 3: scan the mirrored run log for any `[k6-perf][*-event]` JSON payloads emitted by the k6 side (`transaction.ts` and `request.ts`) and return them as structured event lists. Used by `finalizeRunArtifacts` to merge per-iteration check failures, transaction exceptions, and snapshot- cap warnings into the same error/warning pipelines the rest of reporting consumes. Best-effort — malformed lines are skipped.",
     "kind": "function",
-    "line": 2367,
+    "line": 2430,
     "name": "extractK6PerfEvents"
   },
   "core_engine/src/cli/run.ts#extractPayloadWithPrefix": {
@@ -804,7 +804,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "Same dequote logic as snapshot extraction, parameterized on the prefix.",
     "kind": "function",
-    "line": 2392,
+    "line": 2455,
     "name": "extractPayloadWithPrefix"
   },
   "core_engine/src/cli/run.ts#extractSnapshotPayload": {
@@ -812,7 +812,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 2406,
+    "line": 2469,
     "name": "extractSnapshotPayload"
   },
   "core_engine/src/cli/run.ts#extractTransactionNamesFromSource": {
@@ -820,7 +820,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 1211,
+    "line": 1274,
     "name": "extractTransactionNamesFromSource"
   },
   "core_engine/src/cli/run.ts#filterPassthroughArgs": {
@@ -828,7 +828,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 969,
+    "line": 1032,
     "name": "filterPassthroughArgs"
   },
   "core_engine/src/cli/run.ts#finalizeRunArtifacts": {
@@ -836,7 +836,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "Distributed mode: suppress the per-machine custom RunReport.html (the merge produces the single report).",
     "kind": "function",
-    "line": 1364,
+    "line": 1427,
     "name": "finalizeRunArtifacts"
   },
   "core_engine/src/cli/run.ts#formatCell": {
@@ -844,7 +844,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 1912,
+    "line": 1975,
     "name": "formatCell"
   },
   "core_engine/src/cli/run.ts#getEntryScriptDirectory": {
@@ -852,7 +852,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 1012,
+    "line": 1075,
     "name": "getEntryScriptDirectory"
   },
   "core_engine/src/cli/run.ts#importCmd": {
@@ -860,7 +860,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "const",
-    "line": 201,
+    "line": 203,
     "name": "importCmd"
   },
   "core_engine/src/cli/run.ts#parseAndFlushSnapshots": {
@@ -868,7 +868,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "Reads the mirrored k6 log file, extracts snapshot events emitted during the run, and writes a consolidated snapshots.json to the report directory.",
     "kind": "function",
-    "line": 2335,
+    "line": 2398,
     "name": "parseAndFlushSnapshots"
   },
   "core_engine/src/cli/run.ts#pct": {
@@ -876,7 +876,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 1950,
+    "line": 2013,
     "name": "pct"
   },
   "core_engine/src/cli/run.ts#percentilesFromStats": {
@@ -884,7 +884,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 1352,
+    "line": 1415,
     "name": "percentilesFromStats"
   },
   "core_engine/src/cli/run.ts#prepareRunArtifacts": {
@@ -892,7 +892,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 1029,
+    "line": 1092,
     "name": "prepareRunArtifacts"
   },
   "core_engine/src/cli/run.ts#printTransactionTable": {
@@ -900,7 +900,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "Print a LoadRunner-style transaction metrics table to the console.",
     "kind": "function",
-    "line": 1818,
+    "line": 1881,
     "name": "printTransactionTable"
   },
   "core_engine/src/cli/run.ts#program": {
@@ -908,7 +908,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "const",
-    "line": 62,
+    "line": 64,
     "name": "program"
   },
   "core_engine/src/cli/run.ts#renderFixedTable": {
@@ -916,7 +916,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "Fixed-position rendering: the table lives at rows `tableTop..termRows`, frozen below k6's scroll region. Save cursor → clear table area → draw table → restore cursor, so k6's progress bar continues animating above without ever touching our table area.",
     "kind": "function",
-    "line": 2272,
+    "line": 2335,
     "name": "renderFixedTable"
   },
   "core_engine/src/cli/run.ts#renderScrollbackTable": {
@@ -924,7 +924,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "Fallback for non-TTY stdout or terminals too short for fixed positioning: just append the latest snapshot as scrollback.",
     "kind": "function",
-    "line": 2313,
+    "line": 2376,
     "name": "renderScrollbackTable"
   },
   "core_engine/src/cli/run.ts#resolveRecordingLogForStandaloneDebug": {
@@ -932,7 +932,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 1000,
+    "line": 1063,
     "name": "resolveRecordingLogForStandaloneDebug"
   },
   "core_engine/src/cli/run.ts#runJourneyDebug": {
@@ -940,7 +940,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 937,
+    "line": 1000,
     "name": "runJourneyDebug"
   },
   "core_engine/src/cli/run.ts#runPlanDebugMode": {
@@ -948,7 +948,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 889,
+    "line": 952,
     "name": "runPlanDebugMode"
   },
   "core_engine/src/cli/run.ts#startLiveTransactionDisplay": {
@@ -956,7 +956,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 1963,
+    "line": 2026,
     "name": "startLiveTransactionDisplay"
   },
   "core_engine/src/cli/run.ts#templatesCmd": {
@@ -964,7 +964,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "const",
-    "line": 377,
+    "line": 404,
     "name": "templatesCmd"
   },
   "core_engine/src/cli/run.ts#toImportSpecifier": {
@@ -972,7 +972,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 1024,
+    "line": 1087,
     "name": "toImportSpecifier"
   },
   "core_engine/src/cli/run.ts#writeRunManifest": {
@@ -980,7 +980,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 1231,
+    "line": 1294,
     "name": "writeRunManifest"
   },
   "core_engine/src/cli/templates.ts#listTemplates": {
@@ -2066,7 +2066,7 @@
   "core_engine/src/distributed/LiveStatusHeartbeat.ts#LiveStatusHeartbeat": {
     "exported": true,
     "file": "core_engine/src/distributed/LiveStatusHeartbeat.ts",
-    "jsdoc": "",
+    "jsdoc": "Reflect a control transition (e.g. 'stopping'/'aborting') immediately.",
     "kind": "class",
     "line": 58,
     "name": "LiveStatusHeartbeat"
@@ -2263,6 +2263,78 @@
     "line": 21,
     "name": "sharedRunFolder"
   },
+  "core_engine/src/distributed/control.ts#ControlAction": {
+    "exported": true,
+    "file": "core_engine/src/distributed/control.ts",
+    "jsdoc": "",
+    "kind": "type",
+    "line": 18,
+    "name": "ControlAction"
+  },
+  "core_engine/src/distributed/control.ts#ControlFile": {
+    "exported": true,
+    "file": "core_engine/src/distributed/control.ts",
+    "jsdoc": "ISO time to act (stop only, for coordinated drain). Absent/past → act now.",
+    "kind": "interface",
+    "line": 20,
+    "name": "ControlFile"
+  },
+  "core_engine/src/distributed/control.ts#ControlWatcher": {
+    "exported": true,
+    "file": "core_engine/src/distributed/control.ts",
+    "jsdoc": "Polls the control dir; fires onAbort/onStop exactly once.",
+    "kind": "class",
+    "line": 88,
+    "name": "ControlWatcher"
+  },
+  "core_engine/src/distributed/control.ts#ControlWatcherOptions": {
+    "exported": true,
+    "file": "core_engine/src/distributed/control.ts",
+    "jsdoc": "",
+    "kind": "interface",
+    "line": 80,
+    "name": "ControlWatcherOptions"
+  },
+  "core_engine/src/distributed/control.ts#controlDirFor": {
+    "exported": true,
+    "file": "core_engine/src/distributed/control.ts",
+    "jsdoc": "`<collectDir>/control_<runId>`.",
+    "kind": "function",
+    "line": 29,
+    "name": "controlDirFor"
+  },
+  "core_engine/src/distributed/control.ts#k6ApiStop": {
+    "exported": true,
+    "file": "core_engine/src/distributed/control.ts",
+    "jsdoc": "Graceful stop via k6's local REST API. Resolves true on 2xx/3xx. Never throws.",
+    "kind": "function",
+    "line": 64,
+    "name": "k6ApiStop"
+  },
+  "core_engine/src/distributed/control.ts#killProcessTree": {
+    "exported": true,
+    "file": "core_engine/src/distributed/control.ts",
+    "jsdoc": "Kill a process (tree) — Windows: `taskkill /F /T`; POSIX: SIGKILL. Best-effort.",
+    "kind": "function",
+    "line": 54,
+    "name": "killProcessTree"
+  },
+  "core_engine/src/distributed/control.ts#readControl": {
+    "exported": true,
+    "file": "core_engine/src/distributed/control.ts",
+    "jsdoc": "",
+    "kind": "function",
+    "line": 43,
+    "name": "readControl"
+  },
+  "core_engine/src/distributed/control.ts#writeControl": {
+    "exported": true,
+    "file": "core_engine/src/distributed/control.ts",
+    "jsdoc": "Write the control marker atomically (tmp + rename). Returns the file path.",
+    "kind": "function",
+    "line": 34,
+    "name": "writeControl"
+  },
   "core_engine/src/distributed/liveAggregate.ts#DEFAULT_STATS": {
     "exported": true,
     "file": "core_engine/src/distributed/liveAggregate.ts",
@@ -2348,7 +2420,7 @@
     "file": "core_engine/src/distributed/liveDashboard.ts",
     "jsdoc": "",
     "kind": "interface",
-    "line": 17,
+    "line": 19,
     "name": "DashboardOptions"
   },
   "core_engine/src/distributed/liveDashboard.ts#page": {
@@ -2356,7 +2428,7 @@
     "file": "core_engine/src/distributed/liveDashboard.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 26,
+    "line": 28,
     "name": "page"
   },
   "core_engine/src/distributed/liveDashboard.ts#runDashboardCli": {
@@ -2364,7 +2436,7 @@
     "file": "core_engine/src/distributed/liveDashboard.ts",
     "jsdoc": "CLI handler for `k6-framework monitor --serve`. Keeps running until interrupted.",
     "kind": "function",
-    "line": 118,
+    "line": 157,
     "name": "runDashboardCli"
   },
   "core_engine/src/distributed/liveDashboard.ts#startDashboardServer": {
@@ -2372,7 +2444,7 @@
     "file": "core_engine/src/distributed/liveDashboard.ts",
     "jsdoc": "Start the live dashboard HTTP server. Resolves once listening.",
     "kind": "function",
-    "line": 93,
+    "line": 110,
     "name": "startDashboardServer"
   },
   "core_engine/src/distributed/monitor.ts#MonitorOptions": {
@@ -2692,7 +2764,7 @@
     "file": "core_engine/src/execution/PipelineRunner.ts",
     "jsdoc": "The exact k6 command line the framework launched (for report/debug traceability).",
     "kind": "interface",
-    "line": 40,
+    "line": 42,
     "name": "PipelineRunResult"
   },
   "core_engine/src/execution/PipelineRunner.ts#PipelineRunner": {
@@ -2700,7 +2772,7 @@
     "file": "core_engine/src/execution/PipelineRunner.ts",
     "jsdoc": "Execute k6 with the given options. Writes options.scenarios to a temp config snippet and passes it via --config.",
     "kind": "class",
-    "line": 54,
+    "line": 56,
     "name": "PipelineRunner"
   },
   "core_engine/src/execution/PipelineRunner.ts#RunOptions": {

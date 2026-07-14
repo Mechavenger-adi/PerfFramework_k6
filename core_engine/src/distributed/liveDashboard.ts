@@ -11,8 +11,10 @@
  */
 
 import * as http from 'http';
+import * as path from 'path';
 import { Logger } from '../utils/logger';
 import { aggregate, resolveLiveDir } from './liveAggregate';
+import { writeControl, ControlAction } from './control';
 
 export interface DashboardOptions {
   liveDir?: string;
@@ -47,11 +49,19 @@ function page(intervalMs: number): string {
   .st-running{ color:var(--run); } .st-done{ color:var(--dim); } .st-stopped{ color:var(--stop); } .st-aborted{ color:var(--abort); }
   tfoot td{ font-weight:700; border-top:2px solid var(--line); border-bottom:none; }
   .note{ color:var(--dim); font-size:11px; margin-top:6px; }
+  .ctls{ margin-left:auto; display:flex; gap:8px; }
+  .ctl{ font:inherit; font-size:12px; font-weight:600; padding:5px 12px; border-radius:7px; border:1px solid var(--line); cursor:pointer; color:var(--fg); background:var(--card); }
+  .ctl.stop{ border-color:var(--stop); color:var(--stop); } .ctl.abort{ border-color:var(--abort); color:var(--abort); }
+  .ctl:disabled{ opacity:.4; cursor:default; }
 </style></head><body>
 <header>
   <h1>k6 · distributed live monitor</h1>
   <span id="badge" class="badge live">LIVE</span>
   <span class="meta" id="meta"></span>
+  <span class="ctls" id="ctls">
+    <button id="btn-stop" class="ctl stop">Stop (graceful)</button>
+    <button id="btn-abort" class="ctl abort">Abort</button>
+  </span>
 </header>
 <main>
   <div class="cards" id="kpis"></div>
@@ -62,6 +72,12 @@ function page(intervalMs: number): string {
 <script>
 const INTERVAL = ${intervalMs};
 const esc = s => String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+async function postControl(action){
+  const effectiveAt = action==='stop' ? new Date(Date.now()+10000).toISOString() : undefined;
+  try{ await fetch('control',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,effectiveAt})}); }catch(e){}
+}
+document.getElementById('btn-stop').onclick=()=>{ if(confirm('Gracefully STOP the test in ~10s?\\nEach machine finishes in-flight iterations and writes a valid (partial-window) report.')) postControl('stop'); };
+document.getElementById('btn-abort').onclick=()=>{ if(confirm('ABORT now?\\nk6 is killed immediately; artifacts are partial and flagged INVALID.')) postControl('abort'); };
 const n0 = x => (x==null?'-':Number(x).toFixed(0));
 const n1 = x => (x==null?'-':Number(x).toFixed(1));
 function kpi(l,v){ return '<div class="kpi"><div class="v">'+v+'</div><div class="l">'+l+'</div></div>'; }
@@ -69,6 +85,7 @@ async function tick(){
   let d; try { d = await (await fetch('data.json',{cache:'no-store'})).json(); } catch(e){ return; }
   const badge=document.getElementById('badge');
   badge.textContent = d.allDone ? 'DONE' : 'LIVE'; badge.className='badge '+(d.allDone?'done':'live');
+  document.getElementById('ctls').style.display = d.allDone ? 'none' : 'flex';
   document.getElementById('meta').textContent = d.machineCount+' machine(s) · updated '+new Date(d.updatedAt).toLocaleTimeString();
   document.getElementById('kpis').innerHTML =
     kpi('VUs',d.totals.vus)+kpi('Transactions',d.totals.txns)+kpi('Throughput/s',n1(d.totals.tps))+kpi('Error %',n1(d.totals.errorRate));
@@ -92,8 +109,30 @@ tick(); setInterval(tick, INTERVAL);
 /** Start the live dashboard HTTP server. Resolves once listening. */
 export function startDashboardServer(o: { dir: string; host: string; port: number; intervalMs: number }): Promise<http.Server> {
   const html = page(o.intervalMs);
+  // Control dir is the sibling of live_<runId>: control_<runId>.
+  const base = path.basename(o.dir);
+  const runId = base.startsWith('live_') ? base.slice('live_'.length) : '';
+  const controlDir = path.join(path.dirname(o.dir), `control_${runId}`);
+
   const server = http.createServer((req, res) => {
     const url = (req.url || '/').split('?')[0];
+    if (req.method === 'POST' && url === '/control') {
+      let body = '';
+      req.on('data', (c) => { body += c; if (body.length > 4096) req.destroy(); });
+      req.on('end', () => {
+        try {
+          const { action, effectiveAt } = JSON.parse(body || '{}') as { action?: ControlAction; effectiveAt?: string };
+          if (action !== 'abort' && action !== 'stop') { res.writeHead(400); res.end('{"ok":false}'); return; }
+          const p = writeControl(controlDir, { action, effectiveAt, by: 'dashboard' });
+          Logger.warning(`[dashboard] ${action} signal written → ${p}`);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true, action }));
+        } catch {
+          res.writeHead(400); res.end('{"ok":false}');
+        }
+      });
+      return;
+    }
     if (url === '/data.json') {
       const body = JSON.stringify(aggregate(o.dir));
       res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
