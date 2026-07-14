@@ -154,7 +154,11 @@ Merge per-machine distributed run artifacts into a single report
 | Option | Required | Default | Description |
 |--------|----------|---------|-------------|
 | `--run-dir <path>` | yes |  | Shared run dir containing <machineName>/ subfolders for one runId |
-| `--out <path>` | no |  | Output dir for the merged result (default: <run-dir>/_merged) |
+| `--out <path>` | no |  | Output dir for the merged result (default: <run-dir>/Final_<testname>_<ts>) |
+| `--wait` | no |  | Block until all --machines have collected in, then merge (auto-finalize) |
+| `--machines <list>` | no |  | Comma-separated machine names to wait for (with --wait) |
+| `--poll <sec>` | no | `5` | Poll interval while waiting |
+| `--wait-timeout <sec>` | no | `600` | Max seconds to wait before giving up |
 
 ### `collect`
 
@@ -166,6 +170,7 @@ Copy a finished local run folder into <collectDir>/shared_<runId>/<machine>/
 | `--into <path>` | yes |  | Shared collect base dir |
 | `--machine <name>` | no |  | Machine name (defaults to hostname) |
 | `--run-id <id>` | no |  | Shared runId (defaults to the run-manifest runId) |
+| `--include-raw` | no |  | Also copy the large raw metrics-stream.json (excluded by default) |
 
 ### `agent`
 

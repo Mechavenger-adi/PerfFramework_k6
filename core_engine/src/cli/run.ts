@@ -270,9 +270,20 @@ program
   .command('merge')
   .description('Merge per-machine distributed run artifacts into a single report')
   .requiredOption('--run-dir <path>', 'Shared run dir containing <machineName>/ subfolders for one runId')
-  .option('--out <path>', 'Output dir for the merged result (default: <run-dir>/_merged)')
-  .action((opts) => {
-    const passed = runMerge({ runDir: opts.runDir, out: opts.out });
+  .option('--out <path>', 'Output dir for the merged result (default: <run-dir>/Final_<testname>_<ts>)')
+  .option('--wait', 'Block until all --machines have collected in, then merge (auto-finalize)')
+  .option('--machines <list>', 'Comma-separated machine names to wait for (with --wait)')
+  .option('--poll <sec>', 'Poll interval while waiting', '5')
+  .option('--wait-timeout <sec>', 'Max seconds to wait before giving up', '600')
+  .action(async (opts) => {
+    const passed = await runMerge({
+      runDir: opts.runDir,
+      out: opts.out,
+      wait: opts.wait,
+      machines: opts.machines ? String(opts.machines).split(',').map((s: string) => s.trim()).filter(Boolean) : undefined,
+      pollSec: Number(opts.poll) || 5,
+      waitTimeoutSec: Number(opts.waitTimeout) || 600,
+    });
     if (!passed) process.exit(1);
   });
 
@@ -286,8 +297,9 @@ program
   .requiredOption('--into <path>', 'Shared collect base dir')
   .option('--machine <name>', 'Machine name (defaults to hostname)')
   .option('--run-id <id>', 'Shared runId (defaults to the run-manifest runId)')
+  .option('--include-raw', 'Also copy the large raw metrics-stream.json (excluded by default)')
   .action((opts) => {
-    const ok = runCollect({ from: opts.from, into: opts.into, machine: opts.machine || os.hostname(), runId: opts.runId });
+    const ok = runCollect({ from: opts.from, into: opts.into, machine: opts.machine || os.hostname(), runId: opts.runId, includeRaw: opts.includeRaw });
     if (!ok) process.exit(1);
   });
 

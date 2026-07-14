@@ -51,13 +51,52 @@ function readNdjson(file: string): Array<Record<string, unknown>> {
 interface MergeCliOptions {
   runDir: string;
   out?: string;
+  /** Wait until every machine in `machines` has landed (run-manifest.json), then merge. */
+  wait?: boolean;
+  machines?: string[];
+  pollSec?: number;
+  waitTimeoutSec?: number;
 }
 
-export function runMerge(options: MergeCliOptions): boolean {
+const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+
+/** A machine folder is "landed" once its run-manifest.json (written last) is present. */
+function machineLanded(runDir: string, name: string): boolean {
+  return fs.existsSync(path.join(runDir, name, 'run-manifest.json'));
+}
+
+async function waitForMachines(runDir: string, machines: string[], pollSec: number, timeoutSec: number): Promise<boolean> {
+  const deadline = Date.now() + timeoutSec * 1000;
+  for (;;) {
+    const missing = machines.filter((m) => !machineLanded(runDir, m));
+    if (missing.length === 0) return true;
+    if (Date.now() >= deadline) {
+      Logger.error(`[merge] timed out after ${timeoutSec}s waiting for: ${missing.join(', ')}`);
+      return false;
+    }
+    Logger.info(`[merge] waiting for ${missing.length}/${machines.length} machine(s): ${missing.join(', ')}`);
+    await sleep(pollSec * 1000);
+  }
+}
+
+export async function runMerge(options: MergeCliOptions): Promise<boolean> {
   const runDir = path.resolve(options.runDir);
   if (!fs.existsSync(runDir) || !fs.statSync(runDir).isDirectory()) {
-    Logger.error(`[merge] run dir not found: ${runDir}`);
-    return false;
+    // With --wait the run dir may not exist yet; create/tolerate and keep polling below.
+    if (!options.wait) { Logger.error(`[merge] run dir not found: ${runDir}`); return false; }
+    fs.mkdirSync(runDir, { recursive: true });
+  }
+
+  // ── Auto-finalize: block until all expected machines have collected in. ──
+  if (options.wait) {
+    if (!options.machines || options.machines.length === 0) {
+      Logger.error('[merge] --wait requires --machines <lg1,lg2,...> so it knows when the run is complete');
+      return false;
+    }
+    Logger.info(`[merge] --wait: expecting ${options.machines.length} machine(s): ${options.machines.join(', ')}`);
+    const ready = await waitForMachines(runDir, options.machines, options.pollSec ?? 5, options.waitTimeoutSec ?? 600);
+    if (!ready) return false;
+    Logger.pass('[merge] all machines collected — finalizing');
   }
 
   // ── Discover per-machine subdirs (any subdir with at least one artifact). ──
