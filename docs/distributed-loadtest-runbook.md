@@ -38,11 +38,11 @@ Design/EDD: [engineering_docs/edd/EDD-distributed-loadtest.md](../engineering_do
 
 ## Setup (once per machine)
 
-1. **Build** (so you can run the compiled JS — avoids the `tsx`/`esbuild` allow-list issue):
+1. **Install dependencies** (the CLI runs from source via `npm run cli`):
    ```
-   npm run build
+   npm ci
    ```
-2. **Check `node` and `k6` are allowed & on PATH:**
+2. **Check `node` and `k6` are on PATH:**
    ```
    node -v
    k6 version
@@ -50,13 +50,17 @@ Design/EDD: [engineering_docs/edd/EDD-distributed-loadtest.md](../engineering_do
 3. **Have a shared folder** every machine can read/write (SMB). Simplest: share the **controller's**
    results folder (Step 1 below).
 
+> **Shell note:** commands below use forward slashes so they work in **Git Bash**, **cmd**, and
+> **PowerShell**. For UNC share paths in **Git Bash**, use forward slashes (`//CTRL01/k6results`) or quote
+> them; cmd/PowerShell accept `\\CTRL01\k6results`. Every command is `npm run cli -- <subcommand> …`.
+
 ---
 
 ## Running a test — step by step
 
 ### Step 1 — (controller) share the results folder
 ```
-node dist\cli\run.js share-setup --host CTRL01
+npm run cli -- share-setup --host CTRL01
 ```
 Run the `New-SmbShare`/`net share` line it prints (as **Administrator**). Note the UNC path it gives, e.g.
 `\\CTRL01\k6results`, and the `K6_PERF_COLLECT_DIR=…` line for the LGs.
@@ -76,21 +80,21 @@ K6_PERF_COLLECT_DIR=\\CTRL01\k6results
 
 ### Step 3 — (controller) start the live dashboard
 ```
-node dist\cli\run.js monitor --serve --collect-dir \\CTRL01\k6results --run-id run_1430 --port 8787
+npm run cli -- monitor --serve --collect-dir \\CTRL01\k6results --run-id run_1430 --port 8787
 ```
 Open **http://localhost:8787** on the controller. (It says "waiting for machines" until the LGs start.)
 
 ### Step 4 — (each LG) run the test
 With `.env` filled in, the command is small:
 ```
-node dist\cli\run.js run --plan config\test_plans\load_test.json
+npm run cli -- run --plan config/test_plans/load_test.json
 ```
 Each LG waits until `START_AT`, runs, streams a live heartbeat to the share, and copies its results to
 `\\CTRL01\k6results\shared_run_1430\<machine>\` when done.
 
 ### Step 5 — (controller) finalize into one report
 ```
-node dist\cli\run.js merge --wait --machines lg-a,lg-b --run-dir \\CTRL01\k6results\shared_run_1430
+npm run cli -- merge --wait --machines lg-a,lg-b --run-dir \\CTRL01\k6results\shared_run_1430
 ```
 `--wait` blocks until **every** machine in `--machines` has finished and collected in, then merges.
 
@@ -106,22 +110,22 @@ This is the **exact**, merged report — the one you make decisions from.
 
 **LG** (after `.env` is filled):
 ```
-node dist\cli\run.js run --plan config\test_plans\load_test.json
+npm run cli -- run --plan config/test_plans/load_test.json
 ```
 
 **Controller — share / monitor / stop / merge:**
 ```
-node dist\cli\run.js share-setup --host CTRL01
-node dist\cli\run.js monitor --serve --collect-dir \\CTRL01\k6results --run-id run_1430 --port 8787
-node dist\cli\run.js signal --collect-dir \\CTRL01\k6results --run-id run_1430 --mode stop
-node dist\cli\run.js merge  --wait --machines lg-a,lg-b --run-dir \\CTRL01\k6results\shared_run_1430
+npm run cli -- share-setup --host CTRL01
+npm run cli -- monitor --serve --collect-dir \\CTRL01\k6results --run-id run_1430 --port 8787
+npm run cli -- signal --collect-dir \\CTRL01\k6results --run-id run_1430 --mode stop
+npm run cli -- merge  --wait --machines lg-a,lg-b --run-dir \\CTRL01\k6results\shared_run_1430
 ```
 
 **Don't want to use `.env`?** Put the values on the command line instead (PowerShell):
 ```powershell
 $env:K6_PERF_RUN_ID="run_1430"; $env:K6_PERF_START_AT="2026-07-20T14:30:00Z"
 $env:K6_PERF_MACHINE="lg-a"; $env:K6_PERF_COLLECT_DIR="\\CTRL01\k6results"
-node dist\cli\run.js run --plan config\test_plans\load_test.json --distributed --role agent
+npm run cli -- run --plan config/test_plans/load_test.json --distributed --role agent
 ```
 
 ---
@@ -155,7 +159,7 @@ node dist\cli\run.js run --plan config\test_plans\load_test.json --distributed -
 
 - **Dashboard says "waiting for machines"** → no LG has started yet, or `--collect-dir`/`--run-id` don't
   match what the LGs use. They must point at the same share + runId.
-- **LG can't reach the share** → verify SMB from that LG: `node dist\cli\run.js probe --tcp CTRL01:445`.
+- **LG can't reach the share** → verify SMB from that LG: `npm run cli -- probe --tcp CTRL01:445`.
   On the share host, allow **File and Printer Sharing** inbound.
 - **`merge` says "no per-machine artifact folders"** → the LGs haven't collected yet, or `--run-dir` is
   wrong. It should be `<share>\shared_<runId>`.

@@ -46,6 +46,6 @@ export function printControllerShareSuggestion(options: ShareSuggestionOptions =
   Logger.detail('3. On EACH load generator, point collect at the share:');
   Logger.bullet(`K6_PERF_COLLECT_DIR=${unc}`);
   Logger.detail('4. Verify a load generator can reach the share through the firewall (SMB/445):');
-  Logger.bullet(`node dist/cli/run.js probe --tcp ${host}:445`);
+  Logger.bullet(`npm run cli -- probe --tcp ${host}:445`);
   Logger.warning('Tighten "Everyone,CHANGE" to the specific LG accounts/machines for a real environment.');
 }
