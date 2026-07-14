@@ -294,7 +294,7 @@
     ],
     "importsNode": true,
     "layer": "cli",
-    "loc": 2420,
+    "loc": 2421,
     "path": "core_engine/src/cli/run.ts"
   },
   {
@@ -776,7 +776,7 @@
     ],
     "importsNode": true,
     "layer": "distributed",
-    "loc": 112,
+    "loc": 126,
     "path": "core_engine/src/distributed/LiveStatusHeartbeat.ts"
   },
   {
@@ -854,6 +854,7 @@
       "runMonitor"
     ],
     "imports": [
+      "core_engine/src/reporting/Histogram.ts",
       "core_engine/src/utils/logger.ts",
       "core_engine/src/distributed/LiveStatusHeartbeat.ts",
       "fs",
@@ -861,7 +862,7 @@
     ],
     "importsNode": true,
     "layer": "distributed",
-    "loc": 112,
+    "loc": 175,
     "path": "core_engine/src/distributed/monitor.ts"
   },
   {

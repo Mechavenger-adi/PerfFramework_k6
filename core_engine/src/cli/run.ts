@@ -778,6 +778,7 @@ program
             liveHeartbeat = new LiveStatusHeartbeat({
               machine: hostName, runId, testId, csvPath: transactionLogPath,
               liveDir: path.join(path.resolve(collectDir), `live_${runId}`),
+              stats: resolvedConfig.runtime.reporting.transactionStats,
             });
             liveHeartbeat.start();
           } else {

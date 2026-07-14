@@ -13,7 +13,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { Logger } from '../utils/logger';
-import { percentileR7 } from '../reporting/Histogram';
+import { RelativeHistogram, HistogramJSON } from '../reporting/Histogram';
 import { readTransactionCsvStats } from './transactionCsv';
 
 export type LiveState = 'running' | 'done' | 'stopped' | 'aborted';
@@ -32,7 +32,14 @@ export interface LiveStatusSnapshot {
   errorRate: number;
   /** Windowed (current) transaction throughput, txn/s. */
   throughputTps: number;
-  transactions: Array<{ name: string; count: number; fail: number; p95: number }>;
+  /** Configured stat set (from the plan) so the monitor renders the same columns. */
+  stats: string[];
+  /**
+   * Per-transaction: counts + a compact MERGEABLE response-time histogram (ms). The
+   * controller sums bucket counts across machines → combined avg/min/max/percentiles.
+   * A few KB per transaction, independent of request volume. Raw is never shipped.
+   */
+  transactions: Array<{ name: string; count: number; fail: number; hist: HistogramJSON }>;
 }
 
 export interface HeartbeatOptions {
@@ -43,6 +50,8 @@ export interface HeartbeatOptions {
   csvPath: string;
   /** `<collectDir>/live_<runId>` — where this machine's status file lands. */
   liveDir: string;
+  /** Configured transaction stats (e.g. ["avg","min","med","max","p(90)","p(99)"]). */
+  stats?: string[];
   intervalMs?: number;
 }
 
@@ -83,7 +92,11 @@ export class LiveStatusHeartbeat {
 
       const transactions = [...stats.perTxn.entries()]
         .sort((a, b) => a[0].localeCompare(b[0]))
-        .map(([name, e]) => ({ name, count: e.count, fail: e.fail, p95: e.times.length ? percentileR7(e.times, 0.95) : 0 }));
+        .map(([name, e]) => {
+          const h = new RelativeHistogram();
+          for (const t of e.times) h.record(t);
+          return { name, count: e.count, fail: e.fail, hist: h.toJSON() };
+        });
 
       const snap: LiveStatusSnapshot = {
         schemaVersion: 1,
@@ -98,6 +111,7 @@ export class LiveStatusHeartbeat {
         failTotal: stats.totalFail,
         errorRate: stats.totalCount ? (stats.totalFail / stats.totalCount) * 100 : 0,
         throughputTps,
+        stats: this.opts.stats ?? [],
         transactions,
       };
 

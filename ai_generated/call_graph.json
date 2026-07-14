@@ -354,10 +354,6 @@
     },
     {
       "from": "core_engine/src/distributed/LiveStatusHeartbeat.ts",
-      "to": "core_engine/src/reporting/Histogram.ts"
-    },
-    {
-      "from": "core_engine/src/distributed/LiveStatusHeartbeat.ts",
       "to": "core_engine/src/utils/logger.ts"
     },
     {
@@ -366,6 +362,10 @@
     },
     {
       "from": "core_engine/src/distributed/MergeEngine.ts",
+      "to": "core_engine/src/reporting/Histogram.ts"
+    },
+    {
+      "from": "core_engine/src/distributed/monitor.ts",
       "to": "core_engine/src/reporting/Histogram.ts"
     },
     {
