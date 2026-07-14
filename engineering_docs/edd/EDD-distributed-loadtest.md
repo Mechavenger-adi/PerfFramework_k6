@@ -21,6 +21,8 @@ updated: 2026-07-14
 
 # EDD: Distributed Load Test (Manual / Shared-Location)
 
+> **Operator runbook** (how to actually run one): [docs/distributed-loadtest-runbook.md](../../docs/distributed-loadtest-runbook.md)
+
 ## Executive Summary
 Generate load from multiple machines ("LGs"), **monitor the combined test live**, and produce a
 **single merged Run Report** — without any machine opening an inbound network port. Synchronization is
