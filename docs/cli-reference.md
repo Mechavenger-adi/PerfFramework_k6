@@ -219,6 +219,8 @@ Live-monitor a distributed run (console, or --serve for a browser dashboard)
 | `--serve` | no |  | Serve a live browser dashboard instead of the console view |
 | `--host <host>` | no | `127.0.0.1` | Dashboard bind host (localhost now; 0.0.0.0 to share once a port is open) |
 | `--port <port>` | no | `8787` | Dashboard port |
+| `--no-auto-merge` | no |  | Do NOT auto-merge when all machines finish (run `merge` yourself) |
+| `--merge-timeout <sec>` | no | `300` | Max seconds to wait for collects before auto-merge gives up |
 
 ### `signal`
 

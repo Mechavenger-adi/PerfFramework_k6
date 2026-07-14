@@ -221,9 +221,11 @@ final is for deciding.
    `<share>/shared_<runId>/<machine>/` via `K6_PERF_COLLECT_DIR` ([collectRun.ts](../../core_engine/src/distributed/collectRun.ts), [run.ts:729](../../core_engine/src/cli/run.ts#L729)). Outbound
    write; each LG owns its subfolder (no collision). **The raw `metrics-stream.json` is excluded** (kept
    local for debugging) — the merge needs only the transaction CSV + JSON artifacts.
-2. **Auto-finalize:** the controller runs `merge --wait --machines lg1,lg2`, which polls
-   `shared_<runId>/` until every expected `run-manifest.json` is present, then runs the merge
-   ([runMerge.ts](../../core_engine/src/distributed/runMerge.ts)) with **zero manual steps**.
+2. **Auto-finalize (zero commands):** the controller's `monitor` (console or `--serve`) watches the
+   heartbeats; when **all** machines report finished it **automatically** runs the merge — polling
+   `shared_<runId>/` until every `run-manifest.json` lands, then merging ([runMerge.ts](../../core_engine/src/distributed/runMerge.ts)). The
+   dashboard shows a "Final report ready" banner. `--no-auto-merge` disables it; the standalone
+   `merge --wait --machines lg1,lg2` remains for manual use.
 3. **Output folder:** the merged result is written to **`Final_<testname>_<dd_MM_yyyyTHH_mm>/`**
    (Windows-path-safe; e.g. `Final_checkout_14_07_2026T16_45`) instead of `_merged/`.
 

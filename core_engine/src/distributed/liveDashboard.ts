@@ -13,8 +13,9 @@
 import * as http from 'http';
 import * as path from 'path';
 import { Logger } from '../utils/logger';
-import { aggregate, resolveLiveDir } from './liveAggregate';
+import { aggregate, resolveRunContext, findLatestFinalReport } from './liveAggregate';
 import { writeControl, ControlAction } from './control';
+import { runMerge } from './runMerge';
 
 export interface DashboardOptions {
   liveDir?: string;
@@ -23,6 +24,9 @@ export interface DashboardOptions {
   host: string;
   port: number;
   intervalMs: number;
+  /** Auto-merge when all machines finish (default true). */
+  autoMerge?: boolean;
+  mergeTimeoutSec?: number;
 }
 
 function page(intervalMs: number): string {
@@ -53,6 +57,11 @@ function page(intervalMs: number): string {
   .ctl{ font:inherit; font-size:12px; font-weight:600; padding:5px 12px; border-radius:7px; border:1px solid var(--line); cursor:pointer; color:var(--fg); background:var(--card); }
   .ctl.stop{ border-color:var(--stop); color:var(--stop); } .ctl.abort{ border-color:var(--abort); color:var(--abort); }
   .ctl:disabled{ opacity:.4; cursor:default; }
+  .mergebar{ padding:9px 18px; font-size:13px; font-weight:600; border-bottom:1px solid var(--line); }
+  .mergebar.merging{ background:rgba(56,189,248,.12); color:var(--accent); }
+  .mergebar.done{ background:rgba(74,222,128,.14); color:var(--run); }
+  .mergebar.failed{ background:rgba(248,113,113,.14); color:var(--abort); }
+  .mergebar a{ color:inherit; }
 </style></head><body>
 <header>
   <h1>k6 · distributed live monitor</h1>
@@ -63,6 +72,7 @@ function page(intervalMs: number): string {
     <button id="btn-abort" class="ctl abort">Abort</button>
   </span>
 </header>
+<div id="mergebar" class="mergebar" style="display:none"></div>
 <main>
   <div class="cards" id="kpis"></div>
   <h2>Fleet</h2><div class="scroll"><table id="fleet"></table></div>
@@ -86,6 +96,13 @@ async function tick(){
   const badge=document.getElementById('badge');
   badge.textContent = d.allDone ? 'DONE' : 'LIVE'; badge.className='badge '+(d.allDone?'done':'live');
   document.getElementById('ctls').style.display = d.allDone ? 'none' : 'flex';
+  const mb=document.getElementById('mergebar'), ms=(d.merge&&d.merge.state)||'idle';
+  if(ms==='idle'){ mb.style.display='none'; }
+  else { mb.style.display='block'; mb.className='mergebar '+ms;
+    if(ms==='merging') mb.textContent='⏳ Merging results into the final report…';
+    else if(ms==='done') mb.innerHTML='✅ Final report ready: <code>'+esc(d.merge.report||'')+'</code>';
+    else mb.textContent='⚠️ Auto-merge failed — run merge manually.';
+  }
   document.getElementById('meta').textContent = d.machineCount+' machine(s) · updated '+new Date(d.updatedAt).toLocaleTimeString();
   document.getElementById('kpis').innerHTML =
     kpi('VUs',d.totals.vus)+kpi('Transactions',d.totals.txns)+kpi('Throughput/s',n1(d.totals.tps))+kpi('Error %',n1(d.totals.errorRate));
@@ -107,12 +124,32 @@ tick(); setInterval(tick, INTERVAL);
 }
 
 /** Start the live dashboard HTTP server. Resolves once listening. */
-export function startDashboardServer(o: { dir: string; host: string; port: number; intervalMs: number }): Promise<http.Server> {
+export function startDashboardServer(
+  o: { dir: string; host: string; port: number; intervalMs: number; sharedDir?: string; runId?: string; autoMerge?: boolean; mergeTimeoutSec?: number },
+): Promise<http.Server> {
   const html = page(o.intervalMs);
   // Control dir is the sibling of live_<runId>: control_<runId>.
   const base = path.basename(o.dir);
-  const runId = base.startsWith('live_') ? base.slice('live_'.length) : '';
+  const runId = o.runId || (base.startsWith('live_') ? base.slice('live_'.length) : '');
   const controlDir = path.join(path.dirname(o.dir), `control_${runId}`);
+
+  // ── Auto-merge state: fire once when every machine has finished. ──
+  let mergeState: 'idle' | 'merging' | 'done' | 'failed' = 'idle';
+  let finalReport = '';
+  const maybeAutoMerge = async (): Promise<void> => {
+    if (o.autoMerge === false || mergeState !== 'idle' || !o.sharedDir || !runId) return;
+    const agg = aggregate(o.dir);
+    if (agg.machineCount === 0 || !agg.allDone) return;
+    mergeState = 'merging';
+    Logger.info(`[dashboard] all ${agg.machineCount} machine(s) finished — auto-merging…`);
+    const machines = agg.fleet.map((f) => f.machine);
+    const ok = await runMerge({ runDir: o.sharedDir, wait: true, machines, pollSec: 3, waitTimeoutSec: o.mergeTimeoutSec ?? 300 });
+    finalReport = findLatestFinalReport(o.sharedDir) ?? '';
+    mergeState = ok ? 'done' : 'failed';
+    Logger.pass(`[dashboard] auto-merge ${mergeState}${finalReport ? ` → ${finalReport}` : ''}`);
+  };
+  const amTimer = o.autoMerge === false ? null : setInterval(() => { void maybeAutoMerge(); }, Math.max(2000, o.intervalMs));
+  if (amTimer?.unref) amTimer.unref();
 
   const server = http.createServer((req, res) => {
     const url = (req.url || '/').split('?')[0];
@@ -134,7 +171,7 @@ export function startDashboardServer(o: { dir: string; host: string; port: numbe
       return;
     }
     if (url === '/data.json') {
-      const body = JSON.stringify(aggregate(o.dir));
+      const body = JSON.stringify({ ...aggregate(o.dir), merge: { state: mergeState, report: finalReport } });
       res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
       res.end(body);
       return;
@@ -155,17 +192,21 @@ export function startDashboardServer(o: { dir: string; host: string; port: numbe
 
 /** CLI handler for `k6-framework monitor --serve`. Keeps running until interrupted. */
 export async function runDashboardCli(o: DashboardOptions): Promise<void> {
-  const dir = resolveLiveDir(o);
-  if (!dir) {
+  const ctx = resolveRunContext(o);
+  if (!ctx) {
     Logger.fail('[dashboard] provide --live-dir, or --collect-dir together with --run-id');
     process.exit(1);
   }
   try {
-    const server = await startDashboardServer({ dir: dir as string, host: o.host, port: o.port, intervalMs: o.intervalMs });
+    const server = await startDashboardServer({
+      dir: ctx.liveDir, host: o.host, port: o.port, intervalMs: o.intervalMs,
+      sharedDir: ctx.sharedDir, runId: ctx.runId, autoMerge: o.autoMerge, mergeTimeoutSec: o.mergeTimeoutSec,
+    });
     const viewHost = o.host === '0.0.0.0' || o.host === '' ? 'localhost' : o.host;
     Logger.header('k6-framework — distributed live dashboard');
     Logger.pass(`Serving at http://${viewHost}:${o.port}/`);
-    Logger.detail(`Live dir: ${dir}`);
+    Logger.detail(`Live dir: ${ctx.liveDir}`);
+    Logger.detail(o.autoMerge === false ? 'Auto-merge: off (run `merge` manually).' : 'Auto-merge: on — the final report builds automatically when all machines finish.');
     if (o.host === '0.0.0.0') Logger.detail('Bound to all interfaces — shareable across the network once the firewall port is open.');
     else Logger.detail('Bound locally — view on this machine (open a port + `--host 0.0.0.0` to share).');
     Logger.detail('Ctrl+C to stop.');

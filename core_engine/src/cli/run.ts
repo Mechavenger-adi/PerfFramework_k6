@@ -362,6 +362,8 @@ program
   .option('--serve', 'Serve a live browser dashboard instead of the console view')
   .option('--host <host>', 'Dashboard bind host (localhost now; 0.0.0.0 to share once a port is open)', '127.0.0.1')
   .option('--port <port>', 'Dashboard port', '8787')
+  .option('--no-auto-merge', 'Do NOT auto-merge when all machines finish (run `merge` yourself)')
+  .option('--merge-timeout <sec>', 'Max seconds to wait for collects before auto-merge gives up', '300')
   .action(async (opts) => {
     if (opts.serve) {
       await runDashboardCli({
@@ -371,6 +373,8 @@ program
         host: opts.host,
         port: Number(opts.port) || 8787,
         intervalMs: Number(opts.interval) || 3000,
+        autoMerge: opts.autoMerge,
+        mergeTimeoutSec: Number(opts.mergeTimeout) || 300,
       });
       return;
     }
@@ -380,6 +384,8 @@ program
       runId: opts.runId,
       intervalMs: Number(opts.interval) || 3000,
       once: opts.once,
+      autoMerge: opts.autoMerge,
+      mergeTimeoutSec: Number(opts.mergeTimeout) || 300,
     });
     if (!ok) process.exit(1);
   });

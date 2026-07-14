@@ -7,7 +7,8 @@
  */
 
 import { Logger, ansi } from '../utils/logger';
-import { aggregate, resolveLiveDir, LiveAggregate } from './liveAggregate';
+import { aggregate, resolveRunContext, LiveAggregate } from './liveAggregate';
+import { runMerge } from './runMerge';
 
 export interface MonitorOptions {
   liveDir?: string;
@@ -15,6 +16,9 @@ export interface MonitorOptions {
   runId?: string;
   intervalMs?: number;
   once?: boolean;
+  /** Auto-merge when all machines finish (default true). */
+  autoMerge?: boolean;
+  mergeTimeoutSec?: number;
 }
 
 const padR = (s: string, n: number): string => (s.length >= n ? s.slice(0, n) : s + ' '.repeat(n - s.length));
@@ -65,26 +69,41 @@ function render(agg: LiveAggregate, dir: string): string {
   return out.join('\n') + '\n';
 }
 
-/** CLI handler for `k6-framework monitor` (console). Resolves true when all machines finish. */
+/** CLI handler for `k6-framework monitor` (console). Auto-merges when all machines finish. */
 export async function runMonitor(o: MonitorOptions): Promise<boolean> {
-  const dir = resolveLiveDir(o);
-  if (!dir) {
+  const ctx = resolveRunContext(o);
+  if (!ctx) {
     Logger.fail('[monitor] provide --live-dir, or --collect-dir together with --run-id');
     return false;
   }
   const intervalMs = o.intervalMs ?? 3000;
+  const autoMerge = o.autoMerge !== false;
 
   return new Promise<boolean>((resolve) => {
     let timer: NodeJS.Timeout | null = null;
-    const finish = (): void => { if (timer) clearInterval(timer); resolve(true); };
-    const tick = (): void => {
-      const agg = aggregate(dir);
+    let ended = false;
+    const finish = (v: boolean): void => { if (ended) return; ended = true; if (timer) clearInterval(timer); resolve(v); };
+    const tick = async (): Promise<void> => {
+      if (ended) return;
+      const agg = aggregate(ctx.liveDir);
       process.stdout.write('\x1b[2J\x1b[H');
-      process.stdout.write(render(agg, dir));
-      if (o.once || agg.allDone) finish();
+      process.stdout.write(render(agg, ctx.liveDir));
+      if (o.once) { finish(true); return; }
+      if (agg.allDone) {
+        ended = true; // stop further ticks before the (awaited) merge
+        if (timer) clearInterval(timer);
+        if (autoMerge && ctx.runId) {
+          const machines = agg.fleet.map((f) => f.machine);
+          Logger.info(`\n[monitor] all ${machines.length} machine(s) finished — auto-merging…`);
+          const ok = await runMerge({ runDir: ctx.sharedDir, wait: true, machines, pollSec: 3, waitTimeoutSec: o.mergeTimeoutSec ?? 300 });
+          resolve(ok);
+        } else {
+          resolve(true);
+        }
+      }
     };
-    process.on('SIGINT', finish);
-    tick();
-    if (!o.once) timer = setInterval(tick, intervalMs);
+    process.on('SIGINT', () => finish(true));
+    void tick();
+    if (!o.once) timer = setInterval(() => void tick(), intervalMs);
   });
 }

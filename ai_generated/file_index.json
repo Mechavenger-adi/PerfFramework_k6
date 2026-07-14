@@ -297,7 +297,7 @@
     ],
     "importsNode": true,
     "layer": "cli",
-    "loc": 2518,
+    "loc": 2524,
     "path": "core_engine/src/cli/run.ts"
   },
   {
@@ -879,9 +879,12 @@
     "exports": [
       "DEFAULT_STATS",
       "LiveAggregate",
+      "RunContext",
       "aggregate",
+      "findLatestFinalReport",
       "readSnapshots",
       "resolveLiveDir",
+      "resolveRunContext",
       "timingStats"
     ],
     "imports": [
@@ -892,7 +895,7 @@
     ],
     "importsNode": true,
     "layer": "distributed",
-    "loc": 119,
+    "loc": 148,
     "path": "core_engine/src/distributed/liveAggregate.ts"
   },
   {
@@ -905,12 +908,13 @@
       "core_engine/src/utils/logger.ts",
       "core_engine/src/distributed/control.ts",
       "core_engine/src/distributed/liveAggregate.ts",
+      "core_engine/src/distributed/runMerge.ts",
       "http",
       "path"
     ],
     "importsNode": true,
     "layer": "distributed",
-    "loc": 183,
+    "loc": 224,
     "path": "core_engine/src/distributed/liveDashboard.ts"
   },
   {
@@ -920,11 +924,12 @@
     ],
     "imports": [
       "core_engine/src/utils/logger.ts",
-      "core_engine/src/distributed/liveAggregate.ts"
+      "core_engine/src/distributed/liveAggregate.ts",
+      "core_engine/src/distributed/runMerge.ts"
     ],
     "importsNode": false,
     "layer": "distributed",
-    "loc": 91,
+    "loc": 110,
     "path": "core_engine/src/distributed/monitor.ts"
   },
   {

@@ -30,6 +30,35 @@ export function resolveLiveDir(o: { liveDir?: string; collectDir?: string; runId
   return null;
 }
 
+export interface RunContext { liveDir: string; sharedDir: string; runId: string; }
+
+/** Resolve both the live_<runId> and shared_<runId> dirs (+ runId) for a monitor/auto-merge. */
+export function resolveRunContext(o: { liveDir?: string; collectDir?: string; runId?: string }): RunContext | null {
+  if (o.collectDir && o.runId) {
+    const base = path.resolve(o.collectDir);
+    return { liveDir: path.join(base, `live_${o.runId}`), sharedDir: path.join(base, `shared_${o.runId}`), runId: o.runId };
+  }
+  if (o.liveDir) {
+    const live = path.resolve(o.liveDir);
+    const b = path.basename(live);
+    const runId = b.startsWith('live_') ? b.slice('live_'.length) : '';
+    return { liveDir: live, sharedDir: path.join(path.dirname(live), `shared_${runId}`), runId };
+  }
+  return null;
+}
+
+/** The newest Final_… report under a shared dir, or null. */
+export function findLatestFinalReport(sharedDir: string): string | null {
+  try {
+    const finals = fs.readdirSync(sharedDir).filter((f) => f.startsWith('Final_')).map((f) => path.join(sharedDir, f));
+    if (finals.length === 0) return null;
+    finals.sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs);
+    return path.join(finals[0], 'RunReport.html');
+  } catch {
+    return null;
+  }
+}
+
 export function readSnapshots(dir: string): LiveStatusSnapshot[] {
   try {
     return fs.readdirSync(dir)

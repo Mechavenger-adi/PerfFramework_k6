@@ -602,6 +602,10 @@
     },
     {
       "from": "core_engine/src/distributed/liveDashboard.ts",
+      "to": "core_engine/src/distributed/runMerge.ts"
+    },
+    {
+      "from": "core_engine/src/distributed/liveDashboard.ts",
       "to": "core_engine/src/utils/logger.ts"
     },
     {
@@ -647,6 +651,10 @@
     {
       "from": "core_engine/src/distributed/monitor.ts",
       "to": "core_engine/src/distributed/liveAggregate.ts"
+    },
+    {
+      "from": "core_engine/src/distributed/monitor.ts",
+      "to": "core_engine/src/distributed/runMerge.ts"
     },
     {
       "from": "core_engine/src/distributed/monitor.ts",

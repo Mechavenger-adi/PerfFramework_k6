@@ -25,9 +25,9 @@ Design/EDD: [engineering_docs/edd/EDD-distributed-loadtest.md](../engineering_do
 |---|---|---|
 | **`run … --distributed --role agent`** | **each LG** | **Runs the load test** on that machine |
 | `share-setup` | controller (setup) | Prints how to share the results folder + the line to give the LGs |
-| `monitor --serve` | controller (during) | Serves the **combined live dashboard** in a browser |
+| `monitor --serve` | controller (during) | Combined live dashboard **and auto-merges** into the final report when all LGs finish |
 | `signal --mode stop\|abort` | controller (during) | Stop/abort the test mid-run |
-| `merge --wait` | controller (after) | Combines everything into the **final report** |
+| `merge --wait` | controller (optional) | Manual finalize — only if you ran `monitor --no-auto-merge` |
 
 > **About the "dashboard on every machine":** each k6 process starts **k6's own** dashboard at
 > `http://localhost:5665` — that shows **only that one machine** and is a built-in k6 feature. **Our**
@@ -83,6 +83,7 @@ K6_PERF_COLLECT_DIR=\\CTRL01\k6results
 npm run cli -- monitor --serve --collect-dir \\CTRL01\k6results --run-id run_1430 --port 8787
 ```
 Open **http://localhost:8787** on the controller. (It says "waiting for machines" until the LGs start.)
+Leave this **running** — it also **auto-merges** (Step 5). This is the only controller command you run.
 
 ### Step 4 — (each LG) run the test
 With `.env` filled in, the command is small:
@@ -92,11 +93,15 @@ npm run cli -- run --plan config/test_plans/load_test.json
 Each LG waits until `START_AT`, runs, streams a live heartbeat to the share, and copies its results to
 `\\CTRL01\k6results\shared_run_1430\<machine>\` when done.
 
-### Step 5 — (controller) finalize into one report
-```
-npm run cli -- merge --wait --machines lg-a,lg-b --run-dir \\CTRL01\k6results\shared_run_1430
-```
-`--wait` blocks until **every** machine in `--machines` has finished and collected in, then merges.
+### Step 5 — finalize: **automatic**
+When the **last** LG finishes and its results land, the controller's `monitor` (from Step 3)
+**auto-merges by itself** — no command. The dashboard shows **"✅ Final report ready: …"** and the console
+prints the path. Nothing to run.
+
+> Turn it off with `--no-auto-merge` and run the merge yourself instead:
+> ```
+> npm run cli -- merge --wait --machines lg-a,lg-b --run-dir \\CTRL01\k6results\shared_run_1430
+> ```
 
 ### Step 6 — open the report
 ```
@@ -113,12 +118,15 @@ This is the **exact**, merged report — the one you make decisions from.
 npm run cli -- run --plan config/test_plans/load_test.json
 ```
 
-**Controller — share / monitor / stop / merge:**
+**Controller — share, then monitor (which also auto-merges):**
 ```
 npm run cli -- share-setup --host CTRL01
 npm run cli -- monitor --serve --collect-dir \\CTRL01\k6results --run-id run_1430 --port 8787
-npm run cli -- signal --collect-dir \\CTRL01\k6results --run-id run_1430 --mode stop
-npm run cli -- merge  --wait --machines lg-a,lg-b --run-dir \\CTRL01\k6results\shared_run_1430
+npm run cli -- signal  --collect-dir \\CTRL01\k6results --run-id run_1430 --mode stop   # optional, mid-test
+```
+Manual merge (only with `monitor --no-auto-merge`):
+```
+npm run cli -- merge --wait --machines lg-a,lg-b --run-dir \\CTRL01\k6results\shared_run_1430
 ```
 
 **Don't want to use `.env`?** Put the values on the command line instead (PowerShell):
