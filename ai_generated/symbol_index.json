@@ -2050,7 +2050,7 @@
   "core_engine/src/distributed/MergeEngine.ts#MachineArtifacts": {
     "exported": true,
     "file": "core_engine/src/distributed/MergeEngine.ts",
-    "jsdoc": "",
+    "jsdoc": "Raw per-transaction response times (ms) from this machine's transaction CSV. When present, merged percentiles are pooled + computed via R-7 (exact, histogram-parked phase). Falls back to the merged histogram when absent.",
     "kind": "interface",
     "line": 26,
     "name": "MachineArtifacts"
@@ -2060,7 +2060,7 @@
     "file": "core_engine/src/distributed/MergeEngine.ts",
     "jsdoc": "",
     "kind": "class",
-    "line": 73,
+    "line": 79,
     "name": "MergeEngine"
   },
   "core_engine/src/distributed/MergeEngine.ts#MergeOptions": {
@@ -2068,7 +2068,7 @@
     "file": "core_engine/src/distributed/MergeEngine.ts",
     "jsdoc": "Output runId for the merged result (defaults to the inputs' shared runId).",
     "kind": "interface",
-    "line": 33,
+    "line": 39,
     "name": "MergeOptions"
   },
   "core_engine/src/distributed/MergeEngine.ts#MergeResult": {
@@ -2076,7 +2076,7 @@
     "file": "core_engine/src/distributed/MergeEngine.ts",
     "jsdoc": "Merged per-(transaction|overview, bucket) histograms (sum of all machines).",
     "kind": "interface",
-    "line": 40,
+    "line": 46,
     "name": "MergeResult"
   },
   "core_engine/src/distributed/MergeEngine.ts#TxnAccumulator": {
@@ -2084,7 +2084,7 @@
     "file": "core_engine/src/distributed/MergeEngine.ts",
     "jsdoc": "",
     "kind": "interface",
-    "line": 50,
+    "line": 56,
     "name": "TxnAccumulator"
   },
   "core_engine/src/distributed/MergeEngine.ts#statToFraction": {
@@ -2092,7 +2092,7 @@
     "file": "core_engine/src/distributed/MergeEngine.ts",
     "jsdoc": "Parse a stat label into a percentile fraction in [0,1], or null if not a percentile.",
     "kind": "function",
-    "line": 62,
+    "line": 68,
     "name": "statToFraction"
   },
   "core_engine/src/distributed/MergedReportBuilder.ts#MachineTimeseries": {
@@ -2295,12 +2295,20 @@
     "line": 173,
     "name": "runProbe"
   },
+  "core_engine/src/distributed/runMerge.ts#FINAL_PREFIX": {
+    "exported": false,
+    "file": "core_engine/src/distributed/runMerge.ts",
+    "jsdoc": "",
+    "kind": "const",
+    "line": 23,
+    "name": "FINAL_PREFIX"
+  },
   "core_engine/src/distributed/runMerge.ts#MERGED_DIR": {
     "exported": false,
     "file": "core_engine/src/distributed/runMerge.ts",
     "jsdoc": "",
     "kind": "const",
-    "line": 21,
+    "line": 22,
     "name": "MERGED_DIR"
   },
   "core_engine/src/distributed/runMerge.ts#MergeCliOptions": {
@@ -2308,15 +2316,23 @@
     "file": "core_engine/src/distributed/runMerge.ts",
     "jsdoc": "",
     "kind": "interface",
-    "line": 43,
+    "line": 51,
     "name": "MergeCliOptions"
+  },
+  "core_engine/src/distributed/runMerge.ts#finalTimestamp": {
+    "exported": false,
+    "file": "core_engine/src/distributed/runMerge.ts",
+    "jsdoc": "dd_MM_yyyyTHH_mm — Windows-path-safe merged-output folder timestamp.",
+    "kind": "function",
+    "line": 26,
+    "name": "finalTimestamp"
   },
   "core_engine/src/distributed/runMerge.ts#readJson": {
     "exported": false,
     "file": "core_engine/src/distributed/runMerge.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 23,
+    "line": 31,
     "name": "readJson"
   },
   "core_engine/src/distributed/runMerge.ts#readNdjson": {
@@ -2324,7 +2340,7 @@
     "file": "core_engine/src/distributed/runMerge.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 33,
+    "line": 41,
     "name": "readNdjson"
   },
   "core_engine/src/distributed/runMerge.ts#runMerge": {
@@ -2332,7 +2348,7 @@
     "file": "core_engine/src/distributed/runMerge.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 48,
+    "line": 56,
     "name": "runMerge"
   },
   "core_engine/src/distributed/runMerge.ts#validateManifests": {
@@ -2340,7 +2356,7 @@
     "file": "core_engine/src/distributed/runMerge.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 147,
+    "line": 165,
     "name": "validateManifests"
   },
   "core_engine/src/distributed/shareSetup.ts#ShareSuggestionOptions": {
@@ -2374,6 +2390,30 @@
     "kind": "function",
     "line": 15,
     "name": "awaitScheduledStart"
+  },
+  "core_engine/src/distributed/transactionCsv.ts#findTransactionCsv": {
+    "exported": true,
+    "file": "core_engine/src/distributed/transactionCsv.ts",
+    "jsdoc": "Find the transaction CSV inside a collected machine folder, if present.",
+    "kind": "function",
+    "line": 65,
+    "name": "findTransactionCsv"
+  },
+  "core_engine/src/distributed/transactionCsv.ts#parseCsvLine": {
+    "exported": false,
+    "file": "core_engine/src/distributed/transactionCsv.ts",
+    "jsdoc": "Minimal RFC-4180-ish line parser (handles quoted fields + escaped quotes).",
+    "kind": "function",
+    "line": 14,
+    "name": "parseCsvLine"
+  },
+  "core_engine/src/distributed/transactionCsv.ts#readTransactionCsvRaw": {
+    "exported": true,
+    "file": "core_engine/src/distributed/transactionCsv.ts",
+    "jsdoc": "Read a transaction CSV into { transactionName: responseTimesMs[] }. Returns {} if the file is missing/empty or lacks the required columns.",
+    "kind": "function",
+    "line": 42,
+    "name": "readTransactionCsvRaw"
   },
   "core_engine/src/execution/FileWriteSink.ts#FILE_TAG": {
     "exported": false,

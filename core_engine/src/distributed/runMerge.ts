@@ -15,10 +15,18 @@ import { ArtifactWriter } from '../reporting/ArtifactWriter';
 import { RunReportGenerator } from '../reporting/RunReportGenerator';
 import { MergeEngine, MachineArtifacts } from './MergeEngine';
 import { MergedReportBuilder, MachineTimeseries } from './MergedReportBuilder';
+import { readTransactionCsvRaw, findTransactionCsv } from './transactionCsv';
 import { CiSummary, TimeSeriesFile, TransactionMetricsFile } from '../types/ReportingContracts';
 import { HistogramArtifact } from '../reporting/HistogramArtifactBuilder';
 
 const MERGED_DIR = '_merged';
+const FINAL_PREFIX = 'Final_';
+
+/** dd_MM_yyyyTHH_mm — Windows-path-safe merged-output folder timestamp. */
+function finalTimestamp(d = new Date()): string {
+  const p = (n: number): string => String(n).padStart(2, '0');
+  return `${p(d.getDate())}_${p(d.getMonth() + 1)}_${d.getFullYear()}T${p(d.getHours())}_${p(d.getMinutes())}`;
+}
 
 function readJson<T>(file: string): T | undefined {
   try {
@@ -54,7 +62,7 @@ export function runMerge(options: MergeCliOptions): boolean {
 
   // ── Discover per-machine subdirs (any subdir with at least one artifact). ──
   const machineDirs = fs.readdirSync(runDir)
-    .filter((name) => name !== MERGED_DIR)
+    .filter((name) => name !== MERGED_DIR && !name.startsWith(FINAL_PREFIX))
     .map((name) => path.join(runDir, name))
     .filter((dir) => fs.statSync(dir).isDirectory())
     .filter((dir) =>
@@ -81,9 +89,16 @@ export function runMerge(options: MergeCliOptions): boolean {
     const ts = readJson<TimeSeriesFile>(path.join(dir, 'timeseries.json'));
     const manifest = readJson<{ runId?: string; scriptHash?: string; plan?: { name?: string; environment?: string; executionMode?: string } }>(path.join(dir, 'run-manifest.json'));
 
-    if (!hist) Logger.warn(`[merge] ${machineName}: no metrics-histogram.json (was K6_PERF_EMIT_HISTOGRAM set on the run?)`);
+    // Raw transaction CSV → exact (R-7) pooled percentiles (histogram-parked phase).
+    const csvPath = findTransactionCsv(dir);
+    const transactionRaw = csvPath ? readTransactionCsvRaw(csvPath) : undefined;
+    if (!csvPath && !hist) {
+      Logger.warn(`[merge] ${machineName}: no transaction CSV and no histogram — percentiles unavailable for this machine`);
+    } else if (!csvPath) {
+      Logger.warn(`[merge] ${machineName}: no transaction CSV — falling back to the histogram for percentiles`);
+    }
 
-    machineArtifacts.push({ machineName, transactionMetrics: tm, histogram: hist, ciSummary: ci });
+    machineArtifacts.push({ machineName, transactionMetrics: tm, histogram: hist, ciSummary: ci, transactionRaw });
     machineTimeseries.push({
       machineName, timeseries: ts,
       errors: readNdjson(path.join(dir, 'errors.ndjson')),
@@ -110,8 +125,11 @@ export function runMerge(options: MergeCliOptions): boolean {
     transactionStats: merge.transactionMetrics.stats,
   });
 
-  // ── Write merged artifacts ──
-  const outDir = options.out ? path.resolve(options.out) : path.join(runDir, MERGED_DIR);
+  // ── Write merged artifacts to Final_<testname>_<ts>/ (EDD §End) ──
+  const testName = planInfo.name ?? merge.ciSummary.plan ?? 'DistributedRun';
+  const safeTestName = testName.replace(/[^a-zA-Z0-9_]/g, '_');
+  const finalFolder = `${FINAL_PREFIX}${safeTestName}_${finalTimestamp()}`;
+  const outDir = options.out ? path.resolve(options.out) : path.join(runDir, finalFolder);
   fs.mkdirSync(outDir, { recursive: true });
 
   ArtifactWriter.writeJson(path.join(outDir, 'transaction-metrics.json'), merge.transactionMetrics);

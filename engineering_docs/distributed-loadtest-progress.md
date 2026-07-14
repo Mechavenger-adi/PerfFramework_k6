@@ -4,7 +4,7 @@ Living status of every feature in the distributed load-test capability.
 Design: [EDD-distributed-loadtest.md](edd/EDD-distributed-loadtest.md). Status legend:
 ⬜ not started · 🟡 in progress · ✅ done · 🔬 needs verification · ⏸️ blocked/deferred.
 
-_Last updated: 2026-07-14 (steps 1–2 done + verified)_
+_Last updated: 2026-07-14 (steps 1–3 done + verified)_
 
 ## Pre-work / spikes
 | Item | Status | Notes |
@@ -18,7 +18,7 @@ _Last updated: 2026-07-14 (steps 1–2 done + verified)_
 |---|---|---|---|
 | 1 | Mode switch (`K6_PERF_DISTRIBUTED`/`--distributed`) + `--role` + `testId` tag + HTML policy + forced CSV | ✅ | Verified: distributed run tags machine/runId/testId, CSV forced, RunReport+CDN HTML suppressed, TestSummary+handleSummary kept; local run unchanged (both HTMLs, no tags). |
 | 2 | Controller share **suggestion** (print UNC + `COLLECT_DIR` line; 445 hint) | ✅ | `share-setup` command + auto-print on `run --role controller`. Verified. `shareSetup.ts`. |
-| 3 | CSV reader → R-7 pooled percentiles in `MergeEngine`; `Final_<testname>_<ts>` naming | ⬜ | Unit note: CSV sec→ms normalization. |
+| 3 | CSV reader → R-7 pooled percentiles in `MergeEngine`; `Final_<testname>_<ts>` naming | ✅ | Verified: single-machine merged percentiles == source exactly (p90 to the decimal); 2-machine pooling additive; `Final_WebUI_Load_Test___jpet_14_07_2026T10_19`. New: `transactionCsv.ts`. |
 | 4 | Agent live-status heartbeat + controller combined console aggregator | ⬜ | Per-machine `*.status.json`; exact counts/throughput, per-machine p95. |
 | 5 | Live Run Report regeneration + local HTTP server (configurable bind) | ⬜ | Local now; network-shareable when a port opens. |
 | 6 | Mid-test control: `control_<runId>` file + agent poll/executor + dashboard buttons + ack | ⬜ | Unblocked: abort=kill; stop=k6 REST API `PATCH /v1/status` (verified). Map exit 103→STOPPED-EARLY. |

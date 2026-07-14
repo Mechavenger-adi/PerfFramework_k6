@@ -772,7 +772,7 @@
     ],
     "importsNode": false,
     "layer": "distributed",
-    "loc": 313,
+    "loc": 336,
     "path": "core_engine/src/distributed/MergeEngine.ts"
   },
   {
@@ -858,12 +858,13 @@
       "core_engine/src/utils/logger.ts",
       "core_engine/src/distributed/MergedReportBuilder.ts",
       "core_engine/src/distributed/MergeEngine.ts",
+      "core_engine/src/distributed/transactionCsv.ts",
       "fs",
       "path"
     ],
     "importsNode": true,
     "layer": "distributed",
-    "loc": 157,
+    "loc": 175,
     "path": "core_engine/src/distributed/runMerge.ts"
   },
   {
@@ -893,6 +894,19 @@
     "layer": "distributed",
     "loc": 33,
     "path": "core_engine/src/distributed/startBarrier.ts"
+  },
+  {
+    "exports": [
+      "findTransactionCsv",
+      "readTransactionCsvRaw"
+    ],
+    "imports": [
+      "fs"
+    ],
+    "importsNode": true,
+    "layer": "distributed",
+    "loc": 73,
+    "path": "core_engine/src/distributed/transactionCsv.ts"
   },
   {
     "exports": [

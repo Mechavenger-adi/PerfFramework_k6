@@ -21,13 +21,19 @@
 
 import { CiSummary, CiTransactionSummary, TransactionMetricRow, TransactionMetricsFile } from '../types/ReportingContracts';
 import { HistogramArtifact } from '../reporting/HistogramArtifactBuilder';
-import { HistogramJSON, RelativeHistogram } from '../reporting/Histogram';
+import { HistogramJSON, RelativeHistogram, percentileR7 } from '../reporting/Histogram';
 
 export interface MachineArtifacts {
   machineName: string;
   transactionMetrics?: TransactionMetricsFile;
   histogram?: HistogramArtifact;
   ciSummary?: CiSummary;
+  /**
+   * Raw per-transaction response times (ms) from this machine's transaction CSV.
+   * When present, merged percentiles are pooled + computed via R-7 (exact,
+   * histogram-parked phase). Falls back to the merged histogram when absent.
+   */
+  transactionRaw?: Record<string, number[]>;
 }
 
 export interface MergeOptions {
@@ -125,11 +131,26 @@ export class MergeEngine {
       }
     }
 
-    // ── 3. Build merged transaction rows (percentiles from merged histograms) ──
+    // ── 3a. Pool raw response times (ms) by logical transaction, across machines. ──
+    // When present these drive EXACT (R-7) merged percentiles; sorted once so
+    // percentileR7 can run presorted. Histogram is the fallback when raw is absent.
+    const pooledRaw = new Map<string, number[]>();
+    for (const m of present) {
+      if (!m.transactionRaw) continue;
+      for (const [name, vals] of Object.entries(m.transactionRaw)) {
+        const arr = pooledRaw.get(name) ?? [];
+        for (const v of vals) arr.push(v);
+        pooledRaw.set(name, arr);
+      }
+    }
+    for (const arr of pooledRaw.values()) arr.sort((x, y) => x - y);
+
+    // ── 3b. Build merged transaction rows (percentiles: pooled R-7, else histogram). ──
     const rows: TransactionMetricRow[] = [];
     for (const [name, a] of [...acc].sort((x, y) => x[0].localeCompare(y[0]))) {
       const total = a.pass + a.fail;
       const hist = merged.transactions[name];
+      const raw = pooledRaw.get(name);
       const row: TransactionMetricRow = {
         journey: a.journey,
         transaction: name,
@@ -143,7 +164,9 @@ export class MergeEngine {
       };
       for (const stat of stats) {
         const frac = statToFraction(stat);
-        if (frac !== null && hist) row[stat] = hist.valueAtPercentile(frac);
+        if (frac === null) continue;
+        if (raw && raw.length > 0) row[stat] = percentileR7(raw, frac, true);
+        else if (hist) row[stat] = hist.valueAtPercentile(frac);
       }
       rows.push(row);
     }
