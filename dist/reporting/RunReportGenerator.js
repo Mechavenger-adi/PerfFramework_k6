@@ -1999,7 +1999,9 @@ class RunReportGenerator {
         + (anyLocal ? '<button class="small-btn" id="err-clear">Clear filters</button>' : '')
         + '</div>';
 
-      const header = '<tr><th>Timestamp</th><th>Type</th><th>Transaction</th><th>Request</th><th>VU</th><th>Iteration</th><th>Message</th><th></th></tr>';
+      const anyMachine = rows.some(function(r){ return r.machine; });
+      const machColH = anyMachine ? '<th>Machine</th>' : '';
+      const header = '<tr><th>Timestamp</th>' + machColH + '<th>Type</th><th>Transaction</th><th>Request</th><th>VU</th><th>Iteration</th><th>Message</th><th></th></tr>';
       const body = rows.length ? rows.map(function(row) {
         const snapIdx = snapshotByTxn[row.transaction];
         const hasSnap = typeof snapIdx === 'number';
@@ -2007,6 +2009,7 @@ class RunReportGenerator {
         const iteration = row.iteration != null ? row.iteration : (hasSnap ? snapshots[snapIdx].iteration : '');
         return '<tr>' +
           '<td style="white-space:nowrap">' + escapeHtml(String(row.ts || '')) + '</td>' +
+          (anyMachine ? '<td>' + escapeHtml(String(row.machine || '')) + '</td>' : '') +
           '<td>' + escapeHtml(String(row.type || '')) + '</td>' +
           '<td>' + escapeHtml(String(row.transaction || '')) + '</td>' +
           '<td class="wrap">' + escapeHtml(String(row.request || row.requestName || '')) + '</td>' +
@@ -2015,7 +2018,7 @@ class RunReportGenerator {
           '<td class="wrap">' + escapeHtml(String(row.message || '')) + '</td>' +
           '<td>' + (hasSnap ? '<button class="view-btn" onclick="showSnapshotDetail(' + snapIdx + ')">View Request</button>' : '') + '</td>' +
           '</tr>';
-      }).join('') : '<tr><td colspan="8" class="subtle" style="text-align:center;padding:18px">No events match the current filter.</td></tr>';
+      }).join('') : '<tr><td colspan="' + (anyMachine ? 9 : 8) + '" class="subtle" style="text-align:center;padding:18px">No events match the current filter.</td></tr>';
 
       const groupsHtml = '<div class="section-title">All Error Events' + infoTip('Every captured error event; View opens the snapshot.') + '</div>';
       panel.innerHTML = clustersHtml + groupsHtml + toolbar + '<div class="table-scroll"><table><thead>' + header + '</thead><tbody>' + body + '</tbody></table></div>';
