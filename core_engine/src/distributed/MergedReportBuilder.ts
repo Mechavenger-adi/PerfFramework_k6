@@ -58,8 +58,21 @@ export class MergedReportBuilder {
     const tsFiles = input.machines.map((m) => m.timeseries).filter((t): t is TimeSeriesFile => !!t);
 
     const timeseries = this.mergeTimeseries(tsFiles, input.merge.histogram, counterBucket, input.transactionStats ?? input.merge.transactionMetrics.stats ?? [], input.requestFailBuckets);
+    // Per-machine host series → the System tab draws one CPU/mem line per LG.
+    timeseries.series.system = this.buildSystemSeries(input.machines);
     const bundle = this.assembleBundle(input, timeseries);
     return { bundle, timeseries };
+  }
+
+  /** Group each machine's host snapshots into a per-agent system series (keyed by machine name). */
+  private static buildSystemSeries(machines: MachineTimeseries[]): Record<string, TimeSeriesPoint[]> {
+    const sys: Record<string, TimeSeriesPoint[]> = {};
+    for (const m of machines) {
+      const snaps = m.hostSnapshots ?? [];
+      if (snaps.length === 0) continue;
+      sys[m.machineName] = snaps.map((s) => ({ ts: String(s.ts ?? ''), cpuPercent: Number(s.cpuPercent ?? 0), memoryPercent: Number(s.memoryPercent ?? 0) } as TimeSeriesPoint));
+    }
+    return sys;
   }
 
   private static mergeTimeseries(
