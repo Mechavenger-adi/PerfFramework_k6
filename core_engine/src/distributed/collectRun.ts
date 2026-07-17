@@ -17,9 +17,17 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { Logger } from '../utils/logger';
 
-/** Folder name for a run's shared collection dir. */
-export function sharedRunFolder(runId: string): string {
-  return `shared_${runId}`;
+/** Per-run base folder: <collectDir>/<runId>/  (holds live/, shared/, control/, Final_…). */
+export function runBaseDir(collectDir: string, runId: string): string {
+  return path.join(path.resolve(collectDir), runId);
+}
+/** Shared collect dir for a run: <collectDir>/<runId>/shared. */
+export function sharedRunDir(collectDir: string, runId: string): string {
+  return path.join(runBaseDir(collectDir, runId), 'shared');
+}
+/** Live heartbeat dir for a run: <collectDir>/<runId>/live. */
+export function liveRunDir(collectDir: string, runId: string): string {
+  return path.join(runBaseDir(collectDir, runId), 'live');
 }
 
 /** k6's raw metrics firehose — kept LOCAL by default; the merge needs only the CSV + JSON artifacts. */
@@ -37,12 +45,12 @@ function copyDirInto(src: string, dest: string, exclude: Set<string>): void {
 }
 
 /**
- * Copy a finished local run folder into <collectDir>/shared_<runId>/<machineName>/.
+ * Copy a finished local run folder into <collectDir>/<runId>/shared/<machineName>/.
  * The raw metrics-stream.json is excluded by default (large, local-only); pass
  * `includeRaw` to copy it too. Returns the destination path.
  */
 export function collectRunDir(reportDir: string, runId: string, machineName: string, collectDir: string, includeRaw = false): string {
-  const dest = path.join(path.resolve(collectDir), sharedRunFolder(runId), machineName);
+  const dest = path.join(sharedRunDir(collectDir, runId), machineName);
   copyDirInto(reportDir, dest, includeRaw ? new Set<string>() : DEFAULT_EXCLUDE);
   return dest;
 }
@@ -66,6 +74,6 @@ export function runCollect(opts: { from: string; into: string; machine: string; 
   const runId = opts.runId || readRunId(from) || path.basename(from);
   const dest = collectRunDir(from, runId, opts.machine, opts.into, opts.includeRaw);
   Logger.pass(`[collect] ${from} → ${dest}`);
-  Logger.detail(`Merge with: k6-framework merge --run-dir ${path.join(path.resolve(opts.into), sharedRunFolder(runId))}`);
+  Logger.detail(`Merge with: k6-framework merge --run-dir ${sharedRunDir(opts.into, runId)}`);
   return true;
 }

@@ -154,7 +154,9 @@ export class LiveStatusHeartbeat {
         updatedAt: new Date().toISOString(),
         state,
         elapsedSec: Math.round(elapsedSec),
-        currentVus: this.vusCache, // real active VUs from k6's REST API (not the CSV VU-id column)
+        // Real active VUs from k6's REST API. Force 0 in terminal states — after the
+        // test there are no active VUs (k6's last reading during ramp-down lingers otherwise).
+        currentVus: (state === 'done' || state === 'stopped' || state === 'aborted') ? 0 : this.vusCache,
         transactionsTotal: stats.totalCount,
         failTotal: stats.totalFail,
         errorRate: stats.totalCount ? (stats.totalFail / stats.totalCount) * 100 : 0,

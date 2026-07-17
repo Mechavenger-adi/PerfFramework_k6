@@ -28,6 +28,28 @@ function finalTimestamp(d = new Date()): string {
   return `${p(d.getDate())}_${p(d.getMonth() + 1)}_${d.getFullYear()}T${p(d.getHours())}_${p(d.getMinutes())}`;
 }
 
+/**
+ * Concatenate the per-machine CSVs (whose names end with `suffix`, e.g.
+ * `_request_metric.csv`) into one merged CSV — header once, all data rows. The rows
+ * already carry a hostName column so each machine stays identifiable. Returns row count.
+ */
+function writeMergedCsv(machineDirs: string[], suffix: string, outPath: string): number {
+  let header = '';
+  const rows: string[] = [];
+  for (const dir of machineDirs) {
+    let name: string | undefined;
+    try { name = fs.readdirSync(dir).find((n) => n.endsWith(suffix)); } catch { name = undefined; }
+    if (!name) continue;
+    const lines = fs.readFileSync(path.join(dir, name), 'utf-8').split(/\r?\n/).filter((l) => l.trim().length > 0);
+    if (lines.length === 0) continue;
+    if (!header) header = lines[0];
+    for (let i = 1; i < lines.length; i++) rows.push(lines[i]);
+  }
+  if (!header) return 0;
+  fs.writeFileSync(outPath, `${header}\n${rows.join('\n')}\n`, 'utf-8');
+  return rows.length;
+}
+
 function readJson<T>(file: string): T | undefined {
   try {
     if (!fs.existsSync(file)) return undefined;
@@ -170,7 +192,10 @@ export async function runMerge(options: MergeCliOptions): Promise<boolean> {
   const testName = planInfo.name ?? merge.ciSummary.plan ?? 'DistributedRun';
   const safeTestName = testName.replace(/[^a-zA-Z0-9_]/g, '_');
   const finalFolder = `${FINAL_PREFIX}${safeTestName}_${finalTimestamp()}`;
-  const outDir = options.out ? path.resolve(options.out) : path.join(runDir, finalFolder);
+  // New layout: run-dir is <collectDir>/<runId>/shared → put Final_ in the runId folder
+  // (a sibling of shared). Legacy/other run-dirs → Final_ inside the run-dir.
+  const finalParent = path.basename(runDir) === 'shared' ? path.dirname(runDir) : runDir;
+  const outDir = options.out ? path.resolve(options.out) : path.join(finalParent, finalFolder);
   fs.mkdirSync(outDir, { recursive: true });
 
   ArtifactWriter.writeJson(path.join(outDir, 'transaction-metrics.json'), merge.transactionMetrics);
@@ -190,10 +215,15 @@ export async function runMerge(options: MergeCliOptions): Promise<boolean> {
     validationWarnings: [...validationWarnings, ...merge.warnings],
   });
 
+  // Merged raw CSVs (all machines concatenated; rows keep their hostName column).
+  const reqRows = writeMergedCsv(machineDirs, '_request_metric.csv', path.join(outDir, 'merged_request_metric.csv'));
+  const txnRows = writeMergedCsv(machineDirs, '_transaction_metric.csv', path.join(outDir, 'merged_transaction_metric.csv'));
+
   const reportPath = path.join(outDir, 'RunReport.html');
   fs.writeFileSync(reportPath, RunReportGenerator.generate(bundle), 'utf-8');
 
   Logger.pass(`[merge] merged ${merge.machines.length} machine(s) → ${outDir}`);
+  Logger.detail(`Merged CSVs: ${reqRows} request row(s), ${txnRows} transaction row(s)`);
   Logger.detail(`Machines: ${merge.machines.join(', ')}`);
   Logger.detail(`Status: ${merge.ciSummary.status} · transaction failure rate ${(merge.ciSummary.transactionFailureRate ?? 0).toFixed(2)}% (budget ${merge.ciSummary.transactionErrorBudget ?? 0}%)`);
   Logger.detail(`Transactions: ${merge.transactionMetrics.transactions.length}`);

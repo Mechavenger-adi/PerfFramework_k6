@@ -771,15 +771,17 @@
       "LiveStatusSnapshot"
     ],
     "imports": [
+      "core_engine/src/execution/HostMonitor.ts",
       "core_engine/src/reporting/Histogram.ts",
       "core_engine/src/utils/logger.ts",
+      "core_engine/src/distributed/control.ts",
       "core_engine/src/distributed/transactionCsv.ts",
       "fs",
       "path"
     ],
     "importsNode": true,
     "layer": "distributed",
-    "loc": 135,
+    "loc": 181,
     "path": "core_engine/src/distributed/LiveStatusHeartbeat.ts"
   },
   {
@@ -813,7 +815,7 @@
     ],
     "importsNode": false,
     "layer": "distributed",
-    "loc": 232,
+    "loc": 235,
     "path": "core_engine/src/distributed/MergedReportBuilder.ts"
   },
   {
@@ -838,8 +840,10 @@
   {
     "exports": [
       "collectRunDir",
+      "liveRunDir",
+      "runBaseDir",
       "runCollect",
-      "sharedRunFolder"
+      "sharedRunDir"
     ],
     "imports": [
       "core_engine/src/utils/logger.ts",
@@ -848,7 +852,7 @@
     ],
     "importsNode": true,
     "layer": "distributed",
-    "loc": 72,
+    "loc": 80,
     "path": "core_engine/src/distributed/collectRun.ts"
   },
   {
@@ -858,6 +862,7 @@
       "ControlWatcher",
       "ControlWatcherOptions",
       "controlDirFor",
+      "fetchK6Vus",
       "k6ApiStop",
       "killProcessTree",
       "readControl",
@@ -872,7 +877,7 @@
     ],
     "importsNode": true,
     "layer": "distributed",
-    "loc": 118,
+    "loc": 141,
     "path": "core_engine/src/distributed/control.ts"
   },
   {
@@ -881,13 +886,16 @@
       "LiveAggregate",
       "RunContext",
       "aggregate",
+      "controllerHost",
       "findLatestFinalReport",
       "readSnapshots",
       "resolveLiveDir",
       "resolveRunContext",
+      "startControllerHostSampling",
       "timingStats"
     ],
     "imports": [
+      "core_engine/src/execution/HostMonitor.ts",
       "core_engine/src/reporting/Histogram.ts",
       "core_engine/src/distributed/LiveStatusHeartbeat.ts",
       "fs",
@@ -895,7 +903,7 @@
     ],
     "importsNode": true,
     "layer": "distributed",
-    "loc": 148,
+    "loc": 184,
     "path": "core_engine/src/distributed/liveAggregate.ts"
   },
   {
@@ -914,7 +922,7 @@
     ],
     "importsNode": true,
     "layer": "distributed",
-    "loc": 224,
+    "loc": 277,
     "path": "core_engine/src/distributed/liveDashboard.ts"
   },
   {
@@ -929,7 +937,7 @@
     ],
     "importsNode": false,
     "layer": "distributed",
-    "loc": 110,
+    "loc": 115,
     "path": "core_engine/src/distributed/monitor.ts"
   },
   {
@@ -969,7 +977,7 @@
     ],
     "importsNode": true,
     "layer": "distributed",
-    "loc": 216,
+    "loc": 248,
     "path": "core_engine/src/distributed/runMerge.ts"
   },
   {

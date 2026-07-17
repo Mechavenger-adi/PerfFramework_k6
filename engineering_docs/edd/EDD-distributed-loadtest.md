@@ -230,16 +230,21 @@ final is for deciding.
    (Windows-path-safe; e.g. `Final_checkout_14_07_2026T16_45`) instead of `_merged/`.
 
 ## Folder Layout (on the shared location)
+Everything for a run lives under one `<runId>/` folder in the collect dir:
 ```
-<share>/
-  live_<runId>/                         ← during run: light per-machine status (live view)
+<share>/<runId>/
+  live/                                 ← during run: light per-machine status (live view)
     lg1.status.json   lg2.status.json
-  shared_<runId>/                       ← at end: full per-machine artifacts (auto-collected)
-    lg1/  <testId>_<host>_transaction_metric.csv  transaction-metrics.json  ci-summary.json
-          timeseries.json  summary.json  run-manifest.json  TestSummary.html …  (no raw stream)
+  control/                              ← mid-test control marker (abort/stop)
+    control.json
+  shared/                               ← at end: full per-machine artifacts (auto-collected)
+    lg1/  <testId>_<host>_transaction_metric.csv  <testId>_<host>_request_metric.csv
+          transaction-metrics.json  ci-summary.json  timeseries.json  system-metrics.json
+          run-manifest.json  TestSummary.html …  (no raw stream)
     lg2/  …
-    Final_<testname>_<ts>/              ← produced by merge: the single combined output
+  Final_<testname>_<ts>/               ← produced by merge (sibling of shared): the combined output
           transaction-metrics.json  timeseries.json  ci-summary.json  RunReport.html
+          merged_request_metric.csv   merged_transaction_metric.csv
 ```
 
 ## CLI Surface

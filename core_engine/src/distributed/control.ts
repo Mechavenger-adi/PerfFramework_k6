@@ -25,9 +25,9 @@ export interface ControlFile {
   token?: string;
 }
 
-/** `<collectDir>/control_<runId>`. */
+/** `<collectDir>/<runId>/control`. */
 export function controlDirFor(collectDir: string, runId: string): string {
-  return path.join(path.resolve(collectDir), `control_${runId}`);
+  return path.join(path.resolve(collectDir), runId, 'control');
 }
 
 /** Write the control marker atomically (tmp + rename). Returns the file path. */

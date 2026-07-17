@@ -106,7 +106,7 @@ document.getElementById('btn-abort').onclick=()=>{ if(confirm('ABORT now?\\nk6 i
 const n0 = x => (x==null?'-':Number(x).toFixed(0));
 const n1 = x => (x==null?'-':Number(x).toFixed(1));
 function kpi(l,v){ return '<div class="kpi"><div class="v">'+v+'</div><div class="l">'+l+'</div></div>'; }
-const hist=[]; const MAXPTS=600;
+const hist=[]; const MAXPTS=600; let frozen=false;
 function drawChart(){
   const svg=document.getElementById('chart'); if(!svg) return;
   const W=1000,H=300,mL=46,mR=46,mT=14,mB=26, pw=W-mL-mR, ph=H-mT-mB, axis='#8a93a6';
@@ -140,13 +140,12 @@ async function tick(){
   document.getElementById('meta').textContent = d.machineCount+' machine(s) · updated '+new Date(d.updatedAt).toLocaleTimeString();
   const ev=d.events||{errorCount:0,warnCount:0,recentErrors:[],recentWarnings:[]};
   document.getElementById('kpis').innerHTML =
-    kpi('VUs',d.totals.vus)+kpi('Transactions',d.totals.txns)+kpi('Throughput/s',n1(d.totals.tps))+kpi('Error %',n1(d.totals.errorRate))+kpi('Errors',ev.errorCount)+kpi('Warnings',ev.warnCount);
-  // VUs + failure-rate over time
-  hist.push({t:Date.now(), vus:Number(d.totals.vus)||0, err:Number(d.totals.errorRate)||0});
-  if(hist.length>MAXPTS) hist.shift();
+    kpi('Active VUs',d.totals.vus)+kpi('Transactions',d.totals.txns)+kpi('Throughput/s',n1(d.totals.tps))+kpi('Error %',n1(d.totals.errorRate))+kpi('Errors',ev.errorCount)+kpi('Warnings',ev.warnCount);
+  // VUs + failure-rate over time (freeze once all machines finish)
+  if(!frozen){ hist.push({t:Date.now(), vus:Number(d.totals.vus)||0, err:Number(d.totals.errorRate)||0}); if(hist.length>MAXPTS) hist.shift(); if(d.allDone) frozen=true; }
   drawChart();
   // fleet
-  let f='<thead><tr><th>Machine</th><th>State</th><th>Elapsed</th><th>VUs</th><th>Txns</th><th>Err%</th><th>TPS</th></tr></thead><tbody>';
+  let f='<thead><tr><th>Machine</th><th>State</th><th>Elapsed</th><th>Active VUs</th><th>Txns</th><th>Err%</th><th>TPS</th></tr></thead><tbody>';
   for(const m of d.fleet){ f+='<tr><td>'+esc(m.machine)+'</td><td class="st-'+esc(m.state)+'">'+esc(m.state)+'</td><td>'+m.elapsedSec+'s</td><td>'+m.vus+'</td><td>'+m.txns+'</td><td>'+n1(m.errorRate)+'</td><td>'+n1(m.tps)+'</td></tr>'; }
   f+='</tbody><tfoot><tr><td>TOTAL</td><td></td><td></td><td>'+d.totals.vus+'</td><td>'+d.totals.txns+'</td><td>'+n1(d.totals.errorRate)+'</td><td>'+n1(d.totals.tps)+'</td></tr></tfoot>';
   document.getElementById('fleet').innerHTML=f;
@@ -179,10 +178,10 @@ export function startDashboardServer(
 ): Promise<http.Server> {
   const html = page(o.intervalMs);
   startControllerHostSampling(); // controller's own CPU/mem for the Resources panel
-  // Control dir is the sibling of live_<runId>: control_<runId>.
-  const base = path.basename(o.dir);
-  const runId = o.runId || (base.startsWith('live_') ? base.slice('live_'.length) : '');
-  const controlDir = path.join(path.dirname(o.dir), `control_${runId}`);
+  // Layout is <collectDir>/<runId>/{live,control,shared}; control is a sibling of live.
+  const runIdFolder = path.dirname(o.dir);
+  const runId = o.runId || path.basename(runIdFolder);
+  const controlDir = path.join(runIdFolder, 'control');
 
   // ── Auto-merge state: fire once when every machine has finished. ──
   let mergeState: 'idle' | 'merging' | 'done' | 'failed' = 'idle';

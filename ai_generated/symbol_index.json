@@ -2052,7 +2052,7 @@
     "file": "core_engine/src/distributed/LiveStatusHeartbeat.ts",
     "jsdoc": "The transaction CSV being written live on this machine.",
     "kind": "interface",
-    "line": 45,
+    "line": 68,
     "name": "HeartbeatOptions"
   },
   "core_engine/src/distributed/LiveStatusHeartbeat.ts#LiveState": {
@@ -2060,15 +2060,15 @@
     "file": "core_engine/src/distributed/LiveStatusHeartbeat.ts",
     "jsdoc": "",
     "kind": "type",
-    "line": 19,
+    "line": 21,
     "name": "LiveState"
   },
   "core_engine/src/distributed/LiveStatusHeartbeat.ts#LiveStatusHeartbeat": {
     "exported": true,
     "file": "core_engine/src/distributed/LiveStatusHeartbeat.ts",
-    "jsdoc": "Reflect a control transition (e.g. 'stopping'/'aborting') immediately.",
+    "jsdoc": "Refresh active VUs (k6 API) + host CPU/mem (best-effort; keep last good values).",
     "kind": "class",
-    "line": 58,
+    "line": 81,
     "name": "LiveStatusHeartbeat"
   },
   "core_engine/src/distributed/LiveStatusHeartbeat.ts#LiveStatusSnapshot": {
@@ -2076,8 +2076,16 @@
     "file": "core_engine/src/distributed/LiveStatusHeartbeat.ts",
     "jsdoc": "Windowed (current) transaction throughput, txn/s.",
     "kind": "interface",
-    "line": 21,
+    "line": 38,
     "name": "LiveStatusSnapshot"
+  },
+  "core_engine/src/distributed/LiveStatusHeartbeat.ts#tailNdjson": {
+    "exported": false,
+    "file": "core_engine/src/distributed/LiveStatusHeartbeat.ts",
+    "jsdoc": "Count lines in an ndjson file + the last `n` as short messages. Best-effort.",
+    "kind": "function",
+    "line": 24,
+    "name": "tailNdjson"
   },
   "core_engine/src/distributed/MergeEngine.ts#MachineArtifacts": {
     "exported": true,
@@ -2130,7 +2138,7 @@
   "core_engine/src/distributed/MergedReportBuilder.ts#MachineTimeseries": {
     "exported": true,
     "file": "core_engine/src/distributed/MergedReportBuilder.ts",
-    "jsdoc": "",
+    "jsdoc": "Host CPU/mem snapshots from this machine's system-metrics.json (for the System tab).",
     "kind": "interface",
     "line": 21,
     "name": "MachineTimeseries"
@@ -2140,7 +2148,7 @@
     "file": "core_engine/src/distributed/MergedReportBuilder.ts",
     "jsdoc": "Find the merged-histogram bucket (10s) whose window contains `ts`.",
     "kind": "class",
-    "line": 49,
+    "line": 51,
     "name": "MergedReportBuilder"
   },
   "core_engine/src/distributed/MergedReportBuilder.ts#MergedReportInput": {
@@ -2148,7 +2156,7 @@
     "file": "core_engine/src/distributed/MergedReportBuilder.ts",
     "jsdoc": "Counter bucket seconds (default 2, from runtime settings).",
     "kind": "interface",
-    "line": 28,
+    "line": 30,
     "name": "MergedReportInput"
   },
   "core_engine/src/distributed/MergedReportBuilder.ts#percentilesFrom": {
@@ -2156,7 +2164,7 @@
     "file": "core_engine/src/distributed/MergedReportBuilder.ts",
     "jsdoc": "Percentiles to emit per bucket: fixed p90 ∪ every percentile in the configured stats.",
     "kind": "function",
-    "line": 38,
+    "line": 40,
     "name": "percentilesFrom"
   },
   "core_engine/src/distributed/agentServer.ts#AgentServerOptions": {
@@ -2236,15 +2244,15 @@
     "file": "core_engine/src/distributed/collectRun.ts",
     "jsdoc": "k6's raw metrics firehose — kept LOCAL by default; the merge needs only the CSV + JSON artifacts.",
     "kind": "const",
-    "line": 26,
+    "line": 34,
     "name": "DEFAULT_EXCLUDE"
   },
   "core_engine/src/distributed/collectRun.ts#collectRunDir": {
     "exported": true,
     "file": "core_engine/src/distributed/collectRun.ts",
-    "jsdoc": "Copy a finished local run folder into <collectDir>/shared_<runId>/<machineName>/. The raw metrics-stream.json is excluded by default (large, local-only); pass `includeRaw` to copy it too. Returns the destination path.",
+    "jsdoc": "Copy a finished local run folder into <collectDir>/<runId>/shared/<machineName>/. The raw metrics-stream.json is excluded by default (large, local-only); pass `includeRaw` to copy it too. Returns the destination path.",
     "kind": "function",
-    "line": 44,
+    "line": 52,
     "name": "collectRunDir"
   },
   "core_engine/src/distributed/collectRun.ts#copyDirInto": {
@@ -2252,32 +2260,48 @@
     "file": "core_engine/src/distributed/collectRun.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 28,
+    "line": 36,
     "name": "copyDirInto"
+  },
+  "core_engine/src/distributed/collectRun.ts#liveRunDir": {
+    "exported": true,
+    "file": "core_engine/src/distributed/collectRun.ts",
+    "jsdoc": "Live heartbeat dir for a run: <collectDir>/<runId>/live.",
+    "kind": "function",
+    "line": 29,
+    "name": "liveRunDir"
   },
   "core_engine/src/distributed/collectRun.ts#readRunId": {
     "exported": false,
     "file": "core_engine/src/distributed/collectRun.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 50,
+    "line": 58,
     "name": "readRunId"
+  },
+  "core_engine/src/distributed/collectRun.ts#runBaseDir": {
+    "exported": true,
+    "file": "core_engine/src/distributed/collectRun.ts",
+    "jsdoc": "Per-run base folder: <collectDir>/<runId>/ (holds live/, shared/, control/, Final_…).",
+    "kind": "function",
+    "line": 21,
+    "name": "runBaseDir"
   },
   "core_engine/src/distributed/collectRun.ts#runCollect": {
     "exported": true,
     "file": "core_engine/src/distributed/collectRun.ts",
     "jsdoc": "CLI handler: `k6-framework collect --from <runDir> --into <collectDir> --machine <name>`.",
     "kind": "function",
-    "line": 60,
+    "line": 68,
     "name": "runCollect"
   },
-  "core_engine/src/distributed/collectRun.ts#sharedRunFolder": {
+  "core_engine/src/distributed/collectRun.ts#sharedRunDir": {
     "exported": true,
     "file": "core_engine/src/distributed/collectRun.ts",
-    "jsdoc": "Folder name for a run's shared collection dir.",
+    "jsdoc": "Shared collect dir for a run: <collectDir>/<runId>/shared.",
     "kind": "function",
-    "line": 21,
-    "name": "sharedRunFolder"
+    "line": 25,
+    "name": "sharedRunDir"
   },
   "core_engine/src/distributed/control.ts#ControlAction": {
     "exported": true,
@@ -2300,7 +2324,7 @@
     "file": "core_engine/src/distributed/control.ts",
     "jsdoc": "Polls the control dir; fires onAbort/onStop exactly once.",
     "kind": "class",
-    "line": 88,
+    "line": 111,
     "name": "ControlWatcher"
   },
   "core_engine/src/distributed/control.ts#ControlWatcherOptions": {
@@ -2308,23 +2332,31 @@
     "file": "core_engine/src/distributed/control.ts",
     "jsdoc": "",
     "kind": "interface",
-    "line": 80,
+    "line": 103,
     "name": "ControlWatcherOptions"
   },
   "core_engine/src/distributed/control.ts#controlDirFor": {
     "exported": true,
     "file": "core_engine/src/distributed/control.ts",
-    "jsdoc": "`<collectDir>/control_<runId>`.",
+    "jsdoc": "`<collectDir>/<runId>/control`.",
     "kind": "function",
     "line": 29,
     "name": "controlDirFor"
+  },
+  "core_engine/src/distributed/control.ts#fetchK6Vus": {
+    "exported": true,
+    "file": "core_engine/src/distributed/control.ts",
+    "jsdoc": "Read the CURRENT active VU count from k6's local REST API (/v1/status). Null if unreachable.",
+    "kind": "function",
+    "line": 64,
+    "name": "fetchK6Vus"
   },
   "core_engine/src/distributed/control.ts#k6ApiStop": {
     "exported": true,
     "file": "core_engine/src/distributed/control.ts",
     "jsdoc": "Graceful stop via k6's local REST API. Resolves true on 2xx/3xx. Never throws.",
     "kind": "function",
-    "line": 64,
+    "line": 87,
     "name": "k6ApiStop"
   },
   "core_engine/src/distributed/control.ts#killProcessTree": {
@@ -2356,15 +2388,15 @@
     "file": "core_engine/src/distributed/liveAggregate.ts",
     "jsdoc": "",
     "kind": "const",
-    "line": 15,
+    "line": 31,
     "name": "DEFAULT_STATS"
   },
   "core_engine/src/distributed/liveAggregate.ts#LiveAggregate": {
     "exported": true,
     "file": "core_engine/src/distributed/liveAggregate.ts",
-    "jsdoc": "",
+    "jsdoc": "Combined errors/warnings across machines: totals + recent messages (machine-tagged).",
     "kind": "interface",
-    "line": 17,
+    "line": 33,
     "name": "LiveAggregate"
   },
   "core_engine/src/distributed/liveAggregate.ts#MergedTxn": {
@@ -2372,7 +2404,7 @@
     "file": "core_engine/src/distributed/liveAggregate.ts",
     "jsdoc": "",
     "kind": "interface",
-    "line": 102,
+    "line": 127,
     "name": "MergedTxn"
   },
   "core_engine/src/distributed/liveAggregate.ts#RunContext": {
@@ -2380,7 +2412,7 @@
     "file": "core_engine/src/distributed/liveAggregate.ts",
     "jsdoc": "",
     "kind": "interface",
-    "line": 33,
+    "line": 58,
     "name": "RunContext"
   },
   "core_engine/src/distributed/liveAggregate.ts#aggregate": {
@@ -2388,15 +2420,39 @@
     "file": "core_engine/src/distributed/liveAggregate.ts",
     "jsdoc": "Merge all heartbeats in `dir` into one combined live view.",
     "kind": "function",
-    "line": 120,
+    "line": 145,
     "name": "aggregate"
+  },
+  "core_engine/src/distributed/liveAggregate.ts#controllerHost": {
+    "exported": true,
+    "file": "core_engine/src/distributed/liveAggregate.ts",
+    "jsdoc": "",
+    "kind": "function",
+    "line": 29,
+    "name": "controllerHost"
+  },
+  "core_engine/src/distributed/liveAggregate.ts#ctrlHost": {
+    "exported": false,
+    "file": "core_engine/src/distributed/liveAggregate.ts",
+    "jsdoc": "",
+    "kind": "const",
+    "line": 18,
+    "name": "ctrlHost"
+  },
+  "core_engine/src/distributed/liveAggregate.ts#ctrlTimer": {
+    "exported": false,
+    "file": "core_engine/src/distributed/liveAggregate.ts",
+    "jsdoc": "",
+    "kind": "const",
+    "line": 19,
+    "name": "ctrlTimer"
   },
   "core_engine/src/distributed/liveAggregate.ts#findLatestFinalReport": {
     "exported": true,
     "file": "core_engine/src/distributed/liveAggregate.ts",
     "jsdoc": "The newest Final_… report under a shared dir, or null.",
     "kind": "function",
-    "line": 51,
+    "line": 76,
     "name": "findLatestFinalReport"
   },
   "core_engine/src/distributed/liveAggregate.ts#mergeTransactions": {
@@ -2404,7 +2460,7 @@
     "file": "core_engine/src/distributed/liveAggregate.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 104,
+    "line": 129,
     "name": "mergeTransactions"
   },
   "core_engine/src/distributed/liveAggregate.ts#readSnapshots": {
@@ -2412,7 +2468,7 @@
     "file": "core_engine/src/distributed/liveAggregate.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 62,
+    "line": 87,
     "name": "readSnapshots"
   },
   "core_engine/src/distributed/liveAggregate.ts#resolveLiveDir": {
@@ -2420,23 +2476,31 @@
     "file": "core_engine/src/distributed/liveAggregate.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 27,
+    "line": 52,
     "name": "resolveLiveDir"
   },
   "core_engine/src/distributed/liveAggregate.ts#resolveRunContext": {
     "exported": true,
     "file": "core_engine/src/distributed/liveAggregate.ts",
-    "jsdoc": "Resolve both the live_<runId> and shared_<runId> dirs (+ runId) for a monitor/auto-merge.",
+    "jsdoc": "Resolve the live/shared dirs (+ runId) under <collectDir>/<runId>/ for a monitor/auto-merge.",
     "kind": "function",
-    "line": 36,
+    "line": 61,
     "name": "resolveRunContext"
+  },
+  "core_engine/src/distributed/liveAggregate.ts#startControllerHostSampling": {
+    "exported": true,
+    "file": "core_engine/src/distributed/liveAggregate.ts",
+    "jsdoc": "",
+    "kind": "function",
+    "line": 20,
+    "name": "startControllerHostSampling"
   },
   "core_engine/src/distributed/liveAggregate.ts#statToFraction": {
     "exported": false,
     "file": "core_engine/src/distributed/liveAggregate.ts",
     "jsdoc": "Parse a stat label into a percentile fraction in [0,1], or null if not a percentile.",
     "kind": "function",
-    "line": 76,
+    "line": 101,
     "name": "statToFraction"
   },
   "core_engine/src/distributed/liveAggregate.ts#statValue": {
@@ -2444,7 +2508,7 @@
     "file": "core_engine/src/distributed/liveAggregate.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 84,
+    "line": 109,
     "name": "statValue"
   },
   "core_engine/src/distributed/liveAggregate.ts#timingStats": {
@@ -2452,7 +2516,7 @@
     "file": "core_engine/src/distributed/liveAggregate.ts",
     "jsdoc": "Keep only stats a response-time histogram can produce (drop count/pass/fail/std/etc).",
     "kind": "function",
-    "line": 94,
+    "line": 119,
     "name": "timingStats"
   },
   "core_engine/src/distributed/liveDashboard.ts#DashboardOptions": {
@@ -2476,7 +2540,7 @@
     "file": "core_engine/src/distributed/liveDashboard.ts",
     "jsdoc": "CLI handler for `k6-framework monitor --serve`. Keeps running until interrupted.",
     "kind": "function",
-    "line": 194,
+    "line": 244,
     "name": "runDashboardCli"
   },
   "core_engine/src/distributed/liveDashboard.ts#startDashboardServer": {
@@ -2484,7 +2548,7 @@
     "file": "core_engine/src/distributed/liveDashboard.ts",
     "jsdoc": "Start the live dashboard HTTP server. Resolves once listening.",
     "kind": "function",
-    "line": 127,
+    "line": 176,
     "name": "startDashboardServer"
   },
   "core_engine/src/distributed/monitor.ts#MonitorOptions": {
@@ -2524,7 +2588,7 @@
     "file": "core_engine/src/distributed/monitor.ts",
     "jsdoc": "CLI handler for `k6-framework monitor` (console). Auto-merges when all machines finish.",
     "kind": "function",
-    "line": 73,
+    "line": 76,
     "name": "runMonitor"
   },
   "core_engine/src/distributed/probe.ts#ProbeResult": {
@@ -2612,7 +2676,7 @@
     "file": "core_engine/src/distributed/runMerge.ts",
     "jsdoc": "Wait until every machine in `machines` has landed (run-manifest.json), then merge.",
     "kind": "interface",
-    "line": 51,
+    "line": 73,
     "name": "MergeCliOptions"
   },
   "core_engine/src/distributed/runMerge.ts#finalTimestamp": {
@@ -2628,7 +2692,7 @@
     "file": "core_engine/src/distributed/runMerge.ts",
     "jsdoc": "A machine folder is \"landed\" once its run-manifest.json (written last) is present.",
     "kind": "function",
-    "line": 64,
+    "line": 86,
     "name": "machineLanded"
   },
   "core_engine/src/distributed/runMerge.ts#readJson": {
@@ -2636,7 +2700,7 @@
     "file": "core_engine/src/distributed/runMerge.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 31,
+    "line": 53,
     "name": "readJson"
   },
   "core_engine/src/distributed/runMerge.ts#readNdjson": {
@@ -2644,7 +2708,7 @@
     "file": "core_engine/src/distributed/runMerge.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 41,
+    "line": 63,
     "name": "readNdjson"
   },
   "core_engine/src/distributed/runMerge.ts#runMerge": {
@@ -2652,7 +2716,7 @@
     "file": "core_engine/src/distributed/runMerge.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 82,
+    "line": 104,
     "name": "runMerge"
   },
   "core_engine/src/distributed/runMerge.ts#sleep": {
@@ -2660,7 +2724,7 @@
     "file": "core_engine/src/distributed/runMerge.ts",
     "jsdoc": "",
     "kind": "const",
-    "line": 61,
+    "line": 83,
     "name": "sleep"
   },
   "core_engine/src/distributed/runMerge.ts#validateManifests": {
@@ -2668,7 +2732,7 @@
     "file": "core_engine/src/distributed/runMerge.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 204,
+    "line": 236,
     "name": "validateManifests"
   },
   "core_engine/src/distributed/runMerge.ts#waitForMachines": {
@@ -2676,8 +2740,16 @@
     "file": "core_engine/src/distributed/runMerge.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 68,
+    "line": 90,
     "name": "waitForMachines"
+  },
+  "core_engine/src/distributed/runMerge.ts#writeMergedCsv": {
+    "exported": false,
+    "file": "core_engine/src/distributed/runMerge.ts",
+    "jsdoc": "Concatenate the per-machine CSVs (whose names end with `suffix`, e.g. `_request_metric.csv`) into one merged CSV — header once, all data rows. The rows already carry a hostName column so each machine stays identifiable. Returns row count.",
+    "kind": "function",
+    "line": 36,
+    "name": "writeMergedCsv"
   },
   "core_engine/src/distributed/shareSetup.ts#ShareSuggestionOptions": {
     "exported": true,

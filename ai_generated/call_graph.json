@@ -362,6 +362,10 @@
     },
     {
       "from": "core_engine/src/distributed/liveAggregate.ts",
+      "to": "core_engine/src/execution/HostMonitor.ts"
+    },
+    {
+      "from": "core_engine/src/distributed/liveAggregate.ts",
       "to": "core_engine/src/reporting/Histogram.ts"
     },
     {
@@ -382,7 +386,15 @@
     },
     {
       "from": "core_engine/src/distributed/LiveStatusHeartbeat.ts",
+      "to": "core_engine/src/distributed/control.ts"
+    },
+    {
+      "from": "core_engine/src/distributed/LiveStatusHeartbeat.ts",
       "to": "core_engine/src/distributed/transactionCsv.ts"
+    },
+    {
+      "from": "core_engine/src/distributed/LiveStatusHeartbeat.ts",
+      "to": "core_engine/src/execution/HostMonitor.ts"
     },
     {
       "from": "core_engine/src/distributed/LiveStatusHeartbeat.ts",

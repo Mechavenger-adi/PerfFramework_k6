@@ -848,7 +848,7 @@ program
           if (collectDir) {
             liveHeartbeat = new LiveStatusHeartbeat({
               machine: hostName, runId, testId, csvPath: transactionLogPath,
-              liveDir: path.join(path.resolve(collectDir), `live_${runId}`),
+              liveDir: path.join(path.resolve(collectDir), runId, 'live'),
               stats: resolvedConfig.runtime.reporting.transactionStats,
             });
             liveHeartbeat.start();

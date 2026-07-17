@@ -91,7 +91,7 @@ With `.env` filled in, the command is small:
 npm run cli -- run --plan config/test_plans/load_test.json
 ```
 Each LG waits until `START_AT`, runs, streams a live heartbeat to the share, and copies its results to
-`\\CTRL01\k6results\shared_run_1430\<machine>\` when done.
+`\\CTRL01\k6results\run_1430\shared\<machine>\` when done.
 
 ### Step 5 — finalize: **automatic**
 When the **last** LG finishes and its results land, the controller's `monitor` (from Step 3)
@@ -100,12 +100,12 @@ prints the path. Nothing to run.
 
 > Turn it off with `--no-auto-merge` and run the merge yourself instead:
 > ```
-> npm run cli -- merge --wait --machines lg-a,lg-b --run-dir \\CTRL01\k6results\shared_run_1430
+> npm run cli -- merge --wait --machines lg-a,lg-b --run-dir \\CTRL01\k6results\run_1430\shared
 > ```
 
 ### Step 6 — open the report
 ```
-\\CTRL01\k6results\shared_run_1430\Final_<testname>_<timestamp>\RunReport.html
+\\CTRL01\k6results\run_1430\Final_<testname>_<timestamp>\RunReport.html
 ```
 This is the **exact**, merged report — the one you make decisions from.
 
@@ -126,7 +126,7 @@ npm run cli -- signal  --collect-dir \\CTRL01\k6results --run-id run_1430 --mode
 ```
 Manual merge (only with `monitor --no-auto-merge`):
 ```
-npm run cli -- merge --wait --machines lg-a,lg-b --run-dir \\CTRL01\k6results\shared_run_1430
+npm run cli -- merge --wait --machines lg-a,lg-b --run-dir \\CTRL01\k6results\run_1430\shared
 ```
 
 **Don't want to use `.env`?** Put the values on the command line instead (PowerShell):
@@ -181,7 +181,7 @@ npm run cli -- run --plan config/test_plans/load_test.json --distributed --role 
 - **LG can't reach the share** → verify SMB from that LG: `npm run cli -- probe --tcp CTRL01:445`.
   On the share host, allow **File and Printer Sharing** inbound.
 - **`merge` says "no per-machine artifact folders"** → the LGs haven't collected yet, or `--run-dir` is
-  wrong. It should be `<share>\shared_<runId>`.
+  wrong. It should be `<share>\<runId>\shared`.
 - **`merge --wait` never finishes** → an LG in `--machines` never landed (crashed / wrong `COLLECT_DIR`).
   It times out after `--wait-timeout` (default 600s).
 - **Graceful stop didn't stop k6** → the k6 REST API wasn't reachable; distributed runs enable it via
