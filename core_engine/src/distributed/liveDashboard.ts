@@ -70,6 +70,8 @@ function page(intervalMs: number): string {
   .ev{ font-size:12px; padding:5px 9px; border-radius:6px; border:1px solid var(--line); background:var(--card); white-space:pre-wrap; }
   .ev.err{ border-left:3px solid var(--abort); } .ev.warn{ border-left:3px solid var(--stop); } .ev.none{ color:var(--dim); }
   .ev b{ color:var(--dim); font-weight:600; margin-right:6px; }
+  .filter{ padding:6px 10px; margin-bottom:6px; border:1px solid var(--line); border-radius:7px; background:var(--card); color:var(--fg); font:inherit; font-size:13px; width:260px; max-width:100%; }
+  thead th:hover{ color:var(--fg); }
 </style></head><body>
 <header>
   <h1>k6 · distributed live monitor</h1>
@@ -90,7 +92,9 @@ function page(intervalMs: number): string {
   </div>
   <h2>Fleet</h2><div class="scroll"><table id="fleet"></table></div>
   <h2>Host resources</h2><div class="scroll"><table id="resources"></table></div>
-  <h2>Combined transactions</h2><div class="scroll"><table id="txns"></table></div>
+  <h2>Combined transactions</h2>
+  <input id="txnFilter" class="filter" placeholder="filter by transaction…" oninput="txnFilter=this.value.toLowerCase(); renderTxns();">
+  <div class="scroll"><table id="txns"></table></div>
   <h2>Errors &amp; warnings</h2><div id="events" class="events"></div>
   <div class="note">Percentiles are histogram-based (≤0.1%); the bit-exact numbers are in the final report. Counts, throughput, min, max and avg are exact.</div>
 </main>
@@ -107,6 +111,28 @@ const n0 = x => (x==null?'-':Number(x).toFixed(0));
 const n1 = x => (x==null?'-':Number(x).toFixed(1));
 function kpi(l,v){ return '<div class="kpi"><div class="v">'+v+'</div><div class="l">'+l+'</div></div>'; }
 const hist=[]; const MAXPTS=600; let frozen=false;
+let lastTxns=[], lastStats=[], txnSort='count', txnDir=-1, txnFilter='';
+function setSort(k){ if(txnSort===k) txnDir=-txnDir; else { txnSort=k; txnDir=(k==='name')?1:-1; } renderTxns(); }
+function renderTxns(){
+  const el=document.getElementById('txns'); if(!el) return;
+  let rows=lastTxns.filter(r=>!txnFilter || String(r.name).toLowerCase().indexOf(txnFilter)>=0);
+  rows=rows.slice().sort((a,b)=>{
+    let av,bv;
+    if(txnSort==='name'){av=String(a.name);bv=String(b.name);return txnDir*av.localeCompare(bv);}
+    else if(txnSort==='count'){av=a.count;bv=b.count;}
+    else if(txnSort==='errPct'){av=a.errPct;bv=b.errPct;}
+    else {const st=txnSort.slice(5); av=a.values[st]||0; bv=b.values[st]||0;}
+    return txnDir*(av-bv);
+  });
+  const arrow=k=> txnSort===k?(txnDir<0?' ▼':' ▲'):'';
+  const th=(k,label)=>'<th onclick="setSort(\''+k+'\')" style="cursor:pointer">'+label+arrow(k)+'</th>';
+  let t='<thead><tr>'+th('name','Transaction')+th('count','Count')+th('errPct','Err%');
+  for(const st of lastStats) t+=th('stat:'+st, esc(st));
+  t+='</tr></thead><tbody>';
+  for(const r of rows){ t+='<tr><td>'+esc(r.name)+'</td><td>'+r.count+'</td><td>'+n1(r.errPct)+'</td>'; for(const st of lastStats) t+='<td>'+n0(r.values[st])+'</td>'; t+='</tr>'; }
+  t+='</tbody>';
+  el.innerHTML=t;
+}
 function drawChart(){
   const svg=document.getElementById('chart'); if(!svg) return;
   const W=1000,H=300,mL=46,mR=46,mT=14,mB=26, pw=W-mL-mR, ph=H-mT-mB, axis='#8a93a6';
@@ -155,13 +181,8 @@ async function tick(){
   if(d.controller){ r+='<tr><td>controller (this)</td><td>'+n1(d.controller.cpu)+'</td><td>'+n1(d.controller.mem)+'</td></tr>'; }
   r+='</tbody>';
   document.getElementById('resources').innerHTML=r;
-  // transactions
-  let t='<thead><tr><th>Transaction</th><th>Count</th><th>Err%</th>';
-  for(const st of d.stats) t+='<th>'+esc(st)+'</th>';
-  t+='</tr></thead><tbody>';
-  for(const r of d.transactions){ t+='<tr><td>'+esc(r.name)+'</td><td>'+r.count+'</td><td>'+n1(r.errPct)+'</td>'; for(const st of d.stats) t+='<td>'+n0(r.values[st])+'</td>'; t+='</tr>'; }
-  t+='</tbody>';
-  document.getElementById('txns').innerHTML=t;
+  // transactions (sortable + filterable; state persists across ticks)
+  lastTxns=d.transactions||[]; lastStats=d.stats||[]; renderTxns();
   // errors & warnings (combined, machine-tagged)
   const evRows=(arr,cls)=>arr.map(e=>'<div class="ev '+cls+'"><b>'+esc(e.machine)+'</b>'+esc(e.msg)+'</div>').join('');
   let evHtml=evRows(ev.recentErrors||[],'err')+evRows(ev.recentWarnings||[],'warn');
