@@ -36,6 +36,8 @@ export interface MergedReportInput {
   transactionStats?: string[];
   /** Pooled checks-first request failure per counter bucket (key = bucketStartMs). */
   requestFailBuckets?: Map<number, { total: number; failed: number }>;
+  /** Top-N slowest requests (by p90), pooled across machines. */
+  topRequests?: Array<Record<string, unknown>>;
 }
 
 /** Percentiles to emit per bucket: fixed p90 ∪ every percentile in the configured stats. */
@@ -230,7 +232,7 @@ export class MergedReportBuilder {
         runtimeSnapshot: {},
         thresholds: [],
         totals: timeseries.totals,
-        topRequests: [],
+        topRequests: input.topRequests ?? [],
         compliancePercentiles: [],
         // Provenance: this is a merged, multi-machine report.
         distributed: { machines: merge.machines, warnings: merge.warnings },

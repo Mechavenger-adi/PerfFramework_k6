@@ -15,7 +15,8 @@ import { ArtifactWriter } from '../reporting/ArtifactWriter';
 import { RunReportGenerator } from '../reporting/RunReportGenerator';
 import { MergeEngine, MachineArtifacts } from './MergeEngine';
 import { MergedReportBuilder, MachineTimeseries } from './MergedReportBuilder';
-import { readTransactionCsvRaw, findTransactionCsv, findRequestCsv, readRequestFailByBucket } from './transactionCsv';
+import { readTransactionCsvRaw, findTransactionCsv, findRequestCsv, readRequestFailByBucket, readRequestTimings } from './transactionCsv';
+import { percentileR7 } from '../reporting/Histogram';
 import { CiSummary, TimeSeriesFile, TransactionMetricsFile } from '../types/ReportingContracts';
 import { HistogramArtifact } from '../reporting/HistogramArtifactBuilder';
 
@@ -183,10 +184,26 @@ export async function runMerge(options: MergeCliOptions): Promise<boolean> {
   // Pool checks-first request failure (isError) across machines, bucketed → the
   // request-failure-over-time series (correct Σfailed/Σtotal, not summed percentages).
   const requestFailBuckets = new Map<number, { total: number; failed: number }>();
+  const reqTimings = new Map<string, import('./transactionCsv').RequestTiming>();
   for (const dir of machineDirs) {
     const rc = findRequestCsv(dir);
-    if (rc) readRequestFailByBucket(rc, counterBucketSeconds, requestFailBuckets);
+    if (rc) { readRequestFailByBucket(rc, counterBucketSeconds, requestFailBuckets); readRequestTimings(rc, reqTimings); }
   }
+  // Top-5 slowest requests (by p90), pooled across machines.
+  const topRequests = [...reqTimings.entries()]
+    .map(([name, e]) => {
+      const sorted = e.times.slice().sort((a, b) => a - b);
+      const count = sorted.length;
+      return {
+        name, method: e.method, transaction: e.transaction, count,
+        avg: count ? sorted.reduce((s, v) => s + v, 0) / count : 0,
+        min: count ? sorted[0] : 0,
+        max: count ? sorted[count - 1] : 0,
+        p90: count ? percentileR7(sorted, 0.9, true) : 0,
+      };
+    })
+    .sort((a, b) => b.p90 - a.p90)
+    .slice(0, 5);
   const { bundle, timeseries } = MergedReportBuilder.build({
     merge,
     machines: machineTimeseries,
@@ -194,6 +211,7 @@ export async function runMerge(options: MergeCliOptions): Promise<boolean> {
     counterBucketSeconds,
     transactionStats: merge.transactionMetrics.stats,
     requestFailBuckets,
+    topRequests,
   });
 
   // ── Write merged artifacts to Final_<testname>_<ts>/ (EDD §End) ──

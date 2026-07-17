@@ -170,6 +170,38 @@ export function readRequestFailByBucket(file: string, bucketSec: number, into?: 
   return out;
 }
 
+export interface RequestTiming { transaction: string; method: string; times: number[]; }
+
+/** Per-request-name response times (ms) + method/transaction, accumulated across files. */
+export function readRequestTimings(file: string, acc = new Map<string, RequestTiming>()): Map<string, RequestTiming> {
+  try {
+    if (!fs.existsSync(file)) return acc;
+    const lines = fs.readFileSync(file, 'utf-8').split(/\r?\n/).filter((l) => l.trim().length > 0);
+    if (lines.length < 2) return acc;
+    const h = parseCsvLine(lines[0]);
+    const nameIdx = h.indexOf('Request Name');
+    const txnIdx = h.indexOf('Transaction');
+    const rtIdx = h.indexOf('responsetime');
+    const tagIdx = h.indexOf('tags');
+    if (nameIdx === -1 || rtIdx === -1) return acc;
+    for (let i = 1; i < lines.length; i++) {
+      const c = parseCsvLine(lines[i]);
+      const name = c[nameIdx];
+      const rt = parseFloat(c[rtIdx]);
+      if (!name || !Number.isFinite(rt)) continue;
+      let e = acc.get(name);
+      if (!e) {
+        let method = '';
+        try { method = (JSON.parse(c[tagIdx] || '{}') as { method?: string }).method ?? ''; } catch { /* ignore */ }
+        e = { transaction: txnIdx !== -1 ? (c[txnIdx] || '') : '', method, times: [] };
+        acc.set(name, e);
+      }
+      e.times.push(rt * 1000);
+    }
+  } catch { /* ignore */ }
+  return acc;
+}
+
 /** Find the transaction CSV inside a collected machine folder, if present. */
 export function findTransactionCsv(dir: string): string | null {
   try {
