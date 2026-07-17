@@ -34,6 +34,8 @@ export interface MergedReportInput {
   /** Counter bucket seconds (default 2, from runtime settings). */
   counterBucketSeconds?: number;
   transactionStats?: string[];
+  /** Pooled checks-first request failure per counter bucket (key = bucketStartMs). */
+  requestFailBuckets?: Map<number, { total: number; failed: number }>;
 }
 
 /** Percentiles to emit per bucket: fixed p90 ∪ every percentile in the configured stats. */
@@ -53,7 +55,7 @@ export class MergedReportBuilder {
     const counterBucket = input.counterBucketSeconds ?? 2;
     const tsFiles = input.machines.map((m) => m.timeseries).filter((t): t is TimeSeriesFile => !!t);
 
-    const timeseries = this.mergeTimeseries(tsFiles, input.merge.histogram, counterBucket, input.transactionStats ?? input.merge.transactionMetrics.stats ?? []);
+    const timeseries = this.mergeTimeseries(tsFiles, input.merge.histogram, counterBucket, input.transactionStats ?? input.merge.transactionMetrics.stats ?? [], input.requestFailBuckets);
     const bundle = this.assembleBundle(input, timeseries);
     return { bundle, timeseries };
   }
@@ -63,6 +65,7 @@ export class MergedReportBuilder {
     mergedHist: HistogramArtifact | null,
     counterBucket: number,
     stats: string[],
+    requestFailBuckets?: Map<number, { total: number; failed: number }>,
   ): TimeSeriesFile {
     // Fixed base (min/avg/max/std) + every configured percentile → over-time graph lines.
     const pcts = percentilesFrom(stats);
@@ -131,7 +134,16 @@ export class MergedReportBuilder {
       const requests = num(acc, 'requests');
       const w = (acc as Record<string, number>)._durW || 0;
       acc.requestRate = counterBucket > 0 ? requests / counterBucket : 0;
-      acc.httpFailedRate = requests > 0 ? num(acc, 'httpFailedCount') / requests : 0;
+      // Prefer checks-first request failure (pooled request CSVs, Σfailed/Σtotal) for
+      // this bucket; fall back to k6's status-based http_req_failed when unavailable.
+      const bucketMs = Math.floor(Date.parse(ts) / (counterBucket * 1000)) * (counterBucket * 1000);
+      const rf = requestFailBuckets?.get(bucketMs);
+      if (rf && rf.total > 0) {
+        acc.httpFailedRate = rf.failed / rf.total;
+        acc.httpFailedCount = rf.failed;
+      } else {
+        acc.httpFailedRate = requests > 0 ? num(acc, 'httpFailedCount') / requests : 0;
+      }
       acc.httpDurationAvg = w > 0 ? (acc as Record<string, number>)._durAvgW / w : 0;
       if (acc.httpDurationMin === Infinity) acc.httpDurationMin = 0;
       if (acc.httpDurationMax === -Infinity) acc.httpDurationMax = 0;

@@ -83,10 +83,10 @@ function page(intervalMs: number): string {
 <div id="mergebar" class="mergebar" style="display:none"></div>
 <main>
   <div class="cards" id="kpis"></div>
-  <h2>VUs &amp; failure rate — over time</h2>
+  <h2>Active VUs &amp; request failure — over time</h2>
   <div class="chartwrap">
     <svg id="chart" class="chart" viewBox="0 0 1000 300" preserveAspectRatio="xMidYMid meet"></svg>
-    <div class="legend"><span><i style="background:#38bdf8"></i>Active VUs</span><span><i style="background:#f87171"></i>Failure %</span></div>
+    <div class="legend"><span><i style="background:#38bdf8"></i>Active VUs</span><span><i style="background:#f87171"></i>Request failure %</span></div>
   </div>
   <h2>Fleet</h2><div class="scroll"><table id="fleet"></table></div>
   <h2>Host resources</h2><div class="scroll"><table id="resources"></table></div>
@@ -140,9 +140,9 @@ async function tick(){
   document.getElementById('meta').textContent = d.machineCount+' machine(s) · updated '+new Date(d.updatedAt).toLocaleTimeString();
   const ev=d.events||{errorCount:0,warnCount:0,recentErrors:[],recentWarnings:[]};
   document.getElementById('kpis').innerHTML =
-    kpi('Active VUs',d.totals.vus)+kpi('Transactions',d.totals.txns)+kpi('Throughput/s',n1(d.totals.tps))+kpi('Error %',n1(d.totals.errorRate))+kpi('Errors',ev.errorCount)+kpi('Warnings',ev.warnCount);
+    kpi('Active VUs',d.totals.vus)+kpi('Transactions',d.totals.txns)+kpi('Throughput/s',n1(d.totals.tps))+kpi('Req fail %',n1(d.totals.reqFailRate))+kpi('Errors',ev.errorCount)+kpi('Warnings',ev.warnCount);
   // VUs + failure-rate over time (freeze once all machines finish)
-  if(!frozen){ hist.push({t:Date.now(), vus:Number(d.totals.vus)||0, err:Number(d.totals.errorRate)||0}); if(hist.length>MAXPTS) hist.shift(); if(d.allDone) frozen=true; }
+  if(!frozen){ hist.push({t:Date.now(), vus:Number(d.totals.vus)||0, err:Number(d.totals.reqFailRate)||0}); if(hist.length>MAXPTS) hist.shift(); if(d.allDone) frozen=true; }
   drawChart();
   // fleet
   let f='<thead><tr><th>Machine</th><th>State</th><th>Elapsed</th><th>Active VUs</th><th>Txns</th><th>Err%</th><th>TPS</th></tr></thead><tbody>';

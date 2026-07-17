@@ -15,7 +15,7 @@ import { ArtifactWriter } from '../reporting/ArtifactWriter';
 import { RunReportGenerator } from '../reporting/RunReportGenerator';
 import { MergeEngine, MachineArtifacts } from './MergeEngine';
 import { MergedReportBuilder, MachineTimeseries } from './MergedReportBuilder';
-import { readTransactionCsvRaw, findTransactionCsv } from './transactionCsv';
+import { readTransactionCsvRaw, findTransactionCsv, findRequestCsv, readRequestFailByBucket } from './transactionCsv';
 import { CiSummary, TimeSeriesFile, TransactionMetricsFile } from '../types/ReportingContracts';
 import { HistogramArtifact } from '../reporting/HistogramArtifactBuilder';
 
@@ -180,12 +180,20 @@ export async function runMerge(options: MergeCliOptions): Promise<boolean> {
 
   const planInfo = manifests.find((m) => m.plan)?.plan ?? {};
   const counterBucketSeconds = machineTimeseries.find((m) => m.timeseries)?.timeseries?.bucketSizeSeconds ?? 2;
+  // Pool checks-first request failure (isError) across machines, bucketed → the
+  // request-failure-over-time series (correct Σfailed/Σtotal, not summed percentages).
+  const requestFailBuckets = new Map<number, { total: number; failed: number }>();
+  for (const dir of machineDirs) {
+    const rc = findRequestCsv(dir);
+    if (rc) readRequestFailByBucket(rc, counterBucketSeconds, requestFailBuckets);
+  }
   const { bundle, timeseries } = MergedReportBuilder.build({
     merge,
     machines: machineTimeseries,
     plan: { name: planInfo.name ?? merge.ciSummary.plan ?? 'Distributed Run', environment: planInfo.environment ?? merge.ciSummary.environment ?? '', executionMode: planInfo.executionMode },
     counterBucketSeconds,
     transactionStats: merge.transactionMetrics.stats,
+    requestFailBuckets,
   });
 
   // ── Write merged artifacts to Final_<testname>_<ts>/ (EDD §End) ──

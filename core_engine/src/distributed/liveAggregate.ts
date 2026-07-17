@@ -36,7 +36,7 @@ export interface LiveAggregate {
   machineCount: number;
   stats: string[];
   fleet: Array<{ machine: string; state: string; elapsedSec: number; vus: number; txns: number; errorRate: number; tps: number; cpu: number; mem: number }>;
-  totals: { vus: number; txns: number; errorRate: number; tps: number };
+  totals: { vus: number; txns: number; errorRate: number; tps: number; reqTotal: number; reqFailed: number; reqFailRate: number };
   transactions: Array<{ name: string; count: number; fail: number; errPct: number; values: Record<string, number> }>;
   /** Combined errors/warnings across machines: totals + recent messages (machine-tagged). */
   events: {
@@ -153,11 +153,13 @@ export function aggregate(dir: string): LiveAggregate {
   }));
 
   let vus = 0; let txns = 0; let fail = 0; let tps = 0;
+  let reqTotal = 0; let reqFailed = 0;
   let errorCount = 0; let warnCount = 0;
   const recentErrors: Array<{ machine: string; msg: string }> = [];
   const recentWarnings: Array<{ machine: string; msg: string }> = [];
   for (const s of snaps) {
     vus += s.currentVus; txns += s.transactionsTotal; fail += s.failTotal; tps += s.throughputTps;
+    reqTotal += s.reqTotal ?? 0; reqFailed += s.reqFailed ?? 0;
     errorCount += s.errorCount ?? 0;
     warnCount += s.warnCount ?? 0;
     for (const m of s.recentErrors ?? []) recentErrors.push({ machine: s.machine, msg: m });
@@ -176,7 +178,7 @@ export function aggregate(dir: string): LiveAggregate {
     machineCount: snaps.length,
     stats,
     fleet,
-    totals: { vus, txns, errorRate: txns ? (fail / txns) * 100 : 0, tps },
+    totals: { vus, txns, errorRate: txns ? (fail / txns) * 100 : 0, tps, reqTotal, reqFailed, reqFailRate: reqTotal ? (reqFailed / reqTotal) * 100 : 0 },
     transactions,
     events: { errorCount, warnCount, recentErrors: recentErrors.slice(-8), recentWarnings: recentWarnings.slice(-8) },
   };

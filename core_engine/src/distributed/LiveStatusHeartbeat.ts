@@ -14,7 +14,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { Logger } from '../utils/logger';
 import { RelativeHistogram, HistogramJSON } from '../reporting/Histogram';
-import { readTransactionCsvStats } from './transactionCsv';
+import { readTransactionCsvStats, findRequestCsv, readRequestFailure } from './transactionCsv';
 import { fetchK6Vus } from './control';
 import { HostMonitor } from '../execution/HostMonitor';
 
@@ -47,6 +47,9 @@ export interface LiveStatusSnapshot {
   transactionsTotal: number;
   failTotal: number;
   errorRate: number;
+  /** Request-level totals (from the request CSV isError) — for the request-failure graph. */
+  reqTotal: number;
+  reqFailed: number;
   /** Windowed (current) transaction throughput, txn/s. */
   throughputTps: number;
   /** This machine's host resource utilisation (%). */
@@ -131,6 +134,8 @@ export class LiveStatusHeartbeat {
       const reportDir = path.dirname(this.opts.csvPath);
       const errs = tailNdjson(path.join(reportDir, 'errors.ndjson'), 3);
       const warns = tailNdjson(path.join(reportDir, 'warnings.ndjson'), 3);
+      const reqCsv = findRequestCsv(reportDir);
+      const req = reqCsv ? readRequestFailure(reqCsv) : { total: 0, failed: 0 };
       const now = Date.now();
       const elapsedSec = Math.max(0.001, (now - this.startMs) / 1000);
       const dt = Math.max(0.001, (now - this.prevMs) / 1000);
@@ -160,6 +165,8 @@ export class LiveStatusHeartbeat {
         transactionsTotal: stats.totalCount,
         failTotal: stats.totalFail,
         errorRate: stats.totalCount ? (stats.totalFail / stats.totalCount) * 100 : 0,
+        reqTotal: req.total,
+        reqFailed: req.failed,
         throughputTps,
         host: this.hostCache,
         errorCount: errs.count,

@@ -109,6 +109,67 @@ export function readTransactionCsvStats(file: string): TransactionCsvStats {
   return { perTxn, totalCount, totalFail, lastVus };
 }
 
+/** Find the request CSV inside a folder, if present. */
+export function findRequestCsv(dir: string): string | null {
+  try {
+    const name = fs.readdirSync(dir).find((f) => f.endsWith('_request_metric.csv'));
+    return name ? `${dir}/${name}` : null;
+  } catch { return null; }
+}
+
+/**
+ * Request-level failure from a request CSV: total requests and failed (isError, which
+ * is checks-first then status). This is the authoritative failure source for the
+ * failure graph — combined correctly as Σfailed/Σtotal, never averaged percentages.
+ */
+export function readRequestFailure(file: string): { total: number; failed: number } {
+  const out = { total: 0, failed: 0 };
+  try {
+    if (!fs.existsSync(file)) return out;
+    const lines = fs.readFileSync(file, 'utf-8').split(/\r?\n/).filter((l) => l.trim().length > 0);
+    if (lines.length < 2) return out;
+    const errIdx = parseCsvLine(lines[0]).indexOf('isError');
+    if (errIdx === -1) return out;
+    for (let i = 1; i < lines.length; i++) {
+      const v = (parseCsvLine(lines[i])[errIdx] || '').toLowerCase();
+      out.total++;
+      if (v === 'true' || v === '1') out.failed++;
+    }
+  } catch { /* ignore */ }
+  return out;
+}
+
+/**
+ * Request failure bucketed by wall-clock time (checks-first isError). Key = bucket
+ * start in ms (floor(ts / bucketMs) * bucketMs). Pooled across machines then read as
+ * failed/total per bucket → the request-failure-over-time series.
+ */
+export function readRequestFailByBucket(file: string, bucketSec: number, into?: Map<number, { total: number; failed: number }>): Map<number, { total: number; failed: number }> {
+  const out = into ?? new Map<number, { total: number; failed: number }>();
+  const bucketMs = Math.max(1, bucketSec) * 1000;
+  try {
+    if (!fs.existsSync(file)) return out;
+    const lines = fs.readFileSync(file, 'utf-8').split(/\r?\n/).filter((l) => l.trim().length > 0);
+    if (lines.length < 2) return out;
+    const header = parseCsvLine(lines[0]);
+    const tsIdx = header.indexOf('ts');
+    const errIdx = header.indexOf('isError');
+    if (tsIdx === -1 || errIdx === -1) return out;
+    for (let i = 1; i < lines.length; i++) {
+      const cols = parseCsvLine(lines[i]);
+      const ms = Date.parse(cols[tsIdx]);
+      if (!Number.isFinite(ms)) continue;
+      const key = Math.floor(ms / bucketMs) * bucketMs;
+      const e = out.get(key) ?? { total: 0, failed: 0 };
+      e.total++;
+      const v = (cols[errIdx] || '').toLowerCase();
+      if (v === 'true' || v === '1') e.failed++;
+      out.set(key, e);
+    }
+  } catch { /* ignore */ }
+  return out;
+}
+
 /** Find the transaction CSV inside a collected machine folder, if present. */
 export function findTransactionCsv(dir: string): string | null {
   try {
