@@ -442,6 +442,10 @@
     },
     {
       "from": "core_engine/src/distributed/runMerge.ts",
+      "to": "core_engine/src/reporting/Histogram.ts"
+    },
+    {
+      "from": "core_engine/src/distributed/runMerge.ts",
       "to": "core_engine/src/reporting/RunReportGenerator.ts"
     },
     {

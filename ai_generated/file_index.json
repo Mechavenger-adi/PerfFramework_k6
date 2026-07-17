@@ -781,7 +781,7 @@
     ],
     "importsNode": true,
     "layer": "distributed",
-    "loc": 181,
+    "loc": 190,
     "path": "core_engine/src/distributed/LiveStatusHeartbeat.ts"
   },
   {
@@ -815,7 +815,7 @@
     ],
     "importsNode": false,
     "layer": "distributed",
-    "loc": 235,
+    "loc": 262,
     "path": "core_engine/src/distributed/MergedReportBuilder.ts"
   },
   {
@@ -903,7 +903,7 @@
     ],
     "importsNode": true,
     "layer": "distributed",
-    "loc": 184,
+    "loc": 186,
     "path": "core_engine/src/distributed/liveAggregate.ts"
   },
   {
@@ -922,7 +922,7 @@
     ],
     "importsNode": true,
     "layer": "distributed",
-    "loc": 277,
+    "loc": 298,
     "path": "core_engine/src/distributed/liveDashboard.ts"
   },
   {
@@ -965,6 +965,7 @@
     ],
     "imports": [
       "core_engine/src/reporting/ArtifactWriter.ts",
+      "core_engine/src/reporting/Histogram.ts",
       "core_engine/src/reporting/HistogramArtifactBuilder.ts",
       "core_engine/src/reporting/RunReportGenerator.ts",
       "core_engine/src/types/ReportingContracts.ts",
@@ -977,7 +978,7 @@
     ],
     "importsNode": true,
     "layer": "distributed",
-    "loc": 248,
+    "loc": 275,
     "path": "core_engine/src/distributed/runMerge.ts"
   },
   {
@@ -1010,8 +1011,13 @@
   },
   {
     "exports": [
+      "RequestTiming",
       "TransactionCsvStats",
+      "findRequestCsv",
       "findTransactionCsv",
+      "readRequestFailByBucket",
+      "readRequestFailure",
+      "readRequestTimings",
       "readTransactionCsvRaw",
       "readTransactionCsvStats"
     ],
@@ -1020,7 +1026,7 @@
     ],
     "importsNode": true,
     "layer": "distributed",
-    "loc": 121,
+    "loc": 214,
     "path": "core_engine/src/distributed/transactionCsv.ts"
   },
   {
@@ -1529,7 +1535,7 @@
     ],
     "importsNode": false,
     "layer": "reporting",
-    "loc": 2692,
+    "loc": 2695,
     "path": "core_engine/src/reporting/RunReportGenerator.ts"
   },
   {

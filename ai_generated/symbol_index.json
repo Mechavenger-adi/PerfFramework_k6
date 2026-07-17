@@ -2052,7 +2052,7 @@
     "file": "core_engine/src/distributed/LiveStatusHeartbeat.ts",
     "jsdoc": "The transaction CSV being written live on this machine.",
     "kind": "interface",
-    "line": 68,
+    "line": 73,
     "name": "HeartbeatOptions"
   },
   "core_engine/src/distributed/LiveStatusHeartbeat.ts#LiveState": {
@@ -2068,15 +2068,15 @@
     "file": "core_engine/src/distributed/LiveStatusHeartbeat.ts",
     "jsdoc": "Refresh active VUs (k6 API) + host CPU/mem (best-effort; keep last good values).",
     "kind": "class",
-    "line": 81,
+    "line": 86,
     "name": "LiveStatusHeartbeat"
   },
   "core_engine/src/distributed/LiveStatusHeartbeat.ts#LiveStatusSnapshot": {
     "exported": true,
     "file": "core_engine/src/distributed/LiveStatusHeartbeat.ts",
-    "jsdoc": "Windowed (current) transaction throughput, txn/s.",
+    "jsdoc": "Request-level totals (from the request CSV isError) — for the request-failure graph.",
     "kind": "interface",
-    "line": 38,
+    "line": 40,
     "name": "LiveStatusSnapshot"
   },
   "core_engine/src/distributed/LiveStatusHeartbeat.ts#tailNdjson": {
@@ -2146,9 +2146,9 @@
   "core_engine/src/distributed/MergedReportBuilder.ts#MergedReportBuilder": {
     "exported": true,
     "file": "core_engine/src/distributed/MergedReportBuilder.ts",
-    "jsdoc": "Find the merged-histogram bucket (10s) whose window contains `ts`.",
+    "jsdoc": "Group each machine's host snapshots into a per-agent system series (keyed by machine name).",
     "kind": "class",
-    "line": 51,
+    "line": 55,
     "name": "MergedReportBuilder"
   },
   "core_engine/src/distributed/MergedReportBuilder.ts#MergedReportInput": {
@@ -2164,7 +2164,7 @@
     "file": "core_engine/src/distributed/MergedReportBuilder.ts",
     "jsdoc": "Percentiles to emit per bucket: fixed p90 ∪ every percentile in the configured stats.",
     "kind": "function",
-    "line": 40,
+    "line": 44,
     "name": "percentilesFrom"
   },
   "core_engine/src/distributed/agentServer.ts#AgentServerOptions": {
@@ -2540,7 +2540,7 @@
     "file": "core_engine/src/distributed/liveDashboard.ts",
     "jsdoc": "CLI handler for `k6-framework monitor --serve`. Keeps running until interrupted.",
     "kind": "function",
-    "line": 244,
+    "line": 265,
     "name": "runDashboardCli"
   },
   "core_engine/src/distributed/liveDashboard.ts#startDashboardServer": {
@@ -2548,7 +2548,7 @@
     "file": "core_engine/src/distributed/liveDashboard.ts",
     "jsdoc": "Start the live dashboard HTTP server. Resolves once listening.",
     "kind": "function",
-    "line": 176,
+    "line": 197,
     "name": "startDashboardServer"
   },
   "core_engine/src/distributed/monitor.ts#MonitorOptions": {
@@ -2660,7 +2660,7 @@
     "file": "core_engine/src/distributed/runMerge.ts",
     "jsdoc": "",
     "kind": "const",
-    "line": 23,
+    "line": 24,
     "name": "FINAL_PREFIX"
   },
   "core_engine/src/distributed/runMerge.ts#MERGED_DIR": {
@@ -2668,7 +2668,7 @@
     "file": "core_engine/src/distributed/runMerge.ts",
     "jsdoc": "",
     "kind": "const",
-    "line": 22,
+    "line": 23,
     "name": "MERGED_DIR"
   },
   "core_engine/src/distributed/runMerge.ts#MergeCliOptions": {
@@ -2676,7 +2676,7 @@
     "file": "core_engine/src/distributed/runMerge.ts",
     "jsdoc": "Wait until every machine in `machines` has landed (run-manifest.json), then merge.",
     "kind": "interface",
-    "line": 73,
+    "line": 74,
     "name": "MergeCliOptions"
   },
   "core_engine/src/distributed/runMerge.ts#finalTimestamp": {
@@ -2684,7 +2684,7 @@
     "file": "core_engine/src/distributed/runMerge.ts",
     "jsdoc": "dd_MM_yyyyTHH_mm — Windows-path-safe merged-output folder timestamp.",
     "kind": "function",
-    "line": 26,
+    "line": 27,
     "name": "finalTimestamp"
   },
   "core_engine/src/distributed/runMerge.ts#machineLanded": {
@@ -2692,7 +2692,7 @@
     "file": "core_engine/src/distributed/runMerge.ts",
     "jsdoc": "A machine folder is \"landed\" once its run-manifest.json (written last) is present.",
     "kind": "function",
-    "line": 86,
+    "line": 87,
     "name": "machineLanded"
   },
   "core_engine/src/distributed/runMerge.ts#readJson": {
@@ -2700,7 +2700,7 @@
     "file": "core_engine/src/distributed/runMerge.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 53,
+    "line": 54,
     "name": "readJson"
   },
   "core_engine/src/distributed/runMerge.ts#readNdjson": {
@@ -2708,7 +2708,7 @@
     "file": "core_engine/src/distributed/runMerge.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 63,
+    "line": 64,
     "name": "readNdjson"
   },
   "core_engine/src/distributed/runMerge.ts#runMerge": {
@@ -2716,7 +2716,7 @@
     "file": "core_engine/src/distributed/runMerge.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 104,
+    "line": 105,
     "name": "runMerge"
   },
   "core_engine/src/distributed/runMerge.ts#sleep": {
@@ -2724,7 +2724,7 @@
     "file": "core_engine/src/distributed/runMerge.ts",
     "jsdoc": "",
     "kind": "const",
-    "line": 83,
+    "line": 84,
     "name": "sleep"
   },
   "core_engine/src/distributed/runMerge.ts#validateManifests": {
@@ -2732,7 +2732,7 @@
     "file": "core_engine/src/distributed/runMerge.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 236,
+    "line": 263,
     "name": "validateManifests"
   },
   "core_engine/src/distributed/runMerge.ts#waitForMachines": {
@@ -2740,7 +2740,7 @@
     "file": "core_engine/src/distributed/runMerge.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 90,
+    "line": 91,
     "name": "waitForMachines"
   },
   "core_engine/src/distributed/runMerge.ts#writeMergedCsv": {
@@ -2748,7 +2748,7 @@
     "file": "core_engine/src/distributed/runMerge.ts",
     "jsdoc": "Concatenate the per-machine CSVs (whose names end with `suffix`, e.g. `_request_metric.csv`) into one merged CSV — header once, all data rows. The rows already carry a hostName column so each machine stays identifiable. Returns row count.",
     "kind": "function",
-    "line": 36,
+    "line": 37,
     "name": "writeMergedCsv"
   },
   "core_engine/src/distributed/shareSetup.ts#ShareSuggestionOptions": {
@@ -2783,6 +2783,14 @@
     "line": 15,
     "name": "awaitScheduledStart"
   },
+  "core_engine/src/distributed/transactionCsv.ts#RequestTiming": {
+    "exported": true,
+    "file": "core_engine/src/distributed/transactionCsv.ts",
+    "jsdoc": "",
+    "kind": "interface",
+    "line": 173,
+    "name": "RequestTiming"
+  },
   "core_engine/src/distributed/transactionCsv.ts#TransactionCsvStats": {
     "exported": true,
     "file": "core_engine/src/distributed/transactionCsv.ts",
@@ -2791,12 +2799,20 @@
     "line": 64,
     "name": "TransactionCsvStats"
   },
+  "core_engine/src/distributed/transactionCsv.ts#findRequestCsv": {
+    "exported": true,
+    "file": "core_engine/src/distributed/transactionCsv.ts",
+    "jsdoc": "Find the request CSV inside a folder, if present.",
+    "kind": "function",
+    "line": 113,
+    "name": "findRequestCsv"
+  },
   "core_engine/src/distributed/transactionCsv.ts#findTransactionCsv": {
     "exported": true,
     "file": "core_engine/src/distributed/transactionCsv.ts",
     "jsdoc": "Find the transaction CSV inside a collected machine folder, if present.",
     "kind": "function",
-    "line": 113,
+    "line": 206,
     "name": "findTransactionCsv"
   },
   "core_engine/src/distributed/transactionCsv.ts#parseCsvLine": {
@@ -2806,6 +2822,30 @@
     "kind": "function",
     "line": 14,
     "name": "parseCsvLine"
+  },
+  "core_engine/src/distributed/transactionCsv.ts#readRequestFailByBucket": {
+    "exported": true,
+    "file": "core_engine/src/distributed/transactionCsv.ts",
+    "jsdoc": "Request failure bucketed by wall-clock time (checks-first isError). Key = bucket start in ms (floor(ts / bucketMs) * bucketMs). Pooled across machines then read as failed/total per bucket → the request-failure-over-time series.",
+    "kind": "function",
+    "line": 147,
+    "name": "readRequestFailByBucket"
+  },
+  "core_engine/src/distributed/transactionCsv.ts#readRequestFailure": {
+    "exported": true,
+    "file": "core_engine/src/distributed/transactionCsv.ts",
+    "jsdoc": "Request-level failure from a request CSV: total requests and failed (isError, which is checks-first then status). This is the authoritative failure source for the failure graph — combined correctly as Σfailed/Σtotal, never averaged percentages.",
+    "kind": "function",
+    "line": 125,
+    "name": "readRequestFailure"
+  },
+  "core_engine/src/distributed/transactionCsv.ts#readRequestTimings": {
+    "exported": true,
+    "file": "core_engine/src/distributed/transactionCsv.ts",
+    "jsdoc": "Per-request-name response times (ms) + method/transaction, accumulated across files.",
+    "kind": "function",
+    "line": 176,
+    "name": "readRequestTimings"
   },
   "core_engine/src/distributed/transactionCsv.ts#readTransactionCsvRaw": {
     "exported": true,

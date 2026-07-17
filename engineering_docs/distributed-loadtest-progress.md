@@ -27,6 +27,20 @@ _Last updated: 2026-07-14 (ALL STEPS DONE + verified — Phase-1 manual distribu
 | 7b | Controller **auto-merge** (no `merge` command) | ✅ | `monitor` (console + `--serve`) auto-fires the merge when all machines finish → `Final_…` + dashboard "Final report ready" banner. `--no-auto-merge` opts out; standalone `merge` kept. Verified: report produced with no merge command. |
 | 8 | Config-driven per-bucket over-time stats; manifest/`testId` validation + split-CSV guardrail; docs | ✅ | Verified: merged timeseries emits `durationP<k>` for every configured percentile + `durationStd` (no hardcoded p95, exact from pooled durations); `testId` in manifest + merge validation; `npm run test:merge` CSV-pooled R-7 EXACT + histogram ≤alpha. |
 
+## Fixes batch (2026-07-17)
+| # | Fix | Status |
+|---|---|---|
+| 1 | Live VU/failure chart freezes when all machines finish | ✅ |
+| 2 | Active VUs forced to 0 in terminal states (no lingering VUs) | ✅ |
+| 3 | merged_request_metric.csv + merged_transaction_metric.csv in Final folder | ✅ |
+| 4 | Collect layout under `<collectDir>/<runId>/{live,shared,control,Final_}` | ✅ |
+| 5 | Failure graph = request-failure % (checks-first isError, Σfailed/Σtotal); live + merged report. Local single-machine is already combined-correct; checks-first switch for local = follow-up | ✅ |
+| 6 | Errors: vu·iter live + Machine column in report error table | ✅ |
+| 7 | Merged report System tab: per-LG CPU/mem series (verified lg-a/lg-b, 28 pts). Controller-in-report = follow-up (shown live) | ✅ |
+| 8 | Top-5 slowest requests in merged report | ✅ |
+| 9 | "VUs" → "Active VUs" | ✅ |
+| 10 | Combined-transactions table sortable + filterable | ✅ |
+
 ## Live-monitoring enhancements (post-Phase-1)
 | # | Feature | Status | Notes |
 |---|---|---|---|
