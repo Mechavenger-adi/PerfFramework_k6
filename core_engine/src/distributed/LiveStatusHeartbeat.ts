@@ -28,8 +28,10 @@ function tailNdjson(file: string, n: number): { count: number; recent: string[] 
     const recent = lines.slice(-n).map((l) => {
       try {
         const o = JSON.parse(l) as Record<string, unknown>;
-        return String(o.message ?? o.msg ?? o.error ?? o.type ?? l).slice(0, 160);
-      } catch { return l.slice(0, 160); }
+        const who = (o.vu !== undefined || o.iteration !== undefined) ? `vu${o.vu ?? '?'}·it${o.iteration ?? '?'} ` : '';
+        const body = String(o.message ?? o.msg ?? o.error ?? o.request ?? o.type ?? l);
+        return (who + body).slice(0, 220);
+      } catch { return l.slice(0, 220); }
     });
     return { count: lines.length, recent };
   } catch { return { count: 0, recent: [] }; }

@@ -164,8 +164,9 @@ export async function runMerge(options: MergeCliOptions): Promise<boolean> {
     const sysMetrics = readJson<{ snapshots?: Array<Record<string, unknown>> }>(path.join(dir, 'system-metrics.json'));
     machineTimeseries.push({
       machineName, timeseries: ts,
-      errors: readNdjson(path.join(dir, 'errors.ndjson')),
-      warnings: readNdjson(path.join(dir, 'warnings.ndjson')),
+      // Tag each error/warning with its machine so the merged report can show "on which machine".
+      errors: readNdjson(path.join(dir, 'errors.ndjson')).map((e) => ({ machine: machineName, ...e })),
+      warnings: readNdjson(path.join(dir, 'warnings.ndjson')).map((e) => ({ machine: machineName, ...e })),
       hostSnapshots: sysMetrics?.snapshots ?? [],
     });
     manifests.push({ machine: machineName, runId: manifest?.runId, testId: manifest?.testId, scriptHash: manifest?.scriptHash, plan: manifest?.plan });
