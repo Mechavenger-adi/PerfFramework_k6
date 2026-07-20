@@ -167,10 +167,11 @@ Copy a finished local run folder into <collectDir>/shared_<runId>/<machine>/
 | Option | Required | Default | Description |
 |--------|----------|---------|-------------|
 | `--from <path>` | yes |  | Local run dir to collect (e.g. results/<plan>/<runId>) |
-| `--into <path>` | yes |  | Shared collect base dir |
-| `--machine <name>` | no |  | Machine name (defaults to hostname) |
+| `--into <path>` | no |  | Shared collect base dir (or K6_PERF_COLLECT_DIR) |
+| `--machine <name>` | no |  | Machine name (or K6_PERF_MACHINE; defaults to hostname) |
 | `--run-id <id>` | no |  | Shared runId (defaults to the run-manifest runId) |
 | `--include-raw` | no |  | Also copy the large raw metrics-stream.json (excluded by default) |
+| `--env-file <path>` | no | `.env` | Path to .env file |
 
 ### `agent`
 
@@ -212,15 +213,16 @@ Live-monitor a distributed run (console, or --serve for a browser dashboard)
 | Option | Required | Default | Description |
 |--------|----------|---------|-------------|
 | `--live-dir <path>` | no |  | Path to the live_<runId> folder |
-| `--collect-dir <path>` | no |  | Shared collect base dir (use with --run-id) |
-| `--run-id <id>` | no |  | Shared runId (use with --collect-dir) |
+| `--collect-dir <path>` | no |  | Shared collect base dir (or K6_PERF_COLLECT_DIR; use with --run-id) |
+| `--run-id <id>` | no |  | Shared runId (or K6_PERF_RUN_ID / derived from K6_PERF_START_AT) |
 | `--interval <ms>` | no | `3000` | Refresh interval in milliseconds |
 | `--once` | no |  | Print a single snapshot and exit (console only) |
 | `--serve` | no |  | Serve a live browser dashboard instead of the console view |
-| `--host <host>` | no | `127.0.0.1` | Dashboard bind host (localhost now; 0.0.0.0 to share once a port is open) |
-| `--port <port>` | no | `8787` | Dashboard port |
+| `--host <host>` | no |  | Dashboard bind host (or K6_PERF_DASHBOARD_HOST; default 127.0.0.1) |
+| `--port <port>` | no |  | Dashboard port (or K6_PERF_DASHBOARD_PORT; default 8787) |
 | `--no-auto-merge` | no |  | Do NOT auto-merge when all machines finish (run `merge` yourself) |
 | `--merge-timeout <sec>` | no | `300` | Max seconds to wait for collects before auto-merge gives up |
+| `--env-file <path>` | no | `.env` | Path to .env file |
 
 ### `signal`
 
@@ -229,10 +231,11 @@ Send abort/stop to a running distributed run (writes control_<runId>/control.jso
 | Option | Required | Default | Description |
 |--------|----------|---------|-------------|
 | `--mode <mode>` | yes |  | abort | stop |
-| `--collect-dir <path>` | no |  | Shared collect base dir (use with --run-id) |
-| `--run-id <id>` | no |  | Shared runId (use with --collect-dir) |
+| `--collect-dir <path>` | no |  | Shared collect base dir (or K6_PERF_COLLECT_DIR; use with --run-id) |
+| `--run-id <id>` | no |  | Shared runId (or K6_PERF_RUN_ID / derived from K6_PERF_START_AT) |
 | `--control-dir <path>` | no |  | Explicit control_<runId> dir (alternative to --collect-dir/--run-id) |
 | `--effective-at <sec>` | no | `10` | stop only: seconds from now to drain together |
+| `--env-file <path>` | no | `.env` | Path to .env file |
 
 ### `templates`
 

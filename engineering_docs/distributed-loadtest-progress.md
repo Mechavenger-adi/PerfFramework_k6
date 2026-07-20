@@ -41,6 +41,13 @@ _Last updated: 2026-07-14 (ALL STEPS DONE + verified — Phase-1 manual distribu
 | 9 | "VUs" → "Active VUs" | ✅ |
 | 10 | Combined-transactions table sortable + filterable | ✅ |
 
+## Fixes batch (2026-07-20b) — .env-driven controller commands
+| # | Fix | Status |
+|---|---|---|
+| 1 | `monitor`/`signal`/`collect` now load `.env` (via `bridgeEnvFile`) and fall back to `K6_PERF_COLLECT_DIR` + runId (`K6_PERF_RUN_ID`, else derived from `K6_PERF_START_AT` — no future guard) instead of demanding `--collect-dir`/`--run-id` flags. | ✅ |
+| 2 | Dashboard host/port read from `K6_PERF_DASHBOARD_HOST`/`K6_PERF_DASHBOARD_PORT` (flags still override). Removed commander defaults so env can fill them. | ✅ |
+| 3 | `npm run controller` (= `monitor --serve`) + `npm run monitor` shortcuts; `.env.template` documents the new vars. Friendly guard when no target resolves. | ✅ |
+
 ## Fixes batch (2026-07-20) — merged-report snapshots & host metrics
 | # | Fix | Status |
 |---|---|---|

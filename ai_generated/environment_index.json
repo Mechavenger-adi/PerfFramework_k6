@@ -51,6 +51,20 @@
     "usedIn": [
       "core_engine/src/cli/run.ts"
     ],
+    "var": "K6_PERF_DASHBOARD_HOST"
+  },
+  {
+    "templates": [],
+    "usedIn": [
+      "core_engine/src/cli/run.ts"
+    ],
+    "var": "K6_PERF_DASHBOARD_PORT"
+  },
+  {
+    "templates": [],
+    "usedIn": [
+      "core_engine/src/cli/run.ts"
+    ],
     "var": "K6_PERF_DISTRIBUTED"
   },
   {

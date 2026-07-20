@@ -214,6 +214,10 @@
     },
     {
       "from": "core_engine/src/cli/run.ts",
+      "to": "core_engine/src/config/EnvResolver.ts"
+    },
+    {
+      "from": "core_engine/src/cli/run.ts",
       "to": "core_engine/src/config/GatekeeperValidator.ts"
     },
     {

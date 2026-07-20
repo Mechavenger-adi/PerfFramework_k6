@@ -10,6 +10,7 @@ import * as path from 'path';
 import * as os from 'os';
 import * as readline from 'readline';
 import { ConfigurationManager } from '../config/ConfigurationManager';
+import { EnvResolver } from '../config/EnvResolver';
 import { GatekeeperValidator } from '../config/GatekeeperValidator';
 import { RuntimeConfigManager } from '../config/RuntimeConfigManager';
 import { RecordingLogResolver } from '../debug/RecordingLogResolver';
@@ -63,6 +64,40 @@ import { runNewWizard } from './new';
 import { generateDocs } from './docs';
 
 const program = new Command();
+
+/**
+ * Bridge a .env file into process.env for the distributed subcommands
+ * (monitor / signal / collect). The `run` command does this via
+ * ConfigurationManager; these lighter commands don't load full config, so
+ * without this they'd never see K6_PERF_COLLECT_DIR / K6_PERF_START_AT /
+ * K6_PERF_RUN_ID / K6_PERF_DASHBOARD_* that the operator set only in .env.
+ * Real shell/CI env still wins (EnvResolver only fills unset keys).
+ */
+function bridgeEnvFile(envFilePath?: string): void {
+  try {
+    // eslint-disable-next-line no-new -- constructed for its .env→process.env bridge side effect
+    new EnvResolver(envFilePath);
+  } catch {
+    /* .env is optional — absence just means nothing to bridge. */
+  }
+}
+
+/**
+ * Resolve the SHARED distributed runId from the environment, mirroring how the
+ * run command derives it (see resolveReportDir): explicit K6_PERF_RUN_ID wins,
+ * else derive it from the shared K6_PERF_START_AT so `monitor`/`signal` target
+ * the same run folder the LGs created — no need to repeat --run-id on the CLI.
+ * Unlike the run path there is no "future only" guard: monitor/signal usually
+ * run after the start instant has passed, and the folder still carries that id.
+ */
+function resolveSharedRunIdFromEnv(): string | undefined {
+  if (process.env.K6_PERF_RUN_ID) return process.env.K6_PERF_RUN_ID;
+  const startAtMs = Date.parse(process.env.K6_PERF_START_AT || '');
+  if (Number.isFinite(startAtMs)) {
+    return `Run_${new Date(startAtMs).toISOString().replace(/[-:.]/g, '_')}`;
+  }
+  return undefined;
+}
 
 program
   .name('k6-framework')
@@ -295,12 +330,16 @@ program
   .command('collect')
   .description('Copy a finished local run folder into <collectDir>/shared_<runId>/<machine>/')
   .requiredOption('--from <path>', 'Local run dir to collect (e.g. results/<plan>/<runId>)')
-  .requiredOption('--into <path>', 'Shared collect base dir')
-  .option('--machine <name>', 'Machine name (defaults to hostname)')
+  .option('--into <path>', 'Shared collect base dir (or K6_PERF_COLLECT_DIR)')
+  .option('--machine <name>', 'Machine name (or K6_PERF_MACHINE; defaults to hostname)')
   .option('--run-id <id>', 'Shared runId (defaults to the run-manifest runId)')
   .option('--include-raw', 'Also copy the large raw metrics-stream.json (excluded by default)')
+  .option('--env-file <path>', 'Path to .env file', '.env')
   .action((opts) => {
-    const ok = runCollect({ from: opts.from, into: opts.into, machine: opts.machine || os.hostname(), runId: opts.runId, includeRaw: opts.includeRaw });
+    bridgeEnvFile(opts.envFile);
+    const into = opts.into || process.env.K6_PERF_COLLECT_DIR;
+    if (!into) { Logger.fail('[collect] no destination: pass --into or set K6_PERF_COLLECT_DIR in .env'); process.exit(1); }
+    const ok = runCollect({ from: opts.from, into, machine: opts.machine || process.env.K6_PERF_MACHINE || os.hostname(), runId: opts.runId, includeRaw: opts.includeRaw });
     if (!ok) process.exit(1);
   });
 
@@ -356,23 +395,35 @@ program
   .command('monitor')
   .description('Live-monitor a distributed run (console, or --serve for a browser dashboard)')
   .option('--live-dir <path>', 'Path to the live_<runId> folder')
-  .option('--collect-dir <path>', 'Shared collect base dir (use with --run-id)')
-  .option('--run-id <id>', 'Shared runId (use with --collect-dir)')
+  .option('--collect-dir <path>', 'Shared collect base dir (or K6_PERF_COLLECT_DIR; use with --run-id)')
+  .option('--run-id <id>', 'Shared runId (or K6_PERF_RUN_ID / derived from K6_PERF_START_AT)')
   .option('--interval <ms>', 'Refresh interval in milliseconds', '3000')
   .option('--once', 'Print a single snapshot and exit (console only)')
   .option('--serve', 'Serve a live browser dashboard instead of the console view')
-  .option('--host <host>', 'Dashboard bind host (localhost now; 0.0.0.0 to share once a port is open)', '127.0.0.1')
-  .option('--port <port>', 'Dashboard port', '8787')
+  .option('--host <host>', 'Dashboard bind host (or K6_PERF_DASHBOARD_HOST; default 127.0.0.1)')
+  .option('--port <port>', 'Dashboard port (or K6_PERF_DASHBOARD_PORT; default 8787)')
   .option('--no-auto-merge', 'Do NOT auto-merge when all machines finish (run `merge` yourself)')
   .option('--merge-timeout <sec>', 'Max seconds to wait for collects before auto-merge gives up', '300')
+  .option('--env-file <path>', 'Path to .env file', '.env')
   .action(async (opts) => {
+    // Bridge .env so collect-dir / run-id / dashboard host+port set there are
+    // honored without repeating them as flags (→ `npm run controller`).
+    bridgeEnvFile(opts.envFile);
+    const collectDir = opts.collectDir || process.env.K6_PERF_COLLECT_DIR;
+    const runId = opts.runId || resolveSharedRunIdFromEnv();
+    const host = opts.host || process.env.K6_PERF_DASHBOARD_HOST || '127.0.0.1';
+    const port = Number(opts.port || process.env.K6_PERF_DASHBOARD_PORT || 8787) || 8787;
+    if (!opts.liveDir && !(collectDir && runId)) {
+      Logger.fail('[monitor] no target: set K6_PERF_COLLECT_DIR + (K6_PERF_START_AT or K6_PERF_RUN_ID) in .env, or pass --collect-dir with --run-id (or --live-dir).');
+      process.exit(1);
+    }
     if (opts.serve) {
       await runDashboardCli({
         liveDir: opts.liveDir,
-        collectDir: opts.collectDir,
-        runId: opts.runId,
-        host: opts.host,
-        port: Number(opts.port) || 8787,
+        collectDir,
+        runId,
+        host,
+        port,
         intervalMs: Number(opts.interval) || 3000,
         autoMerge: opts.autoMerge,
         mergeTimeoutSec: Number(opts.mergeTimeout) || 300,
@@ -381,8 +432,8 @@ program
     }
     const ok = await runMonitor({
       liveDir: opts.liveDir,
-      collectDir: opts.collectDir,
-      runId: opts.runId,
+      collectDir,
+      runId,
       intervalMs: Number(opts.interval) || 3000,
       once: opts.once,
       autoMerge: opts.autoMerge,
@@ -398,17 +449,22 @@ program
   .command('signal')
   .description('Send abort/stop to a running distributed run (writes control_<runId>/control.json)')
   .requiredOption('--mode <mode>', 'abort | stop')
-  .option('--collect-dir <path>', 'Shared collect base dir (use with --run-id)')
-  .option('--run-id <id>', 'Shared runId (use with --collect-dir)')
+  .option('--collect-dir <path>', 'Shared collect base dir (or K6_PERF_COLLECT_DIR; use with --run-id)')
+  .option('--run-id <id>', 'Shared runId (or K6_PERF_RUN_ID / derived from K6_PERF_START_AT)')
   .option('--control-dir <path>', 'Explicit control_<runId> dir (alternative to --collect-dir/--run-id)')
   .option('--effective-at <sec>', 'stop only: seconds from now to drain together', '10')
+  .option('--env-file <path>', 'Path to .env file', '.env')
   .action((opts) => {
     if (opts.mode !== 'abort' && opts.mode !== 'stop') {
       Logger.fail('[signal] --mode must be abort or stop'); process.exit(1);
     }
+    // Same .env fallback as monitor: collect-dir + run-id (or START_AT) from .env.
+    bridgeEnvFile(opts.envFile);
+    const collectDir = opts.collectDir || process.env.K6_PERF_COLLECT_DIR;
+    const runId = opts.runId || resolveSharedRunIdFromEnv();
     const dir = opts.controlDir
-      || (opts.collectDir && opts.runId ? controlDirFor(opts.collectDir, opts.runId) : null);
-    if (!dir) { Logger.fail('[signal] provide --control-dir, or --collect-dir together with --run-id'); process.exit(1); }
+      || (collectDir && runId ? controlDirFor(collectDir, runId) : null);
+    if (!dir) { Logger.fail('[signal] provide --control-dir, or --collect-dir + --run-id (or set K6_PERF_COLLECT_DIR + K6_PERF_START_AT/K6_PERF_RUN_ID in .env)'); process.exit(1); }
     const effectiveAt = opts.mode === 'stop'
       ? new Date(Date.now() + (Number(opts.effectiveAt) || 10) * 1000).toISOString()
       : undefined;

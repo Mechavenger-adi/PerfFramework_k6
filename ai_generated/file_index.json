@@ -239,6 +239,7 @@
     "exports": [],
     "imports": [
       "core_engine/src/config/ConfigurationManager.ts",
+      "core_engine/src/config/EnvResolver.ts",
       "core_engine/src/config/GatekeeperValidator.ts",
       "core_engine/src/config/RuntimeConfigManager.ts",
       "core_engine/src/debug/RecordingLogResolver.ts",
@@ -298,7 +299,7 @@
     ],
     "importsNode": true,
     "layer": "cli",
-    "loc": 2538,
+    "loc": 2594,
     "path": "core_engine/src/cli/run.ts"
   },
   {

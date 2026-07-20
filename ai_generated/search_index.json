@@ -616,6 +616,7 @@
       "Pre-work / spikes",
       "Build steps (from EDD)",
       "Fixes batch (2026-07-17)",
+      "Fixes batch (2026-07-20b) — .env-driven controller commands",
       "Fixes batch (2026-07-20) — merged-report snapshots & host metrics",
       "Live-monitoring enhancements (post-Phase-1)",
       "Sub-tasks — Step 1 (done)"

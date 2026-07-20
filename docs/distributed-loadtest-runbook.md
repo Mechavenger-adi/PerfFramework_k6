@@ -79,11 +79,21 @@ K6_PERF_COLLECT_DIR=\\CTRL01\k6results
 (On the controller's own `.env`, set `K6_PERF_ROLE=controller` — only needed if it also generates load.)
 
 ### Step 3 — (controller) start the live dashboard
+With the controller's `.env` filled in (`K6_PERF_COLLECT_DIR`, `K6_PERF_START_AT` or
+`K6_PERF_RUN_ID`, and optionally `K6_PERF_DASHBOARD_HOST`/`K6_PERF_DASHBOARD_PORT`), it's just:
+```
+npm run controller
+```
+Or pass everything explicitly (flags win over `.env`):
 ```
 npm run cli -- monitor --serve --collect-dir \\CTRL01\k6results --run-id run_1430 --port 8787
 ```
 Open **http://localhost:8787** on the controller. (It says "waiting for machines" until the LGs start.)
 Leave this **running** — it also **auto-merges** (Step 5). This is the only controller command you run.
+
+> `monitor`, `signal`, and `collect` all read `K6_PERF_COLLECT_DIR` and the runId
+> (`K6_PERF_RUN_ID`, else derived from `K6_PERF_START_AT`) from `.env`, so you rarely
+> need `--collect-dir`/`--run-id`. Real shell env and explicit flags still override `.env`.
 
 ### Step 4 — (each LG) run the test
 With `.env` filled in, the command is small:
@@ -121,9 +131,10 @@ npm run cli -- run --plan config/test_plans/load_test.json
 **Controller — share, then monitor (which also auto-merges):**
 ```
 npm run cli -- share-setup --host CTRL01
-npm run cli -- monitor --serve --collect-dir \\CTRL01\k6results --run-id run_1430 --port 8787
-npm run cli -- signal  --collect-dir \\CTRL01\k6results --run-id run_1430 --mode stop   # optional, mid-test
+npm run controller                         # monitor --serve; reads collect-dir/run-id/host/port from .env
+npm run cli -- signal --mode stop          # optional, mid-test; collect-dir/run-id from .env too
 ```
+(Flags still work and override `.env`, e.g. `npm run cli -- monitor --serve --collect-dir \\CTRL01\k6results --run-id run_1430 --port 8787`.)
 Manual merge (only with `monitor --no-auto-merge`):
 ```
 npm run cli -- merge --wait --machines lg-a,lg-b --run-dir \\CTRL01\k6results\run_1430\shared
@@ -140,8 +151,10 @@ npm run cli -- run --plan config/test_plans/load_test.json --distributed --role 
 | Script | Expands to |
 |---|---|
 | `npm run dist:agent` | `run --plan config/test_plans/load_test.json --distributed --role agent` |
-| `npm run dist:controller -- --collect-dir <share> --run-id <id> --port 8787` | `monitor --serve …` (live dashboard + auto-merge) |
-| `npm run dist:monitor -- --collect-dir <share> --run-id <id>` | `monitor …` (console) |
+| `npm run controller` | `monitor --serve …` — reads collect-dir/run-id/host/port from `.env` (no flags needed) |
+| `npm run monitor` | `monitor …` (console) — same `.env` fallback |
+| `npm run dist:controller -- --collect-dir <share> --run-id <id> --port 8787` | `monitor --serve …` (explicit flags) |
+| `npm run dist:monitor -- --collect-dir <share> --run-id <id>` | `monitor …` (console, explicit flags) |
 | `npm run dist:merge -- --wait --machines lg-a,lg-b --run-dir <share>/shared_<id>` | `merge …` |
 | `npm run dist:share -- --host <ctrl>` | `share-setup …` |
 | `npm run dist:signal -- --collect-dir <share> --run-id <id> --mode stop\|abort` | `signal …` |

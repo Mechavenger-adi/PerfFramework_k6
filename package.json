@@ -51,6 +51,8 @@
     "dist:agent": "npm run cli -- run --plan config/test_plans/load_test.json --distributed --role agent",
     "dist:controller": "npm run cli -- monitor --serve",
     "dist:monitor": "npm run cli -- monitor",
+    "controller": "npm run cli -- monitor --serve",
+    "monitor": "npm run cli -- monitor",
     "dist:merge": "npm run cli -- merge",
     "dist:share": "npm run cli -- share-setup",
     "dist:signal": "npm run cli -- signal",
