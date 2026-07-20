@@ -651,6 +651,12 @@ program
     // and its own console summary table, so the k6 entry script needs NO third-party
     // report libraries. handleSummary writes only handleSummary.json (the data artifact
     // the report/threshold logic consumes). No CDN imports → every run is air-gap safe.
+    //
+    // DEBUG AID: k6's own console text-summary is disabled (defining handleSummary
+    // suppresses it). To restore it while debugging a run, uncomment the two lines
+    // marked "DEBUG textSummary" below — this pulls jslib's textSummary and returns it
+    // as `stdout`. It re-introduces a CDN import, so leave it commented for normal runs.
+    // entryCode += `import { textSummary } from 'https://jslib.k6.io/k6-summary/0.0.1/index.js'; // DEBUG textSummary\n`;
     for (const journey of plan.user_journeys) {
       const execName = journey.name.replace(/[^a-zA-Z0-9_]/g, '_');
       const importPath = toImportSpecifier(entryScriptDir, journey.scriptPath);
@@ -659,6 +665,7 @@ program
     entryCode += `\nexport function handleSummary(data) {\n`;
     entryCode += `  return {\n`;
     entryCode += `    "${safeReportDir}/handleSummary.json": JSON.stringify(data),\n`;
+    // entryCode += `    stdout: textSummary(data, { indent: " ", enableColors: true }), // DEBUG textSummary\n`;
     entryCode += `  };\n`;
     entryCode += `}\n`;
 
