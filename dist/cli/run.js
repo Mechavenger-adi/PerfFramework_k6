@@ -76,6 +76,7 @@ const init_1 = require("./init");
 const validate_1 = require("./validate");
 const runMerge_1 = require("../distributed/runMerge");
 const collectRun_1 = require("../distributed/collectRun");
+const transactionCsv_1 = require("../distributed/transactionCsv");
 const startBarrier_1 = require("../distributed/startBarrier");
 const agentServer_1 = require("../distributed/agentServer");
 const probe_1 = require("../distributed/probe");
@@ -1515,6 +1516,27 @@ async function finalizeRunArtifacts(options) {
         // charts. p90 is always included by the parser.
         percentiles: percentilesFromStats(runtime.getTransactionStats()),
     });
+    // Failure graph = checks-first REQUEST failure (isError) from the request CSV,
+    // consistent with the distributed merged report. Overrides the overview's
+    // status-based httpFailedRate per bucket when the request CSV is present.
+    try {
+        const reqCsv = (0, transactionCsv_1.findRequestCsv)(options.reportDir);
+        if (reqCsv) {
+            const bucketSec = timeseries.bucketSizeSeconds || 2;
+            const buckets = (0, transactionCsv_1.readRequestFailByBucket)(reqCsv, bucketSec);
+            for (const p of timeseries.series.overview) {
+                const ms = Date.parse(String(p.ts));
+                if (!Number.isFinite(ms))
+                    continue;
+                const rf = buckets.get(Math.floor(ms / (bucketSec * 1000)) * (bucketSec * 1000));
+                if (rf && rf.total > 0) {
+                    p.httpFailedRate = rf.failed / rf.total;
+                    p.httpFailedCount = rf.failed;
+                }
+            }
+        }
+    }
+    catch { /* keep k6's status-based rate on any failure */ }
     // Slowest individual requests by p90 — derived from the same raw metrics
     // stream (per-request `name` tag). Computed before the stream may be removed
     // below when reporting.timeseries.keepRawMetricsStream=false.
