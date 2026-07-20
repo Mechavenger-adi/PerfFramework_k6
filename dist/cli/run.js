@@ -626,15 +626,10 @@ program
     const entryScriptDir = getEntryScriptDirectory(plan.user_journeys);
     fs.mkdirSync(entryScriptDir, { recursive: true });
     let entryCode = '';
-    // In distributed mode the LG is headless: no CDN imports (air-gap safe — both
-    // benc-uk/k6-reporter and jslib.k6.io are remote) and no per-machine HTML. Only
-    // handleSummary.json (a data artifact the report/threshold logic consumes) is
-    // written; the single merged RunReport comes from the merge step. Local
-    // (non-distributed) runs keep the full HTML + textSummary behavior unchanged.
-    if (!distributed) {
-        entryCode += `import { htmlReport } from "https://raw.githubusercontent.com/benc-uk/k6-reporter/main/dist/bundle.js";\n`;
-        entryCode += `import { textSummary } from "https://jslib.k6.io/k6-summary/0.0.1/index.js";\n`;
-    }
+    // The framework produces its own reports (RunReport.html + k6's TestSummary.html)
+    // and its own console summary table, so the k6 entry script needs NO third-party
+    // report libraries. handleSummary writes only handleSummary.json (the data artifact
+    // the report/threshold logic consumes). No CDN imports → every run is air-gap safe.
     for (const journey of plan.user_journeys) {
         const execName = journey.name.replace(/[^a-zA-Z0-9_]/g, '_');
         const importPath = toImportSpecifier(entryScriptDir, journey.scriptPath);
@@ -642,13 +637,7 @@ program
     }
     entryCode += `\nexport function handleSummary(data) {\n`;
     entryCode += `  return {\n`;
-    if (!distributed) {
-        entryCode += `    "${safeReportDir}/k6-reporter-summary.html": htmlReport(data),\n`;
-    }
     entryCode += `    "${safeReportDir}/handleSummary.json": JSON.stringify(data),\n`;
-    if (!distributed) {
-        entryCode += `    stdout: textSummary(data, { indent: " ", enableColors: true }),\n`;
-    }
     entryCode += `  };\n`;
     entryCode += `}\n`;
     const entryScriptPath = path.join(entryScriptDir, `.k6-perf-entry-${runId.replace(/[^a-zA-Z0-9_]/g, '_')}.js`);

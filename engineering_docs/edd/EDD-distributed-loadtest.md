@@ -95,13 +95,14 @@ Every metric point carries the identity needed to merge unambiguously — inject
 
    | Output | Source | LG (distributed) | After merge |
    |---|---|---|---|
-   | `TestSummary.html` | k6 web-dashboard export ([run.ts:569](../../core_engine/src/cli/run.ts#L569)) — self-contained | **keep** | — |
-   | `RunReport.html` (custom) | `RunReportGenerator` ([run.ts:1659](../../core_engine/src/cli/run.ts#L1659)) | **suppress** | **generated** |
-   | `k6-reporter-summary.html` | `handleSummary`→`htmlReport()` **CDN** ([run.ts:522](../../core_engine/src/cli/run.ts#L522),[:531](../../core_engine/src/cli/run.ts#L531)) | **suppress** | — |
+   | `TestSummary.html` | k6 web-dashboard export — self-contained | **keep** | — |
+   | `RunReport.html` (custom) | `RunReportGenerator` | **suppress** | **generated** |
 
-   Suppressing the CDN `htmlReport()` also **removes the `raw.githubusercontent.com` import** from the LG
-   entry script → **air-gap safe**. `handleSummary.json` ([run.ts:532](../../core_engine/src/cli/run.ts#L532)) is **kept** (a data artifact the
-   threshold/report logic depends on, [run.ts:1309](../../core_engine/src/cli/run.ts#L1309)).
+   The **3rd-party `k6-reporter-summary.html`** (benc-uk/k6-reporter via `htmlReport()`) and the
+   CDN `textSummary` were **removed from the framework entirely** (all runs), so the k6 entry script has
+   **no CDN imports** → every run is air-gap safe with no vendoring needed. `handleSummary` writes only
+   `handleSummary.json` (a data artifact the threshold/report logic depends on); the framework's own
+   `RunReport.html` + `TestSummary.html` + console table are the reports.
 4. Warn loudly on missing discipline (no `MACHINE` → hostname; no `START_AT` → unsynchronized ramps).
 5. Write k6's raw stream **locally** (authoritative). Push only a **light status file** to the share live
    (§Live). At end, auto-collect the full local folder to the share (§End).
