@@ -125,13 +125,14 @@ function renderTxns(){
     return txnDir*(av-bv);
   });
   const arrow=k=> txnSort===k?(txnDir<0?' ▼':' ▲'):'';
-  const th=(k,label)=>'<th onclick="setSort(\''+k+'\')" style="cursor:pointer">'+label+arrow(k)+'</th>';
+  const th=(k,label)=>'<th data-sort="'+k+'" style="cursor:pointer">'+label+arrow(k)+'</th>';
   let t='<thead><tr>'+th('name','Transaction')+th('count','Count')+th('errPct','Err%');
   for(const st of lastStats) t+=th('stat:'+st, esc(st));
   t+='</tr></thead><tbody>';
   for(const r of rows){ t+='<tr><td>'+esc(r.name)+'</td><td>'+r.count+'</td><td>'+n1(r.errPct)+'</td>'; for(const st of lastStats) t+='<td>'+n0(r.values[st])+'</td>'; t+='</tr>'; }
   t+='</tbody>';
   el.innerHTML=t;
+  el.querySelectorAll('th[data-sort]').forEach(function(x){ x.addEventListener('click',function(){ setSort(x.getAttribute('data-sort')); }); });
 }
 function drawChart(){
   const svg=document.getElementById('chart'); if(!svg) return;
