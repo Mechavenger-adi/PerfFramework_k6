@@ -295,7 +295,7 @@
         "exports": [
           "RunReportGenerator"
         ],
-        "loc": 2695,
+        "loc": 2709,
         "path": "core_engine/src/reporting/RunReportGenerator.ts"
       },
       {
@@ -468,7 +468,7 @@
     "files": [
       {
         "exports": [],
-        "loc": 2524,
+        "loc": 2538,
         "path": "core_engine/src/cli/run.ts"
       },
       {

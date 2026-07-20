@@ -41,6 +41,13 @@ _Last updated: 2026-07-14 (ALL STEPS DONE + verified — Phase-1 manual distribu
 | 9 | "VUs" → "Active VUs" | ✅ |
 | 10 | Combined-transactions table sortable + filterable | ✅ |
 
+## Fixes batch (2026-07-20) — merged-report snapshots & host metrics
+| # | Fix | Status |
+|---|---|---|
+| 1 | Merge no longer conflates the two snapshot streams: `reportData.snapshots` = **failure** snapshots (request/response, read per-machine from `snapshots.json`); `system.snapshots` = **host** CPU/mem samples. Fixes empty REQUEST/RESPONSE in the Snapshots panel after merge. | ✅ |
+| 2 | Host snapshots tagged with originating machine (`host` field); Raw Host Snapshots table shows a **host** column (only when tagged, so local runs stay clean). | ✅ |
+| 3 | Failure snapshots tagged with `machine`; per-machine CPU/mem chart already draws one line pair per LG (dynamic). | ✅ |
+
 ## Live-monitoring enhancements (post-Phase-1)
 | # | Feature | Status | Notes |
 |---|---|---|---|

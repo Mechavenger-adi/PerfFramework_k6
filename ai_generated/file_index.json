@@ -253,6 +253,7 @@
       "core_engine/src/distributed/runMerge.ts",
       "core_engine/src/distributed/shareSetup.ts",
       "core_engine/src/distributed/startBarrier.ts",
+      "core_engine/src/distributed/transactionCsv.ts",
       "core_engine/src/execution/FileWriteSink.ts",
       "core_engine/src/execution/HostMonitor.ts",
       "core_engine/src/execution/ParallelExecutionManager.ts",
@@ -297,7 +298,7 @@
     ],
     "importsNode": true,
     "layer": "cli",
-    "loc": 2524,
+    "loc": 2538,
     "path": "core_engine/src/cli/run.ts"
   },
   {
@@ -815,7 +816,7 @@
     ],
     "importsNode": false,
     "layer": "distributed",
-    "loc": 262,
+    "loc": 273,
     "path": "core_engine/src/distributed/MergedReportBuilder.ts"
   },
   {
@@ -922,7 +923,7 @@
     ],
     "importsNode": true,
     "layer": "distributed",
-    "loc": 298,
+    "loc": 299,
     "path": "core_engine/src/distributed/liveDashboard.ts"
   },
   {
@@ -978,7 +979,7 @@
     ],
     "importsNode": true,
     "layer": "distributed",
-    "loc": 275,
+    "loc": 279,
     "path": "core_engine/src/distributed/runMerge.ts"
   },
   {
@@ -1535,7 +1536,7 @@
     ],
     "importsNode": false,
     "layer": "reporting",
-    "loc": 2695,
+    "loc": 2709,
     "path": "core_engine/src/reporting/RunReportGenerator.ts"
   },
   {

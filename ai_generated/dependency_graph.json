@@ -270,6 +270,10 @@
     },
     {
       "from": "core_engine/src/cli/run.ts",
+      "to": "core_engine/src/distributed/transactionCsv.ts"
+    },
+    {
+      "from": "core_engine/src/cli/run.ts",
       "to": "core_engine/src/execution/FileWriteSink.ts"
     },
     {

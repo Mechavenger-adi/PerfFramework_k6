@@ -162,12 +162,16 @@ export async function runMerge(options: MergeCliOptions): Promise<boolean> {
 
     machineArtifacts.push({ machineName, transactionMetrics: tm, histogram: hist, ciSummary: ci, transactionRaw });
     const sysMetrics = readJson<{ snapshots?: Array<Record<string, unknown>> }>(path.join(dir, 'system-metrics.json'));
+    // Failure snapshots (request/response captured at failure) live in snapshots.json.
+    // These are DISTINCT from the host CPU/mem samples in system-metrics.json.
+    const failureSnapshots = readJson<Array<Record<string, unknown>>>(path.join(dir, 'snapshots.json')) ?? [];
     machineTimeseries.push({
       machineName, timeseries: ts,
       // Tag each error/warning with its machine so the merged report can show "on which machine".
       errors: readNdjson(path.join(dir, 'errors.ndjson')).map((e) => ({ machine: machineName, ...e })),
       warnings: readNdjson(path.join(dir, 'warnings.ndjson')).map((e) => ({ machine: machineName, ...e })),
       hostSnapshots: sysMetrics?.snapshots ?? [],
+      failureSnapshots,
     });
     manifests.push({ machine: machineName, runId: manifest?.runId, testId: manifest?.testId, scriptHash: manifest?.scriptHash, plan: manifest?.plan });
   }

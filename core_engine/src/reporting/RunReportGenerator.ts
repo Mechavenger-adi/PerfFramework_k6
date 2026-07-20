@@ -2314,7 +2314,7 @@ export class RunReportGenerator {
         ? '<div class="card"><h3>' + label + '</h3><strong>' + st.min.toFixed(1) + ' / ' + st.avg.toFixed(1) + ' / ' + st.max.toFixed(1) + '%</strong></div>'
         : '';
       const statCards = (cpu || mem)
-        ? '<div class="section-title">Load Generator Health' + infoTip('CPU/memory of the test machine (min / avg / max).') + '</div>'
+        ? '<div class="section-title">Load Generator Health' + infoTip('Whole-machine CPU/memory (all processes on the box, not just k6) — min / avg / max. High values from other processes can distort results.') + '</div>'
           + '<div class="cards" style="margin-bottom:18px">'
             + statCard('CPU % — min / avg / max', cpu)
             + statCard('Memory % — min / avg / max', mem)
@@ -2324,7 +2324,7 @@ export class RunReportGenerator {
       document.getElementById('panel-system').innerHTML = \`
         \${statCards}
         <div class="chart-box" style="margin-bottom:18px">
-          <h3>Host Resource Usage Over Time\${infoTip('Load-generator CPU% and memory% over time.')}</h3>
+          <h3>Host Resource Usage Over Time\${infoTip('Whole-machine CPU% (left axis, 0–100) and memory% (right axis, auto-scaled) over time — all processes on the box, not just k6.')}</h3>
           \${hasSeries
             ? '<div class="chart-canvas-wrap" style="min-height:260px"><canvas id="chart-system-cpu-mem"></canvas></div>'
             : '<div class="empty">No host monitoring data captured. Enable <code>runtime.monitoring.enabled</code> in your runtime settings to record per-bucket CPU/memory percent.</div>'
@@ -2337,7 +2337,7 @@ export class RunReportGenerator {
           </div>
           <div class="card">
             <h3>Raw Host Snapshots\${infoTip('Raw CPU/memory samples behind the chart.')}</h3>
-            \${snapshots.length ? renderTable(snapshots, ['ts', 'cpuPercent', 'memoryPercent']) : '<div class="empty">No raw host snapshots recorded.</div>'}
+            \${snapshots.length ? renderTable(snapshots, (snapshots.some((s) => s.host != null) ? ['host'] : []).concat(['ts', 'cpuPercent', 'memoryPercent'])) : '<div class="empty">No raw host snapshots recorded.</div>'}
           </div>
         </div>
       \`;
@@ -2363,6 +2363,7 @@ export class RunReportGenerator {
           borderColor: palette[(idx * 2) % palette.length],
           backgroundColor: palette[(idx * 2) % palette.length] + '22',
           borderWidth: 2, pointRadius: 0, pointHoverRadius: 4, tension: 0.2, spanGaps: true,
+          yAxisID: 'y', // CPU on the fixed 0–100 left axis
         });
         datasets.push({
           label: name + ' — Memory %',
@@ -2371,13 +2372,26 @@ export class RunReportGenerator {
           backgroundColor: palette[(idx * 2 + 1) % palette.length] + '22',
           borderWidth: 2, pointRadius: 0, pointHoverRadius: 4, tension: 0.2,
           borderDash: [4, 4], spanGaps: true,
+          yAxisID: 'yMem', // Memory on its own auto-scaled right axis so small drift is visible
         });
       });
 
+      // Whole-machine memory% moves in a narrow band (e.g. 60→63%); on a shared 0–100
+      // axis it looks like a flat line. Give it a dedicated right-hand axis that
+      // auto-scales to the data range (beginAtZero:false + grace padding) so the real
+      // variation shows, while CPU keeps the fixed 0–100 left axis for absolute headroom.
+      const sysOptions = lineOptions('CPU %', { suggestedMax: 100 }, filtered);
+      sysOptions.scales.yMem = {
+        position: 'right',
+        title: { display: true, text: 'Memory %' },
+        beginAtZero: false,
+        grace: '15%',
+        grid: { drawOnChartArea: false },
+      };
       systemChartInstances.push(new Chart(document.getElementById('chart-system-cpu-mem'), {
         type: 'line',
         data: { labels, datasets },
-        options: lineOptions('%', { suggestedMax: 100 }, filtered),
+        options: sysOptions,
       }));
     }
 

@@ -25,6 +25,8 @@ export interface MachineTimeseries {
   warnings?: Array<Record<string, unknown>>;
   /** Host CPU/mem snapshots from this machine's system-metrics.json (for the System tab). */
   hostSnapshots?: Array<Record<string, unknown>>;
+  /** Failure snapshots (captured request/response at failure) from this machine's snapshots.json. */
+  failureSnapshots?: Array<Record<string, unknown>>;
 }
 
 export interface MergedReportInput {
@@ -228,7 +230,16 @@ export class MergedReportBuilder {
 
     const allErrors = input.machines.flatMap((m) => m.errors ?? []);
     const allWarnings = input.machines.flatMap((m) => m.warnings ?? []);
-    const allSnapshots = input.machines.flatMap((m) => m.hostSnapshots ?? []);
+    // Two DIFFERENT snapshot streams — do not conflate them:
+    //  - failure snapshots (request/response at failure) → reportData.snapshots (Snapshots panel)
+    //  - host CPU/mem samples → reportData.system.snapshots (System tab)
+    // Tag each with its originating machine so multi-LG runs stay identifiable.
+    const allFailureSnapshots = input.machines.flatMap(
+      (m) => (m.failureSnapshots ?? []).map((s) => ({ machine: m.machineName, ...s })),
+    );
+    const allHostSnapshots = input.machines.flatMap(
+      (m) => (m.hostSnapshots ?? []).map((s) => ({ host: m.machineName, ...s })),
+    );
 
     return {
       meta: {
@@ -254,8 +265,8 @@ export class MergedReportBuilder {
       timeseries,
       errors: allErrors,
       warnings: allWarnings,
-      snapshots: allSnapshots,
-      system: { agents: [], machines: merge.machines, snapshots: allSnapshots },
+      snapshots: allFailureSnapshots,
+      system: { agents: [], machines: merge.machines, snapshots: allHostSnapshots },
     };
   }
 }
