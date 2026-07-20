@@ -417,6 +417,10 @@ program
       Logger.fail('[monitor] no target: set K6_PERF_COLLECT_DIR + (K6_PERF_START_AT or K6_PERF_RUN_ID) in .env, or pass --collect-dir with --run-id (or --live-dir).');
       process.exit(1);
     }
+    // Same shared-start countdown the LGs show: if K6_PERF_START_AT is still
+    // upcoming, tick it down in place, then begin monitoring at the start instant
+    // (the LGs won't produce data until then anyway). Already-passed → no wait.
+    await awaitScheduledStart();
     if (opts.serve) {
       await runDashboardCli({
         liveDir: opts.liveDir,

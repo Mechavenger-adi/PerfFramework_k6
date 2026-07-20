@@ -299,7 +299,7 @@
     ],
     "importsNode": true,
     "layer": "cli",
-    "loc": 2594,
+    "loc": 2598,
     "path": "core_engine/src/cli/run.ts"
   },
   {
@@ -1004,11 +1004,12 @@
       "awaitScheduledStart"
     ],
     "imports": [
-      "core_engine/src/utils/logger.ts"
+      "core_engine/src/utils/logger.ts",
+      "readline"
     ],
     "importsNode": false,
     "layer": "distributed",
-    "loc": 33,
+    "loc": 84,
     "path": "core_engine/src/distributed/startBarrier.ts"
   },
   {

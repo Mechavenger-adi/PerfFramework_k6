@@ -41,6 +41,12 @@ _Last updated: 2026-07-14 (ALL STEPS DONE + verified — Phase-1 manual distribu
 | 9 | "VUs" → "Active VUs" | ✅ |
 | 10 | Combined-transactions table sortable + filterable | ✅ |
 
+## Fixes batch (2026-07-20c) — live start-time countdown
+| # | Fix | Status |
+|---|---|---|
+| 1 | `awaitScheduledStart` (startBarrier) now renders a LIVE in-place countdown on a TTY (updates same line, ticks to zero) instead of a single static "Xs left" that froze. Piped/CI keeps one static line (no CR spam). Applies to LGs + local `run`. | ✅ |
+| 2 | Controller `monitor`/`monitor --serve` also runs the same countdown (already-passed START_AT → no wait), so all roles show the shared countdown. | ✅ |
+
 ## Fixes batch (2026-07-20b) — .env-driven controller commands
 | # | Fix | Status |
 |---|---|---|
