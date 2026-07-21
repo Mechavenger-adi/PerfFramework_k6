@@ -50,34 +50,50 @@ export async function awaitScheduledStart(): Promise<void> {
     return;
   }
 
-  // Non-TTY (piped/CI): a single static line, then wait silently. Rewriting the
-  // same line with carriage returns would spam a log file with control chars.
-  if (!process.stdout.isTTY) {
+  // Non-TTY (piped/CI), or explicitly opted out: a single static line, then wait
+  // silently. Rewriting the same line with carriage returns would spam a log file with
+  // control chars — and on Windows every write is a chance to block (see below).
+  const quiet = /^(1|true|yes)$/i.test((process.env.K6_PERF_NO_COUNTDOWN ?? '').trim());
+  if (!process.stdout.isTTY || quiet) {
     Logger.info(`[start] waiting until shared start ${raw} (${Math.round(waitMs / 1000)}s) for ramp alignment`);
     await new Promise((resolve) => setTimeout(resolve, waitMs));
     Logger.detail('[start] scheduled start reached — launching k6');
     return;
   }
 
-  // TTY: live countdown that overwrites itself. Refresh a few times a second so
-  // the value visibly decrements all the way to zero (never a frozen number).
+  // TTY: live countdown that overwrites itself.
+  //
+  // Deliberately ONE write per second, and only when the rendered text actually
+  // changes. Console writes are SYNCHRONOUS on Windows, and selecting text in a
+  // conhost window (QuickEdit, on by default) stops the console draining — the next
+  // write then blocks and freezes this whole process, so the run never starts. Each
+  // write is an opportunity to hit that, so we make as few as possible. Ticking at
+  // 250ms only to redraw the same number was pure risk for no benefit.
   await new Promise<void>((resolve) => {
-    const render = () => {
+    let lastText = '';
+    const render = (): void => {
       const remMs = target - Date.now();
-      readline.clearLine(process.stdout, 0);
-      readline.cursorTo(process.stdout, 0);
       if (remMs <= 0) {
+        readline.clearLine(process.stdout, 0);
+        readline.cursorTo(process.stdout, 0);
         resolve();
         return;
       }
-      const sec = Math.ceil(remMs / 1000);
-      process.stdout.write(
-        `${ansi.bold}${ansi.cyan}⏳ [start] launching in ${fmtRemaining(sec)}${ansi.reset}`
-        + `${ansi.dim}  (shared start ${raw})${ansi.reset}`,
-      );
-      setTimeout(render, 250);
+      const text = `${ansi.bold}${ansi.cyan}⏳ [start] launching in ${fmtRemaining(Math.ceil(remMs / 1000))}${ansi.reset}`
+        + `${ansi.dim}  (shared start ${raw})${ansi.reset}`;
+      if (text !== lastText) {
+        lastText = text;
+        readline.clearLine(process.stdout, 0);
+        readline.cursorTo(process.stdout, 0);
+        process.stdout.write(text);
+      }
+      // Align the next tick to the next whole second so the number never appears to skip.
+      setTimeout(render, Math.max(50, remMs % 1000 || 1000));
     };
     render();
   });
   Logger.detail('[start] scheduled start reached — launching k6');
+  if (process.platform === 'win32' && process.stdout.isTTY) {
+    Logger.detail('Windows tip: selecting text in this console PAUSES it and stalls the run until you press Esc. Turn off QuickEdit Mode, or set K6_PERF_NO_COUNTDOWN=1.');
+  }
 }

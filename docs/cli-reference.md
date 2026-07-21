@@ -220,6 +220,7 @@ Live-monitor a distributed run (console, or --serve for a browser dashboard)
 | `--serve` | no |  | Serve a live browser dashboard instead of the console view |
 | `--host <host>` | no |  | Dashboard bind host (or K6_PERF_DASHBOARD_HOST; default 127.0.0.1) |
 | `--port <port>` | no |  | Dashboard port (or K6_PERF_DASHBOARD_PORT; default 8787) |
+| `--no-open` | no |  | Do NOT auto-open the dashboard in your default browser (--serve only) |
 | `--no-auto-merge` | no |  | Do NOT auto-merge when all machines finish (run `merge` yourself) |
 | `--merge-timeout <sec>` | no | `300` | Max seconds to wait for collects before auto-merge gives up |
 | `--env-file <path>` | no | `.env` | Path to .env file |

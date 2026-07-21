@@ -402,6 +402,7 @@ program
   .option('--serve', 'Serve a live browser dashboard instead of the console view')
   .option('--host <host>', 'Dashboard bind host (or K6_PERF_DASHBOARD_HOST; default 127.0.0.1)')
   .option('--port <port>', 'Dashboard port (or K6_PERF_DASHBOARD_PORT; default 8787)')
+  .option('--no-open', 'Do NOT auto-open the dashboard in your default browser (--serve only)')
   .option('--no-auto-merge', 'Do NOT auto-merge when all machines finish (run `merge` yourself)')
   .option('--merge-timeout <sec>', 'Max seconds to wait for collects before auto-merge gives up', '300')
   .option('--env-file <path>', 'Path to .env file', '.env')
@@ -431,6 +432,7 @@ program
         intervalMs: Number(opts.interval) || 3000,
         autoMerge: opts.autoMerge,
         mergeTimeoutSec: Number(opts.mergeTimeout) || 300,
+        open: opts.open,
       });
       return;
     }

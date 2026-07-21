@@ -122,6 +122,13 @@
   {
     "templates": [],
     "usedIn": [
+      "core_engine/src/distributed/startBarrier.ts"
+    ],
+    "var": "K6_PERF_NO_COUNTDOWN"
+  },
+  {
+    "templates": [],
+    "usedIn": [
       "core_engine/src/cli/run.ts"
     ],
     "var": "K6_PERF_REQUEST_LOG"

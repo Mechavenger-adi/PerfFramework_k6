@@ -201,6 +201,31 @@ npm run cli -- run --plan config/test_plans/load_test.json --distributed --role 
   `--address` automatically. If a box runs two k6s, set `K6_PERF_K6_API` to distinct ports.
 - **Two machines overwrote each other** → they shared a `K6_PERF_MACHINE`; it must be unique per LG.
 
+### ⚠️ The countdown froze / the test never started / the dashboard stalled (Windows)
+
+**Symptom:** the start countdown sticks at an arbitrary value (e.g. 32s), the run never launches,
+and everything springs back to life the moment you press a key. Or: the dashboard says the final
+report is ready but no `Final_*` folder appears until you return to the console.
+
+**Cause — not the framework.** Windows consoles (`cmd.exe` / conhost) ship with **QuickEdit Mode**
+on. **Selecting text pauses the console**, and because console writes are *synchronous* on Windows,
+the next write **blocks the whole process**. The countdown, the dashboard, the auto-merge and k6's
+own progress bar all stop dead until you press <kbd>Esc</kbd>. A common way to trigger it is
+clicking into a window just to focus it, or selecting the dashboard URL to copy it.
+
+**Prove it in 30 seconds:** run `ping -t 8.8.8.8` in the same window and drag-select some text —
+output stops; press <kbd>Esc</kbd> — it resumes. Nothing to do with k6.
+
+**Fixes**
+1. **Turn off QuickEdit** on every LG and the controller: console title bar → Properties → Options →
+   uncheck **QuickEdit Mode**. (Or run under **Windows Terminal** / the VS Code terminal, which do not
+   block this way.) This is the only fix that also protects the k6 run itself.
+2. **Don't copy the URL by hand.** The dashboard opens your browser automatically; `--no-open` disables
+   it. The URL is also written next to the run as `dashboard-url.txt` and a double-clickable
+   `dashboard.url` shortcut, so you never need to select text in the console.
+3. **Silence the countdown** with `K6_PERF_NO_COUNTDOWN=1` — prints one static line instead of
+   repainting, so there is almost nothing to block on.
+
 ---
 
 ## What's **not** built yet (Phase 2)

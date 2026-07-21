@@ -299,7 +299,7 @@
     ],
     "importsNode": true,
     "layer": "cli",
-    "loc": 2617,
+    "loc": 2619,
     "path": "core_engine/src/cli/run.ts"
   },
   {
@@ -919,12 +919,14 @@
       "core_engine/src/distributed/control.ts",
       "core_engine/src/distributed/liveAggregate.ts",
       "core_engine/src/distributed/runMerge.ts",
+      "child_process",
+      "fs",
       "http",
       "path"
     ],
     "importsNode": true,
     "layer": "distributed",
-    "loc": 372,
+    "loc": 422,
     "path": "core_engine/src/distributed/liveDashboard.ts"
   },
   {
@@ -1009,7 +1011,7 @@
     ],
     "importsNode": false,
     "layer": "distributed",
-    "loc": 84,
+    "loc": 100,
     "path": "core_engine/src/distributed/startBarrier.ts"
   },
   {

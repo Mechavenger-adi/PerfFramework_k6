@@ -11,7 +11,9 @@
  */
 
 import * as http from 'http';
+import * as fs from 'fs';
 import * as path from 'path';
+import { spawn } from 'child_process';
 import { Logger } from '../utils/logger';
 import { aggregate, resolveRunContext, findLatestFinalReport, startControllerHostSampling, controllerHost } from './liveAggregate';
 import { writeControl, ControlAction } from './control';
@@ -27,6 +29,34 @@ export interface DashboardOptions {
   /** Auto-merge when all machines finish (default true). */
   autoMerge?: boolean;
   mergeTimeoutSec?: number;
+  /** Launch the default browser at the dashboard URL (default true). */
+  open?: boolean;
+}
+
+/**
+ * Open `url` in the OS default browser, detached, best-effort.
+ *
+ * Why this exists: copying the URL out of a Windows console means SELECTING text, and
+ * selecting puts conhost into mark mode, which stops draining output — the next write
+ * from this process then blocks and (because console writes are synchronous on Windows)
+ * freezes the whole process, dashboard and auto-merge included. Opening the browser for
+ * the user removes the reason to select anything.
+ */
+function openInBrowser(url: string): void {
+  try {
+    const [cmd, args] = process.platform === 'win32'
+      // `start` is a cmd builtin; the empty "" is the window title, otherwise a quoted
+      // URL would be consumed as the title and nothing would open.
+      ? ['cmd', ['/c', 'start', '', url]]
+      : process.platform === 'darwin'
+        ? ['open', [url]]
+        : ['xdg-open', [url]];
+    const child = spawn(cmd, args as string[], { detached: true, stdio: 'ignore' });
+    child.on('error', () => { /* no browser / headless — the URL is printed anyway */ });
+    child.unref();
+  } catch {
+    /* never let opening a browser break the dashboard */
+  }
 }
 
 function page(intervalMs: number): string {
@@ -354,9 +384,29 @@ export async function runDashboardCli(o: DashboardOptions): Promise<void> {
     Logger.pass(`Serving at ${clickable}`);
     Logger.detail(`Open: ${url}`);
     Logger.detail(`Live dir: ${ctx.liveDir}`);
+
+    // Drop the URL next to the run so it can be opened from Explorer WITHOUT selecting
+    // text in the console (see openInBrowser: selecting in a Windows console pauses the
+    // process). The .url shortcut opens in the default browser on double-click.
+    try {
+      const urlDir = path.dirname(ctx.liveDir);
+      fs.writeFileSync(path.join(urlDir, 'dashboard-url.txt'), `${url}\n`, 'utf-8');
+      fs.writeFileSync(path.join(urlDir, 'dashboard.url'), `[InternetShortcut]\r\nURL=${url}\r\n`, 'utf-8');
+      Logger.detail(`Shortcut: ${path.join(urlDir, 'dashboard.url')}`);
+    } catch { /* the URL is printed above; a missing shortcut is not fatal */ }
+
+    if (o.open !== false) {
+      openInBrowser(url);
+      Logger.detail('Opened in your default browser (use --no-open to disable).');
+    }
     Logger.detail(o.autoMerge === false ? 'Auto-merge: off (run `merge` manually).' : 'Auto-merge: on — the final report builds automatically when all machines finish.');
     if (o.host === '0.0.0.0') Logger.detail('Bound to all interfaces — shareable across the network once the firewall port is open.');
     else Logger.detail('Bound locally — view on this machine (open a port + `--host 0.0.0.0` to share).');
+    // Windows console hazard: selecting text pauses output and blocks this process
+    // (dashboard + auto-merge included). Warn where it actually applies.
+    if (process.platform === 'win32' && process.stdout.isTTY) {
+      Logger.detail('Windows tip: selecting text in this console PAUSES it and freezes the dashboard/auto-merge until you press Esc. Turn off QuickEdit Mode (title bar → Properties → Options), or use Windows Terminal.');
+    }
     Logger.detail('Ctrl+C to stop.');
     const shutdown = (): void => { server.close(() => process.exit(0)); };
     process.on('SIGINT', shutdown);
