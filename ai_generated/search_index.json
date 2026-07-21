@@ -617,6 +617,7 @@
       "Build steps (from EDD)",
       "Fixes batch (2026-07-17)",
       "Fixes batch (2026-07-20f) — transaction identity = (scenario, transaction)",
+      "Artifact consolidation (2026-07-21) — fewer files per run",
       "Fixes batch (2026-07-20e) — failure-rate, per-machine health, live x-axis",
       "Fixes batch (2026-07-20d) — live dashboard: auto-merge banner + chart lead-in",
       "Fixes batch (2026-07-20c) — live start-time countdown",

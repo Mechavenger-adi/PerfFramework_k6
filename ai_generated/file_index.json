@@ -299,7 +299,7 @@
     ],
     "importsNode": true,
     "layer": "cli",
-    "loc": 2609,
+    "loc": 2614,
     "path": "core_engine/src/cli/run.ts"
   },
   {
@@ -980,7 +980,7 @@
     ],
     "importsNode": true,
     "layer": "distributed",
-    "loc": 293,
+    "loc": 306,
     "path": "core_engine/src/distributed/runMerge.ts"
   },
   {
@@ -1775,7 +1775,7 @@
     ],
     "importsNode": false,
     "layer": "types",
-    "loc": 186,
+    "loc": 187,
     "path": "core_engine/src/types/ConfigContracts.ts"
   },
   {
@@ -1816,6 +1816,7 @@
       "ReportBundle",
       "ReportBundleConfig",
       "ReportBundleMeta",
+      "RunSummaryFile",
       "TimeSeriesFile",
       "TimeSeriesPoint",
       "TransactionMetricRow",
@@ -1828,7 +1829,7 @@
     ],
     "importsNode": false,
     "layer": "types",
-    "loc": 185,
+    "loc": 199,
     "path": "core_engine/src/types/ReportingContracts.ts"
   },
   {

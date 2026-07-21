@@ -491,7 +491,7 @@ function buildMarkdown(model) {
   lines.push("- Prefer adding framework behavior in engine layers instead of CLI handlers.");
   lines.push("- Runtime utilities under `core_engine/src/utils` execute inside k6 and must remain compatible with k6's JavaScript runtime.");
   lines.push("- Debug replay depends on generated or converted scripts calling `logExchange()` for every meaningful HTTP exchange.");
-  lines.push("- Reporting is artifact-first; CI should consume `ci-summary.json` and related JSON/NDJSON artifacts instead of console text.");
+  lines.push("- Reporting is artifact-first; CI should consume `run-summary.json` (gate + per-transaction table) and related JSON/NDJSON artifacts instead of console text.");
   lines.push("- Existing `dist` files are generated build output and are intentionally not duplicated in the source-level reference.");
   lines.push("");
   return lines.join("\n");

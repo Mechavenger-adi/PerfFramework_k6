@@ -71,12 +71,13 @@ export interface TimeSeriesReportingConfig {
   /** Bucket size in seconds for aggregated timeseries points */
   bucketSizeSeconds?: number;
   /**
-   * Retain the raw `metrics-stream.json` k6 streaming output file in the
-   * run folder after the unified report is generated. When `false`, the
-   * file is deleted to save disk (typical CI use case). When `true` (the
-   * default), it stays for ad-hoc re-analysis or external tooling.
-   * The file can be several MB to several hundred MB for long high-RPS
-   * runs — toggle off when storage-constrained.
+   * Retain the raw `metrics-stream.json` k6 streaming output after the report is
+   * generated. It is purely an INPUT: the per-bucket timeseries artifact and the
+   * mergeable histogram are both derived from it, and every chart reads those — so
+   * once they exist the stream is redundant. It is also the largest file a run
+   * produces (hundreds of KB to hundreds of MB on long high-RPS runs), which is why
+   * it now defaults to `false` (deleted after the report is built). Set `true` to
+   * keep it for ad-hoc re-analysis or external tooling.
    */
   keepRawMetricsStream?: boolean;
 }
@@ -151,7 +152,7 @@ export const FRAMEWORK_DEFAULTS: RuntimeSettings = {
       // Default 1-second granularity per Proposal 5. Users can raise this
       // for long-running tests where HTML size or memory matter.
       bucketSizeSeconds: 1,
-      keepRawMetricsStream: true,
+      keepRawMetricsStream: false,
     },
   },
   errors: {

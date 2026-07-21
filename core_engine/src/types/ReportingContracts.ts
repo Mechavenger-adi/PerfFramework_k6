@@ -131,6 +131,20 @@ export interface TimeSeriesFile {
   };
 }
 
+/**
+ * The single derived summary artifact (`run-summary.json`): the run-level CI gate
+ * PLUS the full per-transaction table. Replaces the old transaction-metrics.json +
+ * ci-summary.json pair, which each carried their own copy of the per-transaction
+ * array (ci-summary's was a subset — no scenario, no std/p90). Consumers that only
+ * need the gate read the top-level fields; the report/merge read `transactions`.
+ */
+export interface RunSummaryFile extends Omit<CiSummary, 'transactions'> {
+  /** Configured transaction stats — the column set for `transactions`. */
+  stats: string[];
+  /** Full per-transaction rows, keyed by (journey/scenario, transaction). */
+  transactions: TransactionMetricRow[];
+}
+
 /** One per-(scenario, transaction) time series. Tags are explicit fields. */
 export interface TransactionSeries {
   scenario: string;

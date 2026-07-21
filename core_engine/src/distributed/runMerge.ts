@@ -17,7 +17,7 @@ import { MergeEngine, MachineArtifacts } from './MergeEngine';
 import { MergedReportBuilder, MachineTimeseries } from './MergedReportBuilder';
 import { readTransactionCsvRaw, findTransactionCsv, findRequestCsv, readRequestFailByBucket, readRequestTimings, buildTransactionRowsFromCsv } from './transactionCsv';
 import { percentileR7 } from '../reporting/Histogram';
-import { CiSummary, TimeSeriesFile, TransactionMetricsFile } from '../types/ReportingContracts';
+import { CiSummary, TimeSeriesFile, TransactionMetricsFile, RunSummaryFile } from '../types/ReportingContracts';
 import { HistogramArtifact } from '../reporting/HistogramArtifactBuilder';
 
 const MERGED_DIR = '_merged';
@@ -129,11 +129,12 @@ export async function runMerge(options: MergeCliOptions): Promise<boolean> {
     .filter((dir) => fs.statSync(dir).isDirectory())
     .filter((dir) =>
       fs.existsSync(path.join(dir, 'metrics-histogram.json')) ||
+      fs.existsSync(path.join(dir, 'run-summary.json')) ||
       fs.existsSync(path.join(dir, 'transaction-metrics.json')));
 
   if (machineDirs.length === 0) {
     Logger.error(`[merge] no per-machine artifact folders found under ${runDir}`);
-    Logger.detail('Expected layout: <run-dir>/<machineName>/{transaction-metrics.json, metrics-histogram.json, ...}');
+    Logger.detail('Expected layout: <run-dir>/<machineName>/{run-summary.json, metrics-histogram.json, ...}');
     return false;
   }
 
@@ -145,9 +146,17 @@ export async function runMerge(options: MergeCliOptions): Promise<boolean> {
 
   for (const dir of machineDirs) {
     const machineName = path.basename(dir);
-    const tm = readJson<TransactionMetricsFile>(path.join(dir, 'transaction-metrics.json'));
+    // One consolidated per-machine summary. Older collected runs shipped the pair
+    // (transaction-metrics.json + ci-summary.json) — fall back to those so previously
+    // collected runs still merge.
+    const rs = readJson<RunSummaryFile>(path.join(dir, 'run-summary.json'));
+    const tm = rs
+      ? { runId: rs.runId, stats: rs.stats ?? [], transactions: rs.transactions ?? [] }
+      : readJson<TransactionMetricsFile>(path.join(dir, 'transaction-metrics.json'));
     const hist = readJson<HistogramArtifact>(path.join(dir, 'metrics-histogram.json'));
-    const ci = readJson<CiSummary>(path.join(dir, 'ci-summary.json'));
+    const ci = rs
+      ? ({ ...rs, transactions: [] } as unknown as CiSummary)
+      : readJson<CiSummary>(path.join(dir, 'ci-summary.json'));
     const ts = readJson<TimeSeriesFile>(path.join(dir, 'timeseries.json'));
     const manifest = readJson<{ runId?: string; testId?: string; scriptHash?: string; plan?: { name?: string; environment?: string; executionMode?: string } }>(path.join(dir, 'run-manifest.json'));
 
@@ -243,8 +252,12 @@ export async function runMerge(options: MergeCliOptions): Promise<boolean> {
   const outDir = options.out ? path.resolve(options.out) : path.join(finalParent, finalFolder);
   fs.mkdirSync(outDir, { recursive: true });
 
-  ArtifactWriter.writeJson(path.join(outDir, 'transaction-metrics.json'), merge.transactionMetrics);
-  ArtifactWriter.writeJson(path.join(outDir, 'ci-summary.json'), merge.ciSummary);
+  // ONE consolidated summary artifact (gate + full per-transaction table).
+  ArtifactWriter.writeJson(path.join(outDir, 'run-summary.json'), {
+    ...merge.ciSummary,
+    stats: merge.transactionMetrics.stats,
+    transactions: merge.transactionMetrics.transactions,
+  });
   ArtifactWriter.writeJson(path.join(outDir, 'timeseries.json'), timeseries);
   if (merge.histogram) ArtifactWriter.writeJson(path.join(outDir, 'metrics-histogram.json'), merge.histogram);
   ArtifactWriter.writeJson(path.join(outDir, 'run-manifest.json'), {

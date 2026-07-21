@@ -27,7 +27,11 @@ function mostRecentRunDir(): string | null {
     if (!fs.statSync(planDir).isDirectory()) continue;
     for (const run of fs.readdirSync(planDir)) {
       const runDir = path.join(planDir, run);
-      if (fs.existsSync(path.join(runDir, 'metrics-stream.json')) && fs.existsSync(path.join(runDir, 'transaction-metrics.json'))) {
+      // run-summary.json is the current consolidated artifact; transaction-metrics.json
+      // is the legacy pair member, still accepted for older run folders.
+      const hasTxns = fs.existsSync(path.join(runDir, 'run-summary.json'))
+        || fs.existsSync(path.join(runDir, 'transaction-metrics.json'));
+      if (fs.existsSync(path.join(runDir, 'metrics-stream.json')) && hasTxns) {
         candidates.push({ dir: runDir, mtime: fs.statSync(runDir).mtimeMs });
       }
     }
@@ -51,7 +55,10 @@ function statFraction(stat: string): number | null {
   }
   console.log(`Validating histogram vs k6 recorded numbers for:\n  ${runDir}\n`);
 
-  const tm = JSON.parse(fs.readFileSync(path.join(runDir, 'transaction-metrics.json'), 'utf-8')) as TransactionMetricsFile;
+  // Prefer the consolidated run-summary.json; fall back to the legacy file.
+  const runSummaryPath = path.join(runDir, 'run-summary.json');
+  const txnSource = fs.existsSync(runSummaryPath) ? runSummaryPath : path.join(runDir, 'transaction-metrics.json');
+  const tm = JSON.parse(fs.readFileSync(txnSource, 'utf-8')) as TransactionMetricsFile;
   const txnNames = tm.transactions.map((t) => t.transaction);
   const art = await HistogramArtifactBuilder.build(path.join(runDir, 'metrics-stream.json'), {
     bucketSeconds: 10, relativeAccuracy: 0.001, transactionNames: txnNames,

@@ -760,7 +760,6 @@ program
     const safeRunLogPath = runLogPath.replace(/\\/g, '/');
 
     const extraArgs: string[] = [
-      '--summary-export', `${safeReportDir}/summary.json`,
       '--out', `web-dashboard=export=${safeReportDir}/TestSummary.html`,
       '--out', `json=${safeMetricsStreamPath}`,
       // Send k6 log output (console.log, framework events) ONLY to the log
@@ -1002,8 +1001,7 @@ program
 
     Logger.pass(distributed ? 'Run artifacts generated (distributed: per-machine HTML suppressed)' : 'Unified report artifacts generated');
     if (!distributed) Logger.detail(`Unified HTML report: ${generatedArtifacts.runReportHtml}`);
-    Logger.detail(`Transaction metrics: ${generatedArtifacts.transactionMetricsJson}`);
-    Logger.detail(`CI summary: ${generatedArtifacts.ciSummaryJson}`);
+    Logger.detail(`Run summary (gate + transactions): ${generatedArtifacts.runSummaryJson}`);
 
     if (generatedArtifacts.transactionMetrics) {
       printTransactionTable(generatedArtifacts.transactionMetrics);
@@ -1396,14 +1394,12 @@ function writeRunManifest(
     runtime: scenarioMetadata.runtime,
     artifacts: {
       reportDir,
-      summaryJson: `${reportDir}/summary.json`,
-      testDetailsHtml: `${reportDir}/TestDetails.html`,
+      handleSummaryJson: `${reportDir}/handleSummary.json`,
       testSummaryHtml: `${reportDir}/TestSummary.html`,
       runReportHtml: `${reportDir}/RunReport.html`,
-      transactionMetricsJson: `${reportDir}/transaction-metrics.json`,
+      runSummaryJson: `${reportDir}/run-summary.json`,
       errorsNdjson: `${reportDir}/errors.ndjson`,
       warningsNdjson: `${reportDir}/warnings.ndjson`,
-      ciSummaryJson: `${reportDir}/ci-summary.json`,
       timeseriesJson: `${reportDir}/timeseries.json`,
       systemMetricsJson: `${reportDir}/system-metrics.json`,
       runManifest: runManifestPath.replace(/\\/g, '/'),
@@ -1531,41 +1527,47 @@ async function finalizeRunArtifacts(options: {
   execution?: { command: string; entryScript: string; options: unknown };
 }): Promise<{
   runReportHtml: string;
-  transactionMetricsJson: string;
+  /** Consolidated CI gate + per-transaction table (replaces transaction-metrics + ci-summary). */
+  runSummaryJson: string;
   errorsNdjson: string;
   warningsNdjson: string;
-  ciSummaryJson: string;
   timeseriesJson: string;
   systemMetricsJson: string;
   transactionMetrics?: import('../types/ReportingContracts').TransactionMetricsFile;
 }> {
-  const summaryPath = path.join(options.reportDir, 'summary.json');
+  // handleSummary.json is the single k6 summary artifact. k6's `--summary-export`
+  // (summary.json) carried the SAME 48 metrics + root_group in a flatter format but
+  // WITHOUT the metric type/contains metadata, options and state — a strict subset in
+  // a larger file — so it is no longer written. A legacy summary.json is still read
+  // as a fallback for re-generating reports from older run folders.
+  const legacySummaryPath = path.join(options.reportDir, 'summary.json');
   const handleSummaryPath = path.join(options.reportDir, 'handleSummary.json');
-  const transactionMetricsPath = path.join(options.reportDir, 'transaction-metrics.json');
   const errorsPath = path.join(options.reportDir, 'errors.ndjson');
   const warningsPath = path.join(options.reportDir, 'warnings.ndjson');
-  const ciSummaryPath = path.join(options.reportDir, 'ci-summary.json');
   const timeseriesPath = path.join(options.reportDir, 'timeseries.json');
   const systemMetricsPath = path.join(options.reportDir, 'system-metrics.json');
   const runReportPath = path.join(options.reportDir, 'RunReport.html');
+  // ONE derived summary artifact: the CI gate + the full per-transaction table.
+  // Replaces the old transaction-metrics.json + ci-summary.json pair, which each
+  // carried their own copy of the per-transaction array.
+  const runSummaryPath = path.join(options.reportDir, 'run-summary.json');
 
-  if (!fs.existsSync(summaryPath) && !fs.existsSync(handleSummaryPath)) {
-    Logger.warn(`summary.json not found at ${summaryPath}. Unified report generation skipped for this run.`);
+  if (!fs.existsSync(handleSummaryPath) && !fs.existsSync(legacySummaryPath)) {
+    Logger.warn(`handleSummary.json not found at ${handleSummaryPath}. Unified report generation skipped for this run.`);
     return {
       runReportHtml: runReportPath,
-      transactionMetricsJson: transactionMetricsPath,
+      runSummaryJson: runSummaryPath,
       errorsNdjson: errorsPath,
       warningsNdjson: warningsPath,
-      ciSummaryJson: ciSummaryPath,
       timeseriesJson: timeseriesPath,
       systemMetricsJson: systemMetricsPath,
       transactionMetrics: undefined,
     };
   }
 
-  // Prefer handleSummary.json (richer format with Trend metric counts and array-based groups)
-  // over --summary-export's flat format
-  const primarySummaryPath = fs.existsSync(handleSummaryPath) ? handleSummaryPath : summaryPath;
+  // handleSummary.json is authoritative; fall back to a legacy summary.json only
+  // when re-generating from an older run folder.
+  const primarySummaryPath = fs.existsSync(handleSummaryPath) ? handleSummaryPath : legacySummaryPath;
   const summaryData = JSON.parse(fs.readFileSync(primarySummaryPath, 'utf-8')) as {
     metrics?: Record<string, {
       type?: string;
@@ -1774,10 +1776,14 @@ async function finalizeRunArtifacts(options: {
     }
   }
 
-  ArtifactWriter.writeJson(transactionMetricsPath, transactionMetrics);
+  // ONE derived summary file: gate fields + the full per-transaction table.
+  ArtifactWriter.writeJson(runSummaryPath, {
+    ...ciSummary,
+    stats: transactionMetrics.stats,
+    transactions: transactionMetrics.transactions,
+  });
   ArtifactWriter.writeNdjson(errorsPath, eventArtifacts.errors as unknown as Array<Record<string, unknown>>);
   ArtifactWriter.writeNdjson(warningsPath, eventArtifacts.warnings as unknown as Array<Record<string, unknown>>);
-  ArtifactWriter.writeJson(ciSummaryPath, ciSummary);
   ArtifactWriter.writeJson(timeseriesPath, timeseries);
   ArtifactWriter.writeJson(systemMetricsPath, {
     snapshots: options.hostSnapshots,
@@ -1922,7 +1928,7 @@ async function finalizeRunArtifacts(options: {
       timeseriesEnabled: runtime.isTimeseriesEnabled(),
     },
     summary: {
-      rawSummaryPath: summaryPath.replace(/\\/g, '/'),
+      rawSummaryPath: primarySummaryPath.replace(/\\/g, '/'),
       ciSummary,
       planProfile,
       runtimeSnapshot,
@@ -1967,10 +1973,9 @@ async function finalizeRunArtifacts(options: {
 
   return {
     runReportHtml: runReportPath,
-    transactionMetricsJson: transactionMetricsPath,
+    runSummaryJson: runSummaryPath,
     errorsNdjson: errorsPath,
     warningsNdjson: warningsPath,
-    ciSummaryJson: ciSummaryPath,
     timeseriesJson: timeseriesPath,
     systemMetricsJson: systemMetricsPath,
     transactionMetrics,
