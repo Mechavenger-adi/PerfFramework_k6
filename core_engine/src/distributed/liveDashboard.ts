@@ -92,8 +92,8 @@ function page(intervalMs: number): string {
   </div>
   <h2>Fleet</h2><div class="scroll"><table id="fleet"></table></div>
   <h2>Host resources</h2><div class="scroll"><table id="resources"></table></div>
-  <h2>Combined transactions</h2>
-  <input id="txnFilter" class="filter" placeholder="filter by transaction…" oninput="txnFilter=this.value.toLowerCase(); renderTxns();">
+  <h2>Results by scenario &amp; transaction</h2>
+  <input id="txnFilter" class="filter" placeholder="filter by scenario or transaction…" oninput="txnFilter=this.value.toLowerCase(); renderTxns();">
   <div class="scroll"><table id="txns"></table></div>
   <h2>Errors &amp; warnings</h2><div id="events" class="events"></div>
   <div class="note">Percentiles are histogram-based (≤0.1%); the bit-exact numbers are in the final report. Counts, throughput, min, max and avg are exact.</div>
@@ -110,7 +110,7 @@ document.getElementById('btn-abort').onclick=()=>{ if(confirm('ABORT now?\\nk6 i
 const n0 = x => (x==null?'-':Number(x).toFixed(0));
 const n1 = x => (x==null?'-':Number(x).toFixed(1));
 function kpi(l,v){ return '<div class="kpi"><div class="v">'+v+'</div><div class="l">'+l+'</div></div>'; }
-const hist=[]; const MAXPTS=600; let frozen=false; let prevReq=null;
+let hist=[];
 let lastTxns=[], lastStats=[], txnSort='count', txnDir=-1, txnFilter='';
 function setSort(k){ if(txnSort===k) txnDir=-txnDir; else { txnSort=k; txnDir=(k==='name')?1:-1; } renderTxns(); }
 function renderTxns(){
@@ -184,18 +184,12 @@ async function tick(){
   const ev=d.events||{errorCount:0,warnCount:0,recentErrors:[],recentWarnings:[]};
   document.getElementById('kpis').innerHTML =
     kpi('Active VUs',d.totals.vus)+kpi('Transactions',d.totals.txns)+kpi('Throughput/s',n1(d.totals.tps))+kpi('Req fail %',n1(d.totals.reqFailRate))+kpi('Errors',ev.errorCount)+kpi('Warnings',ev.warnCount);
-  // VUs + failure-rate over time (freeze once all machines finish)
-  // Chart plots the PER-INTERVAL failure rate (Δfailed/Δtotal since the last poll),
-  // not the cumulative reqFailRate — the cumulative one only ever climbs and flattens,
-  // which hides WHEN failures happened. The KPI card above still shows the overall %.
-  if(!frozen){
-    const rt=Number(d.totals.reqTotal)||0, rf=Number(d.totals.reqFailed)||0;
-    let ierr=0;
-    if(prevReq){ const dT=rt-prevReq.rt, dF=rf-prevReq.rf; ierr=dT>0?Math.max(0,Math.min(100,(dF/dT)*100)):0; }
-    prevReq={rt,rf};
-    hist.push({t:Date.now(), vus:Number(d.totals.vus)||0, err:ierr});
-    if(hist.length>MAXPTS) hist.shift(); if(d.allDone) frozen=true;
-  }
+  // VUs + failure-rate over time. The series is built SERVER-side (from when the
+  // monitor started) and shipped whole, so opening this page mid-test still shows the
+  // full run instead of starting the graph from the moment you opened it. The server
+  // also computes the PER-INTERVAL failure rate and freezes the series when the fleet
+  // finishes. The KPI card above still shows the cumulative overall %.
+  hist = d.history || [];
   drawChart();
   // fleet
   let f='<thead><tr><th>Machine</th><th>State</th><th>Elapsed</th><th>Active VUs</th><th>Txns</th><th>Err%</th><th>TPS</th></tr></thead><tbody>';
@@ -230,6 +224,38 @@ export function startDashboardServer(
   const runIdFolder = path.dirname(o.dir);
   const runId = o.runId || path.basename(runIdFolder);
   const controlDir = path.join(runIdFolder, 'control');
+
+  // ── Chart history, accumulated SERVER-side ──────────────────────────────
+  // The browser used to build this itself, one point per poll, so opening the
+  // dashboard mid-test lost everything before that moment (and two tabs disagreed).
+  // The monitor process samples from the moment it starts and serves the whole
+  // series, so any browser — opened at any time — sees the full run.
+  const MAXPTS = 600;
+  const history: Array<{ t: number; vus: number; err: number }> = [];
+  let prevReq: { rt: number; rf: number } | null = null;
+  let histFrozen = false;
+  const sampleHistory = (): void => {
+    if (histFrozen) return;
+    const agg = aggregate(o.dir);
+    if (agg.machineCount === 0) return; // nothing running yet — don't seed a flat lead-in
+    const rt = agg.totals.reqTotal || 0;
+    const rf = agg.totals.reqFailed || 0;
+    // Per-interval failure rate (Δfailed/Δtotal), not the cumulative rate — the
+    // cumulative one only climbs and hides WHEN failures happened.
+    let err = 0;
+    if (prevReq) {
+      const dT = rt - prevReq.rt;
+      const dF = rf - prevReq.rf;
+      err = dT > 0 ? Math.max(0, Math.min(100, (dF / dT) * 100)) : 0;
+    }
+    prevReq = { rt, rf };
+    history.push({ t: Date.now(), vus: agg.totals.vus || 0, err });
+    if (history.length > MAXPTS) history.shift();
+    if (agg.allDone) histFrozen = true; // freeze the chart once the fleet finishes
+  };
+  const histTimer = setInterval(sampleHistory, Math.max(1000, o.intervalMs));
+  if (histTimer.unref) histTimer.unref();
+  sampleHistory();
 
   // ── Auto-merge state: fire once when every machine has finished. ──
   let mergeState: 'idle' | 'merging' | 'done' | 'failed' = 'idle';
@@ -281,7 +307,12 @@ export function startDashboardServer(
       return;
     }
     if (url === '/data.json') {
-      const body = JSON.stringify({ ...aggregate(o.dir), controller: controllerHost(), merge: { state: mergeState, report: finalReport } });
+      const body = JSON.stringify({
+        ...aggregate(o.dir),
+        controller: controllerHost(),
+        merge: { state: mergeState, report: finalReport },
+        history, // server-side series → a browser opened mid-test still sees the whole run
+      });
       res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
       res.end(body);
       return;
@@ -317,7 +348,11 @@ export async function runDashboardCli(o: DashboardOptions): Promise<void> {
     // OSC 8 hyperlink → clickable in modern terminals (VS Code, Windows Terminal, iTerm).
     const clickable = `\x1b]8;;${url}\x07${url}\x1b]8;;\x07`;
     Logger.header('k6-framework — distributed live dashboard');
+    // Print BOTH forms: the OSC-8 hyperlink (ctrl/cmd-click in VS Code, Windows
+    // Terminal, iTerm) and the bare URL on its own line. Terminals that don't grok
+    // OSC 8 still get a plain URL they can auto-linkify or copy.
     Logger.pass(`Serving at ${clickable}`);
+    Logger.detail(`Open: ${url}`);
     Logger.detail(`Live dir: ${ctx.liveDir}`);
     Logger.detail(o.autoMerge === false ? 'Auto-merge: off (run `merge` manually).' : 'Auto-merge: on — the final report builds automatically when all machines finish.');
     if (o.host === '0.0.0.0') Logger.detail('Bound to all interfaces — shareable across the network once the firewall port is open.');

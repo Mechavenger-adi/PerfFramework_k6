@@ -2420,7 +2420,7 @@
     "file": "core_engine/src/distributed/liveAggregate.ts",
     "jsdoc": "",
     "kind": "interface",
-    "line": 127,
+    "line": 131,
     "name": "MergedTxn"
   },
   "core_engine/src/distributed/liveAggregate.ts#RunContext": {
@@ -2436,7 +2436,7 @@
     "file": "core_engine/src/distributed/liveAggregate.ts",
     "jsdoc": "Merge all heartbeats in `dir` into one combined live view.",
     "kind": "function",
-    "line": 153,
+    "line": 157,
     "name": "aggregate"
   },
   "core_engine/src/distributed/liveAggregate.ts#controllerHost": {
@@ -2476,7 +2476,7 @@
     "file": "core_engine/src/distributed/liveAggregate.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 129,
+    "line": 133,
     "name": "mergeTransactions"
   },
   "core_engine/src/distributed/liveAggregate.ts#readSnapshots": {
@@ -2484,7 +2484,7 @@
     "file": "core_engine/src/distributed/liveAggregate.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 87,
+    "line": 91,
     "name": "readSnapshots"
   },
   "core_engine/src/distributed/liveAggregate.ts#resolveLiveDir": {
@@ -2516,7 +2516,7 @@
     "file": "core_engine/src/distributed/liveAggregate.ts",
     "jsdoc": "Parse a stat label into a percentile fraction in [0,1], or null if not a percentile.",
     "kind": "function",
-    "line": 101,
+    "line": 105,
     "name": "statToFraction"
   },
   "core_engine/src/distributed/liveAggregate.ts#statValue": {
@@ -2524,7 +2524,7 @@
     "file": "core_engine/src/distributed/liveAggregate.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 109,
+    "line": 113,
     "name": "statValue"
   },
   "core_engine/src/distributed/liveAggregate.ts#timingStats": {
@@ -2532,7 +2532,7 @@
     "file": "core_engine/src/distributed/liveAggregate.ts",
     "jsdoc": "Keep only stats a response-time histogram can produce (drop count/pass/fail/std/etc).",
     "kind": "function",
-    "line": 119,
+    "line": 123,
     "name": "timingStats"
   },
   "core_engine/src/distributed/liveDashboard.ts#DashboardOptions": {
@@ -2556,7 +2556,7 @@
     "file": "core_engine/src/distributed/liveDashboard.ts",
     "jsdoc": "CLI handler for `k6-framework monitor --serve`. Keeps running until interrupted.",
     "kind": "function",
-    "line": 304,
+    "line": 335,
     "name": "runDashboardCli"
   },
   "core_engine/src/distributed/liveDashboard.ts#startDashboardServer": {
@@ -2564,7 +2564,7 @@
     "file": "core_engine/src/distributed/liveDashboard.ts",
     "jsdoc": "Start the live dashboard HTTP server. Resolves once listening.",
     "kind": "function",
-    "line": 224,
+    "line": 218,
     "name": "startDashboardServer"
   },
   "core_engine/src/distributed/monitor.ts#MonitorOptions": {

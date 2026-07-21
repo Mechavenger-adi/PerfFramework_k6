@@ -39,3 +39,48 @@ Yes — run `npm run cli` on a TTY with no subcommand, or `npm run cli -- menu`.
 
 **Where's the field-level config reference?**
 [configuration-reference.md](configuration-reference.md) (generated from JSON schemas).
+
+**k6 crashes at startup with `fatal error: concurrent map read and map write`**
+This is a **bug in k6 itself**, not the framework, and it only bites when **more than one
+scenario** loads CSV test data via the experimental CSV module. The stack trace names
+`experimental/csv` → `NewSharedArrayFrom` → `sobek`:
+
+```
+fatal error: concurrent map read and map write
+  .../k6/experimental/csv/module.go   (*ModuleInstance).Parse.func1
+  .../k6/data/share.go                sharedArray.wrap
+```
+
+`csv.parse()` does its work in a **background goroutine** that reaches into the shared JS
+runtime ([`module.go`](https://github.com/grafana/k6) — k6's own comment notes the module
+instance is shared in the RootModule). With two scenarios initialising at the same time,
+two goroutines touch that shared state and Go aborts the process. Nothing in your test plan
+causes it, and it is intermittent — it depends on init timing.
+
+**Fix: load the data with `open()` + `SharedArray` instead of `csv.parse()`.** This is the
+long-standing, non-experimental k6 pattern; `SharedArray` construction is serialised by k6,
+parses once, and is shared across all VUs and scenarios:
+
+```js
+import { SharedArray } from 'k6/data';
+
+// Parsed ONCE at init, shared by every VU in every scenario.
+const members = new SharedArray('members', () => {
+  const text = open('./data/members.csv');           // relative to the script
+  const [header, ...rows] = text.trim().split('\n');
+  const cols = header.split(',');
+  return rows.map((line) => {
+    const cells = line.split(',');
+    return Object.fromEntries(cols.map((c, i) => [c.trim(), (cells[i] ?? '').trim()]));
+  });
+});
+
+export default function () {
+  const row = members[(__VU + __ITER) % members.length];
+  // …
+}
+```
+
+Keep the `SharedArray` **name** constant — that is what lets k6 store one copy. If your CSV
+has quoted fields containing commas, parse accordingly inside the callback (the callback runs
+once, so cost is irrelevant).

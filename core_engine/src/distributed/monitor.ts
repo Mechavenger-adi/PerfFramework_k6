@@ -2,7 +2,7 @@
  * monitor.ts
  * Controller (aggregator) console view of a distributed run. Renders two live panels
  * from the shared heartbeats (see liveAggregate): FLEET (per-machine health) and
- * COMBINED TRANSACTIONS (merged across machines). Reads only; no inbound port. The
+ * RESULTS BY SCENARIO & TRANSACTION (merged across machines). Reads only; no inbound port. The
  * browser equivalent is liveDashboard.ts — both share `aggregate()`.
  */
 
@@ -54,9 +54,9 @@ function render(agg: LiveAggregate, dir: string): string {
     out.push(`${ansi.dim}${padR('controller', 14)} ${padR('(monitor)', 9)} ${padL('', 8)} ${padL('', 5)} ${padL('', 8)} ${padL('', 7)} ${padL('', 8)} ${padL(agg.controller.cpu.toFixed(0), 6)} ${padL(agg.controller.mem.toFixed(0), 6)}${ansi.reset}`);
   }
 
-  // ── COMBINED TRANSACTIONS ──
+  // ── RESULTS BY SCENARIO & TRANSACTION ──
   out.push('');
-  out.push(`${ansi.bold}COMBINED TRANSACTIONS${ansi.reset} ${ansi.dim}(merged across machines; percentiles ≤0.1% — exact in the final report)${ansi.reset}`);
+  out.push(`${ansi.bold}RESULTS BY SCENARIO & TRANSACTION${ansi.reset} ${ansi.dim}(merged across machines; percentiles ≤0.1% — exact in the final report)${ansi.reset}`);
   // Scenario column only when transactions carry one (multi-journey / distributed),
   // so same-named transactions from different journeys are distinguishable.
   const hasScen = agg.transactions.some((t) => t.scenario);

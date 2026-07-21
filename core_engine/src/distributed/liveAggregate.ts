@@ -75,7 +75,11 @@ export function resolveRunContext(o: { liveDir?: string; collectDir?: string; ru
 /** The newest Final_… report under a shared dir, or null. */
 export function findLatestFinalReport(sharedDir: string): string | null {
   try {
-    const finals = fs.readdirSync(sharedDir).filter((f) => f.startsWith('Final_')).map((f) => path.join(sharedDir, f));
+    // The merge writes Final_<name>_<ts> as a SIBLING of `shared` (i.e. into the runId
+    // folder), NOT inside it — mirror runMerge's `finalParent` logic or we look in the
+    // wrong place, find nothing, and wrongly report the auto-merge as failed.
+    const base = path.basename(sharedDir) === 'shared' ? path.dirname(sharedDir) : sharedDir;
+    const finals = fs.readdirSync(base).filter((f) => f.startsWith('Final_')).map((f) => path.join(base, f));
     if (finals.length === 0) return null;
     finals.sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs);
     return path.join(finals[0], 'RunReport.html');
