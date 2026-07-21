@@ -15,7 +15,7 @@ import { percentileR7, RelativeHistogram } from '../reporting/Histogram';
 import { HistogramArtifact } from '../reporting/HistogramArtifactBuilder';
 import {
   ReportBundle, TimeSeriesFile, TimeSeriesPoint, TransactionMetricsFile, CiSummary,
-  TransactionSeries, normalizeTransactionSeries,
+  TransactionSeries,
 } from '../types/ReportingContracts';
 import { MergeResult } from './MergeEngine';
 
@@ -129,7 +129,7 @@ export class MergedReportBuilder {
       // ── per-transaction: concat raw durations by ts (exact merge) ──
       // Grouped by (scenario, transaction) — both tags are explicit fields on the
       // series, so machines merge on the tag pair, never on a name alone.
-      for (const series of normalizeTransactionSeries(f.series.transactions)) {
+      for (const series of f.series.transactions ?? []) {
         let byTxn = txns.get(series.scenario);
         if (!byTxn) { byTxn = new Map(); txns.set(series.scenario, byTxn); }
         let map = byTxn.get(series.transaction);

@@ -129,8 +129,7 @@ export async function runMerge(options: MergeCliOptions): Promise<boolean> {
     .filter((dir) => fs.statSync(dir).isDirectory())
     .filter((dir) =>
       fs.existsSync(path.join(dir, 'metrics-histogram.json')) ||
-      fs.existsSync(path.join(dir, 'run-summary.json')) ||
-      fs.existsSync(path.join(dir, 'transaction-metrics.json')));
+      fs.existsSync(path.join(dir, 'run-summary.json')));
 
   if (machineDirs.length === 0) {
     Logger.error(`[merge] no per-machine artifact folders found under ${runDir}`);
@@ -146,17 +145,13 @@ export async function runMerge(options: MergeCliOptions): Promise<boolean> {
 
   for (const dir of machineDirs) {
     const machineName = path.basename(dir);
-    // One consolidated per-machine summary. Older collected runs shipped the pair
-    // (transaction-metrics.json + ci-summary.json) — fall back to those so previously
-    // collected runs still merge.
+    // One consolidated per-machine summary: the CI gate + the per-transaction table.
     const rs = readJson<RunSummaryFile>(path.join(dir, 'run-summary.json'));
-    const tm = rs
+    const tm: TransactionMetricsFile | undefined = rs
       ? { runId: rs.runId, stats: rs.stats ?? [], transactions: rs.transactions ?? [] }
-      : readJson<TransactionMetricsFile>(path.join(dir, 'transaction-metrics.json'));
+      : undefined;
     const hist = readJson<HistogramArtifact>(path.join(dir, 'metrics-histogram.json'));
-    const ci = rs
-      ? ({ ...rs, transactions: [] } as unknown as CiSummary)
-      : readJson<CiSummary>(path.join(dir, 'ci-summary.json'));
+    const ci = rs ? ({ ...rs, transactions: [] } as unknown as CiSummary) : undefined;
     const ts = readJson<TimeSeriesFile>(path.join(dir, 'timeseries.json'));
     const manifest = readJson<{ runId?: string; testId?: string; scriptHash?: string; plan?: { name?: string; environment?: string; executionMode?: string } }>(path.join(dir, 'run-manifest.json'));
 

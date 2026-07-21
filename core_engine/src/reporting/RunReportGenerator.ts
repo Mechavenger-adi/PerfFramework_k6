@@ -552,13 +552,9 @@ export class RunReportGenerator {
     // Per-transaction series carry their TAGS as explicit fields:
     //   { scenario, transaction, points[] }
     // so same-named transactions from different journeys stay separate and nothing
-    // here has to encode or decode a key. Artifacts written before transactions were
-    // scenario-aware used an object keyed by transaction name — normalize that shape
-    // so older reports still render.
+    // here has to encode or decode a key.
     function txnSeriesList() {
-      const t = (reportData.timeseries && reportData.timeseries.series && reportData.timeseries.series.transactions) || [];
-      if (Array.isArray(t)) return t;
-      return Object.keys(t).map(function (name) { return { scenario: '', transaction: name, points: t[name] || [] }; });
+      return (reportData.timeseries && reportData.timeseries.series && reportData.timeseries.series.transactions) || [];
     }
     function txnLabel(s){ return s.scenario ? s.scenario + ' / ' + s.transaction : s.transaction; }
 
@@ -1674,11 +1670,9 @@ export class RunReportGenerator {
           const copy = Object.assign({}, r);
           // Surface journey under a scenario field so the table can show it.
           copy.scenario = r.journey ? String(r.journey) : '';
-          // Match the series on BOTH tags; fall back to a name-only match for legacy
-          // artifacts written before transactions carried a scenario.
+          // Match the series on BOTH tags — (scenario, transaction) is the identity.
           const scen = String(r.journey || '');
-          const series = txnSeries.find((s) => s.transaction === r.transaction && s.scenario === scen)
-            || txnSeries.find((s) => s.transaction === r.transaction && !s.scenario);
+          const series = txnSeries.find((s) => s.transaction === r.transaction && s.scenario === scen);
           if (series) {
             const durs = [];
             for (const b of series.points) { if (Array.isArray(b.durations)) { for (const d of b.durations) durs.push(Number(d)); } }

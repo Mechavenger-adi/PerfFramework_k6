@@ -2748,7 +2748,7 @@
     "file": "core_engine/src/distributed/runMerge.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 294,
+    "line": 289,
     "name": "validateManifests"
   },
   "core_engine/src/distributed/runMerge.ts#waitForMachines": {
@@ -4388,7 +4388,7 @@
     "file": "core_engine/src/types/ReportingContracts.ts",
     "jsdoc": "",
     "kind": "interface",
-    "line": 185,
+    "line": 170,
     "name": "ReportBundle"
   },
   "core_engine/src/types/ReportingContracts.ts#ReportBundleConfig": {
@@ -4396,7 +4396,7 @@
     "file": "core_engine/src/types/ReportingContracts.ts",
     "jsdoc": "",
     "kind": "interface",
-    "line": 179,
+    "line": 164,
     "name": "ReportBundleConfig"
   },
   "core_engine/src/types/ReportingContracts.ts#ReportBundleMeta": {
@@ -4404,7 +4404,7 @@
     "file": "core_engine/src/types/ReportingContracts.ts",
     "jsdoc": "",
     "kind": "interface",
-    "line": 169,
+    "line": 154,
     "name": "ReportBundleMeta"
   },
   "core_engine/src/types/ReportingContracts.ts#RunSummaryFile": {
@@ -4412,7 +4412,7 @@
     "file": "core_engine/src/types/ReportingContracts.ts",
     "jsdoc": "The single derived summary artifact (`run-summary.json`): the run-level CI gate PLUS the full per-transaction table. Replaces the old transaction-metrics.json + ci-summary.json pair, which each carried their own copy of the per-transaction array (ci-summary's was a subset — no scenario, no std/p90). Consumers that only need the gate read the top-level fields; the report/merge read `transactions`.",
     "kind": "interface",
-    "line": 141,
+    "line": 140,
     "name": "RunSummaryFile"
   },
   "core_engine/src/types/ReportingContracts.ts#TimeSeriesFile": {
@@ -4452,16 +4452,8 @@
     "file": "core_engine/src/types/ReportingContracts.ts",
     "jsdoc": "One per-(scenario, transaction) time series. Tags are explicit fields.",
     "kind": "interface",
-    "line": 149,
+    "line": 148,
     "name": "TransactionSeries"
-  },
-  "core_engine/src/types/ReportingContracts.ts#normalizeTransactionSeries": {
-    "exported": true,
-    "file": "core_engine/src/types/ReportingContracts.ts",
-    "jsdoc": "Accept both the current array-of-records shape and the legacy Record<transactionName, points[]> shape (artifacts written before transactions were scenario-aware), so previously-collected runs still merge and render. Legacy entries carry an empty scenario — they genuinely had none recorded.",
-    "kind": "function",
-    "line": 161,
-    "name": "normalizeTransactionSeries"
   },
   "core_engine/src/types/TestPlanSchema.ts#DataOverflowStrategy": {
     "exported": true,

@@ -26,8 +26,8 @@ top level, so only the filename changes:
 
 This is a deliberate break of the artifact-stability law (`ai_context/architecture-laws.md`
 L6): the two files each carried their own copy of the per-transaction array, so keeping
-both compatible meant keeping the duplication. The merge still **reads** the legacy pair,
-so previously collected distributed runs continue to merge.
+both compatible meant keeping the duplication. Distributed load testing has not gone live
+yet, so no legacy-artifact fallback is carried — the merge reads `run-summary.json` only.
 
 **Also:** transactions are now identified by **(scenario, transaction)** — same-named
 transactions in different journeys are no longer merged into one row, and the `SCENARIO`

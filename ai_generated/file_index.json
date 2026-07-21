@@ -980,7 +980,7 @@
     ],
     "importsNode": true,
     "layer": "distributed",
-    "loc": 306,
+    "loc": 301,
     "path": "core_engine/src/distributed/runMerge.ts"
   },
   {
@@ -1542,7 +1542,7 @@
     ],
     "importsNode": false,
     "layer": "reporting",
-    "loc": 2750,
+    "loc": 2744,
     "path": "core_engine/src/reporting/RunReportGenerator.ts"
   },
   {
@@ -1821,15 +1821,14 @@
       "TimeSeriesPoint",
       "TransactionMetricRow",
       "TransactionMetricsFile",
-      "TransactionSeries",
-      "normalizeTransactionSeries"
+      "TransactionSeries"
     ],
     "imports": [
       "core_engine/src/types/EventContracts.ts"
     ],
     "importsNode": false,
     "layer": "types",
-    "loc": 199,
+    "loc": 184,
     "path": "core_engine/src/types/ReportingContracts.ts"
   },
   {

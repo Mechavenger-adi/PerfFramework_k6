@@ -409,10 +409,6 @@
       "to": "core_engine/src/reporting/Histogram.ts"
     },
     {
-      "from": "core_engine/src/distributed/MergedReportBuilder.ts",
-      "to": "core_engine/src/types/ReportingContracts.ts"
-    },
-    {
       "from": "core_engine/src/distributed/MergeEngine.ts",
       "to": "core_engine/src/reporting/Histogram.ts"
     },

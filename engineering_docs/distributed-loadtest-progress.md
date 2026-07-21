@@ -49,11 +49,11 @@ sourced from the CSV, with a Scenario column shown when present. Also fixes the 
 scenario label for multi-journey runs.
 | # | Area | Status |
 |---|---|---|
-| 1 | `transactionCsv.ts`: `readTransactionCsvStats` keyed by `txnKey(scenario, txn)` + carries scenario; new `buildTransactionRowsFromCsv(files, stats)` pools by (scenario, txn) → exact R-7 rows. | ✅ |
+| 1 | `transactionCsv.ts`: `readTransactionCsvStats` groups via a private nested `Map<scenario, Map<transaction, …>>` and returns records with both tags as explicit fields; new `buildTransactionRowsFromCsv(files, stats)` pools by (scenario, transaction) → exact R-7 rows. | ✅ |
 | 2 | Live: heartbeat carries `scenario` per txn; `liveAggregate` merges by (scenario, name); dashboard + console monitor show a Scenario column (only when present). | ✅ |
 | 3 | Merged report: `runMerge` rebuilds the transaction table from the pooled machine CSVs (overrides the summary-based rows + the written artifact). | ✅ |
 | 4 | Local report: `run.ts` rebuilds the transaction table from the local CSV when present (else falls back to the summary rows). | ✅ |
-| 5 | Timeseries now scenario-keyed too: new shared `reporting/txnKey.ts` (composite key, SOH separator); `TimeseriesStreamParser` keys per-transaction buckets by `(tags.scenario, name)`; builder fallback + `MergedReportBuilder` pool by composite key; `RunReportGenerator` splits keys for the windowed table + per-transaction graphs (labels shown "scenario / transaction"). So the WINDOWED table AND the over-time per-transaction graphs are now scenario-aware, not just the full-run table. Verified: synthetic stream splits `login` into journeyA/journeyB series. | ✅ |
+| 5 | Timeseries is scenario-aware too, with the TAGS as explicit fields (no composite key): `series.transactions` is now `[{ scenario, transaction, points[] }]`. Grouping is a private nested `Map<scenario, Map<transaction, …>>` in the stream parser / runtime / CSV reader / live aggregate; nothing encodes or decodes a key and nothing serializes one. `RunReportGenerator` reads `s.scenario` / `s.transaction` directly for the windowed table + per-transaction graphs. Verified: a render harness with `login` in two scenarios keeps them separate and the embedded JS parses. | ✅ |
 
 ## Artifact consolidation (2026-07-21) — fewer files per run
 Four overlapping summary artifacts reduced to two, plus the raw stream made transient.
@@ -61,13 +61,12 @@ Four overlapping summary artifacts reduced to two, plus the raw stream made tran
 | Change | Rationale |
 |---|---|
 | **`summary.json` removed** (`--summary-export` flag dropped) | Verified byte-for-byte against `handleSummary.json`: identical 48 metrics + root_group (metric-name diff empty both ways, incl. the `{scenario:…}` tagged sub-metrics). summary.json additionally LACKS metric `type`/`contains`, `options` and `state`, and is the larger file (18 KB vs 11 KB) — a strict subset. `handleSummary.json` is now the single k6 summary artifact; a legacy `summary.json` is still read as a fallback. |
-| **`transaction-metrics.json` + `ci-summary.json` → `run-summary.json`** | Both carried their own copy of the per-transaction array (ci-summary's was a subset — no scenario, no std/p90). One file now holds the run-level gate + the FULL per-transaction table. Merge reads the legacy pair as a fallback. |
+| **`transaction-metrics.json` + `ci-summary.json` → `run-summary.json`** | Both carried their own copy of the per-transaction array (ci-summary's was a subset — no scenario, no std/p90). One file now holds the run-level gate + the FULL per-transaction table. No legacy fallback — distributed has not gone live, so the merge reads `run-summary.json` only. |
 | **`keepRawMetricsStream` default `true` → `false`** | `metrics-stream.json` is purely an INPUT: the timeseries artifact and the mergeable histogram are derived from it and every chart reads those. It is also the largest file a run produces. Deleted after the report is built; set `true` to retain for ad-hoc re-analysis. |
 
-Verified by merging a synthetic 2-machine layout built from a legacy run folder: the
-legacy-pair fallback loaded, the Final folder contained `run-summary.json` (no
-`transaction-metrics.json` / `ci-summary.json` / `summary.json`), and all 9 transaction
-rows carried their real scenario.
+Verified by merging a synthetic 2-machine layout: the Final folder contained
+`run-summary.json` (no `transaction-metrics.json` / `ci-summary.json` / `summary.json`),
+and all 9 transaction rows carried their real scenario.
 
 ## Fixes batch (2026-07-20e) — failure-rate, per-machine health, live x-axis
 | # | Fix | Status |
