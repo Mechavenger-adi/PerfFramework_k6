@@ -67,7 +67,7 @@ export interface LiveStatusSnapshot {
    * controller sums bucket counts across machines → combined avg/min/max/percentiles.
    * A few KB per transaction, independent of request volume. Raw is never shipped.
    */
-  transactions: Array<{ name: string; count: number; fail: number; hist: HistogramJSON }>;
+  transactions: Array<{ scenario: string; name: string; count: number; fail: number; hist: HistogramJSON }>;
 }
 
 export interface HeartbeatOptions {
@@ -145,12 +145,12 @@ export class LiveStatusHeartbeat {
       this.prevCount = stats.totalCount;
       this.prevMs = now;
 
-      const transactions = [...stats.perTxn.entries()]
-        .sort((a, b) => a[0].localeCompare(b[0]))
-        .map(([name, e]) => {
+      const transactions = [...stats.transactions]
+        .sort((a, b) => (a.scenario + a.transaction).localeCompare(b.scenario + b.transaction))
+        .map((e) => {
           const h = new RelativeHistogram();
           for (const t of e.times) h.record(t);
-          return { name, count: e.count, fail: e.fail, hist: h.toJSON() };
+          return { scenario: e.scenario, name: e.transaction, count: e.count, fail: e.fail, hist: h.toJSON() };
         });
 
       const snap: LiveStatusSnapshot = {

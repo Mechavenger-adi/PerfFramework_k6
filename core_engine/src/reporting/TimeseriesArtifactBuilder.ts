@@ -143,12 +143,12 @@ export class TimeseriesArtifactBuilder {
           p95Duration: b.httpDurationPct['95'] ?? b.httpDurationPct['90'] ?? b.httpDurationAvg,
         });
       }
-      for (const [name, buckets] of Object.entries(parsed.transactions)) {
-        for (const b of buckets) {
+      for (const series of parsed.transactions) {
+        for (const b of series.buckets) {
           // Flatten the configured percentiles into durationP90, durationP50, …
           const pctKeys: Record<string, number> = {};
           for (const [k, v] of Object.entries(b.durationPct)) pctKeys['durationP' + k] = v;
-          runtime.addTransactionPoint(name, b.ts, {
+          runtime.addTransactionPoint(series.scenario, series.transaction, b.ts, {
             count: b.count,
             durationAvg: b.durationAvg,
             durationMin: b.durationMin,
@@ -198,7 +198,7 @@ export class TimeseriesArtifactBuilder {
         vusMax: metricVal(metrics.vus_max, 'value'),
       });
       for (const row of options.transactions.transactions) {
-        runtime.addTransactionPoint(row.transaction, endTs, {
+        runtime.addTransactionPoint(String(row.journey ?? ''), row.transaction, endTs, {
           count: row.count,
           pass: row.pass ?? 0,
           fail: row.fail ?? 0,

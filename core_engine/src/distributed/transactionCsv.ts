@@ -9,6 +9,42 @@
  */
 
 import * as fs from 'fs';
+import { percentileR7 } from '../reporting/Histogram';
+import { TransactionMetricRow } from '../types/ReportingContracts';
+
+/**
+ * A transaction is identified by its TAGS — (scenario, transaction). Grouping uses a
+ * private nested Map<scenario, Map<transaction, …>>; the tags are then returned as
+ * explicit fields. Nothing here encodes a composite key, so there is no delimiter to
+ * collide on and callers never decode anything.
+ */
+export interface CsvTransactionAggregate {
+  scenario: string;
+  transaction: string;
+  count: number;
+  fail: number;
+  times: number[];
+}
+
+/** Group into the private nested map, returning the leaf aggregate for a tag pair. */
+function leafFor(
+  root: Map<string, Map<string, CsvTransactionAggregate>>,
+  scenario: string,
+  transaction: string,
+): CsvTransactionAggregate {
+  let byTxn = root.get(scenario);
+  if (!byTxn) { byTxn = new Map<string, CsvTransactionAggregate>(); root.set(scenario, byTxn); }
+  let leaf = byTxn.get(transaction);
+  if (!leaf) { leaf = { scenario, transaction, count: 0, fail: 0, times: [] }; byTxn.set(transaction, leaf); }
+  return leaf;
+}
+
+/** Flatten the nested grouping map into records with the tags as explicit fields. */
+function flatten(root: Map<string, Map<string, CsvTransactionAggregate>>): CsvTransactionAggregate[] {
+  const out: CsvTransactionAggregate[] = [];
+  for (const byTxn of root.values()) for (const leaf of byTxn.values()) out.push(leaf);
+  return out;
+}
 
 /** Minimal RFC-4180-ish line parser (handles quoted fields + escaped quotes). */
 function parseCsvLine(line: string): string[] {
@@ -62,7 +98,9 @@ export function readTransactionCsvRaw(file: string): Record<string, number[]> {
 }
 
 export interface TransactionCsvStats {
-  perTxn: Map<string, { count: number; fail: number; times: number[] }>;
+  /** One record per (scenario, transaction) — same-named transactions in different
+   * journeys stay separate, with both tags as explicit fields. */
+  transactions: CsvTransactionAggregate[];
   totalCount: number;
   totalFail: number;
   /** VU count from the most recent row (approximate "current VUs"). */
@@ -75,7 +113,7 @@ export interface TransactionCsvStats {
  * (fine at heartbeat cadence; the file is small relative to the run).
  */
 export function readTransactionCsvStats(file: string): TransactionCsvStats {
-  const empty: TransactionCsvStats = { perTxn: new Map(), totalCount: 0, totalFail: 0, lastVus: 0 };
+  const empty: TransactionCsvStats = { transactions: [], totalCount: 0, totalFail: 0, lastVus: 0 };
   if (!fs.existsSync(file)) return empty;
   const lines = fs.readFileSync(file, 'utf-8').split(/\r?\n/);
   if (lines.length < 2) return empty;
@@ -85,9 +123,10 @@ export function readTransactionCsvStats(file: string): TransactionCsvStats {
   const rtIdx = header.indexOf('responsetime');
   const passIdx = header.indexOf('IsPass');
   const vusIdx = header.indexOf('vus');
+  const scnIdx = header.indexOf('Scenario');
   if (txnIdx === -1 || rtIdx === -1) return empty;
 
-  const perTxn = new Map<string, { count: number; fail: number; times: number[] }>();
+  const grouped = new Map<string, Map<string, CsvTransactionAggregate>>();
   let totalCount = 0;
   let totalFail = 0;
   let lastVus = 0;
@@ -96,8 +135,8 @@ export function readTransactionCsvStats(file: string): TransactionCsvStats {
     const cols = parseCsvLine(lines[i]);
     const txn = cols[txnIdx];
     if (!txn) continue;
-    let e = perTxn.get(txn);
-    if (!e) { e = { count: 0, fail: 0, times: [] }; perTxn.set(txn, e); }
+    const scenario = scnIdx !== -1 ? (cols[scnIdx] || '') : '';
+    const e = leafFor(grouped, scenario, txn);
     e.count++;
     totalCount++;
     const isPass = passIdx !== -1 ? cols[passIdx] : 'true';
@@ -106,7 +145,60 @@ export function readTransactionCsvStats(file: string): TransactionCsvStats {
     if (Number.isFinite(rtSec)) e.times.push(rtSec * 1000);
     if (vusIdx !== -1) { const v = parseInt(cols[vusIdx], 10); if (Number.isFinite(v)) lastVus = v; }
   }
-  return { perTxn, totalCount, totalFail, lastVus };
+  return { transactions: flatten(grouped), totalCount, totalFail, lastVus };
+}
+
+/**
+ * Build merged transaction table rows straight from one or more transaction CSVs,
+ * keyed by (scenario, transaction) so same-named transactions in different journeys
+ * stay SEPARATE (k6's end-of-test summary collapses them — the CSV is the only source
+ * that preserves the scenario per row). Pools counts/pass/fail + response times across
+ * files, then computes the configured stats via exact R-7 percentiles. `journey` is set
+ * to the scenario so the report's SCENARIO column shows the real journey, not "all".
+ */
+export function buildTransactionRowsFromCsv(files: string[], stats: string[]): TransactionMetricRow[] {
+  // Pool across machines/files into the same private nested grouping.
+  const grouped = new Map<string, Map<string, CsvTransactionAggregate>>();
+  for (const file of files) {
+    for (const e of readTransactionCsvStats(file).transactions) {
+      const a = leafFor(grouped, e.scenario, e.transaction);
+      a.count += e.count; a.fail += e.fail;
+      for (const t of e.times) a.times.push(t);
+    }
+  }
+  const rows: TransactionMetricRow[] = [];
+  for (const a of flatten(grouped)) {
+    const times = a.times.sort((x, y) => x - y);
+    const n = times.length;
+    const mean = n ? times.reduce((s, v) => s + v, 0) / n : 0;
+    const row: TransactionMetricRow = {
+      journey: a.scenario,
+      transaction: a.transaction,
+      count: a.count,
+      pass: a.count - a.fail,
+      fail: a.fail,
+      errorPct: a.count > 0 ? Number(((a.fail / a.count) * 100).toFixed(2)) : 0,
+    };
+    for (const stat of stats) {
+      const key = stat.trim().toLowerCase();
+      if (key === 'count' || key === 'pass' || key === 'fail') continue;
+      if (key === 'avg') row.avg = mean;
+      else if (key === 'min') row.min = n ? times[0] : 0;
+      else if (key === 'max') row.max = n ? times[n - 1] : 0;
+      else if (key === 'std' || key === 'stddev') {
+        let ss = 0; for (const v of times) ss += (v - mean) * (v - mean);
+        row[stat] = n ? Math.sqrt(ss / n) : 0;
+      } else if (key === 'med' || key === 'median') {
+        row[stat] = n ? percentileR7(times, 0.5, true) : 0;
+      } else {
+        const m = /^p\(?(\d+(?:\.\d+)?)\)?$/.exec(key);
+        if (m) { const p = Number(m[1]); if (p > 0 && p < 100) row[stat] = n ? percentileR7(times, p / 100, true) : 0; }
+      }
+    }
+    rows.push(row);
+  }
+  rows.sort((a, b) => (Number(b.count) || 0) - (Number(a.count) || 0));
+  return rows;
 }
 
 /** Find the request CSV inside a folder, if present. */

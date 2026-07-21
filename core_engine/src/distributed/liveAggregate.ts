@@ -37,7 +37,7 @@ export interface LiveAggregate {
   stats: string[];
   fleet: Array<{ machine: string; state: string; elapsedSec: number; vus: number; txns: number; errorRate: number; tps: number; cpu: number; mem: number }>;
   totals: { vus: number; txns: number; errorRate: number; tps: number; reqTotal: number; reqFailed: number; reqFailRate: number };
-  transactions: Array<{ name: string; count: number; fail: number; errPct: number; values: Record<string, number> }>;
+  transactions: Array<{ scenario: string; name: string; count: number; fail: number; errPct: number; values: Record<string, number> }>;
   /** Combined errors/warnings across machines: totals + recent messages (machine-tagged). */
   events: {
     errorCount: number;
@@ -124,21 +124,29 @@ export function timingStats(stats: string[]): string[] {
   return kept.length ? kept : DEFAULT_STATS;
 }
 
-interface MergedTxn { name: string; count: number; fail: number; hist: RelativeHistogram | null; }
+interface MergedTxn { scenario: string; name: string; count: number; fail: number; hist: RelativeHistogram | null; }
 
 function mergeTransactions(snaps: LiveStatusSnapshot[]): MergedTxn[] {
-  const byName = new Map<string, MergedTxn>();
+  // Group by (scenario, name) with a nested map so same-named transactions from
+  // different journeys stay separate — no composite key, nothing to decode. Older
+  // heartbeats without a scenario field fall back to '' (name-only), as before.
+  const byScenario = new Map<string, Map<string, MergedTxn>>();
   for (const snap of snaps) {
     for (const t of snap.transactions ?? []) {
+      const scenario = t.scenario ?? '';
+      let byName = byScenario.get(scenario);
+      if (!byName) { byName = new Map<string, MergedTxn>(); byScenario.set(scenario, byName); }
       let e = byName.get(t.name);
-      if (!e) { e = { name: t.name, count: 0, fail: 0, hist: null }; byName.set(t.name, e); }
+      if (!e) { e = { scenario, name: t.name, count: 0, fail: 0, hist: null }; byName.set(t.name, e); }
       e.count += t.count;
       e.fail += t.fail;
       const h = RelativeHistogram.fromJSON(t.hist);
       if (!e.hist) e.hist = h; else e.hist.merge(h);
     }
   }
-  return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
+  const out: MergedTxn[] = [];
+  for (const byName of byScenario.values()) for (const e of byName.values()) out.push(e);
+  return out.sort((a, b) => (a.scenario + a.name).localeCompare(b.scenario + b.name));
 }
 
 /** Merge all heartbeats in `dir` into one combined live view. */
@@ -169,7 +177,7 @@ export function aggregate(dir: string): LiveAggregate {
   const transactions = mergeTransactions(snaps).map((t) => {
     const values: Record<string, number> = {};
     for (const st of stats) values[st] = t.hist ? statValue(st, t.hist) : 0;
-    return { name: t.name, count: t.count, fail: t.fail, errPct: t.count ? (t.fail / t.count) * 100 : 0, values };
+    return { scenario: t.scenario, name: t.name, count: t.count, fail: t.fail, errPct: t.count ? (t.fail / t.count) * 100 : 0, values };
   });
 
   return {

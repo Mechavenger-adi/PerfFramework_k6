@@ -57,12 +57,17 @@ function render(agg: LiveAggregate, dir: string): string {
   // ── COMBINED TRANSACTIONS ──
   out.push('');
   out.push(`${ansi.bold}COMBINED TRANSACTIONS${ansi.reset} ${ansi.dim}(merged across machines; percentiles ≤0.1% — exact in the final report)${ansi.reset}`);
-  let thead = `${padR('TRANSACTION', 22)} ${padL('COUNT', 7)} ${padL('ERR%', 7)}`;
+  // Scenario column only when transactions carry one (multi-journey / distributed),
+  // so same-named transactions from different journeys are distinguishable.
+  const hasScen = agg.transactions.some((t) => t.scenario);
+  const scHead = hasScen ? `${padR('SCENARIO', 18)} ` : '';
+  let thead = `${scHead}${padR('TRANSACTION', 22)} ${padL('COUNT', 7)} ${padL('ERR%', 7)}`;
   for (const st of agg.stats) thead += ` ${padL(st, 8)}`;
   out.push(`${ansi.bold}${thead}${ansi.reset}`);
   out.push('─'.repeat(thead.length));
   for (const t of agg.transactions) {
-    let row = `${padR(t.name, 22)} ${padL(String(t.count), 7)} ${padL(t.errPct.toFixed(1), 7)}`;
+    const scCell = hasScen ? `${padR(t.scenario || '', 18)} ` : '';
+    let row = `${scCell}${padR(t.name, 22)} ${padL(String(t.count), 7)} ${padL(t.errPct.toFixed(1), 7)}`;
     for (const st of agg.stats) row += ` ${padL((t.values[st] ?? 0).toFixed(0), 8)}`;
     out.push(row);
   }

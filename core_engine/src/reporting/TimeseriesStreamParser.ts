@@ -114,6 +114,17 @@ export interface RequestBucket {
   url: string;
 }
 
+/**
+ * One parsed series per (scenario, transaction). The scenario comes from k6's
+ * `scenario` system tag on each sample, so same-named transactions in different
+ * journeys stay separate. Tags are explicit fields — never a composite key.
+ */
+export interface ParsedTransactionSeries {
+  scenario: string;
+  transaction: string;
+  buckets: TransactionBucket[];
+}
+
 export interface ParsedTimeseries {
   bucketSizeSeconds: number;
   /** Earliest bucket ts observed across all metrics. */
@@ -121,8 +132,8 @@ export interface ParsedTimeseries {
   /** Latest bucket ts observed across all metrics. */
   endTime: string;
   overview: OverviewBucket[];
-  /** Per-transaction series keyed by transaction name. */
-  transactions: Record<string, TransactionBucket[]>;
+  /** Per-(scenario, transaction) series. */
+  transactions: ParsedTransactionSeries[];
   /** Per-request series keyed by request name (k6 `name` tag). */
   requests: Record<string, RequestBucket[]>;
   /**
@@ -224,7 +235,9 @@ export class TimeseriesStreamParser {
     const bucketMs = Math.max(1, options.bucketSizeSeconds) * 1000;
     const pcts = normalizePercentiles(options.percentiles);
     const overview = new Map<number, OverviewRaw>();
-    const txns = new Map<string, Map<number, TransactionRaw>>();
+    // scenario → transaction → bucket. Nested so the two tags stay separate
+    // (no composite key to encode, no delimiter to collide on).
+    const txns = new Map<string, Map<string, Map<number, TransactionRaw>>>();
     const reqs = new Map<string, Map<number, RequestRaw>>();
     const knownTxns = new Set(options.transactionNames ?? []);
 
@@ -395,7 +408,14 @@ export class TimeseriesStreamParser {
             if (metric !== 'http_req_duration') break;
           }
           if (!txnName || !kind) break;
-          const map = txns.get(txnName) ?? new Map<number, TransactionRaw>();
+          // Group by (scenario, transaction) so same-named transactions from different
+          // journeys stay separate. The transaction Trend metric name is shared across
+          // scenarios, but each sample carries k6's `scenario` system tag.
+          const scenario = tags.scenario ?? '';
+          let txnMap = txns.get(scenario);
+          if (!txnMap) { txnMap = new Map<string, Map<number, TransactionRaw>>(); txns.set(scenario, txnMap); }
+          let map = txnMap.get(txnName);
+          if (!map) { map = new Map<number, TransactionRaw>(); txnMap.set(txnName, map); }
           const tBucket = map.get(bucketKey) ?? { count: 0, duration: [], pass: 0, fail: 0 };
           if (kind === 'count') tBucket.count += value;
           else if (kind === 'duration') tBucket.duration.push(value);
@@ -404,7 +424,6 @@ export class TimeseriesStreamParser {
             else tBucket.fail += 1;
           }
           map.set(bucketKey, tBucket);
-          txns.set(txnName, map);
           break;
         }
       }
@@ -423,14 +442,17 @@ export class TimeseriesStreamParser {
       overviewBuckets.push(finalizeOverview(raw, k, bucketSeconds, pcts));
     }
 
-    const transactionsOut: Record<string, TransactionBucket[]> = {};
-    for (const [name, map] of txns) {
-      const arr: TransactionBucket[] = [];
-      for (let k = earliestMs; k <= latestMs; k += bucketMs) {
-        const raw = map.get(k);
-        arr.push(finalizeTransaction(raw, k, pcts));
+    // Emit one record per (scenario, transaction) with the tags as explicit fields.
+    const transactionsOut: ParsedTransactionSeries[] = [];
+    for (const [scenario, txnMap] of txns) {
+      for (const [transaction, map] of txnMap) {
+        const arr: TransactionBucket[] = [];
+        for (let k = earliestMs; k <= latestMs; k += bucketMs) {
+          const raw = map.get(k);
+          arr.push(finalizeTransaction(raw, k, pcts));
+        }
+        transactionsOut.push({ scenario, transaction, buckets: arr });
       }
-      transactionsOut[name] = arr;
     }
 
     const requestsOut: Record<string, RequestBucket[]> = {};

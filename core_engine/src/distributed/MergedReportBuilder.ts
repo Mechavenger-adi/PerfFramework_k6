@@ -15,6 +15,7 @@ import { percentileR7, RelativeHistogram } from '../reporting/Histogram';
 import { HistogramArtifact } from '../reporting/HistogramArtifactBuilder';
 import {
   ReportBundle, TimeSeriesFile, TimeSeriesPoint, TransactionMetricsFile, CiSummary,
+  TransactionSeries, normalizeTransactionSeries,
 } from '../types/ReportingContracts';
 import { MergeResult } from './MergeEngine';
 
@@ -87,7 +88,8 @@ export class MergedReportBuilder {
     // Fixed base (min/avg/max/std) + every configured percentile → over-time graph lines.
     const pcts = percentilesFrom(stats);
     const overview = new Map<string, TimeSeriesPoint>();
-    const txns: Record<string, Map<string, TimeSeriesPoint & { _durations: number[] }>> = {};
+    // scenario → transaction → bucketTs → accumulating point.
+    const txns = new Map<string, Map<string, Map<string, TimeSeriesPoint & { _durations: number[] }>>>();
     const events: TimeSeriesFile['series']['events'] = [];
     const totals = { requests: 0, iterations: 0, httpFailures: 0, dataReceived: 0, dataSent: 0 };
     let startTime = '';
@@ -125,9 +127,14 @@ export class MergedReportBuilder {
       }
 
       // ── per-transaction: concat raw durations by ts (exact merge) ──
-      for (const [name, points] of Object.entries(f.series.transactions)) {
-        const map = txns[name] ?? (txns[name] = new Map());
-        for (const p of points) {
+      // Grouped by (scenario, transaction) — both tags are explicit fields on the
+      // series, so machines merge on the tag pair, never on a name alone.
+      for (const series of normalizeTransactionSeries(f.series.transactions)) {
+        let byTxn = txns.get(series.scenario);
+        if (!byTxn) { byTxn = new Map(); txns.set(series.scenario, byTxn); }
+        let map = byTxn.get(series.transaction);
+        if (!map) { map = new Map(); byTxn.set(series.transaction, map); }
+        for (const p of series.points) {
           const ts = String(p.ts);
           const acc = map.get(ts) ?? { ts, count: 0, pass: 0, fail: 0, _durations: [] };
           (acc.count as number) += num(p, 'count');
@@ -176,8 +183,9 @@ export class MergedReportBuilder {
     }
 
     // Finalize transactions: recompute stats from merged raw durations (R-7 exact).
-    const txnSeries: Record<string, TimeSeriesPoint[]> = {};
-    for (const [name, map] of Object.entries(txns)) {
+    const txnSeries: TransactionSeries[] = [];
+    for (const [scenario, byTxn] of txns) {
+      for (const [transaction, map] of byTxn) {
       const pts: TimeSeriesPoint[] = [];
       for (const [ts, acc] of [...map].sort((a, b) => a[0].localeCompare(b[0]))) {
         const ds = acc._durations;
@@ -199,7 +207,8 @@ export class MergedReportBuilder {
         }
         pts.push(point);
       }
-      txnSeries[name] = pts;
+        txnSeries.push({ scenario, transaction, points: pts });
+      }
     }
 
     events.sort((a, b) => String(a.ts).localeCompare(String(b.ts)));

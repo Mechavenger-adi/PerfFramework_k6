@@ -549,6 +549,19 @@ export class RunReportGenerator {
       return true;
     }
 
+    // Per-transaction series carry their TAGS as explicit fields:
+    //   { scenario, transaction, points[] }
+    // so same-named transactions from different journeys stay separate and nothing
+    // here has to encode or decode a key. Artifacts written before transactions were
+    // scenario-aware used an object keyed by transaction name — normalize that shape
+    // so older reports still render.
+    function txnSeriesList() {
+      const t = (reportData.timeseries && reportData.timeseries.series && reportData.timeseries.series.transactions) || [];
+      if (Array.isArray(t)) return t;
+      return Object.keys(t).map(function (name) { return { scenario: '', transaction: name, points: t[name] || [] }; });
+    }
+    function txnLabel(s){ return s.scenario ? s.scenario + ' / ' + s.transaction : s.transaction; }
+
     // transaction name → scenario (journey), from the authoritative metrics rows.
     // Memoized; used to filter per-transaction charts by the global scenario.
     let _txnJourneyCache = null;
@@ -561,13 +574,14 @@ export class RunReportGenerator {
       _txnJourneyCache = map;
       return map;
     }
-    // True when a transaction name passes the active global scenario/transaction
-    // filter — the chart-side equivalent of matchesGlobalFilters for series keyed
-    // only by transaction name.
-    function txnAllowedByFilters(name) {
+    // True when a transaction SERIES passes the active global scenario/transaction
+    // filter — the chart-side equivalent of matchesGlobalFilters. Reads the tags
+    // straight off the series; falls back to the metrics rows only when the series
+    // predates scenario tagging (legacy artifacts carry an empty scenario).
+    function txnAllowedByFilters(s) {
       const f = getActiveFilters();
-      if (f.transaction && String(name) !== f.transaction) return false;
-      if (f.scenario) { const j = txnJourneyMap()[String(name)]; if (j && j !== f.scenario) return false; }
+      if (f.transaction && s.transaction !== f.transaction) return false;
+      if (f.scenario) { const j = s.scenario || txnJourneyMap()[s.transaction] || ''; if (j && j !== f.scenario) return false; }
       return true;
     }
 
@@ -1274,14 +1288,12 @@ export class RunReportGenerator {
       const overviewPoints = filterSeriesByRange(reportData.timeseries.series.overview || [], range);
       const hasTimeseries = overviewPoints.length > 1;
       const labels = overviewPoints.map((p) => fmtBucketTs(p.ts));
-      // Per-transaction series filtered by the same range. Keys here are the
-      // transaction names declared via the framework manifest.
-      const txnSeriesMap = reportData.timeseries.series.transactions || {};
-      const txnNames = Object.keys(txnSeriesMap).sort();
-      const filteredTxnSeries = {};
-      for (const name of txnNames) {
-        filteredTxnSeries[name] = filterSeriesByRange(txnSeriesMap[name] || [], range);
-      }
+      // Per-transaction series filtered by the same range. Each entry carries its
+      // (scenario, transaction) tags plus the range-filtered points.
+      const txnSeriesAll = txnSeriesList()
+        .slice()
+        .sort((a, b) => txnLabel(a).localeCompare(txnLabel(b)))
+        .map((s) => ({ scenario: s.scenario, transaction: s.transaction, points: filterSeriesByRange(s.points || [], range) }));
 
       // Banner only renders when we don't have proper time-series data — the
       // single-point legacy fallback can't be drawn as a line.
@@ -1561,21 +1573,21 @@ export class RunReportGenerator {
         const metric = txnMetricSelect.value;
         const filterText = txnFilter.value.toLowerCase();
         // Honor the global scenario/transaction filter AND the local substring box.
-        const visibleNames = txnNames.filter((n) =>
-          txnAllowedByFilters(n) && (!filterText || n.toLowerCase().includes(filterText)),
+        const visible = txnSeriesAll.filter((s) =>
+          txnAllowedByFilters(s) && (!filterText || txnLabel(s).toLowerCase().includes(filterText)),
         );
         // Stable color palette per transaction — modulo a 10-color cycle.
         const palette = ['#005f73','#0a9396','#f59e0b','#b91c1c','#7c3aed','#15803d','#c2410c','#0369a1','#a16207','#6b21a8'];
         // We use the FIRST txn series for labels; assumes all series share
         // the same bucket grid (true by construction in the parser).
-        const baseLabels = visibleNames.length > 0
-          ? filteredTxnSeries[visibleNames[0]].map((p) => fmtBucketTs(p.ts))
+        const baseLabels = visible.length > 0
+          ? visible[0].points.map((p) => fmtBucketTs(p.ts))
           : labels;
-        const durationDatasets = visibleNames.map((name, idx) => lineDataset(name, palette[idx % palette.length], filteredTxnSeries[name], metric, true));
+        const durationDatasets = visible.map((s, idx) => lineDataset(txnLabel(s), palette[idx % palette.length], s.points, metric, true));
         // Per-txn charts use the first-txn's bucket array for zoom mapping.
         // All transactions share the same bucket grid by construction, so
         // any of their series works as the index→ts mapping for zoom.
-        const zoomPoints = visibleNames.length > 0 ? filteredTxnSeries[visibleNames[0]] : null;
+        const zoomPoints = visible.length > 0 ? visible[0].points : null;
         perTxnChartInstances.push(new Chart(document.getElementById('chart-per-txn-duration'), {
           type: 'line',
           data: { labels: baseLabels, datasets: durationDatasets },
@@ -1583,9 +1595,9 @@ export class RunReportGenerator {
         }));
 
         // Pass rate per transaction over time: pass / (pass+fail) per bucket
-        const passDatasets = visibleNames.map((name, idx) => ({
-          label: name,
-          data: filteredTxnSeries[name].map((p) => {
+        const passDatasets = visible.map((s, idx) => ({
+          label: txnLabel(s),
+          data: s.points.map((p) => {
             const pass = Number(p.pass || 0), fail = Number(p.fail || 0);
             return pass + fail > 0 ? (pass / (pass + fail)) * 100 : null;
           }),
@@ -1653,8 +1665,8 @@ export class RunReportGenerator {
     // real samples in the window — never approximated.
     function txnRowsForRange() {
       const full = reportData.transactions.transactions || [];
-      const txnSeries = (reportData.timeseries && reportData.timeseries.series && reportData.timeseries.series.transactions) || {};
-      if (!window.__k6PerfRange || Object.keys(txnSeries).length === 0) {
+      const txnSeries = txnSeriesList();
+      if (!window.__k6PerfRange || txnSeries.length === 0) {
         // Full run: keep k6's authoritative count/avg/percentiles, but replace
         // the (often percentile-approximated) std with the EXACT std from raw
         // samples so std is trustworthy and consistent with sub-range values.
@@ -1662,10 +1674,14 @@ export class RunReportGenerator {
           const copy = Object.assign({}, r);
           // Surface journey under a scenario field so the table can show it.
           copy.scenario = r.journey ? String(r.journey) : '';
-          const series = txnSeries[String(r.transaction)];
+          // Match the series on BOTH tags; fall back to a name-only match for legacy
+          // artifacts written before transactions carried a scenario.
+          const scen = String(r.journey || '');
+          const series = txnSeries.find((s) => s.transaction === r.transaction && s.scenario === scen)
+            || txnSeries.find((s) => s.transaction === r.transaction && !s.scenario);
           if (series) {
             const durs = [];
-            for (const b of series) { if (Array.isArray(b.durations)) { for (const d of b.durations) durs.push(Number(d)); } }
+            for (const b of series.points) { if (Array.isArray(b.durations)) { for (const d of b.durations) durs.push(Number(d)); } }
             if (durs.length > 0) {
               let s = 0; for (const v of durs) s += v;
               const exact = _stdDev(durs, s / durs.length);
@@ -1679,8 +1695,8 @@ export class RunReportGenerator {
       const range = getSelectedRange();
       const statsList = reportData.config.transactionStats || [];
       const out = [];
-      for (const name of Object.keys(txnSeries)) {
-        const buckets = filterSeriesByRange(txnSeries[name] || [], range);
+      for (const s of txnSeries) {
+        const buckets = filterSeriesByRange(s.points || [], range);
         let count = 0, pass = 0, fail = 0;
         const durations = [];
         for (const b of buckets) {
@@ -1692,9 +1708,11 @@ export class RunReportGenerator {
         durations.sort((a, b) => a - b);
         const n = durations.length;
         const mean = n ? durations.reduce((s, v) => s + v, 0) / n : 0;
-        const _scen = txnJourneyMap()[name] || '';
+        // Tags come straight off the series — nothing to decode. Legacy artifacts
+        // (no scenario recorded) fall back to the metrics rows' journey.
+        const _scen = s.scenario || txnJourneyMap()[s.transaction] || '';
         const row = {
-          transaction: name,
+          transaction: s.transaction,
           scenario: _scen,
           journey: _scen,
           count: count, pass: pass, fail: fail,
@@ -2294,32 +2312,55 @@ export class RunReportGenerator {
       const agentNames = Object.keys(systemSeries);
       const hasSeries = agentNames.some((name) => (systemSeries[name] || []).length > 1);
 
-      // min / avg / max CPU & memory across all agents' samples in the window.
+      // min / avg / max CPU & memory in the window.
       const sysRange = getSelectedRange();
-      const allCpu = [], allMem = [];
-      for (const name of agentNames) {
-        for (const p of filterSeriesByRange(systemSeries[name] || [], sysRange)) {
-          if (p.cpuPercent != null) allCpu.push(Number(p.cpuPercent));
-          if (p.memoryPercent != null) allMem.push(Number(p.memoryPercent));
-        }
-      }
       const mmm = (arr) => {
         if (!arr.length) return null;
         let mn = Infinity, mx = -Infinity, s = 0;
         for (const v of arr) { if (v < mn) mn = v; if (v > mx) mx = v; s += v; }
         return { min: mn, avg: s / arr.length, max: mx };
       };
-      const cpu = mmm(allCpu), mem = mmm(allMem);
+      const statsFor = (names) => {
+        const cpuArr = [], memArr = [];
+        for (const name of names) {
+          for (const p of filterSeriesByRange(systemSeries[name] || [], sysRange)) {
+            if (p.cpuPercent != null) cpuArr.push(Number(p.cpuPercent));
+            if (p.memoryPercent != null) memArr.push(Number(p.memoryPercent));
+          }
+        }
+        return { cpu: mmm(cpuArr), mem: mmm(memArr) };
+      };
+      const fmtMmm = (st) => st ? st.min.toFixed(1) + ' / ' + st.avg.toFixed(1) + ' / ' + st.max.toFixed(1) + '%' : '—';
       const statCard = (label, st) => st
-        ? '<div class="card"><h3>' + label + '</h3><strong>' + st.min.toFixed(1) + ' / ' + st.avg.toFixed(1) + ' / ' + st.max.toFixed(1) + '%</strong></div>'
+        ? '<div class="card"><h3>' + label + '</h3><strong>' + fmtMmm(st) + '</strong></div>'
         : '';
-      const statCards = (cpu || mem)
-        ? '<div class="section-title">Load Generator Health' + infoTip('Whole-machine CPU/memory (all processes on the box, not just k6) — min / avg / max. High values from other processes can distort results.') + '</div>'
-          + '<div class="cards" style="margin-bottom:18px">'
-            + statCard('CPU % — min / avg / max', cpu)
-            + statCard('Memory % — min / avg / max', mem)
-          + '</div>'
-        : '';
+      // Distributed (>1 machine): one card PER machine so a hot LG isn't hidden by
+      // the fleet average. Single machine / local: the combined CPU + Memory cards.
+      let statCards = '';
+      if (agentNames.length > 1) {
+        const perMachine = agentNames
+          .map((name) => ({ name, ...statsFor([name]) }))
+          .filter((m) => m.cpu || m.mem);
+        if (perMachine.length) {
+          statCards = '<div class="section-title">Load Generator Health' + infoTip('Per-machine whole-host CPU/memory (all processes on that box, not just k6) — min / avg / max. Watch for one LG running hotter than the rest.') + '</div>'
+            + '<div class="cards" style="margin-bottom:18px">'
+            + perMachine.map((m) =>
+              '<div class="card"><h3>' + escapeHtml(m.name) + '</h3>'
+              + '<div style="font-size:12px;color:var(--muted);margin-top:4px">CPU % — min / avg / max</div><strong>' + fmtMmm(m.cpu) + '</strong>'
+              + '<div style="font-size:12px;color:var(--muted);margin-top:8px">Memory % — min / avg / max</div><strong>' + fmtMmm(m.mem) + '</strong></div>',
+            ).join('')
+            + '</div>';
+        }
+      } else {
+        const { cpu, mem } = statsFor(agentNames);
+        if (cpu || mem) {
+          statCards = '<div class="section-title">Load Generator Health' + infoTip('Whole-machine CPU/memory (all processes on the box, not just k6) — min / avg / max. High values from other processes can distort results.') + '</div>'
+            + '<div class="cards" style="margin-bottom:18px">'
+              + statCard('CPU % — min / avg / max', cpu)
+              + statCard('Memory % — min / avg / max', mem)
+            + '</div>';
+        }
+      }
 
       document.getElementById('panel-system').innerHTML = \`
         \${statCards}

@@ -104,7 +104,16 @@ export interface TimeSeriesFile {
   };
   series: {
     overview: TimeSeriesPoint[];
-    transactions: Record<string, TimeSeriesPoint[]>;
+    /**
+     * Per-(scenario, transaction) series. A transaction's identity is its TAGS, so
+     * scenario and transaction stay first-class fields — never flattened into a
+     * composite key. Same-named transactions in different journeys are separate
+     * entries (k6's summary collapses them; the stream/CSV keep the scenario tag).
+     * Adding another dimension later (region, tenant, …) is one more field, not one
+     * more level of nesting. Legacy artifacts used Record<name, points[]>; readers
+     * normalize that shape via `normalizeTransactionSeries`.
+     */
+    transactions: TransactionSeries[];
     /**
      * Per-request series keyed by request name (k6 `name` tag). Each point carries
      * count/failed/durations plus method/transaction/url metadata so the report's
@@ -120,6 +129,27 @@ export interface TimeSeriesFile {
       severity: 'error' | 'warning';
     }>;
   };
+}
+
+/** One per-(scenario, transaction) time series. Tags are explicit fields. */
+export interface TransactionSeries {
+  scenario: string;
+  transaction: string;
+  points: TimeSeriesPoint[];
+}
+
+/**
+ * Accept both the current array-of-records shape and the legacy
+ * Record<transactionName, points[]> shape (artifacts written before transactions
+ * were scenario-aware), so previously-collected runs still merge and render.
+ * Legacy entries carry an empty scenario — they genuinely had none recorded.
+ */
+export function normalizeTransactionSeries(
+  input: TransactionSeries[] | Record<string, TimeSeriesPoint[]> | undefined | null,
+): TransactionSeries[] {
+  if (!input) return [];
+  if (Array.isArray(input)) return input;
+  return Object.entries(input).map(([transaction, points]) => ({ scenario: '', transaction, points }));
 }
 
 export interface ReportBundleMeta {

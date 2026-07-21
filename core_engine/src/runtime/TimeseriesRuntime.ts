@@ -2,7 +2,13 @@ import { TimeSeriesFile, TimeSeriesPoint } from '../types/ReportingContracts';
 
 export class TimeseriesRuntime {
   private readonly overview = new Map<string, TimeSeriesPoint>();
-  private readonly transactions = new Map<string, Map<string, TimeSeriesPoint>>();
+  /**
+   * scenario → transaction → bucketTs → point. Nested rather than a composite
+   * string key: the tags stay separate, so there's nothing to encode or decode
+   * and no delimiter to collide. This nesting is private to the runtime — the
+   * built artifact emits scenario/transaction as explicit fields.
+   */
+  private readonly transactions = new Map<string, Map<string, Map<string, TimeSeriesPoint>>>();
   private readonly requests = new Map<string, Map<string, TimeSeriesPoint>>();
   private readonly system = new Map<string, Map<string, TimeSeriesPoint>>();
   private readonly events: TimeSeriesFile['series']['events'] = [];
@@ -27,9 +33,17 @@ export class TimeseriesRuntime {
     this.overview.set(bucket, existing);
   }
 
-  addTransactionPoint(transaction: string, ts: string, values: Record<string, number | number[]>): void {
+  addTransactionPoint(
+    scenario: string,
+    transaction: string,
+    ts: string,
+    values: Record<string, number | number[]>,
+  ): void {
     const bucket = this.bucketTs(ts);
-    const bucketMap = this.transactions.get(transaction) ?? new Map<string, TimeSeriesPoint>();
+    let txnMap = this.transactions.get(scenario);
+    if (!txnMap) { txnMap = new Map<string, Map<string, TimeSeriesPoint>>(); this.transactions.set(scenario, txnMap); }
+    let bucketMap = txnMap.get(transaction);
+    if (!bucketMap) { bucketMap = new Map<string, TimeSeriesPoint>(); txnMap.set(transaction, bucketMap); }
     const existing = bucketMap.get(bucket) ?? { ts: bucket };
     for (const [key, value] of Object.entries(values)) {
       if (Array.isArray(value)) {
@@ -42,7 +56,6 @@ export class TimeseriesRuntime {
       }
     }
     bucketMap.set(bucket, existing);
-    this.transactions.set(transaction, bucketMap);
   }
 
   /**
@@ -91,11 +104,14 @@ export class TimeseriesRuntime {
       endTime,
       series: {
         overview: [...this.overview.values()].sort((a, b) => String(a.ts).localeCompare(String(b.ts))),
-        transactions: Object.fromEntries(
-          [...this.transactions.entries()].map(([transaction, bucketMap]) => [
+        // Flatten scenario→transaction into records with the tags as explicit
+        // fields, so nothing downstream has to encode/decode a composite key.
+        transactions: [...this.transactions.entries()].flatMap(([scenario, txnMap]) =>
+          [...txnMap.entries()].map(([transaction, bucketMap]) => ({
+            scenario,
             transaction,
-            [...bucketMap.values()].sort((a, b) => String(a.ts).localeCompare(String(b.ts))),
-          ]),
+            points: [...bucketMap.values()].sort((a, b) => String(a.ts).localeCompare(String(b.ts))),
+          })),
         ),
         requests: Object.fromEntries(
           [...this.requests.entries()].map(([request, bucketMap]) => [

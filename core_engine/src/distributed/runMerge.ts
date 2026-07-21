@@ -15,7 +15,7 @@ import { ArtifactWriter } from '../reporting/ArtifactWriter';
 import { RunReportGenerator } from '../reporting/RunReportGenerator';
 import { MergeEngine, MachineArtifacts } from './MergeEngine';
 import { MergedReportBuilder, MachineTimeseries } from './MergedReportBuilder';
-import { readTransactionCsvRaw, findTransactionCsv, findRequestCsv, readRequestFailByBucket, readRequestTimings } from './transactionCsv';
+import { readTransactionCsvRaw, findTransactionCsv, findRequestCsv, readRequestFailByBucket, readRequestTimings, buildTransactionRowsFromCsv } from './transactionCsv';
 import { percentileR7 } from '../reporting/Histogram';
 import { CiSummary, TimeSeriesFile, TransactionMetricsFile } from '../types/ReportingContracts';
 import { HistogramArtifact } from '../reporting/HistogramArtifactBuilder';
@@ -218,6 +218,20 @@ export async function runMerge(options: MergeCliOptions): Promise<boolean> {
     requestFailBuckets,
     topRequests,
   });
+
+  // Rebuild the transaction TABLE from the raw transaction CSVs, keyed by
+  // (scenario, transaction), so same-named transactions from different journeys stay
+  // SEPARATE. MergeEngine pools k6's end-of-test summary, which collapses same-named
+  // group()s across scenarios into one node — the CSV is the only source that keeps
+  // the per-row Scenario. Both the report bundle and the written artifact are updated.
+  const txnCsvFiles = machineDirs.map((d) => findTransactionCsv(d)).filter((f): f is string => !!f);
+  if (txnCsvFiles.length) {
+    const csvRows = buildTransactionRowsFromCsv(txnCsvFiles, merge.transactionMetrics.stats);
+    if (csvRows.length) {
+      bundle.transactions = { ...bundle.transactions, transactions: csvRows };
+      merge.transactionMetrics = { ...merge.transactionMetrics, transactions: csvRows };
+    }
+  }
 
   // ── Write merged artifacts to Final_<testname>_<ts>/ (EDD §End) ──
   const testName = planInfo.name ?? merge.ciSummary.plan ?? 'DistributedRun';

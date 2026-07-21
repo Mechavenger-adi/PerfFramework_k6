@@ -47,7 +47,7 @@ import { runInit } from './init';
 import { runValidate } from './validate';
 import { runMerge } from '../distributed/runMerge';
 import { runCollect, collectRunDir } from '../distributed/collectRun';
-import { findRequestCsv, readRequestFailByBucket } from '../distributed/transactionCsv';
+import { findRequestCsv, readRequestFailByBucket, findTransactionCsv, buildTransactionRowsFromCsv } from '../distributed/transactionCsv';
 import { awaitScheduledStart } from '../distributed/startBarrier';
 import { runAgentCli } from '../distributed/agentServer';
 import { runProbe } from '../distributed/probe';
@@ -1599,6 +1599,17 @@ async function finalizeRunArtifacts(options: {
     journeyName,
     summaryData: summaryData as any,
   });
+  // k6's end-of-test summary (what the builder reads) collapses same-named group()s
+  // across scenarios into ONE node and can't attribute a scenario (multi-journey runs
+  // get journey="all"). When the transaction CSV is available it carries the per-row
+  // Scenario, so rebuild the table from it — keyed by (scenario, transaction) — so
+  // same-named transactions from different journeys stay separate and show their real
+  // scenario. Falls back to the summary-derived rows if the CSV is off/empty.
+  const localTxnCsv = findTransactionCsv(options.reportDir);
+  if (localTxnCsv) {
+    const csvRows = buildTransactionRowsFromCsv([localTxnCsv], runtime.getTransactionStats());
+    if (csvRows.length) transactionMetrics.transactions = csvRows;
+  }
 
   // Pass/fail is always exact: the per-iteration `<name>_checkrate` Rate metric
   // backs every transaction (the pre-flight ScriptContractGuard rejects the raw

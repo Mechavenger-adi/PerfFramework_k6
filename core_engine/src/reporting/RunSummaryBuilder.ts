@@ -82,7 +82,7 @@ export class RunSummaryBuilder {
       endTime: new Date().toISOString(),
       series: {
         overview: [],
-        transactions: {},
+        transactions: [],
         system: {},
         events: [],
       },

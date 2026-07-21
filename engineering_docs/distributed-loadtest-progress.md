@@ -41,6 +41,33 @@ _Last updated: 2026-07-14 (ALL STEPS DONE + verified — Phase-1 manual distribu
 | 9 | "VUs" → "Active VUs" | ✅ |
 | 10 | Combined-transactions table sortable + filterable | ✅ |
 
+## Fixes batch (2026-07-20f) — transaction identity = (scenario, transaction)
+Same-named transactions from different journeys were collapsing into one row (k6's
+end-of-test summary merges same-named `group()`s across scenarios; the CSV keeps the
+per-row Scenario). Now transaction identity is **(scenario, transaction)** everywhere,
+sourced from the CSV, with a Scenario column shown when present. Also fixes the "all"
+scenario label for multi-journey runs.
+| # | Area | Status |
+|---|---|---|
+| 1 | `transactionCsv.ts`: `readTransactionCsvStats` keyed by `txnKey(scenario, txn)` + carries scenario; new `buildTransactionRowsFromCsv(files, stats)` pools by (scenario, txn) → exact R-7 rows. | ✅ |
+| 2 | Live: heartbeat carries `scenario` per txn; `liveAggregate` merges by (scenario, name); dashboard + console monitor show a Scenario column (only when present). | ✅ |
+| 3 | Merged report: `runMerge` rebuilds the transaction table from the pooled machine CSVs (overrides the summary-based rows + the written artifact). | ✅ |
+| 4 | Local report: `run.ts` rebuilds the transaction table from the local CSV when present (else falls back to the summary rows). | ✅ |
+| 5 | Timeseries now scenario-keyed too: new shared `reporting/txnKey.ts` (composite key, SOH separator); `TimeseriesStreamParser` keys per-transaction buckets by `(tags.scenario, name)`; builder fallback + `MergedReportBuilder` pool by composite key; `RunReportGenerator` splits keys for the windowed table + per-transaction graphs (labels shown "scenario / transaction"). So the WINDOWED table AND the over-time per-transaction graphs are now scenario-aware, not just the full-run table. Verified: synthetic stream splits `login` into journeyA/journeyB series. | ✅ |
+
+## Fixes batch (2026-07-20e) — failure-rate, per-machine health, live x-axis
+| # | Fix | Status |
+|---|---|---|
+| 1 | Live chart failure line now plots the PER-INTERVAL rate (Δfailed/Δtotal per poll) instead of the cumulative reqFailRate (which only climbed and flattened, hiding when failures happened). KPI card still shows the overall %. Legend relabeled "(per interval)". | ✅ |
+| 2 | Final report System tab "Load Generator Health" is now PER-MACHINE in distributed runs (a card per LG with CPU + Memory min/avg/max) so one hot LG isn't hidden by the fleet average. Single-machine/local keeps the combined cards. | ✅ |
+| 3 | Live dashboard chart X axis now has 5 scalable time ticks (gridline + "Xs"/"M:SS" labels) instead of just start/end seconds. | ✅ |
+
+## Fixes batch (2026-07-20d) — live dashboard: auto-merge banner + chart lead-in
+| # | Fix | Status |
+|---|---|---|
+| 1 | Auto-merge no longer mislabeled "failed" when the TEST fails its CI gate. `runMerge`'s boolean is the pass/fail gate, not whether a report was produced — dashboard now judges success by whether a NEW Final report appeared (and catches genuine merge errors separately). | ✅ |
+| 2 | Live VUs/failure chart trims the leading idle period (VUs=0 & no failures) so a controller started before `START_AT` doesn't render a long flat lead-in that squashes the real ramp into the right edge. Pairs with the countdown fix (controller now waits for `START_AT`). | ✅ |
+
 ## Fixes batch (2026-07-20c) — live start-time countdown
 | # | Fix | Status |
 |---|---|---|

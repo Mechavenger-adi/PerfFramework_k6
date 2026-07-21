@@ -295,7 +295,7 @@
         "exports": [
           "RunReportGenerator"
         ],
-        "loc": 2709,
+        "loc": 2750,
         "path": "core_engine/src/reporting/RunReportGenerator.ts"
       },
       {
@@ -309,12 +309,13 @@
         "exports": [
           "OverviewBucket",
           "ParsedTimeseries",
+          "ParsedTransactionSeries",
           "PhaseTimings",
           "RequestBucket",
           "TimeseriesStreamParser",
           "TransactionBucket"
         ],
-        "loc": 670,
+        "loc": 692,
         "path": "core_engine/src/reporting/TimeseriesStreamParser.ts"
       },
       {
@@ -468,7 +469,7 @@
     "files": [
       {
         "exports": [],
-        "loc": 2598,
+        "loc": 2609,
         "path": "core_engine/src/cli/run.ts"
       },
       {

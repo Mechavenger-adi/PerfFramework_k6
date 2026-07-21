@@ -88,7 +88,7 @@ function page(intervalMs: number): string {
   <h2>Active VUs &amp; request failure — over time</h2>
   <div class="chartwrap">
     <svg id="chart" class="chart" viewBox="0 0 1000 300" preserveAspectRatio="xMidYMid meet"></svg>
-    <div class="legend"><span><i style="background:#38bdf8"></i>Active VUs</span><span><i style="background:#f87171"></i>Request failure %</span></div>
+    <div class="legend"><span><i style="background:#38bdf8"></i>Active VUs</span><span><i style="background:#f87171"></i>Request failure % (per interval)</span></div>
   </div>
   <h2>Fleet</h2><div class="scroll"><table id="fleet"></table></div>
   <h2>Host resources</h2><div class="scroll"><table id="resources"></table></div>
@@ -110,15 +110,19 @@ document.getElementById('btn-abort').onclick=()=>{ if(confirm('ABORT now?\\nk6 i
 const n0 = x => (x==null?'-':Number(x).toFixed(0));
 const n1 = x => (x==null?'-':Number(x).toFixed(1));
 function kpi(l,v){ return '<div class="kpi"><div class="v">'+v+'</div><div class="l">'+l+'</div></div>'; }
-const hist=[]; const MAXPTS=600; let frozen=false;
+const hist=[]; const MAXPTS=600; let frozen=false; let prevReq=null;
 let lastTxns=[], lastStats=[], txnSort='count', txnDir=-1, txnFilter='';
 function setSort(k){ if(txnSort===k) txnDir=-txnDir; else { txnSort=k; txnDir=(k==='name')?1:-1; } renderTxns(); }
 function renderTxns(){
   const el=document.getElementById('txns'); if(!el) return;
-  let rows=lastTxns.filter(r=>!txnFilter || String(r.name).toLowerCase().indexOf(txnFilter)>=0);
+  // Show a Scenario column only when transactions actually carry one (multi-journey /
+  // distributed) so same-named transactions from different journeys are distinguishable.
+  const hasScen=lastTxns.some(r=>r.scenario);
+  let rows=lastTxns.filter(r=>!txnFilter || String(r.name).toLowerCase().indexOf(txnFilter)>=0 || (r.scenario&&String(r.scenario).toLowerCase().indexOf(txnFilter)>=0));
   rows=rows.slice().sort((a,b)=>{
     let av,bv;
-    if(txnSort==='name'){av=String(a.name);bv=String(b.name);return txnDir*av.localeCompare(bv);}
+    if(txnSort==='scenario'){av=String(a.scenario||'');bv=String(b.scenario||'');return txnDir*av.localeCompare(bv);}
+    else if(txnSort==='name'){av=String(a.name);bv=String(b.name);return txnDir*av.localeCompare(bv);}
     else if(txnSort==='count'){av=a.count;bv=b.count;}
     else if(txnSort==='errPct'){av=a.errPct;bv=b.errPct;}
     else {const st=txnSort.slice(5); av=a.values[st]||0; bv=b.values[st]||0;}
@@ -126,10 +130,10 @@ function renderTxns(){
   });
   const arrow=k=> txnSort===k?(txnDir<0?' ▼':' ▲'):'';
   const th=(k,label)=>'<th data-sort="'+k+'" style="cursor:pointer">'+label+arrow(k)+'</th>';
-  let t='<thead><tr>'+th('name','Transaction')+th('count','Count')+th('errPct','Err%');
+  let t='<thead><tr>'+(hasScen?th('scenario','Scenario'):'')+th('name','Transaction')+th('count','Count')+th('errPct','Err%');
   for(const st of lastStats) t+=th('stat:'+st, esc(st));
   t+='</tr></thead><tbody>';
-  for(const r of rows){ t+='<tr><td>'+esc(r.name)+'</td><td>'+r.count+'</td><td>'+n1(r.errPct)+'</td>'; for(const st of lastStats) t+='<td>'+n0(r.values[st])+'</td>'; t+='</tr>'; }
+  for(const r of rows){ t+='<tr>'+(hasScen?'<td>'+esc(r.scenario||'')+'</td>':'')+'<td>'+esc(r.name)+'</td><td>'+r.count+'</td><td>'+n1(r.errPct)+'</td>'; for(const st of lastStats) t+='<td>'+n0(r.values[st])+'</td>'; t+='</tr>'; }
   t+='</tbody>';
   el.innerHTML=t;
   el.querySelectorAll('th[data-sort]').forEach(function(x){ x.addEventListener('click',function(){ setSort(x.getAttribute('data-sort')); }); });
@@ -137,9 +141,15 @@ function renderTxns(){
 function drawChart(){
   const svg=document.getElementById('chart'); if(!svg) return;
   const W=1000,H=300,mL=46,mR=46,mT=14,mB=26, pw=W-mL-mR, ph=H-mT-mB, axis='#8a93a6';
-  if(hist.length<2){ svg.innerHTML='<text x="500" y="150" fill="'+axis+'" text-anchor="middle" font-size="14">collecting…</text>'; return; }
-  const t0=hist[0].t, t1=hist[hist.length-1].t, tr=Math.max(1,t1-t0);
-  const maxV=Math.max(1,...hist.map(p=>p.vus)), maxE=Math.max(1,...hist.map(p=>p.err));
+  // Trim the leading idle period (no VUs and no failures) so a controller started
+  // before the shared start time doesn't render a long flat 0-lead-in that squashes
+  // the real ramp into the right edge. Keep one point before first activity so the
+  // curve still visibly rises from 0.
+  let s0=0; while(s0<hist.length && (Number(hist[s0].vus)||0)===0 && (Number(hist[s0].err)||0)===0) s0++;
+  const h = s0>=hist.length ? [] : hist.slice(Math.max(0,s0-1));
+  if(h.length<2){ svg.innerHTML='<text x="500" y="150" fill="'+axis+'" text-anchor="middle" font-size="14">collecting…</text>'; return; }
+  const t0=h[0].t, t1=h[h.length-1].t, tr=Math.max(1,t1-t0);
+  const maxV=Math.max(1,...h.map(p=>p.vus)), maxE=Math.max(1,...h.map(p=>p.err));
   const X=t=>mL+((t-t0)/tr)*pw, YV=v=>mT+ph-(v/maxV)*ph, YE=e=>mT+ph-(e/maxE)*ph;
   let g='';
   for(let i=0;i<=4;i++){ const y=mT+ph*(i/4);
@@ -147,9 +157,15 @@ function drawChart(){
     g+='<text x="'+(mL-6)+'" y="'+(y+3)+'" fill="#38bdf8" text-anchor="end" font-size="11">'+(maxV*(1-i/4)).toFixed(0)+'</text>';
     g+='<text x="'+(W-mR+6)+'" y="'+(y+3)+'" fill="#f87171" text-anchor="start" font-size="11">'+(maxE*(1-i/4)).toFixed(1)+'</text>';
   }
-  g+='<text x="'+mL+'" y="'+(H-8)+'" fill="'+axis+'" font-size="11">0s</text>';
-  g+='<text x="'+(W-mR)+'" y="'+(H-8)+'" fill="'+axis+'" text-anchor="end" font-size="11">'+Math.round(tr/1000)+'s</text>';
-  const poly=(fy,color)=>'<polyline fill="none" stroke="'+color+'" stroke-width="2" points="'+hist.map(p=>X(p.t).toFixed(1)+','+fy(p).toFixed(1)).join(' ')+'"/>';
+  // X axis: 5 evenly-spaced time ticks (gridline + label) in a scalable format —
+  // "Xs" under ~90s, "M:SS" beyond. Labels are elapsed time since the first plotted
+  // (post-trim) point, so they track the actual run, not the controller's uptime.
+  const fmtT=ms=>{ const s=Math.round(ms/1000); if(s<90) return s+'s'; const m=Math.floor(s/60), ss=s%60; return m+':'+(ss<10?'0':'')+ss; };
+  for(let i=0;i<=4;i++){ const x=mL+pw*(i/4), tv=tr*(i/4);
+    g+='<line x1="'+x+'" y1="'+mT+'" x2="'+x+'" y2="'+(mT+ph)+'" stroke="'+axis+'" stroke-opacity="0.10"/>';
+    g+='<text x="'+x+'" y="'+(H-8)+'" fill="'+axis+'" text-anchor="'+(i===0?'start':(i===4?'end':'middle'))+'" font-size="11">'+fmtT(tv)+'</text>';
+  }
+  const poly=(fy,color)=>'<polyline fill="none" stroke="'+color+'" stroke-width="2" points="'+h.map(p=>X(p.t).toFixed(1)+','+fy(p).toFixed(1)).join(' ')+'"/>';
   svg.innerHTML=g+poly(p=>YV(p.vus),'#38bdf8')+poly(p=>YE(p.err),'#f87171');
 }
 async function tick(){
@@ -169,7 +185,17 @@ async function tick(){
   document.getElementById('kpis').innerHTML =
     kpi('Active VUs',d.totals.vus)+kpi('Transactions',d.totals.txns)+kpi('Throughput/s',n1(d.totals.tps))+kpi('Req fail %',n1(d.totals.reqFailRate))+kpi('Errors',ev.errorCount)+kpi('Warnings',ev.warnCount);
   // VUs + failure-rate over time (freeze once all machines finish)
-  if(!frozen){ hist.push({t:Date.now(), vus:Number(d.totals.vus)||0, err:Number(d.totals.reqFailRate)||0}); if(hist.length>MAXPTS) hist.shift(); if(d.allDone) frozen=true; }
+  // Chart plots the PER-INTERVAL failure rate (Δfailed/Δtotal since the last poll),
+  // not the cumulative reqFailRate — the cumulative one only ever climbs and flattens,
+  // which hides WHEN failures happened. The KPI card above still shows the overall %.
+  if(!frozen){
+    const rt=Number(d.totals.reqTotal)||0, rf=Number(d.totals.reqFailed)||0;
+    let ierr=0;
+    if(prevReq){ const dT=rt-prevReq.rt, dF=rf-prevReq.rf; ierr=dT>0?Math.max(0,Math.min(100,(dF/dT)*100)):0; }
+    prevReq={rt,rf};
+    hist.push({t:Date.now(), vus:Number(d.totals.vus)||0, err:ierr});
+    if(hist.length>MAXPTS) hist.shift(); if(d.allDone) frozen=true;
+  }
   drawChart();
   // fleet
   let f='<thead><tr><th>Machine</th><th>State</th><th>Elapsed</th><th>Active VUs</th><th>Txns</th><th>Err%</th><th>TPS</th></tr></thead><tbody>';
@@ -215,10 +241,22 @@ export function startDashboardServer(
     mergeState = 'merging';
     Logger.info(`[dashboard] all ${agg.machineCount} machine(s) finished — auto-merging…`);
     const machines = agg.fleet.map((f) => f.machine);
-    const ok = await runMerge({ runDir: o.sharedDir, wait: true, machines, pollSec: 3, waitTimeoutSec: o.mergeTimeoutSec ?? 300 });
-    finalReport = findLatestFinalReport(o.sharedDir) ?? '';
-    mergeState = ok ? 'done' : 'failed';
-    Logger.pass(`[dashboard] auto-merge ${mergeState}${finalReport ? ` → ${finalReport}` : ''}`);
+    // runMerge's boolean is the CI GATE (did the test pass?), NOT whether the merge
+    // produced a report — a fully-failing test still yields a valid Final report.
+    // Judge auto-merge success by whether a NEW Final report actually appeared, so a
+    // failing test isn't mislabeled "auto-merge failed". Distinguish a genuine merge
+    // error (nothing produced / timeout / throw) from a produced-but-failing run.
+    const prevReport = findLatestFinalReport(o.sharedDir) ?? '';
+    try {
+      const ciPassed = await runMerge({ runDir: o.sharedDir, wait: true, machines, pollSec: 3, waitTimeoutSec: o.mergeTimeoutSec ?? 300 });
+      finalReport = findLatestFinalReport(o.sharedDir) ?? '';
+      const produced = !!finalReport && finalReport !== prevReport;
+      mergeState = produced ? 'done' : 'failed';
+      Logger.pass(`[dashboard] auto-merge ${mergeState} (test ${ciPassed ? 'passed' : 'FAILED its gate'})${finalReport ? ` → ${finalReport}` : ''}`);
+    } catch (err) {
+      mergeState = 'failed';
+      Logger.fail(`[dashboard] auto-merge error: ${err instanceof Error ? err.message : String(err)}`);
+    }
   };
   const amTimer = o.autoMerge === false ? null : setInterval(() => { void maybeAutoMerge(); }, Math.max(2000, o.intervalMs));
   if (amTimer?.unref) amTimer.unref();

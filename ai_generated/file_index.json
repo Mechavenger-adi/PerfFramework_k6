@@ -299,7 +299,7 @@
     ],
     "importsNode": true,
     "layer": "cli",
-    "loc": 2598,
+    "loc": 2609,
     "path": "core_engine/src/cli/run.ts"
   },
   {
@@ -817,7 +817,7 @@
     ],
     "importsNode": false,
     "layer": "distributed",
-    "loc": 273,
+    "loc": 282,
     "path": "core_engine/src/distributed/MergedReportBuilder.ts"
   },
   {
@@ -905,7 +905,7 @@
     ],
     "importsNode": true,
     "layer": "distributed",
-    "loc": 186,
+    "loc": 194,
     "path": "core_engine/src/distributed/liveAggregate.ts"
   },
   {
@@ -924,7 +924,7 @@
     ],
     "importsNode": true,
     "layer": "distributed",
-    "loc": 299,
+    "loc": 337,
     "path": "core_engine/src/distributed/liveDashboard.ts"
   },
   {
@@ -939,7 +939,7 @@
     ],
     "importsNode": false,
     "layer": "distributed",
-    "loc": 115,
+    "loc": 120,
     "path": "core_engine/src/distributed/monitor.ts"
   },
   {
@@ -980,7 +980,7 @@
     ],
     "importsNode": true,
     "layer": "distributed",
-    "loc": 279,
+    "loc": 293,
     "path": "core_engine/src/distributed/runMerge.ts"
   },
   {
@@ -1014,8 +1014,10 @@
   },
   {
     "exports": [
+      "CsvTransactionAggregate",
       "RequestTiming",
       "TransactionCsvStats",
+      "buildTransactionRowsFromCsv",
       "findRequestCsv",
       "findTransactionCsv",
       "readRequestFailByBucket",
@@ -1025,11 +1027,13 @@
       "readTransactionCsvStats"
     ],
     "imports": [
+      "core_engine/src/reporting/Histogram.ts",
+      "core_engine/src/types/ReportingContracts.ts",
       "fs"
     ],
     "importsNode": true,
     "layer": "distributed",
-    "loc": 214,
+    "loc": 306,
     "path": "core_engine/src/distributed/transactionCsv.ts"
   },
   {
@@ -1538,7 +1542,7 @@
     ],
     "importsNode": false,
     "layer": "reporting",
-    "loc": 2709,
+    "loc": 2750,
     "path": "core_engine/src/reporting/RunReportGenerator.ts"
   },
   {
@@ -1573,6 +1577,7 @@
     "exports": [
       "OverviewBucket",
       "ParsedTimeseries",
+      "ParsedTransactionSeries",
       "PhaseTimings",
       "RequestBucket",
       "TimeseriesStreamParser",
@@ -1584,7 +1589,7 @@
     ],
     "importsNode": true,
     "layer": "reporting",
-    "loc": 670,
+    "loc": 692,
     "path": "core_engine/src/reporting/TimeseriesStreamParser.ts"
   },
   {
@@ -1676,7 +1681,7 @@
     ],
     "importsNode": false,
     "layer": "runtime",
-    "loc": 117,
+    "loc": 133,
     "path": "core_engine/src/runtime/TimeseriesRuntime.ts"
   },
   {
@@ -1814,14 +1819,16 @@
       "TimeSeriesFile",
       "TimeSeriesPoint",
       "TransactionMetricRow",
-      "TransactionMetricsFile"
+      "TransactionMetricsFile",
+      "TransactionSeries",
+      "normalizeTransactionSeries"
     ],
     "imports": [
       "core_engine/src/types/EventContracts.ts"
     ],
     "importsNode": false,
     "layer": "types",
-    "loc": 155,
+    "loc": 185,
     "path": "core_engine/src/types/ReportingContracts.ts"
   },
   {

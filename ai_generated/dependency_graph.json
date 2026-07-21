@@ -729,6 +729,14 @@
       "to": "core_engine/src/utils/logger.ts"
     },
     {
+      "from": "core_engine/src/distributed/transactionCsv.ts",
+      "to": "core_engine/src/reporting/Histogram.ts"
+    },
+    {
+      "from": "core_engine/src/distributed/transactionCsv.ts",
+      "to": "core_engine/src/types/ReportingContracts.ts"
+    },
+    {
       "from": "core_engine/src/execution/HostMonitor.ts",
       "to": "core_engine/src/runtime/ErrorRuntime.ts"
     },

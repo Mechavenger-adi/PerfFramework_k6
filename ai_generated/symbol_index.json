@@ -676,7 +676,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "const",
-    "line": 2490,
+    "line": 2501,
     "name": "ERROR_EVENT_PREFIX"
   },
   "core_engine/src/cli/run.ts#FRAMEWORK_OWNED_FLAGS": {
@@ -692,7 +692,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "const",
-    "line": 2089,
+    "line": 2100,
     "name": "LIVE_TXN_INTERVAL_MS"
   },
   "core_engine/src/cli/run.ts#LiveTxnStats": {
@@ -700,7 +700,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "interface",
-    "line": 2091,
+    "line": 2102,
     "name": "LiveTxnStats"
   },
   "core_engine/src/cli/run.ts#SNAPSHOT_EVENT_PREFIX": {
@@ -708,7 +708,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "const",
-    "line": 2489,
+    "line": 2500,
     "name": "SNAPSHOT_EVENT_PREFIX"
   },
   "core_engine/src/cli/run.ts#WARNING_EVENT_PREFIX": {
@@ -716,7 +716,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "const",
-    "line": 2491,
+    "line": 2502,
     "name": "WARNING_EVENT_PREFIX"
   },
   "core_engine/src/cli/run.ts#bridgeEnvFile": {
@@ -732,7 +732,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "Build the rendered table as a list of strings (one per row). Pure helper shared by both fixed-position and scrollback renderers.",
     "kind": "function",
-    "line": 2339,
+    "line": 2350,
     "name": "buildLiveTableLines"
   },
   "core_engine/src/cli/run.ts#buildReportAgents": {
@@ -740,7 +740,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 1969,
+    "line": 1980,
     "name": "buildReportAgents"
   },
   "core_engine/src/cli/run.ts#buildRunEnvironment": {
@@ -804,7 +804,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "Wave 3: scan the mirrored run log for any `[k6-perf][*-event]` JSON payloads emitted by the k6 side (`transaction.ts` and `request.ts`) and return them as structured event lists. Used by `finalizeRunArtifacts` to merge per-iteration check failures, transaction exceptions, and snapshot- cap warnings into the same error/warning pipelines the rest of reporting consumes. Best-effort — malformed lines are skipped.",
     "kind": "function",
-    "line": 2529,
+    "line": 2540,
     "name": "extractK6PerfEvents"
   },
   "core_engine/src/cli/run.ts#extractPayloadWithPrefix": {
@@ -812,7 +812,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "Same dequote logic as snapshot extraction, parameterized on the prefix.",
     "kind": "function",
-    "line": 2554,
+    "line": 2565,
     "name": "extractPayloadWithPrefix"
   },
   "core_engine/src/cli/run.ts#extractSnapshotPayload": {
@@ -820,7 +820,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 2568,
+    "line": 2579,
     "name": "extractSnapshotPayload"
   },
   "core_engine/src/cli/run.ts#extractTransactionNamesFromSource": {
@@ -852,7 +852,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 2074,
+    "line": 2085,
     "name": "formatCell"
   },
   "core_engine/src/cli/run.ts#getEntryScriptDirectory": {
@@ -876,7 +876,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "Reads the mirrored k6 log file, extracts snapshot events emitted during the run, and writes a consolidated snapshots.json to the report directory.",
     "kind": "function",
-    "line": 2497,
+    "line": 2508,
     "name": "parseAndFlushSnapshots"
   },
   "core_engine/src/cli/run.ts#pct": {
@@ -884,7 +884,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 2112,
+    "line": 2123,
     "name": "pct"
   },
   "core_engine/src/cli/run.ts#percentilesFromStats": {
@@ -908,7 +908,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "Print a LoadRunner-style transaction metrics table to the console.",
     "kind": "function",
-    "line": 1980,
+    "line": 1991,
     "name": "printTransactionTable"
   },
   "core_engine/src/cli/run.ts#program": {
@@ -924,7 +924,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "Fixed-position rendering: the table lives at rows `tableTop..termRows`, frozen below k6's scroll region. Save cursor → clear table area → draw table → restore cursor, so k6's progress bar continues animating above without ever touching our table area.",
     "kind": "function",
-    "line": 2434,
+    "line": 2445,
     "name": "renderFixedTable"
   },
   "core_engine/src/cli/run.ts#renderScrollbackTable": {
@@ -932,7 +932,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "Fallback for non-TTY stdout or terminals too short for fixed positioning: just append the latest snapshot as scrollback.",
     "kind": "function",
-    "line": 2475,
+    "line": 2486,
     "name": "renderScrollbackTable"
   },
   "core_engine/src/cli/run.ts#resolveRecordingLogForStandaloneDebug": {
@@ -972,7 +972,7 @@
     "file": "core_engine/src/cli/run.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 2125,
+    "line": 2136,
     "name": "startLiveTransactionDisplay"
   },
   "core_engine/src/cli/run.ts#templatesCmd": {
@@ -2156,7 +2156,7 @@
     "file": "core_engine/src/distributed/MergedReportBuilder.ts",
     "jsdoc": "Host CPU/mem snapshots from this machine's system-metrics.json (for the System tab).",
     "kind": "interface",
-    "line": 21,
+    "line": 22,
     "name": "MachineTimeseries"
   },
   "core_engine/src/distributed/MergedReportBuilder.ts#MergedReportBuilder": {
@@ -2164,7 +2164,7 @@
     "file": "core_engine/src/distributed/MergedReportBuilder.ts",
     "jsdoc": "Group each machine's host snapshots into a per-agent system series (keyed by machine name).",
     "kind": "class",
-    "line": 57,
+    "line": 58,
     "name": "MergedReportBuilder"
   },
   "core_engine/src/distributed/MergedReportBuilder.ts#MergedReportInput": {
@@ -2172,7 +2172,7 @@
     "file": "core_engine/src/distributed/MergedReportBuilder.ts",
     "jsdoc": "Counter bucket seconds (default 2, from runtime settings).",
     "kind": "interface",
-    "line": 32,
+    "line": 33,
     "name": "MergedReportInput"
   },
   "core_engine/src/distributed/MergedReportBuilder.ts#percentilesFrom": {
@@ -2180,7 +2180,7 @@
     "file": "core_engine/src/distributed/MergedReportBuilder.ts",
     "jsdoc": "Percentiles to emit per bucket: fixed p90 ∪ every percentile in the configured stats.",
     "kind": "function",
-    "line": 46,
+    "line": 47,
     "name": "percentilesFrom"
   },
   "core_engine/src/distributed/agentServer.ts#AgentServerOptions": {
@@ -2436,7 +2436,7 @@
     "file": "core_engine/src/distributed/liveAggregate.ts",
     "jsdoc": "Merge all heartbeats in `dir` into one combined live view.",
     "kind": "function",
-    "line": 145,
+    "line": 153,
     "name": "aggregate"
   },
   "core_engine/src/distributed/liveAggregate.ts#controllerHost": {
@@ -2556,7 +2556,7 @@
     "file": "core_engine/src/distributed/liveDashboard.ts",
     "jsdoc": "CLI handler for `k6-framework monitor --serve`. Keeps running until interrupted.",
     "kind": "function",
-    "line": 266,
+    "line": 304,
     "name": "runDashboardCli"
   },
   "core_engine/src/distributed/liveDashboard.ts#startDashboardServer": {
@@ -2564,7 +2564,7 @@
     "file": "core_engine/src/distributed/liveDashboard.ts",
     "jsdoc": "Start the live dashboard HTTP server. Resolves once listening.",
     "kind": "function",
-    "line": 198,
+    "line": 224,
     "name": "startDashboardServer"
   },
   "core_engine/src/distributed/monitor.ts#MonitorOptions": {
@@ -2604,7 +2604,7 @@
     "file": "core_engine/src/distributed/monitor.ts",
     "jsdoc": "CLI handler for `k6-framework monitor` (console). Auto-merges when all machines finish.",
     "kind": "function",
-    "line": 76,
+    "line": 81,
     "name": "runMonitor"
   },
   "core_engine/src/distributed/probe.ts#ProbeResult": {
@@ -2748,7 +2748,7 @@
     "file": "core_engine/src/distributed/runMerge.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 267,
+    "line": 281,
     "name": "validateManifests"
   },
   "core_engine/src/distributed/runMerge.ts#waitForMachines": {
@@ -2807,28 +2807,44 @@
     "line": 16,
     "name": "fmtRemaining"
   },
+  "core_engine/src/distributed/transactionCsv.ts#CsvTransactionAggregate": {
+    "exported": true,
+    "file": "core_engine/src/distributed/transactionCsv.ts",
+    "jsdoc": "A transaction is identified by its TAGS — (scenario, transaction). Grouping uses a private nested Map<scenario, Map<transaction, …>>; the tags are then returned as explicit fields. Nothing here encodes a composite key, so there is no delimiter to collide on and callers never decode anything.",
+    "kind": "interface",
+    "line": 21,
+    "name": "CsvTransactionAggregate"
+  },
   "core_engine/src/distributed/transactionCsv.ts#RequestTiming": {
     "exported": true,
     "file": "core_engine/src/distributed/transactionCsv.ts",
     "jsdoc": "",
     "kind": "interface",
-    "line": 173,
+    "line": 265,
     "name": "RequestTiming"
   },
   "core_engine/src/distributed/transactionCsv.ts#TransactionCsvStats": {
     "exported": true,
     "file": "core_engine/src/distributed/transactionCsv.ts",
-    "jsdoc": "VU count from the most recent row (approximate \"current VUs\").",
+    "jsdoc": "One record per (scenario, transaction) — same-named transactions in different journeys stay separate, with both tags as explicit fields.",
     "kind": "interface",
-    "line": 64,
+    "line": 100,
     "name": "TransactionCsvStats"
+  },
+  "core_engine/src/distributed/transactionCsv.ts#buildTransactionRowsFromCsv": {
+    "exported": true,
+    "file": "core_engine/src/distributed/transactionCsv.ts",
+    "jsdoc": "Build merged transaction table rows straight from one or more transaction CSVs, keyed by (scenario, transaction) so same-named transactions in different journeys stay SEPARATE (k6's end-of-test summary collapses them — the CSV is the only source that preserves the scenario per row). Pools counts/pass/fail + response times across files, then computes the configured stats via exact R-7 percentiles. `journey` is set to the scenario so the report's SCENARIO column shows the real journey, not \"all\".",
+    "kind": "function",
+    "line": 159,
+    "name": "buildTransactionRowsFromCsv"
   },
   "core_engine/src/distributed/transactionCsv.ts#findRequestCsv": {
     "exported": true,
     "file": "core_engine/src/distributed/transactionCsv.ts",
     "jsdoc": "Find the request CSV inside a folder, if present.",
     "kind": "function",
-    "line": 113,
+    "line": 205,
     "name": "findRequestCsv"
   },
   "core_engine/src/distributed/transactionCsv.ts#findTransactionCsv": {
@@ -2836,15 +2852,31 @@
     "file": "core_engine/src/distributed/transactionCsv.ts",
     "jsdoc": "Find the transaction CSV inside a collected machine folder, if present.",
     "kind": "function",
-    "line": 206,
+    "line": 298,
     "name": "findTransactionCsv"
+  },
+  "core_engine/src/distributed/transactionCsv.ts#flatten": {
+    "exported": false,
+    "file": "core_engine/src/distributed/transactionCsv.ts",
+    "jsdoc": "Flatten the nested grouping map into records with the tags as explicit fields.",
+    "kind": "function",
+    "line": 43,
+    "name": "flatten"
+  },
+  "core_engine/src/distributed/transactionCsv.ts#leafFor": {
+    "exported": false,
+    "file": "core_engine/src/distributed/transactionCsv.ts",
+    "jsdoc": "Group into the private nested map, returning the leaf aggregate for a tag pair.",
+    "kind": "function",
+    "line": 30,
+    "name": "leafFor"
   },
   "core_engine/src/distributed/transactionCsv.ts#parseCsvLine": {
     "exported": false,
     "file": "core_engine/src/distributed/transactionCsv.ts",
     "jsdoc": "Minimal RFC-4180-ish line parser (handles quoted fields + escaped quotes).",
     "kind": "function",
-    "line": 14,
+    "line": 50,
     "name": "parseCsvLine"
   },
   "core_engine/src/distributed/transactionCsv.ts#readRequestFailByBucket": {
@@ -2852,7 +2884,7 @@
     "file": "core_engine/src/distributed/transactionCsv.ts",
     "jsdoc": "Request failure bucketed by wall-clock time (checks-first isError). Key = bucket start in ms (floor(ts / bucketMs) * bucketMs). Pooled across machines then read as failed/total per bucket → the request-failure-over-time series.",
     "kind": "function",
-    "line": 147,
+    "line": 239,
     "name": "readRequestFailByBucket"
   },
   "core_engine/src/distributed/transactionCsv.ts#readRequestFailure": {
@@ -2860,7 +2892,7 @@
     "file": "core_engine/src/distributed/transactionCsv.ts",
     "jsdoc": "Request-level failure from a request CSV: total requests and failed (isError, which is checks-first then status). This is the authoritative failure source for the failure graph — combined correctly as Σfailed/Σtotal, never averaged percentages.",
     "kind": "function",
-    "line": 125,
+    "line": 217,
     "name": "readRequestFailure"
   },
   "core_engine/src/distributed/transactionCsv.ts#readRequestTimings": {
@@ -2868,7 +2900,7 @@
     "file": "core_engine/src/distributed/transactionCsv.ts",
     "jsdoc": "Per-request-name response times (ms) + method/transaction, accumulated across files.",
     "kind": "function",
-    "line": 176,
+    "line": 268,
     "name": "readRequestTimings"
   },
   "core_engine/src/distributed/transactionCsv.ts#readTransactionCsvRaw": {
@@ -2876,7 +2908,7 @@
     "file": "core_engine/src/distributed/transactionCsv.ts",
     "jsdoc": "Read a transaction CSV into { transactionName: responseTimesMs[] }. Returns {} if the file is missing/empty or lacks the required columns.",
     "kind": "function",
-    "line": 42,
+    "line": 78,
     "name": "readTransactionCsvRaw"
   },
   "core_engine/src/distributed/transactionCsv.ts#readTransactionCsvStats": {
@@ -2884,7 +2916,7 @@
     "file": "core_engine/src/distributed/transactionCsv.ts",
     "jsdoc": "Richer parse used by the live heartbeat: per-transaction count/fail/response times (ms) plus totals and the latest VU count. Reads the whole file each call (fine at heartbeat cadence; the file is small relative to the run).",
     "kind": "function",
-    "line": 77,
+    "line": 115,
     "name": "readTransactionCsvStats"
   },
   "core_engine/src/execution/FileWriteSink.ts#FILE_TAG": {
@@ -3596,7 +3628,7 @@
     "file": "core_engine/src/reporting/TimeseriesStreamParser.ts",
     "jsdoc": "",
     "kind": "interface",
-    "line": 145,
+    "line": 156,
     "name": "OverviewRaw"
   },
   "core_engine/src/reporting/TimeseriesStreamParser.ts#ParseOptions": {
@@ -3604,7 +3636,7 @@
     "file": "core_engine/src/reporting/TimeseriesStreamParser.ts",
     "jsdoc": "Comprehensive transaction-name allowlist drawn from the run's manifest.",
     "kind": "interface",
-    "line": 188,
+    "line": 199,
     "name": "ParseOptions"
   },
   "core_engine/src/reporting/TimeseriesStreamParser.ts#ParsedTimeseries": {
@@ -3612,8 +3644,16 @@
     "file": "core_engine/src/reporting/TimeseriesStreamParser.ts",
     "jsdoc": "Earliest bucket ts observed across all metrics.",
     "kind": "interface",
-    "line": 117,
+    "line": 128,
     "name": "ParsedTimeseries"
+  },
+  "core_engine/src/reporting/TimeseriesStreamParser.ts#ParsedTransactionSeries": {
+    "exported": true,
+    "file": "core_engine/src/reporting/TimeseriesStreamParser.ts",
+    "jsdoc": "One parsed series per (scenario, transaction). The scenario comes from k6's `scenario` system tag on each sample, so same-named transactions in different journeys stay separate. Tags are explicit fields — never a composite key.",
+    "kind": "interface",
+    "line": 122,
+    "name": "ParsedTransactionSeries"
   },
   "core_engine/src/reporting/TimeseriesStreamParser.ts#PhaseTimings": {
     "exported": true,
@@ -3628,7 +3668,7 @@
     "file": "core_engine/src/reporting/TimeseriesStreamParser.ts",
     "jsdoc": "",
     "kind": "interface",
-    "line": 210,
+    "line": 221,
     "name": "RawPoint"
   },
   "core_engine/src/reporting/TimeseriesStreamParser.ts#RequestBucket": {
@@ -3644,7 +3684,7 @@
     "file": "core_engine/src/reporting/TimeseriesStreamParser.ts",
     "jsdoc": "",
     "kind": "interface",
-    "line": 174,
+    "line": 185,
     "name": "RequestRaw"
   },
   "core_engine/src/reporting/TimeseriesStreamParser.ts#TimeseriesStreamParser": {
@@ -3652,7 +3692,7 @@
     "file": "core_engine/src/reporting/TimeseriesStreamParser.ts",
     "jsdoc": "Stream-parse the file. Returns `null` if the file doesn't exist or is empty.",
     "kind": "class",
-    "line": 215,
+    "line": 226,
     "name": "TimeseriesStreamParser"
   },
   "core_engine/src/reporting/TimeseriesStreamParser.ts#TransactionBucket": {
@@ -3668,7 +3708,7 @@
     "file": "core_engine/src/reporting/TimeseriesStreamParser.ts",
     "jsdoc": "",
     "kind": "interface",
-    "line": 167,
+    "line": 178,
     "name": "TransactionRaw"
   },
   "core_engine/src/reporting/TimeseriesStreamParser.ts#TrendStats": {
@@ -3676,7 +3716,7 @@
     "file": "core_engine/src/reporting/TimeseriesStreamParser.ts",
     "jsdoc": "Percentile values keyed by number-as-string (e.g. { '90': 210, '95': 260 }).",
     "kind": "interface",
-    "line": 620,
+    "line": 642,
     "name": "TrendStats"
   },
   "core_engine/src/reporting/TimeseriesStreamParser.ts#computeTrendStats": {
@@ -3684,7 +3724,7 @@
     "file": "core_engine/src/reporting/TimeseriesStreamParser.ts",
     "jsdoc": "Compute Trend-metric stats from a per-bucket sample array. Sorts in place (caller's array is discarded after finalize so the mutation is safe and saves a copy). Percentiles use LINEAR INTERPOLATION between neighboring ranks — the exact algorithm k6 itself uses (TrendSink.P): the report's graph traces therefore match k6's reported numbers and, crucially, percentiles separate even for the small per-bucket sample counts produced by low-VU runs (nearest-rank used to collapse them all onto the bucket's max).",
     "kind": "function",
-    "line": 637,
+    "line": 659,
     "name": "computeTrendStats"
   },
   "core_engine/src/reporting/TimeseriesStreamParser.ts#emptyPhase": {
@@ -3692,7 +3732,7 @@
     "file": "core_engine/src/reporting/TimeseriesStreamParser.ts",
     "jsdoc": "Empty phase-timings struct for empty/missing buckets.",
     "kind": "function",
-    "line": 499,
+    "line": 521,
     "name": "emptyPhase"
   },
   "core_engine/src/reporting/TimeseriesStreamParser.ts#finalizeOverview": {
@@ -3700,7 +3740,7 @@
     "file": "core_engine/src/reporting/TimeseriesStreamParser.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 513,
+    "line": 535,
     "name": "finalizeOverview"
   },
   "core_engine/src/reporting/TimeseriesStreamParser.ts#finalizeRequest": {
@@ -3708,7 +3748,7 @@
     "file": "core_engine/src/reporting/TimeseriesStreamParser.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 589,
+    "line": 611,
     "name": "finalizeRequest"
   },
   "core_engine/src/reporting/TimeseriesStreamParser.ts#finalizeTransaction": {
@@ -3716,7 +3756,7 @@
     "file": "core_engine/src/reporting/TimeseriesStreamParser.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 565,
+    "line": 587,
     "name": "finalizeTransaction"
   },
   "core_engine/src/reporting/TimeseriesStreamParser.ts#getOverview": {
@@ -3724,7 +3764,7 @@
     "file": "core_engine/src/reporting/TimeseriesStreamParser.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 473,
+    "line": 495,
     "name": "getOverview"
   },
   "core_engine/src/reporting/TimeseriesStreamParser.ts#normalizePercentiles": {
@@ -3732,7 +3772,7 @@
     "file": "core_engine/src/reporting/TimeseriesStreamParser.ts",
     "jsdoc": "Normalize a percentile list: ensure p90 is present, dedupe, sort ascending.",
     "kind": "function",
-    "line": 202,
+    "line": 213,
     "name": "normalizePercentiles"
   },
   "core_engine/src/reporting/TimeseriesStreamParser.ts#percentile": {
@@ -3740,7 +3780,7 @@
     "file": "core_engine/src/reporting/TimeseriesStreamParser.ts",
     "jsdoc": "Linear-interpolation percentile matching k6's TrendSink.P: index = p·(n−1), then interpolate between the floor/ceil samples. `sorted` must be ascending. `p` is a fraction in [0,1].",
     "kind": "function",
-    "line": 660,
+    "line": 682,
     "name": "percentile"
   },
   "core_engine/src/reporting/TimeseriesStreamParser.ts#phaseStats": {
@@ -3748,7 +3788,7 @@
     "file": "core_engine/src/reporting/TimeseriesStreamParser.ts",
     "jsdoc": "Phase charts keep a fixed avg/p90/p95/p99 shape (k6 web-dashboard parity), independent of the configured percentile set.",
     "kind": "function",
-    "line": 507,
+    "line": 529,
     "name": "phaseStats"
   },
   "core_engine/src/reporting/TransactionMetricLogWriter.ts#CHECKRATE_SUFFIX": {
@@ -3954,7 +3994,7 @@
   "core_engine/src/runtime/TimeseriesRuntime.ts#TimeseriesRuntime": {
     "exported": true,
     "file": "core_engine/src/runtime/TimeseriesRuntime.ts",
-    "jsdoc": "Per-request bucket point. Numeric values (count/failed/durations…) merge the same way as transactions (sum numbers, concat sample arrays); string values (method/transaction/url metadata) are constant per request name and simply overwrite so they survive bucket merges without string concatenation.",
+    "jsdoc": "scenario → transaction → bucketTs → point. Nested rather than a composite string key: the tags stay separate, so there's nothing to encode or decode and no delimiter to collide. This nesting is private to the runtime — the built artifact emits scenario/transaction as explicit fields.",
     "kind": "class",
     "line": 3,
     "name": "TimeseriesRuntime"
@@ -4348,7 +4388,7 @@
     "file": "core_engine/src/types/ReportingContracts.ts",
     "jsdoc": "",
     "kind": "interface",
-    "line": 141,
+    "line": 171,
     "name": "ReportBundle"
   },
   "core_engine/src/types/ReportingContracts.ts#ReportBundleConfig": {
@@ -4356,7 +4396,7 @@
     "file": "core_engine/src/types/ReportingContracts.ts",
     "jsdoc": "",
     "kind": "interface",
-    "line": 135,
+    "line": 165,
     "name": "ReportBundleConfig"
   },
   "core_engine/src/types/ReportingContracts.ts#ReportBundleMeta": {
@@ -4364,7 +4404,7 @@
     "file": "core_engine/src/types/ReportingContracts.ts",
     "jsdoc": "",
     "kind": "interface",
-    "line": 125,
+    "line": 155,
     "name": "ReportBundleMeta"
   },
   "core_engine/src/types/ReportingContracts.ts#TimeSeriesFile": {
@@ -4398,6 +4438,22 @@
     "kind": "interface",
     "line": 21,
     "name": "TransactionMetricsFile"
+  },
+  "core_engine/src/types/ReportingContracts.ts#TransactionSeries": {
+    "exported": true,
+    "file": "core_engine/src/types/ReportingContracts.ts",
+    "jsdoc": "One per-(scenario, transaction) time series. Tags are explicit fields.",
+    "kind": "interface",
+    "line": 135,
+    "name": "TransactionSeries"
+  },
+  "core_engine/src/types/ReportingContracts.ts#normalizeTransactionSeries": {
+    "exported": true,
+    "file": "core_engine/src/types/ReportingContracts.ts",
+    "jsdoc": "Accept both the current array-of-records shape and the legacy Record<transactionName, points[]> shape (artifacts written before transactions were scenario-aware), so previously-collected runs still merge and render. Legacy entries carry an empty scenario — they genuinely had none recorded.",
+    "kind": "function",
+    "line": 147,
+    "name": "normalizeTransactionSeries"
   },
   "core_engine/src/types/TestPlanSchema.ts#DataOverflowStrategy": {
     "exported": true,
