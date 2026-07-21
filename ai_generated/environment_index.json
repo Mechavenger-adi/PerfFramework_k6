@@ -101,6 +101,13 @@
   {
     "templates": [],
     "usedIn": [
+      "core_engine/src/config/RuntimeConfigManager.ts"
+    ],
+    "var": "K6_PERF_KEEP_RAW"
+  },
+  {
+    "templates": [],
+    "usedIn": [
       "core_engine/src/cli/run.ts"
     ],
     "var": "K6_PERF_LIVE_TABLE"

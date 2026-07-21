@@ -146,16 +146,27 @@ export class RuntimeConfigManager {
   }
 
   /**
-   * When false, the raw k6 streaming-JSON file (`metrics-stream.json`) is
-   * deleted after the unified report finishes generating. The file is the
-   * source of truth for the per-second time-series charts and is several
-   * MB per minute of high-RPS traffic — useful for re-analysis but heavy
-   * for CI / storage-constrained environments.
+   * When false (the default), the raw k6 streaming-JSON file
+   * (`metrics-stream.json`) is deleted once the report is built. It is purely an
+   * INPUT — the timeseries artifact and the mergeable histogram are derived from
+   * it and every chart reads those — and it is the largest file a run produces
+   * (several MB per minute of high-RPS traffic).
+   *
+   * Resolution order (first match wins):
+   *   1. `K6_PERF_KEEP_RAW` env (1/true/yes to keep, 0/false/no to delete) — lets a
+   *      one-off debug run retain the stream without editing runtime settings.
+   *   2. `reporting.timeseries.keepRawMetricsStream` in the runtime settings file.
+   *   3. The framework default (false).
    */
   shouldKeepRawMetricsStream(): boolean {
+    const env = process.env.K6_PERF_KEEP_RAW;
+    if (env !== undefined && env.trim() !== '') {
+      if (/^(1|true|yes)$/i.test(env.trim())) return true;
+      if (/^(0|false|no)$/i.test(env.trim())) return false;
+    }
     return this.timeseriesConfig.keepRawMetricsStream
       ?? FRAMEWORK_DEFAULTS.reporting.timeseries.keepRawMetricsStream
-      ?? true;
+      ?? false;
   }
 
   // ---------------------------------------------

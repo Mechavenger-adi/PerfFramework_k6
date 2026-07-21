@@ -724,7 +724,10 @@ program
     }
     entryCode += `\nexport function handleSummary(data) {\n`;
     entryCode += `  return {\n`;
-    entryCode += `    "${safeReportDir}/handleSummary.json": JSON.stringify(data),\n`;
+    // Pretty-printed: this is now the ONLY k6 summary artifact kept per run, and it's
+    // read by humans as often as by the report, so readability wins over the few KB
+    // the indentation costs.
+    entryCode += `    "${safeReportDir}/handleSummary.json": JSON.stringify(data, null, 2),\n`;
     // entryCode += `    stdout: textSummary(data, { indent: " ", enableColors: true }), // DEBUG textSummary\n`;
     entryCode += `  };\n`;
     entryCode += `}\n`;
