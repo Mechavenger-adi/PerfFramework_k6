@@ -222,13 +222,13 @@ engine, thousands of times per second — **no Node built-ins allowed here**. Im
     so interpolations show in the diff. Detail: [EDD-debug-replay](../../engineering_docs/edd/EDD-debug-replay.md).
 
 ### Reporting (`reporting/`) — artifact-first
-*   **Everything is JSON/NDJSON first, HTML second.** CI consumes `ci-summary.json`, never console text.
+*   **Everything is JSON/NDJSON first, HTML second.** CI consumes `run-summary.json`, never console text.
 *   **`RunReportGenerator.ts`** — renders the unified `RunReport.html` (Summary / Transactions / Graphs /
     Errors tabs).
 *   **`TransactionMetricsBuilder.ts`** — builds per-transaction rows; pass/fail comes **solely** from
     `<name>_checkrate` (no estimation — an uncontracted transaction renders "—").
 *   **`RunSummaryBuilder` / `EventArtifactBuilder` / `TimeseriesStreamParser` / `ArtifactWriter`** — build
-    `ci-summary.json`, `errors.ndjson` / `warnings.ndjson`, per-bucket `timeseries.json`, and write them.
+    `run-summary.json`, `errors.ndjson` / `warnings.ndjson`, per-bucket `timeseries.json`, and write them.
 *   Detail: [EDD-reporting](../../engineering_docs/edd/EDD-reporting.md).
 
 ---

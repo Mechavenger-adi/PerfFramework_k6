@@ -59,7 +59,9 @@ MUST be synchronized across all three files.
 
 ## L6 — Artifact Schema Stability
 
-Machine-readable artifacts (`ci-summary.json`, `transaction-metrics.json`, `errors.ndjson`, `warnings.ndjson`, `timeseries.json`, `run-manifest.json`) have implicit consumers (CI pipelines, dashboards). Schema changes MUST be backward-compatible or versioned.
+Machine-readable artifacts (`run-summary.json`, `errors.ndjson`, `warnings.ndjson`, `timeseries.json`, `run-manifest.json`) have implicit consumers (CI pipelines, dashboards). Schema changes MUST be backward-compatible or versioned.
+
+**Breaking change (2026-07-21):** `ci-summary.json` + `transaction-metrics.json` were consolidated into **`run-summary.json`**, and `summary.json` was dropped in favour of `handleSummary.json`. This was a deliberate, documented break rather than a compatible change — the two files each carried their own copy of the per-transaction array. The gate fields kept their names and position at the top level, so a pipeline reading `.status` only needs the filename updated. See `docs/release-notes.md` for migration.
 
 ## L7 — Transaction Metric Naming
 

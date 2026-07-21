@@ -334,12 +334,10 @@ Important files:
 
 - `RunReport.html` - primary human-readable report.
 - `TestSummary.html` - k6 web dashboard export.
-- `k6-reporter-summary.html` - k6 reporter HTML summary.
-- `summary.json` and `handleSummary.json` - raw k6 summary outputs.
-- `transaction-metrics.json` - transaction-level performance metrics.
+- `handleSummary.json` - raw k6 end-of-test summary (the only k6 summary artifact).
+- `run-summary.json` - CI-friendly pass/fail gate **plus** the per-transaction table.
 - `errors.ndjson` - structured run errors.
 - `warnings.ndjson` - structured warnings.
-- `ci-summary.json` - CI-friendly pass/fail summary.
 - `timeseries.json` - bucketed trend data.
 - `system-metrics.json` - host monitoring snapshots.
 - `run-manifest.json` - run metadata and artifact paths.
@@ -410,7 +408,7 @@ export default function () {
 }
 ```
 
-Use transaction names consistently. They appear in console summaries, `transaction-metrics.json`, SLA checks, and `RunReport.html`.
+Use transaction names consistently. They appear in console summaries, `run-summary.json`, SLA checks, and `RunReport.html`.
 
 ## Troubleshooting
 

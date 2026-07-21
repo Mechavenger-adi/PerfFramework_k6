@@ -33,9 +33,9 @@
 13. k6 executes scripts, VU lifecycle runs via lifecycle.ts
 14. HostMonitor.stop() → collects final snapshots
 15. finalizeRunArtifacts():
-    a. TransactionMetricsBuilder → transaction-metrics.json
+    a. TransactionMetricsBuilder ─┐
     b. EventArtifactBuilder → errors.ndjson + warnings.ndjson
-    c. RunSummaryBuilder → ci-summary.json
+    c. RunSummaryBuilder ─────────┴→ run-summary.json (gate + per-transaction table)
     d. TimeseriesArtifactBuilder → timeseries.json
     e. RunReportGenerator → RunReport.html
 16. printTransactionTable() → console output

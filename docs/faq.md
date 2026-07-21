@@ -19,7 +19,9 @@ All k6 executors. Each VU computes when k6 will cull it and runs `endPhase` a ma
 [EDD-lifecycle](../engineering_docs/edd/EDD-lifecycle.md).
 
 **What should CI consume?**
-`ci-summary.json` (and the other JSON/NDJSON artifacts) — not console text. Reporting is artifact-first.
+`run-summary.json` (and the other JSON/NDJSON artifacts) — not console text. Reporting is artifact-first.
+It holds the gate fields at the top level plus the full per-transaction table, so `jq -r '.status'`
+gates the pipeline and `.transactions[]` gives the detail.
 
 **How do I keep replayed sessions valid across iterations?**
 Auto-correlate dynamic values: [migration guide](migration.md) → correlate. Cookies persist by default

@@ -89,8 +89,8 @@ Artifacts land under `results/<plan-name>/Run_<timestamp>/`:
 | File | What |
 |------|------|
 | `RunReport.html` | primary human report (tabs: summary, transactions, graphs, errors) |
-| `ci-summary.json` | CI pass/fail — **consume this in pipelines, not console text** |
-| `transaction-metrics.json` | per-transaction stats (pass/fail from `_checkrate`) |
+| `run-summary.json` | CI pass/fail **plus** the per-transaction table — **consume this in pipelines, not console text** |
+| `handleSummary.json` | raw k6 end-of-test summary |
 | `timeseries.json` | bucketed trend data |
 | `errors.ndjson` / `warnings.ndjson` | structured events |
 

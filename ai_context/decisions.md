@@ -64,9 +64,10 @@
 
 ## D11 — Artifact-First CI/CD Model
 
-**Decision:** CI pipelines consume `ci-summary.json` for gating, not console log scraping.
+**Decision:** CI pipelines consume `run-summary.json` for gating, not console log scraping.
 **Reasoning:** Console output is noisy, format-unstable, and hard to parse reliably. Structured JSON is deterministic.
-**Constraint:** `ci-summary.json` schema is a de facto API contract with CI pipelines. Changes must be backward-compatible.
+**Constraint:** `run-summary.json` schema is a de facto API contract with CI pipelines. Changes must be backward-compatible.
+**History:** Superseded `ci-summary.json` on 2026-07-21, which was consolidated with `transaction-metrics.json` (each held its own copy of the per-transaction array). The gate fields are unchanged at the top level — `jq -r '.status'` still works; only the filename changed.
 
 ## D12 — Transaction Counter Metrics
 

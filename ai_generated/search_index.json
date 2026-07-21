@@ -375,14 +375,13 @@
     "headings": [
       "Reporting Contracts",
       "Run Artifact Directory Layout",
-      "transaction-metrics.json Schema",
-      "ci-summary.json Schema",
+      "run-summary.json Schema",
       "errors.ndjson Schema (one JSON per line)",
       "warnings.ndjson Schema (one JSON per line)",
       "timeseries.json Schema",
       "RunReport.html Tabs",
       "CI/CD Integration Pattern",
-      "Pipeline reads ci-summary.json, not console output"
+      "Pipeline reads run-summary.json, not console output"
     ],
     "layer": "L1",
     "path": "ai_context/reporting-contracts.md",

@@ -45,11 +45,11 @@
 ## Reporting Pipeline Contract
 
 ```
-k6 summary.json
+k6 handleSummary.json
   ↓
-TransactionMetricsBuilder → transaction-metrics.json
-EventArtifactBuilder      → errors.ndjson, warnings.ndjson
-RunSummaryBuilder          → ci-summary.json
+TransactionMetricsBuilder ─┐
+RunSummaryBuilder          ─┴→ run-summary.json (CI gate + per-transaction table)
+EventArtifactBuilder       → errors.ndjson, warnings.ndjson
 TimeseriesArtifactBuilder  → timeseries.json
 RunReportGenerator         → RunReport.html
 ```

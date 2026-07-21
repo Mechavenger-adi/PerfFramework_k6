@@ -67,7 +67,7 @@
 *   **Talking Points:**
     *   Stop guessing whether a test "felt" slow.
     *   **Artifact-first:** every number in the HTML also exists as JSON/NDJSON — **CI consumes
-        `ci-summary.json`, never console text.**
+        `run-summary.json`, never console text.**
     *   Tabs: **Summary** (did it pass?), **Transactions** (exact pass/fail + p95 timings), **Graphs**,
         **Errors**.
     *   SLA breach → k6 threshold fails → the run exits **99**, failing the pipeline natively.
@@ -111,7 +111,7 @@ report."
 
 **Step 5 — View the report**
 Open the path shown in the terminal: `results/<Plan>/Run_.../RunReport.html`.
-"No Grafana, no JSON wrangling — a complete per-transaction breakdown. And `ci-summary.json` next to it is
+"No Grafana, no JSON wrangling — a complete per-transaction breakdown. And `run-summary.json` next to it is
 what a pipeline would gate on."
 
 **Step 6 (optional) — Debug diff**
@@ -126,6 +126,6 @@ npm run cli -- debug --script testSuites/<team>/tests/<your>.js
    not `.ts`.
 2. **Use `transaction()` + `k6Check()`**, never raw `group()`/`check()` — only they produce exact pass/fail.
 3. **Never hardcode URLs** — use the environment config (`config/environments/*.json`) via `getEnvContext()`.
-4. **Point CI at `ci-summary.json`.** If a run exits **99**, an SLA failed — the site was too slow, the test
+4. **Point CI at `run-summary.json`.** If a run exits **99**, an SLA failed — the site was too slow, the test
    didn't crash.
 5. **Stale token on iteration 2+?** Run `npm run correlate` before reaching for manual fixes.

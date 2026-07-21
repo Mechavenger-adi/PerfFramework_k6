@@ -34,7 +34,7 @@ will understand why each step exists.
 ## Step 3 — Read the report (~10 min)
 - [ ] Open `results/WebUI_Load_Test*/Run_*/RunReport.html`.
 - [ ] Tabs to look at: **Summary**, **Transactions** (pass/fail + timings), **Graphs**, **Errors**.
-- [ ] Open `ci-summary.json` — this is what a pipeline consumes, not console text.
+- [ ] Open `run-summary.json` — this is what a pipeline consumes, not console text.
 
 > **Why "artifact-first"?** Every number in the HTML also exists as JSON/NDJSON so CI can gate on it.
 > Pass/fail comes exactly from each transaction's `_checkrate` metric. See
@@ -76,7 +76,7 @@ will understand why each step exists.
 - [ ] Explain the Node-orchestration vs k6-runtime split and why you rebuild `dist/`.
 - [ ] Describe what `initPhase`/`actionPhase`/`endPhase` each do and how often.
 - [ ] Find which file owns a feature using the [Atlas](../../FrameworkAtlas.md) / `feature_index.json`.
-- [ ] Point CI at `ci-summary.json`.
+- [ ] Point CI at `run-summary.json`.
 
 ## Where to go next
 - [Mental Model](mental-model.md) (the rest of it) → then the [EDDs](../../engineering_docs/edd/).

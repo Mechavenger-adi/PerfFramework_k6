@@ -3,6 +3,36 @@
 > Distilled from `ai_context/todos.md` (completed work) and the frozen `archive/Framework-Change-Log.md`.
 > This is a user-facing summary; the authoritative change log lives with the code/history.
 
+## Unreleased — artifact consolidation (2026-07-21) ⚠️ breaking
+
+Fewer files per run (~15 → ~10), and the two heaviest are gone by default.
+
+| Before | Now |
+|---|---|
+| `ci-summary.json` + `transaction-metrics.json` | **`run-summary.json`** — CI gate *and* the full per-transaction table |
+| `summary.json` (k6 `--summary-export`) | **removed** — `handleSummary.json` holds the same metrics plus metric `type`/`contains`, `options` and `state`, in a *smaller* file |
+| `metrics-stream.json` retained | **deleted after the report is built** — it is only an input (timeseries + histogram derive from it). Keep it with `K6_PERF_KEEP_RAW=1` or `reporting.timeseries.keepRawMetricsStream: true` |
+
+**Migration for pipelines.** The gate fields kept their names *and* their position at the
+top level, so only the filename changes:
+
+```diff
+- status=$(jq -r '.status' results/*/Run_*/ci-summary.json)
++ status=$(jq -r '.status' results/*/Run_*/run-summary.json)
+```
+
+`transactions[]` is now *richer* than the old ci-summary subset — each row carries
+`journey` (the scenario) and the full stat set (`std`, `p(90)`, …).
+
+This is a deliberate break of the artifact-stability law (`ai_context/architecture-laws.md`
+L6): the two files each carried their own copy of the per-transaction array, so keeping
+both compatible meant keeping the duplication. The merge still **reads** the legacy pair,
+so previously collected distributed runs continue to merge.
+
+**Also:** transactions are now identified by **(scenario, transaction)** — same-named
+transactions in different journeys are no longer merged into one row, and the `SCENARIO`
+column shows the real journey instead of `all`. `handleSummary.json` is pretty-printed.
+
 ## Current — v1.0.0 (`@k6-perf/core_engine`)
 
 Phases 1–3 complete (foundation, generation/correlation/debug, reporting). Highlights:

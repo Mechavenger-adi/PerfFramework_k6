@@ -342,11 +342,11 @@ The `runDebug()` method:
 ### The artifact chain (in `finalizeRunArtifacts()`, run.ts lines 554–715):
 
 ```
-summary.json (k6 output)
+handleSummary.json (k6 output)
     ↓
-TransactionMetricsBuilder.build()  → transaction-metrics.json
+TransactionMetricsBuilder.build()  ─┐
+RunSummaryBuilder.buildCiSummary() ─┴→ run-summary.json (gate + transactions)
 EventArtifactBuilder.build()       → errors.ndjson, warnings.ndjson
-RunSummaryBuilder.buildCiSummary() → ci-summary.json
 TimeseriesArtifactBuilder.build()  → timeseries.json
     ↓
 All combined into ReportBundle

@@ -27,7 +27,7 @@ generic webhook). **Currently stubs** — the transform exists; the push targets
 This is the primary external-integration extension surface.
 
 **Known limitations.** Push methods are not implemented — artifact-first reporting ([EDD-reporting](../edd/EDD-reporting.md)) is
-the supported path today (CI consumes `ci-summary.json`).
+the supported path today (CI consumes `run-summary.json`).
 
 **Risks.** None active (unwired). Contract drift with `reporting-contracts.md` if implemented later.
 

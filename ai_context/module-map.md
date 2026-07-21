@@ -122,7 +122,7 @@
 | `TransactionMetricsBuilder.ts` | Transaction metrics — pass/fail solely from `<name>_checkrate` (estimation fallback removed) |
 | `TimeseriesStreamParser.ts` | Streaming parser over k6 `--out json=` → per-bucket aggregates |
 | `EventArtifactBuilder.ts` | errors.ndjson + warnings.ndjson builder |
-| `RunSummaryBuilder.ts` | ci-summary.json builder |
+| `RunSummaryBuilder.ts` | CI gate builder (written into run-summary.json) |
 | `TimeseriesArtifactBuilder.ts` | timeseries.json builder (delegates to TimeseriesStreamParser) |
 | `ArtifactWriter.ts` | JSON/NDJSON file writer |
 

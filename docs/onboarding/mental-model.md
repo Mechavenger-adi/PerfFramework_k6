@@ -67,7 +67,7 @@ plan become k6 thresholds. One quirk: **arrays are replaced wholesale, not merge
 ## 5. Reporting is artifact-first
 
 k6's raw output is transformed into stable JSON/NDJSON artifacts *plus* an interactive `RunReport.html`.
-**CI consumes `ci-summary.json`**, never console text. Debug replay produces an HTML diff of live vs
+**CI consumes `run-summary.json`**, never console text. Debug replay produces an HTML diff of live vs
 recorded traffic. See [EDD-reporting](../../engineering_docs/edd/EDD-reporting.md) and [EDD-debug-replay](../../engineering_docs/edd/EDD-debug-replay.md).
 
 ## 6. The documentation is a system too

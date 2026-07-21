@@ -6,61 +6,75 @@
 
 ```
 results/<PlanName>/Run_<timestamp>/
-  ├── summary.json              — k6 native summary
-  ├── transaction-metrics.json  — per-transaction performance matrix
-  ├── ci-summary.json           — CI gate artifact
+  ├── handleSummary.json        — k6 native summary (the ONLY k6 summary artifact)
+  ├── run-summary.json          — CI gate + per-transaction performance matrix
   ├── errors.ndjson             — structured error events
   ├── warnings.ndjson           — structured warning events
   ├── timeseries.json           — bucketed time-series data
   ├── system-metrics.json       — host CPU/memory snapshots
+  ├── snapshots.json            — request/response captured at failure
   ├── run-manifest.json         — run metadata + artifact paths
-  ├── RunReport.html            — unified HTML report (7 tabs)
-  ├── TestDetails.html          — legacy HTML (preserved for compat)
-  └── TestSummary.html          — legacy HTML (preserved for compat)
+  ├── <testId>_<host>_request_metric.csv     — one row per HTTP request
+  ├── <testId>_<host>_transaction_metric.csv — one row per transaction iteration
+  ├── RunReport.html            — unified HTML report
+  └── TestSummary.html          — k6 web-dashboard export
 ```
 
-## transaction-metrics.json Schema
+**Not retained by default:** `metrics-stream.json` (the raw k6 `--out json=` firehose) is
+an INPUT only — `timeseries.json` and the mergeable histogram are derived from it — and
+is the largest file a run produces, so it is deleted once the report is built. Set
+`K6_PERF_KEEP_RAW=1` or `reporting.timeseries.keepRawMetricsStream: true` to keep it.
 
-```json
-{
-  "transactions": [
-    {
-      "name": "Homepage",
-      "count": 100,
-      "pass": 98,
-      "fail": 2,
-      "avg": 245.3,
-      "min": 120.0,
-      "max": 890.5,
-      "p(90)": 450.0,
-      "p(95)": 600.0,
-      "p(99)": 850.0
-    }
-  ],
-  "columns": ["count", "pass", "fail", "avg", "min", "max", "p(90)", "p(95)", "p(99)"]
-}
-```
+**Consolidated 2026-07-21:** `transaction-metrics.json` + `ci-summary.json` → `run-summary.json`
+(each previously carried its own copy of the per-transaction array), and `summary.json`
+(k6 `--summary-export`) was dropped — it held the same metrics as `handleSummary.json` but
+without the metric `type`/`contains` metadata, `options` and `state`, in a larger file.
 
-Columns configurable via `runtime.reporting.transactionStats`.
+## run-summary.json Schema
 
-**Pass/fail source (since 2026-06-15):** `pass`/`fail` come solely from the exact per-iteration `<name>_checkrate` Rate metric (`pass + fail === count` by construction). The old native-`check()`-aggregate estimation path — and the `estimated` per-row flag + file-level `hasEstimatedRows` + warning banner — was removed; `ScriptContractGuard` now rejects scripts using raw k6 `check()`/`group()`, so a checkrate always exists. A transaction lacking a checkrate renders blank rather than guessing.
-
-## ci-summary.json Schema
+Run-level CI gate at the top level, plus the full per-transaction table.
 
 ```json
 {
   "status": "passed" | "failed",
   "runId": "string",
-  "planName": "string",
+  "plan": "string",
   "environment": "string",
-  "timestamp": "ISO-8601",
-  "transactionCount": 0,
+  "thresholdFailures": 0,
+  "transactionFailureRate": 0.0,
+  "transactionErrorBudget": 1,
   "errorCount": 0,
   "warningCount": 0,
-  "thresholdFailures": [...],
-  "transactions": [...]
+  "aborted": false,
+  "stats": ["count", "pass", "fail", "avg", "min", "max", "std", "p(90)", "p(99)"],
+  "transactions": [
+    {
+      "journey": "buy_working_covert",
+      "transaction": "add_to_cart",
+      "count": 100,
+      "pass": 98,
+      "fail": 2,
+      "errorPct": 2.0,
+      "avg": 245.3,
+      "min": 120.0,
+      "max": 890.5,
+      "std": 42.1,
+      "p(90)": 450.0,
+      "p(99)": 850.0
+    }
+  ]
 }
 ```
+
+`stats` lists the columns present on each row, configurable via
+`runtime.reporting.transactionStats`.
+
+**Transaction identity is (journey/scenario, transaction).** Same-named transactions in
+different journeys are SEPARATE rows — k6's end-of-test summary collapses same-named
+`group()`s across scenarios, so the table is rebuilt from the transaction CSV, which keeps
+k6's per-sample `scenario` tag.
+
+**Pass/fail source (since 2026-06-15):** `pass`/`fail` come solely from the exact per-iteration `<name>_checkrate` Rate metric (`pass + fail === count` by construction). The old native-`check()`-aggregate estimation path — and the `estimated` per-row flag + file-level `hasEstimatedRows` + warning banner — was removed; `ScriptContractGuard` now rejects scripts using raw k6 `check()`/`group()`, so a checkrate always exists. A transaction lacking a checkrate renders blank rather than guessing.
 
 ## errors.ndjson Schema (one JSON per line)
 
@@ -102,20 +116,25 @@ Columns configurable via `runtime.reporting.transactionStats`.
 
 | Tab | Data Source |
 |-----|------------|
-| Summary | ci-summary.json + transaction-metrics.json |
+| Summary | run-summary.json |
 | Graphs | timeseries.json (Chart.js bar + doughnut) |
-| Transactions | transaction-metrics.json |
+| Transactions | run-summary.json (`transactions[]`) |
 | Errors | errors.ndjson |
 | Warnings | warnings.ndjson |
-| Snapshots | (reserved, not yet implemented) |
+| Snapshots | snapshots.json |
 | System | system-metrics.json |
 
 ## CI/CD Integration Pattern
 
 ```yaml
-# Pipeline reads ci-summary.json, not console output
+# Pipeline reads run-summary.json, not console output
 - run: npm run cli -- run --plan config/test_plans/load_test.json
 - run: |
-    status=$(jq -r '.status' results/*/Run_*/ci-summary.json)
+    status=$(jq -r '.status' results/*/Run_*/run-summary.json)
     if [ "$status" != "passed" ]; then exit 1; fi
 ```
+
+> **Migrating from `ci-summary.json`:** the gate fields kept their names and their
+> position at the top level, so only the filename changes — `jq -r '.status'` is
+> unchanged. Rows in `transactions[]` now also carry `journey` (the scenario) and the
+> full stat set (`std`, `p(90)`, …), which the old ci-summary subset lacked.

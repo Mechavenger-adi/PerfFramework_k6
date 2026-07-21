@@ -18,7 +18,7 @@ updated: 2026-07-09
 
 ## Executive Summary
 Reporting is **artifact-first**: k6's raw output is transformed into stable JSON/NDJSON artifacts
-(`ci-summary.json`, `transaction-metrics.json`, `timeseries.json`, `errors.ndjson`, `warnings.ndjson`)
+(`run-summary.json`, `timeseries.json`, `errors.ndjson`, `warnings.ndjson`)
 and a single interactive `RunReport.html`. CI consumes the JSON, never console text. SLAs from the test
 plan become k6-native thresholds (`ThresholdManager`); transaction pass/fail is read **exactly** from
 the `<name>_checkrate` Rate metric — no estimation.
@@ -52,7 +52,7 @@ flowchart LR
 | `reporting/TransactionMetricsBuilder.ts` | `build` | k6 summary → per-transaction rows | [:69](../../core_engine/src/reporting/TransactionMetricsBuilder.ts#L69) |
 | `reporting/TimeseriesStreamParser.ts` | streaming parse | `--out json` → per-bucket aggregates | file |
 | `reporting/EventArtifactBuilder.ts` | build | `errors.ndjson` + `warnings.ndjson` | file |
-| `reporting/RunSummaryBuilder.ts` | build | `ci-summary.json` | file |
+| `reporting/RunSummaryBuilder.ts` | build | CI gate (written into `run-summary.json`) | file |
 | `reporting/RunReportGenerator.ts` | generate | Unified `RunReport.html` (tabs) | file |
 
 ## Runtime Flow + Implementation Reverse-Engineering (§4A)
@@ -93,7 +93,7 @@ Translator (SLA DSL → k6 thresholds); Builder (per-artifact); tolerant parser 
 artifact-first (JSON is the contract, HTML is a view).
 
 ## Interfaces
-`TransactionMetricRow`, `TransactionMetricsFile`, `TimeSeriesFile`, `ci-summary.json`, event NDJSON.
+`TransactionMetricRow`, `TransactionMetricsFile`, `RunSummaryFile`, `TransactionSeries`, `TimeSeriesFile`, `run-summary.json`, event NDJSON.
 Contract: [reporting-contracts.md](../../ai_context/reporting-contracts.md) — not restated.
 
 ## Error Handling · Logging · Metrics

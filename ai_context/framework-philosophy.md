@@ -34,7 +34,7 @@ Core engine (`core_engine/`) is shared platform code. Team tests live in `testSu
 
 ## P6 — Artifact-First Reporting
 
-CI pipelines consume machine-readable artifacts (`ci-summary.json`, `transaction-metrics.json`), not console log scraping. HTML reports are for humans.
+CI pipelines consume machine-readable artifacts (`run-summary.json` — the gate plus the per-transaction table), not console log scraping. HTML reports are for humans.
 
 **Implication:** Every new metric or event must flow into structured artifacts first, then optionally into HTML.
 

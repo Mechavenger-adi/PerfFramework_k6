@@ -240,11 +240,11 @@ Everything for a run lives under one `<runId>/` folder in the collect dir:
     control.json
   shared/                               ← at end: full per-machine artifacts (auto-collected)
     lg1/  <testId>_<host>_transaction_metric.csv  <testId>_<host>_request_metric.csv
-          transaction-metrics.json  ci-summary.json  timeseries.json  system-metrics.json
+          run-summary.json  timeseries.json  system-metrics.json  handleSummary.json
           run-manifest.json  TestSummary.html …  (no raw stream)
     lg2/  …
   Final_<testname>_<ts>/               ← produced by merge (sibling of shared): the combined output
-          transaction-metrics.json  timeseries.json  ci-summary.json  RunReport.html
+          run-summary.json  timeseries.json  RunReport.html
           merged_request_metric.csv   merged_transaction_metric.csv
 ```
 
