@@ -158,20 +158,46 @@ export function buildExternallyControlledProfile(options: {
   };
 }
 
-/** Translate a GlobalLoadProfile into a k6 executor config block */
+/**
+ * Executor-specific fields each k6 executor accepts, verified against the vendored k6
+ * source (`k6-master/lib/executor/*.go`). k6 decodes scenario options with
+ * DisallowUnknownFields, so emitting a field the executor doesn't recognise fails the
+ * whole run with `unknown field "<name>"`. The classic trap: a plan's shared
+ * `global_load_profile` keeps `startVUs` (valid for ramping-vus) and an arrival-rate
+ * journey reuses it — k6 then rejects `startVUs`. `executor` + the base fields
+ * (`gracefulStop`, and `exec`/`tags`/`env`/`startTime`, which ScenarioBuilder adds) are
+ * always valid, so they're not listed here.
+ *
+ * Notable per-executor rules baked in below:
+ *  - `startVUs` and `gracefulRampDown` are ramping-VUs only (NOT ramping-arrival-rate).
+ *  - iteration executors use k6's `maxDuration`, not `duration`, so `duration` is dropped
+ *    for them (the framework has no maxDuration field to emit).
+ */
+const EXECUTOR_FIELDS: Record<string, ReadonlyArray<keyof K6ExecutorConfig>> = {
+  'ramping-vus': ['startVUs', 'stages', 'gracefulRampDown'],
+  'constant-vus': ['vus', 'duration'],
+  'ramping-arrival-rate': ['stages', 'timeUnit', 'preAllocatedVUs', 'maxVUs'],
+  'constant-arrival-rate': ['rate', 'timeUnit', 'duration', 'preAllocatedVUs', 'maxVUs'],
+  'shared-iterations': ['vus', 'iterations'],
+  'per-vu-iterations': ['vus', 'iterations'],
+  'externally-controlled': ['vus', 'maxVUs', 'duration'],
+};
+
+/**
+ * Translate a GlobalLoadProfile into a k6 executor config block, emitting ONLY the
+ * fields valid for that executor (see EXECUTOR_FIELDS) so k6 never sees an unknown field.
+ */
 export function toK6ExecutorConfig(profile: GlobalLoadProfile): K6ExecutorConfig {
-  return {
-    executor: profile.executor,
-    startVUs: profile.startVUs,
-    stages: profile.stages,
-    vus: profile.vus,
-    duration: profile.duration,
-    iterations: profile.iterations,
-    rate: profile.rate,
-    timeUnit: profile.timeUnit,
-    preAllocatedVUs: profile.preAllocatedVUs,
-    maxVUs: profile.maxVUs,
-    gracefulRampDown: profile.gracefulRampDown,
-    gracefulStop: profile.gracefulStop,
-  };
+  const out: K6ExecutorConfig = { executor: profile.executor };
+  // gracefulStop is a base-config field valid on every executor.
+  if (profile.gracefulStop !== undefined) out.gracefulStop = profile.gracefulStop;
+
+  const allowed = EXECUTOR_FIELDS[profile.executor] ?? [];
+  for (const field of allowed) {
+    const value = (profile as GlobalLoadProfile)[field as keyof GlobalLoadProfile];
+    if (value !== undefined) {
+      (out as unknown as Record<string, unknown>)[field] = value;
+    }
+  }
+  return out;
 }
