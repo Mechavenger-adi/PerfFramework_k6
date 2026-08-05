@@ -28,7 +28,9 @@
 
 **Risk:** `computePhaseEnvelope()` produces `K6_PERF_PHASES` JSON that `lifecycle.ts` consumes. Format mismatch causes VU lifecycle failures (endPhase not running, or running at wrong time).
 
-**Hidden assumption:** Durations in `K6_PERF_PHASES.stages` are in seconds (not milliseconds). `lifecycle.ts` multiplies by 1000 for k6's `exec.test.elapsed`.
+**Hidden assumption:** every time value in `K6_PERF_PHASES` is in **milliseconds** — `timeline[].endMs` (cumulative from scenario start) and `maxDurationMs`. The plan-facing k6 duration strings (`'30s'`, `'45m'`) are converted once in `ScenarioBuilder`; `lifecycle.ts` compares them directly against `exec.scenario.startTime` + `Date.now()` and must not rescale.
+
+**Second axis:** an executor can be bounded on more than one dimension. Iteration executors carry both `totalIterations` and `maxDurationMs`, and `lifecycle.ts` must treat them as OR (whichever fires first) — dropping either bound loses `endPhase`.
 
 ## RZ5 — k6 Flag vs JSON Config Behavior
 

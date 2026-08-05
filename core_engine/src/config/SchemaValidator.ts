@@ -179,6 +179,7 @@ const TEST_PLAN_SCHEMA_INLINE = {
         },
         vus: { type: 'number', minimum: 0 },
         duration: { type: 'string' },
+        maxDuration: { type: 'string' },
         iterations: { type: 'number', minimum: 1 },
         rate: { type: 'number', minimum: 1 },
         timeUnit: { type: 'string' },

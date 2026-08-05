@@ -537,6 +537,10 @@
       "to": "core_engine/src/scenario/ExecutorFactory.ts"
     },
     {
+      "from": "core_engine/src/scenario/ScenarioBuilder.ts",
+      "to": "core_engine/src/scenario/WorkloadModels.ts"
+    },
+    {
       "from": "core_engine/src/utils/LiveConsoleLogStream.ts",
       "to": "core_engine/src/utils/logger.ts"
     }

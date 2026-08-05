@@ -5,7 +5,12 @@
  */
 
 import { GlobalLoadProfile, ExecutorType } from '../types/TestPlanSchema';
-import { K6ExecutorConfig, toK6ExecutorConfig } from './WorkloadModels';
+import {
+  ITERATION_EXECUTORS,
+  K6ExecutorConfig,
+  parseK6DurationToSeconds,
+  toK6ExecutorConfig,
+} from './WorkloadModels';
 
 interface ExecutorSpec {
   requiredFields: (keyof GlobalLoadProfile)[];
@@ -33,11 +38,13 @@ const EXECUTOR_SPECS: Record<ExecutorType, ExecutorSpec> = {
   },
   'shared-iterations': {
     requiredFields: ['vus', 'iterations'],
-    description: 'Distributes N iterations across VUs. Requires vus + iterations.',
+    description:
+      'Distributes N iterations across VUs. Requires vus + iterations. Optional: maxDuration (defaults to k6\'s 10m, which truncates the pool).',
   },
   'per-vu-iterations': {
     requiredFields: ['vus', 'iterations'],
-    description: 'Each VU runs N iterations. Requires vus + iterations.',
+    description:
+      'Each VU runs N iterations. Requires vus + iterations. Optional: maxDuration (defaults to k6\'s 10m, which truncates the pool).',
   },
   'externally-controlled': {
     requiredFields: ['maxVUs'],
@@ -61,10 +68,29 @@ export class ExecutorFactory {
       (field) => profile[field] === undefined || profile[field] === null,
     );
 
-    return missing.map(
+    const errors = missing.map(
       (field) =>
         `Executor '${profile.executor}' requires field '${field}'. ${spec.description}`,
     );
+
+    // maxDuration is iteration-executor-only, and k6 rejects anything under 1s
+    // (`minDuration` in lib/executor). Catch both here rather than letting k6
+    // fail the run after the whole plan has been generated.
+    if (profile.maxDuration !== undefined) {
+      if (!ITERATION_EXECUTORS.includes(profile.executor)) {
+        errors.push(
+          `Executor '${profile.executor}' does not accept 'maxDuration' — it is only valid on `
+          + `${ITERATION_EXECUTORS.join(' / ')}. Use 'duration' or 'stages' instead.`,
+        );
+      } else if (parseK6DurationToSeconds(profile.maxDuration) < 1) {
+        errors.push(
+          `Executor '${profile.executor}' has an invalid 'maxDuration' ('${profile.maxDuration}'). `
+          + 'It must be a k6 duration string of at least 1s, e.g. \'30m\'.',
+        );
+      }
+    }
+
+    return errors;
   }
 
   /**

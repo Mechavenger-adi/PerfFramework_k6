@@ -8,7 +8,7 @@ sources:
   - core_engine/src/scenario/ScenarioBuilder.ts
   - core_engine/src/scenario/WorkloadModels.ts
 related: [runtime-contracts, execution-flow, risk-zones, fragile-areas, edd]
-updated: 2026-07-09
+updated: 2026-08-06
 ---
 
 # EDD: VU Lifecycle & Phase Envelope
@@ -87,6 +87,7 @@ flowchart LR
 | **Complete runtime flow** | (1) If `terminated\|ended\|isVuTerminated` → `sleep(86400)` and return (park VU). (2) If `!initialized` → `computeEndPlan`; if `endDisabled` (arrival) announce+skip init, else `runSafely('init')`; set `initialized=true`. (3) arrival/external → action + pacing, return. (4) `isEndDueBefore` → `endPhase`, `ended=true`, return. (5) `runSafely('action')`. (6) unless ending, `applyPacing`. (7) `isEndDueAfter` → `endPhase`, `ended=true`. | [:517](../../core_engine/src/utils/lifecycle.ts#L517)→[:582](../../core_engine/src/utils/lifecycle.ts#L582) |
 | **Decision points & branch conditions** | `!state.initialized` [:526]; `activeEndPlan.endDisabled` [:529/549]; `isEndDueBefore()` [:557]; `actionBehavior !== 'continue'` [:565]; `!endingAfter` gates pacing [:573]; `endingAfter && endPhase` [:578]. | [lifecycle.ts:526-581](../../core_engine/src/utils/lifecycle.ts#L526) |
 | **End-plan families** | `ramping-vus` (+ synthetic constant-vus) → time deadline via `terminalDeadlineMs`; `per-vu-iterations` → `lastIteration=total-1`; `shared-iterations` → per-VU assigned share, zero-work VUs `endBeforeAction`; arrival-rate → `endDisabled`; else `external`. | [:410-458](../../core_engine/src/utils/lifecycle.ts#L410) |
+| **Count family is doubly bounded** | Iteration executors carry `lastIteration` AND a `deadlineMs` derived from the envelope's `maxDurationMs` (`scenario.startTime + maxDurationMs`) — k6 bounds them by iteration count *and* `maxDuration` (default 10m), whichever hits first. `isEndDueAfter` **ORs** the two rather than short-circuiting on `deadlineMs`; without the OR a count VU with a far-off deadline would never consult `lastIteration`. Without the deadline, a pool that outruns `maxDuration` is culled with `endPhase` never having run for any VU. | [:434-465](../../core_engine/src/utils/lifecycle.ts#L434), `isEndDueAfter` [:496](../../core_engine/src/utils/lifecycle.ts#L496) |
 | **Deadline math (F5)** | Rank = interpolated curve value at the VU's **onboarding offset** (`Date.now()-scenario.startTime`), NOT `idInInstance` (shuffled). `terminalDeadlineMs` = `sup{t : target(t) ≥ rank}` — last time the curve is at/above the rank; k6 culls just after. | rank [:428-429](../../core_engine/src/utils/lifecycle.ts#L428), sup [:382-407](../../core_engine/src/utils/lifecycle.ts#L382) |
 | **Validation logic** | `parseJsonEnv` swallows bad JSON → fallbacks (`{mode:'unsupported'}` / `{errorBehavior:'continue'}`). Missing counter/trend → `console.error` but no throw. | [:112-125](../../core_engine/src/utils/lifecycle.ts#L112), [transaction.ts:206-231](../../core_engine/src/utils/transaction.ts#L206) |
 | **Fallback logic** | `sup<0` (curve never reaches rank) → return total duration → VU never logs out early, relies on scenario end + `gracefulStop` [:401-406]. `external` family → best-effort action-only. | [:401](../../core_engine/src/utils/lifecycle.ts#L401), [:456](../../core_engine/src/utils/lifecycle.ts#L456) |

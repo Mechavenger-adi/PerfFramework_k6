@@ -547,6 +547,14 @@
   {
     "default": null,
     "enum": null,
+    "key": "global_load_profile.maxDuration",
+    "required": false,
+    "source": "config/schemas/test_plan.schema.json",
+    "type": "string"
+  },
+  {
+    "default": null,
+    "enum": null,
     "key": "global_load_profile.stages",
     "required": false,
     "source": "config/schemas/test_plan.schema.json",

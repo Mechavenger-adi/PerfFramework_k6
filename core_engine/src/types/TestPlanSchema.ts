@@ -42,6 +42,16 @@ export interface GlobalLoadProfile {
   vus?: number;
   /** Duration for constant/arrival-rate executors */
   duration?: string;
+  /**
+   * Wall-clock cap on iteration-based executors (shared-iterations /
+   * per-vu-iterations), which use k6's `maxDuration` rather than `duration`.
+   * k6 duration string, e.g. '30m'. Minimum 1s.
+   *
+   * Omitting it does NOT mean "run until the iterations are done": k6 applies a
+   * 10-minute default and cuts the run off there, leaving iterations unrun. Set
+   * it explicitly whenever the pool may take longer than 10 minutes.
+   */
+  maxDuration?: string;
   /** Total iterations for iteration-based executors */
   iterations?: number;
   /** Arrival rate — requests per timeUnit (arrival-rate executors) */

@@ -44,16 +44,31 @@ Called as `sleep(getFrameworkThinkTime())` between transaction groups.
 
 ## Phase Envelope Contract
 
-`K6_PERF_PHASES` env var contains JSON:
+`K6_PERF_PHASES` env var contains JSON — produced by `ScenarioBuilder.computePhaseEnvelope`,
+consumed by `lifecycle.ts` `computeEndPlan`. Both sides must move together (RZ4):
 ```typescript
 {
-  mode: 'ramping-vus' | 'per-vu-iterations' | 'shared-iterations';
-  stages?: Array<{ duration: number; target: number }>;   // seconds
-  totalDuration?: number;
-  iterations?: number;
+  mode: 'ramping-vus' | 'per-vu-iterations' | 'shared-iterations'
+      | 'constant-arrival-rate' | 'ramping-arrival-rate'
+      | 'externally-controlled' | 'unsupported';
+  // Ramping family (constant-vus is encoded as a synthetic ramping-vus timeline).
+  startVUs?: number;
+  timeline?: Array<{ endMs: number; vus: number }>;   // MILLISECONDS, cumulative from scenario start
+  // Iteration executors.
+  totalIterations?: number;
   vus?: number;
+  maxDurationMs?: number;   // always set for iteration executors: plan maxDuration, else k6's 10m default
+  // Arrival-rate executors.
+  rate?: number;
+  timeUnit?: string;
+  preAllocatedVUs?: number;
+  maxVUs?: number;
 }
 ```
+`maxDurationMs` exists because k6 bounds `shared-iterations` / `per-vu-iterations` by BOTH the
+iteration count and `maxDuration` (10m by default, applied whether or not the plan sets it). The
+lifecycle turns it into a time deadline alongside `lastIteration` so `endPhase` runs before k6
+truncates the pool.
 
 ## Error Behavior Contract
 

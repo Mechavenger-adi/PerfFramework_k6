@@ -99,7 +99,11 @@
         },
         "duration": {
           "type": "string",
-          "description": "Test duration for 'constant-vus' or arrival-rate executors. k6 duration string. Examples: '5m', '1h', '30s'."
+          "description": "Test duration for 'constant-vus' or arrival-rate executors. k6 duration string. Examples: '5m', '1h', '30s'. Ignored by the iteration executors — they use maxDuration."
+        },
+        "maxDuration": {
+          "type": "string",
+          "description": "Wall-clock cap for 'shared-iterations' and 'per-vu-iterations'. k6 duration string, minimum '1s'. Examples: '30m', '2h'.\nIMPORTANT: omitting this does NOT mean 'run until all iterations finish' — k6 applies a 10m default and stops the scenario there with iterations unrun. Set it explicitly whenever the iteration pool may take longer than 10 minutes."
         },
         "iterations": {
           "type": "number",

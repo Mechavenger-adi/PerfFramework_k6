@@ -29,7 +29,7 @@
           "runJourneyLifecycle",
           "thinktime"
         ],
-        "loc": 583,
+        "loc": 608,
         "path": "core_engine/src/utils/lifecycle.ts"
       },
       {
@@ -54,11 +54,13 @@
           "ScenarioBuilder",
           "ScenarioRuntimeMetadata"
         ],
-        "loc": 459,
+        "loc": 488,
         "path": "core_engine/src/scenario/ScenarioBuilder.ts"
       },
       {
         "exports": [
+          "DEFAULT_MAX_DURATION_MS",
+          "ITERATION_EXECUTORS",
           "K6ExecutorConfig",
           "buildConstantArrivalRateProfile",
           "buildExternallyControlledProfile",
@@ -68,9 +70,10 @@
           "buildSoakProfile",
           "buildSpikeProfile",
           "buildStressProfile",
+          "parseK6DurationToSeconds",
           "toK6ExecutorConfig"
         ],
-        "loc": 178,
+        "loc": 264,
         "path": "core_engine/src/scenario/WorkloadModels.ts"
       }
     ],
@@ -429,7 +432,7 @@
           "SchemaValidator",
           "ValidationResult"
         ],
-        "loc": 330,
+        "loc": 331,
         "path": "core_engine/src/config/SchemaValidator.ts"
       },
       {
@@ -543,11 +546,13 @@
           "ScenarioBuilder",
           "ScenarioRuntimeMetadata"
         ],
-        "loc": 459,
+        "loc": 488,
         "path": "core_engine/src/scenario/ScenarioBuilder.ts"
       },
       {
         "exports": [
+          "DEFAULT_MAX_DURATION_MS",
+          "ITERATION_EXECUTORS",
           "K6ExecutorConfig",
           "buildConstantArrivalRateProfile",
           "buildExternallyControlledProfile",
@@ -557,16 +562,17 @@
           "buildSoakProfile",
           "buildSpikeProfile",
           "buildStressProfile",
+          "parseK6DurationToSeconds",
           "toK6ExecutorConfig"
         ],
-        "loc": 178,
+        "loc": 264,
         "path": "core_engine/src/scenario/WorkloadModels.ts"
       },
       {
         "exports": [
           "ExecutorFactory"
         ],
-        "loc": 91,
+        "loc": 117,
         "path": "core_engine/src/scenario/ExecutorFactory.ts"
       },
       {

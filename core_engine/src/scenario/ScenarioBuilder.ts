@@ -6,6 +6,11 @@
 
 import { GlobalLoadProfile, TestPlan, UserJourney } from '../types/TestPlanSchema';
 import { ExecutorFactory } from './ExecutorFactory';
+import {
+  DEFAULT_MAX_DURATION_MS,
+  ITERATION_EXECUTORS,
+  parseK6DurationToSeconds,
+} from './WorkloadModels';
 
 /** k6-native scenario definition (what goes into options.scenarios) */
 export interface K6ScenarioDefinition {
@@ -15,6 +20,7 @@ export interface K6ScenarioDefinition {
   stages?: Array<{ duration: string; target: number }>;
   vus?: number;
   duration?: string;
+  maxDuration?: string;
   iterations?: number;
   rate?: number;
   timeUnit?: string;
@@ -92,6 +98,13 @@ interface ScenarioPhaseEnvelope {
   timeUnit?: string;
   preAllocatedVUs?: number;
   maxVUs?: number;
+  /**
+   * Iteration executors only: absolute wall-clock budget (ms) after which k6
+   * stops the scenario regardless of how many iterations remain. Always set for
+   * shared-iterations / per-vu-iterations — explicitly from the plan, or from
+   * k6's own 10m default — so the VU lifecycle can run endPhase before the cut.
+   */
+  maxDurationMs?: number;
   timeline?: Array<{
     endMs: number;
     vus: number;
@@ -337,11 +350,12 @@ export class ScenarioBuilder {
       };
     }
 
-    // --- per-vu-iterations: iteration-count based exit ---
+    // --- per-vu-iterations: iteration-count based exit, bounded by maxDuration ---
     if (profile.executor === 'per-vu-iterations') {
       return {
         mode: 'per-vu-iterations',
         totalIterations: profile.iterations ?? 1,
+        maxDurationMs: this.resolveMaxDurationMs(profile),
       };
     }
 
@@ -370,6 +384,7 @@ export class ScenarioBuilder {
         mode: 'shared-iterations',
         vus: profile.vus,
         totalIterations: profile.iterations ?? 1,
+        maxDurationMs: this.resolveMaxDurationMs(profile),
       };
     }
 
@@ -428,7 +443,28 @@ export class ScenarioBuilder {
     return this.computePhaseEnvelope(profile);
   }
 
-  /** Estimate total duration of a load profile in seconds */
+  /**
+   * Wall-clock budget (ms) for an iteration executor: the plan's `maxDuration`
+   * when set, otherwise k6's own 10m default — because k6 applies that default
+   * whether or not the plan mentions it, and truncates the iteration pool there.
+   */
+  private static resolveMaxDurationMs(profile: GlobalLoadProfile): number {
+    if (profile.maxDuration) {
+      const seconds = parseK6DurationToSeconds(profile.maxDuration);
+      if (seconds > 0) return seconds * 1000;
+    }
+    return DEFAULT_MAX_DURATION_MS;
+  }
+
+  /**
+   * Estimate total duration of a load profile in seconds.
+   *
+   * Used for sequential/hybrid `startTime` offsets and for histogram bucket
+   * sizing, so it must be an UPPER bound: under-estimating makes a sequential
+   * journey start while the previous one is still running. Iteration executors
+   * have no `duration`, but `maxDuration` (explicit or k6's 10m default) is
+   * exactly that upper bound, so it is used instead of the generic fallback.
+   */
   static estimateTotalDurationSeconds(profile: GlobalLoadProfile): number {
     if (profile.stages && profile.stages.length > 0) {
       return profile.stages.reduce((total, stage) => {
@@ -438,21 +474,14 @@ export class ScenarioBuilder {
     if (profile.duration) {
       return this.parseDurationToSeconds(profile.duration);
     }
+    if (ITERATION_EXECUTORS.includes(profile.executor)) {
+      return this.resolveMaxDurationMs(profile) / 1000;
+    }
     return 300; // default fallback: 5 minutes
   }
 
   /** Parse k6 duration strings: '2m', '30s', '1h30m' */
   private static parseDurationToSeconds(duration: string): number {
-    let total = 0;
-    const matches = duration.matchAll(/(\d+(?:\.\d+)?)(h|m|s)/g);
-    for (const match of matches) {
-      const value = parseFloat(match[1]);
-      switch (match[2]) {
-        case 'h': total += value * 3600; break;
-        case 'm': total += value * 60; break;
-        case 's': total += value; break;
-      }
-    }
-    return total || 60;
+    return parseK6DurationToSeconds(duration) || 60;
   }
 }

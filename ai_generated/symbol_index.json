@@ -1084,7 +1084,7 @@
     "file": "core_engine/src/config/SchemaValidator.ts",
     "jsdoc": "",
     "kind": "class",
-    "line": 222,
+    "line": 223,
     "name": "SchemaValidator"
   },
   "core_engine/src/config/SchemaValidator.ts#TEST_PLAN_SCHEMA_INLINE": {
@@ -1108,7 +1108,7 @@
     "file": "core_engine/src/config/SchemaValidator.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 310,
+    "line": 311,
     "name": "levenshtein"
   },
   "core_engine/src/config/SchemaValidator.ts#loadExternalSchema": {
@@ -4012,7 +4012,7 @@
     "file": "core_engine/src/scenario/ExecutorFactory.ts",
     "jsdoc": "",
     "kind": "const",
-    "line": 15,
+    "line": 20,
     "name": "EXECUTOR_SPECS"
   },
   "core_engine/src/scenario/ExecutorFactory.ts#ExecutorFactory": {
@@ -4020,7 +4020,7 @@
     "file": "core_engine/src/scenario/ExecutorFactory.ts",
     "jsdoc": "Validate that the profile has all required fields for its executor type. Returns an array of error strings (empty = valid).",
     "kind": "class",
-    "line": 49,
+    "line": 56,
     "name": "ExecutorFactory"
   },
   "core_engine/src/scenario/ExecutorFactory.ts#ExecutorSpec": {
@@ -4028,7 +4028,7 @@
     "file": "core_engine/src/scenario/ExecutorFactory.ts",
     "jsdoc": "",
     "kind": "interface",
-    "line": 10,
+    "line": 15,
     "name": "ExecutorSpec"
   },
   "core_engine/src/scenario/ScenarioBuilder.ts#K6ScenarioDefinition": {
@@ -4036,7 +4036,7 @@
     "file": "core_engine/src/scenario/ScenarioBuilder.ts",
     "jsdoc": "k6-native scenario definition (what goes into options.scenarios)",
     "kind": "interface",
-    "line": 11,
+    "line": 16,
     "name": "K6ScenarioDefinition"
   },
   "core_engine/src/scenario/ScenarioBuilder.ts#K6ScenariosMap": {
@@ -4044,7 +4044,7 @@
     "file": "core_engine/src/scenario/ScenarioBuilder.ts",
     "jsdoc": "",
     "kind": "type",
-    "line": 30,
+    "line": 36,
     "name": "K6ScenariosMap"
   },
   "core_engine/src/scenario/ScenarioBuilder.ts#ScenarioBuilder": {
@@ -4052,15 +4052,15 @@
     "file": "core_engine/src/scenario/ScenarioBuilder.ts",
     "jsdoc": "Build a k6 options.scenarios map from a test plan. Handles parallel, sequential, and hybrid execution modes.",
     "kind": "class",
-    "line": 103,
+    "line": 116,
     "name": "ScenarioBuilder"
   },
   "core_engine/src/scenario/ScenarioBuilder.ts#ScenarioPhaseEnvelope": {
     "exported": false,
     "file": "core_engine/src/scenario/ScenarioBuilder.ts",
-    "jsdoc": "",
+    "jsdoc": "Iteration executors only: absolute wall-clock budget (ms) after which k6 stops the scenario regardless of how many iterations remain. Always set for shared-iterations / per-vu-iterations — explicitly from the plan, or from k6's own 10m default — so the VU lifecycle can run endPhase before the cut.",
     "kind": "interface",
-    "line": 79,
+    "line": 85,
     "name": "ScenarioPhaseEnvelope"
   },
   "core_engine/src/scenario/ScenarioBuilder.ts#ScenarioRuntimeMetadata": {
@@ -4068,7 +4068,7 @@
     "file": "core_engine/src/scenario/ScenarioBuilder.ts",
     "jsdoc": "Per-journey transaction names injected as K6_PERF_TRANSACTION_NAMES for auto-registration.",
     "kind": "interface",
-    "line": 32,
+    "line": 38,
     "name": "ScenarioRuntimeMetadata"
   },
   "core_engine/src/scenario/TestPlanLoader.ts#TestPlanLoader": {
@@ -4078,6 +4078,38 @@
     "kind": "class",
     "line": 13,
     "name": "TestPlanLoader"
+  },
+  "core_engine/src/scenario/WorkloadModels.ts#DEFAULT_MAX_DURATION_MS": {
+    "exported": true,
+    "file": "core_engine/src/scenario/WorkloadModels.ts",
+    "jsdoc": "k6's own default for `maxDuration` on both iteration executors (`NewSharedIterationsConfig` / `NewPerVUIterationsConfig` = 10 minutes). The framework mirrors it so the lifecycle engine knows when k6 will cut the run short even for plans that never mention maxDuration.",
+    "kind": "const",
+    "line": 201,
+    "name": "DEFAULT_MAX_DURATION_MS"
+  },
+  "core_engine/src/scenario/WorkloadModels.ts#DURATION_UNIT_SECONDS": {
+    "exported": false,
+    "file": "core_engine/src/scenario/WorkloadModels.ts",
+    "jsdoc": "Seconds per unit accepted by k6 duration strings (Go's time.ParseDuration + k6's `d`).",
+    "kind": "const",
+    "line": 207,
+    "name": "DURATION_UNIT_SECONDS"
+  },
+  "core_engine/src/scenario/WorkloadModels.ts#EXECUTOR_FIELDS": {
+    "exported": false,
+    "file": "core_engine/src/scenario/WorkloadModels.ts",
+    "jsdoc": "Executor-specific fields each k6 executor accepts, verified against the vendored k6 source (`k6-master/lib/executor/*.go`). k6 decodes scenario options with DisallowUnknownFields, so emitting a field the executor doesn't recognise fails the whole run with `unknown field \"<name>\"`. The classic trap: a plan's shared `global_load_profile` keeps `startVUs` (valid for ramping-vus) and an arrival-rate journey reuses it — k6 then rejects `startVUs`. `executor` + the base fields (`gracefulStop`, and `exec`/`tags`/`env`/`startTime`, which ScenarioBuilder adds) are always valid, so they're not listed here. Notable per-executor rules baked in below: - `startVUs` and `gracefulRampDown` are ramping-VUs only (NOT ramping-arrival-rate). - iteration executors use k6's `maxDuration`, not `duration`, so `duration` is dropped for them and `maxDuration` is emitted instead. Leaving `maxDuration` unset does NOT mean \"unbounded\": k6 defaults it to 10m (see DEFAULT_MAX_DURATION_MS) and silently truncates the iteration pool at that point.",
+    "kind": "const",
+    "line": 185,
+    "name": "EXECUTOR_FIELDS"
+  },
+  "core_engine/src/scenario/WorkloadModels.ts#ITERATION_EXECUTORS": {
+    "exported": true,
+    "file": "core_engine/src/scenario/WorkloadModels.ts",
+    "jsdoc": "Executors that accept `maxDuration` (and therefore carry k6's 10m default).",
+    "kind": "const",
+    "line": 204,
+    "name": "ITERATION_EXECUTORS"
   },
   "core_engine/src/scenario/WorkloadModels.ts#K6ExecutorConfig": {
     "exported": true,
@@ -4092,7 +4124,7 @@
     "file": "core_engine/src/scenario/WorkloadModels.ts",
     "jsdoc": "Build a constant arrival-rate profile",
     "kind": "function",
-    "line": 114,
+    "line": 121,
     "name": "buildConstantArrivalRateProfile"
   },
   "core_engine/src/scenario/WorkloadModels.ts#buildExternallyControlledProfile": {
@@ -4100,15 +4132,15 @@
     "file": "core_engine/src/scenario/WorkloadModels.ts",
     "jsdoc": "Build an externally-controlled profile",
     "kind": "function",
-    "line": 148,
+    "line": 155,
     "name": "buildExternallyControlledProfile"
   },
   "core_engine/src/scenario/WorkloadModels.ts#buildIterationProfile": {
     "exported": true,
     "file": "core_engine/src/scenario/WorkloadModels.ts",
-    "jsdoc": "Build a fixed-iteration profile",
+    "jsdoc": "Build a fixed-iteration profile. `maxDuration` is the wall-clock cap on the iteration pool; omit it to inherit k6's 10m default (which truncates silently — see DEFAULT_MAX_DURATION_MS).",
     "kind": "function",
-    "line": 102,
+    "line": 107,
     "name": "buildIterationProfile"
   },
   "core_engine/src/scenario/WorkloadModels.ts#buildLoadProfile": {
@@ -4116,7 +4148,7 @@
     "file": "core_engine/src/scenario/WorkloadModels.ts",
     "jsdoc": "Build a standard load test: ramp-up -> steady -> ramp-down",
     "kind": "function",
-    "line": 35,
+    "line": 36,
     "name": "buildLoadProfile"
   },
   "core_engine/src/scenario/WorkloadModels.ts#buildRampingArrivalRateProfile": {
@@ -4124,7 +4156,7 @@
     "file": "core_engine/src/scenario/WorkloadModels.ts",
     "jsdoc": "Build a ramping arrival-rate profile",
     "kind": "function",
-    "line": 132,
+    "line": 139,
     "name": "buildRampingArrivalRateProfile"
   },
   "core_engine/src/scenario/WorkloadModels.ts#buildSoakProfile": {
@@ -4132,7 +4164,7 @@
     "file": "core_engine/src/scenario/WorkloadModels.ts",
     "jsdoc": "Build a soak test: low steady load for an extended duration",
     "kind": "function",
-    "line": 68,
+    "line": 69,
     "name": "buildSoakProfile"
   },
   "core_engine/src/scenario/WorkloadModels.ts#buildSpikeProfile": {
@@ -4140,7 +4172,7 @@
     "file": "core_engine/src/scenario/WorkloadModels.ts",
     "jsdoc": "Build a spike test: sudden surge then back to baseline",
     "kind": "function",
-    "line": 83,
+    "line": 84,
     "name": "buildSpikeProfile"
   },
   "core_engine/src/scenario/WorkloadModels.ts#buildStressProfile": {
@@ -4148,15 +4180,23 @@
     "file": "core_engine/src/scenario/WorkloadModels.ts",
     "jsdoc": "Build a stress test: aggressive ramp-up, short steady, ramp-down",
     "kind": "function",
-    "line": 53,
+    "line": 54,
     "name": "buildStressProfile"
+  },
+  "core_engine/src/scenario/WorkloadModels.ts#parseK6DurationToSeconds": {
+    "exported": true,
+    "file": "core_engine/src/scenario/WorkloadModels.ts",
+    "jsdoc": "Parse a k6 duration string into seconds. Shared by ScenarioBuilder (timelines, startTime offsets) and ExecutorFactory (validation), which cannot import each other without a cycle. Mirrors k6's ParseExtendedDuration (lib/types/types.go): Go's units ns/us/µs/ms/s/m/h, k6's `d` (days) extension, compound forms like '1h30m', and a bare number meaning MILLISECONDS. The multi-character units are matched before the single-character ones — otherwise '500ms' reads as 500 minutes. Returns 0 for strings with no recognisable unit — callers decide the fallback.",
+    "kind": "function",
+    "line": 230,
+    "name": "parseK6DurationToSeconds"
   },
   "core_engine/src/scenario/WorkloadModels.ts#toK6ExecutorConfig": {
     "exported": true,
     "file": "core_engine/src/scenario/WorkloadModels.ts",
-    "jsdoc": "Translate a GlobalLoadProfile into a k6 executor config block",
+    "jsdoc": "Translate a GlobalLoadProfile into a k6 executor config block, emitting ONLY the fields valid for that executor (see EXECUTOR_FIELDS) so k6 never sees an unknown field.",
     "kind": "function",
-    "line": 162,
+    "line": 250,
     "name": "toK6ExecutorConfig"
   },
   "core_engine/src/types/ConfigContracts.ts#EnvironmentConfig": {
@@ -4476,7 +4516,7 @@
     "file": "core_engine/src/types/TestPlanSchema.ts",
     "jsdoc": "When true, journeys run in single-purpose debug replay mode instead of normal load mode",
     "kind": "interface",
-    "line": 161,
+    "line": 171,
     "name": "DebugSettings"
   },
   "core_engine/src/types/TestPlanSchema.ts#ExecutionMode": {
@@ -4508,7 +4548,7 @@
     "file": "core_engine/src/types/TestPlanSchema.ts",
     "jsdoc": "Global SLA defaults, scoped explicitly into request-level and transaction-level. Precedence is \"most specific wins\", per individual percentile / errorRate key: • REQUEST-level (HTTP `http_req_duration` / `http_req_failed`): journey_slas[journey].pN > global_sla.request.pN > legacy flat global_sla.pN (journey + global request thresholds are different k6 metric selectors, so both apply; \"wins\" only describes which limit is the more specific.) • TRANSACTION-level (per-transaction Trend `<txn>` / `<txn>_checkrate`): transaction_slas[txn].pN > global_sla.transaction.pN global_sla.transaction is a DEFAULT applied to every transaction of every journey; a deliberate transaction_slas entry overrides it for that transaction + percentile only (other percentiles still inherit the global). • PER-REQUEST (single HTTP request submetric `http_req_duration{name:<req>}`): request_slas[req].pN — scoped to one request name only, independent of the request-level and transaction-level scopes above.",
     "kind": "interface",
-    "line": 144,
+    "line": 154,
     "name": "GlobalSLADefinition"
   },
   "core_engine/src/types/TestPlanSchema.ts#HybridGroup": {
@@ -4516,7 +4556,7 @@
     "file": "core_engine/src/types/TestPlanSchema.ts",
     "jsdoc": "",
     "kind": "interface",
-    "line": 102,
+    "line": 112,
     "name": "HybridGroup"
   },
   "core_engine/src/types/TestPlanSchema.ts#LoadStage": {
@@ -4532,7 +4572,7 @@
     "file": "core_engine/src/types/TestPlanSchema.ts",
     "jsdoc": "Max error rate percent (0–100)",
     "kind": "interface",
-    "line": 111,
+    "line": 121,
     "name": "SLADefinition"
   },
   "core_engine/src/types/TestPlanSchema.ts#TestPlan": {
@@ -4540,7 +4580,7 @@
     "file": "core_engine/src/types/TestPlanSchema.ts",
     "jsdoc": "Human-readable test plan name",
     "kind": "interface",
-    "line": 182,
+    "line": 192,
     "name": "TestPlan"
   },
   "core_engine/src/types/TestPlanSchema.ts#UserJourney": {
@@ -4548,7 +4588,7 @@
     "file": "core_engine/src/types/TestPlanSchema.ts",
     "jsdoc": "Unique name – used as the k6 scenario key",
     "kind": "interface",
-    "line": 73,
+    "line": 83,
     "name": "UserJourney"
   },
   "core_engine/src/types/TestPlanSchema.ts#WorkloadModelType": {
@@ -4812,7 +4852,7 @@
     "file": "core_engine/src/utils/lifecycle.ts",
     "jsdoc": "",
     "kind": "interface",
-    "line": 339,
+    "line": 345,
     "name": "CurvePoint"
   },
   "core_engine/src/utils/lifecycle.ts#EndFamily": {
@@ -4820,15 +4860,15 @@
     "file": "core_engine/src/utils/lifecycle.ts",
     "jsdoc": "",
     "kind": "type",
-    "line": 320,
+    "line": 322,
     "name": "EndFamily"
   },
   "core_engine/src/utils/lifecycle.ts#EndPlan": {
     "exported": false,
     "file": "core_engine/src/utils/lifecycle.ts",
-    "jsdoc": "Absolute wall-clock ms at/after which this VU logs out (ramping / time-based).",
+    "jsdoc": "Absolute wall-clock ms at/after which this VU logs out (ramping, and the maxDuration bound of the count family). May coexist with `lastIteration` — whichever fires first ends the VU.",
     "kind": "interface",
-    "line": 322,
+    "line": 324,
     "name": "EndPlan"
   },
   "core_engine/src/utils/lifecycle.ts#JourneyContext": {
@@ -4860,7 +4900,7 @@
     "file": "core_engine/src/utils/lifecycle.ts",
     "jsdoc": "",
     "kind": "const",
-    "line": 465,
+    "line": 480,
     "name": "LIFECYCLE_END_SAFETY_MS"
   },
   "core_engine/src/utils/lifecycle.ts#PhaseFns": {
@@ -4874,7 +4914,7 @@
   "core_engine/src/utils/lifecycle.ts#PhaseMetadata": {
     "exported": false,
     "file": "core_engine/src/utils/lifecycle.ts",
-    "jsdoc": "",
+    "jsdoc": "Iteration executors: wall-clock budget (ms) k6 enforces via maxDuration.",
     "kind": "interface",
     "line": 49,
     "name": "PhaseMetadata"
@@ -4892,7 +4932,7 @@
     "file": "core_engine/src/utils/lifecycle.ts",
     "jsdoc": "",
     "kind": "interface",
-    "line": 62,
+    "line": 64,
     "name": "TimelineStage"
   },
   "core_engine/src/utils/lifecycle.ts#TransactionGate": {
@@ -4900,7 +4940,7 @@
     "file": "core_engine/src/utils/lifecycle.ts",
     "jsdoc": "",
     "kind": "interface",
-    "line": 282,
+    "line": 284,
     "name": "TransactionGate"
   },
   "core_engine/src/utils/lifecycle.ts#__ENV": {
@@ -4916,7 +4956,7 @@
     "file": "core_engine/src/utils/lifecycle.ts",
     "jsdoc": "",
     "kind": "const",
-    "line": 200,
+    "line": 202,
     "name": "_currentPhase"
   },
   "core_engine/src/utils/lifecycle.ts#activeEndPlan": {
@@ -4924,7 +4964,7 @@
     "file": "core_engine/src/utils/lifecycle.ts",
     "jsdoc": "",
     "kind": "const",
-    "line": 336,
+    "line": 342,
     "name": "activeEndPlan"
   },
   "core_engine/src/utils/lifecycle.ts#applyPacing": {
@@ -4932,7 +4972,7 @@
     "file": "core_engine/src/utils/lifecycle.ts",
     "jsdoc": "Pacing: a sleep applied at the END of the action phase — i.e. BETWEEN action iterations — to control how often each VU starts a new iteration. Mirrors think time's fixed/random modes, but where think time spaces transactions WITHIN an action, pacing spaces the iterations themselves. Computed fresh each call so 'random' varies per iteration.",
     "kind": "function",
-    "line": 134,
+    "line": 136,
     "name": "applyPacing"
   },
   "core_engine/src/utils/lifecycle.ts#arrivalNoticePrinted": {
@@ -4940,7 +4980,7 @@
     "file": "core_engine/src/utils/lifecycle.ts",
     "jsdoc": "",
     "kind": "const",
-    "line": 337,
+    "line": 343,
     "name": "arrivalNoticePrinted"
   },
   "core_engine/src/utils/lifecycle.ts#buildVuCurve": {
@@ -4948,7 +4988,7 @@
     "file": "core_engine/src/utils/lifecycle.ts",
     "jsdoc": "Build the piecewise-linear VU curve: (0, startVUs) followed by the timeline.",
     "kind": "function",
-    "line": 342,
+    "line": 348,
     "name": "buildVuCurve"
   },
   "core_engine/src/utils/lifecycle.ts#computeEndPlan": {
@@ -4956,7 +4996,7 @@
     "file": "core_engine/src/utils/lifecycle.ts",
     "jsdoc": "Compute the per-VU EndPlan once, from the injected phase envelope.",
     "kind": "function",
-    "line": 410,
+    "line": 416,
     "name": "computeEndPlan"
   },
   "core_engine/src/utils/lifecycle.ts#createContext": {
@@ -4964,7 +5004,7 @@
     "file": "core_engine/src/utils/lifecycle.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 95,
+    "line": 97,
     "name": "createContext"
   },
   "core_engine/src/utils/lifecycle.ts#createJourneyLifecycleStore": {
@@ -4972,7 +5012,7 @@
     "file": "core_engine/src/utils/lifecycle.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 225,
+    "line": 227,
     "name": "createJourneyLifecycleStore"
   },
   "core_engine/src/utils/lifecycle.ts#createState": {
@@ -4980,7 +5020,7 @@
     "file": "core_engine/src/utils/lifecycle.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 104,
+    "line": 106,
     "name": "createState"
   },
   "core_engine/src/utils/lifecycle.ts#createTrackedProxy": {
@@ -4988,7 +5028,7 @@
     "file": "core_engine/src/utils/lifecycle.ts",
     "jsdoc": "Wraps a context sub-object in a Proxy so that every scalar assignment (`ctx.correlation[\"x\"] = v`, `ctx.session.token = v`, etc.) is automatically registered in the replay variable registry. detectVariableEvents then finds those values inside request URLs/bodies/headers and maps them back to their variable names — no trackCorrelation / trackParameter calls needed in scripts.",
     "kind": "function",
-    "line": 78,
+    "line": 80,
     "name": "createTrackedProxy"
   },
   "core_engine/src/utils/lifecycle.ts#frameworkIterations": {
@@ -4996,7 +5036,7 @@
     "file": "core_engine/src/utils/lifecycle.ts",
     "jsdoc": "",
     "kind": "const",
-    "line": 69,
+    "line": 71,
     "name": "frameworkIterations"
   },
   "core_engine/src/utils/lifecycle.ts#getPhaseMetadata": {
@@ -5004,7 +5044,7 @@
     "file": "core_engine/src/utils/lifecycle.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 152,
+    "line": 154,
     "name": "getPhaseMetadata"
   },
   "core_engine/src/utils/lifecycle.ts#getRuntimeMetadata": {
@@ -5012,7 +5052,7 @@
     "file": "core_engine/src/utils/lifecycle.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 120,
+    "line": 122,
     "name": "getRuntimeMetadata"
   },
   "core_engine/src/utils/lifecycle.ts#getTransactionGate": {
@@ -5020,7 +5060,7 @@
     "file": "core_engine/src/utils/lifecycle.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 288,
+    "line": 290,
     "name": "getTransactionGate"
   },
   "core_engine/src/utils/lifecycle.ts#handlePhaseError": {
@@ -5028,7 +5068,7 @@
     "file": "core_engine/src/utils/lifecycle.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 158,
+    "line": 160,
     "name": "handlePhaseError"
   },
   "core_engine/src/utils/lifecycle.ts#interpolateTarget": {
@@ -5036,15 +5076,15 @@
     "file": "core_engine/src/utils/lifecycle.ts",
     "jsdoc": "Linearly interpolate the planned VU count at a given time offset on the curve.",
     "kind": "function",
-    "line": 351,
+    "line": 357,
     "name": "interpolateTarget"
   },
   "core_engine/src/utils/lifecycle.ts#isEndDueAfter": {
     "exported": false,
     "file": "core_engine/src/utils/lifecycle.ts",
-    "jsdoc": "Should this VU end AFTER the action it just ran?",
+    "jsdoc": "Should this VU end AFTER the action it just ran? The two bounds are OR'd, not prioritised: an iteration executor carries both a `lastIteration` and a maxDuration `deadlineMs`, and k6 stops the scenario at whichever it hits first.",
     "kind": "function",
-    "line": 478,
+    "line": 498,
     "name": "isEndDueAfter"
   },
   "core_engine/src/utils/lifecycle.ts#isEndDueBefore": {
@@ -5052,15 +5092,15 @@
     "file": "core_engine/src/utils/lifecycle.ts",
     "jsdoc": "Should this VU end BEFORE running another action?",
     "kind": "function",
-    "line": 468,
+    "line": 483,
     "name": "isEndDueBefore"
   },
   "core_engine/src/utils/lifecycle.ts#isEnding": {
     "exported": true,
     "file": "core_engine/src/utils/lifecycle.ts",
-    "jsdoc": "Script-facing: true once this VU has reached its logout deadline. Use it as the guard of a long action loop so the loop bails out near the deadline instead of overrunning it: while (!isEnding()) { transaction('search', () => {...}); thinktime(); } Only meaningful for the ramping (time-deadline) family; returns false otherwise.",
+    "jsdoc": "Script-facing: true once this VU has reached its logout deadline. Use it as the guard of a long action loop so the loop bails out near the deadline instead of overrunning it: while (!isEnding()) { transaction('search', () => {...}); thinktime(); } Meaningful for any family with a time deadline: the ramping family (cull deadline) and the iteration executors (maxDuration). Returns false for the arrival-rate and externally-controlled families, which have neither.",
     "kind": "function",
-    "line": 498,
+    "line": 523,
     "name": "isEnding"
   },
   "core_engine/src/utils/lifecycle.ts#parseJsonEnv": {
@@ -5068,7 +5108,7 @@
     "file": "core_engine/src/utils/lifecycle.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 112,
+    "line": 114,
     "name": "parseJsonEnv"
   },
   "core_engine/src/utils/lifecycle.ts#runJourneyLifecycle": {
@@ -5076,7 +5116,7 @@
     "file": "core_engine/src/utils/lifecycle.ts",
     "jsdoc": "Per-VU lifecycle shell. Runs initPhase once, then actionPhase per iteration, and proactively runs endPhase a margin BEFORE k6 culls the VU (deadline ranked by onboarding time so it matches k6's handle cull order). Covers every executor family via computeEndPlan: ramping (time deadline), count (per-vu/shared iterations), arrival (action-only), external (best-effort).",
     "kind": "function",
-    "line": 512,
+    "line": 537,
     "name": "runJourneyLifecycle"
   },
   "core_engine/src/utils/lifecycle.ts#runSafely": {
@@ -5084,7 +5124,7 @@
     "file": "core_engine/src/utils/lifecycle.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 202,
+    "line": 204,
     "name": "runSafely"
   },
   "core_engine/src/utils/lifecycle.ts#terminalDeadlineMs": {
@@ -5092,7 +5132,7 @@
     "file": "core_engine/src/utils/lifecycle.ts",
     "jsdoc": "Terminal-crossing deadline for a VU whose handle \"rank\" is `rank` (its VU-count level — see computeEndPlan, where rank is derived from the curve value at the VU's onboarding time, which mirrors k6's handle index). Returns sup{ t : target(t) >= rank } — the LAST time the curve is at or above that level. k6 culls the matching handle just after the curve drops below it, so this is the moment the VU is about to be removed; the lifecycle fires endPhase a safety margin BEFORE it (LIFECYCLE_END_SAFETY_MS) while the VU is still scheduled. Because we have the whole curve up front, this is correct for every ramping shape: load, soak, stress, step-down, spike, and multi-spike (a VU only ends at the dip after which it is never exceeded again — no premature logout of VUs k6 will reuse). Survivors that never cross (curve ends above the rank) get the total duration → they log out at scenario end under gracefulStop.",
     "kind": "function",
-    "line": 382,
+    "line": 388,
     "name": "terminalDeadlineMs"
   },
   "core_engine/src/utils/lifecycle.ts#thinktime": {
@@ -5100,7 +5140,7 @@
     "file": "core_engine/src/utils/lifecycle.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 232,
+    "line": 234,
     "name": "thinktime"
   },
   "core_engine/src/utils/logger.ts#Logger": {

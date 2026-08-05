@@ -15,6 +15,7 @@ export interface K6ExecutorConfig {
   stages?: LoadStage[];
   vus?: number;
   duration?: string;
+  maxDuration?: string;
   iterations?: number;
   rate?: number;
   timeUnit?: string;
@@ -98,15 +99,21 @@ export function buildSpikeProfile(options: {
   };
 }
 
-/** Build a fixed-iteration profile */
+/**
+ * Build a fixed-iteration profile.
+ * `maxDuration` is the wall-clock cap on the iteration pool; omit it to inherit
+ * k6's 10m default (which truncates silently — see DEFAULT_MAX_DURATION_MS).
+ */
 export function buildIterationProfile(options: {
   vus: number;
   iterations: number;
+  maxDuration?: string;
 }): GlobalLoadProfile {
   return {
     executor: 'shared-iterations',
     vus: options.vus,
     iterations: options.iterations,
+    ...(options.maxDuration !== undefined && { maxDuration: options.maxDuration }),
   };
 }
 
@@ -171,17 +178,70 @@ export function buildExternallyControlledProfile(options: {
  * Notable per-executor rules baked in below:
  *  - `startVUs` and `gracefulRampDown` are ramping-VUs only (NOT ramping-arrival-rate).
  *  - iteration executors use k6's `maxDuration`, not `duration`, so `duration` is dropped
- *    for them (the framework has no maxDuration field to emit).
+ *    for them and `maxDuration` is emitted instead. Leaving `maxDuration` unset does NOT
+ *    mean "unbounded": k6 defaults it to 10m (see DEFAULT_MAX_DURATION_MS) and silently
+ *    truncates the iteration pool at that point.
  */
 const EXECUTOR_FIELDS: Record<string, ReadonlyArray<keyof K6ExecutorConfig>> = {
   'ramping-vus': ['startVUs', 'stages', 'gracefulRampDown'],
   'constant-vus': ['vus', 'duration'],
   'ramping-arrival-rate': ['stages', 'timeUnit', 'preAllocatedVUs', 'maxVUs'],
   'constant-arrival-rate': ['rate', 'timeUnit', 'duration', 'preAllocatedVUs', 'maxVUs'],
-  'shared-iterations': ['vus', 'iterations'],
-  'per-vu-iterations': ['vus', 'iterations'],
+  'shared-iterations': ['vus', 'iterations', 'maxDuration'],
+  'per-vu-iterations': ['vus', 'iterations', 'maxDuration'],
   'externally-controlled': ['vus', 'maxVUs', 'duration'],
 };
+
+/**
+ * k6's own default for `maxDuration` on both iteration executors
+ * (`NewSharedIterationsConfig` / `NewPerVUIterationsConfig` = 10 minutes).
+ * The framework mirrors it so the lifecycle engine knows when k6 will cut the
+ * run short even for plans that never mention maxDuration.
+ */
+export const DEFAULT_MAX_DURATION_MS = 10 * 60 * 1000;
+
+/** Executors that accept `maxDuration` (and therefore carry k6's 10m default). */
+export const ITERATION_EXECUTORS: ReadonlyArray<string> = ['shared-iterations', 'per-vu-iterations'];
+
+/** Seconds per unit accepted by k6 duration strings (Go's time.ParseDuration + k6's `d`). */
+const DURATION_UNIT_SECONDS: Record<string, number> = {
+  ns: 1e-9,
+  us: 1e-6,
+  'µs': 1e-6,
+  ms: 1e-3,
+  s: 1,
+  m: 60,
+  h: 3600,
+  d: 86400,
+};
+
+/**
+ * Parse a k6 duration string into seconds.
+ * Shared by ScenarioBuilder (timelines, startTime offsets) and ExecutorFactory
+ * (validation), which cannot import each other without a cycle.
+ *
+ * Mirrors k6's ParseExtendedDuration (lib/types/types.go): Go's units
+ * ns/us/µs/ms/s/m/h, k6's `d` (days) extension, compound forms like '1h30m',
+ * and a bare number meaning MILLISECONDS. The multi-character units are matched
+ * before the single-character ones — otherwise '500ms' reads as 500 minutes.
+ *
+ * Returns 0 for strings with no recognisable unit — callers decide the fallback.
+ */
+export function parseK6DurationToSeconds(duration: string): number {
+  const trimmed = duration.trim();
+
+  // Bare number = milliseconds, per k6's "assume millisecond values" rule.
+  if (/^\d+(?:\.\d+)?$/.test(trimmed)) {
+    return parseFloat(trimmed) / 1000;
+  }
+
+  let total = 0;
+  const matches = trimmed.matchAll(/(\d+(?:\.\d+)?)(ns|us|µs|ms|d|h|m|s)/g);
+  for (const match of matches) {
+    total += parseFloat(match[1]) * DURATION_UNIT_SECONDS[match[2]];
+  }
+  return total;
+}
 
 /**
  * Translate a GlobalLoadProfile into a k6 executor config block, emitting ONLY the

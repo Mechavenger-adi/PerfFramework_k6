@@ -52,6 +52,8 @@ interface PhaseMetadata {
   startVUs?: number;
   totalIterations?: number;
   vus?: number;
+  /** Iteration executors: wall-clock budget (ms) k6 enforces via maxDuration. */
+  maxDurationMs?: number;
   // arrival-rate executor fields
   rate?: number;
   timeUnit?: string;
@@ -321,7 +323,11 @@ type EndFamily = 'ramping' | 'count' | 'arrival' | 'external';
 
 interface EndPlan {
   family: EndFamily;
-  /** Absolute wall-clock ms at/after which this VU logs out (ramping / time-based). */
+  /**
+   * Absolute wall-clock ms at/after which this VU logs out (ramping, and the
+   * maxDuration bound of the count family). May coexist with `lastIteration` —
+   * whichever fires first ends the VU.
+   */
   deadlineMs?: number;
   /** 0-based index of the last action iteration to run (count-based). */
   lastIteration?: number;
@@ -431,10 +437,19 @@ function computeEndPlan(phases: PhaseMetadata): EndPlan {
     return { family: 'ramping', deadlineMs };
   }
 
+  // Iteration executors are DOUBLY bounded: by the iteration count AND by k6's
+  // maxDuration (10m unless the plan overrides it). Whichever comes first ends
+  // the scenario, so the plan carries both and the VU ends on the earlier one —
+  // otherwise a pool that outruns maxDuration is culled mid-flight with endPhase
+  // (logout/teardown) never having run for any VU.
+  const iterationDeadlineMs = phases.maxDurationMs
+    ? exec.scenario.startTime + Number(phases.maxDurationMs)
+    : undefined;
+
   // Per-VU iterations — deterministic last-iteration exit.
   if (mode === 'per-vu-iterations') {
     const total = Math.max(Number(phases.totalIterations || 1), 1);
-    return { family: 'count', lastIteration: total - 1 };
+    return { family: 'count', lastIteration: total - 1, deadlineMs: iterationDeadlineMs };
   }
 
   // Shared iterations — distribute the pool; zero-work VUs end before any action.
@@ -445,7 +460,7 @@ function computeEndPlan(phases: PhaseMetadata): EndPlan {
     if (assigned <= 0) {
       return { family: 'count', lastIteration: -1, endBeforeAction: true };
     }
-    return { family: 'count', lastIteration: assigned - 1 };
+    return { family: 'count', lastIteration: assigned - 1, deadlineMs: iterationDeadlineMs };
   }
 
   // Arrival-rate — open model: action-only, init/end disabled.
@@ -474,11 +489,19 @@ function isEndDueBefore(): boolean {
   return false;
 }
 
-/** Should this VU end AFTER the action it just ran? */
+/**
+ * Should this VU end AFTER the action it just ran?
+ * The two bounds are OR'd, not prioritised: an iteration executor carries both a
+ * `lastIteration` and a maxDuration `deadlineMs`, and k6 stops the scenario at
+ * whichever it hits first.
+ */
 function isEndDueAfter(): boolean {
   if (!activeEndPlan) return false;
-  if (activeEndPlan.deadlineMs !== undefined) {
-    return Date.now() + LIFECYCLE_END_SAFETY_MS >= activeEndPlan.deadlineMs;
+  if (
+    activeEndPlan.deadlineMs !== undefined
+    && Date.now() + LIFECYCLE_END_SAFETY_MS >= activeEndPlan.deadlineMs
+  ) {
+    return true;
   }
   if (activeEndPlan.lastIteration !== undefined) {
     return exec.vu.iterationInScenario >= activeEndPlan.lastIteration;
@@ -493,7 +516,9 @@ function isEndDueAfter(): boolean {
  *
  *   while (!isEnding()) { transaction('search', () => {...}); thinktime(); }
  *
- * Only meaningful for the ramping (time-deadline) family; returns false otherwise.
+ * Meaningful for any family with a time deadline: the ramping family (cull
+ * deadline) and the iteration executors (maxDuration). Returns false for the
+ * arrival-rate and externally-controlled families, which have neither.
  */
 export function isEnding(): boolean {
   if (activeEndPlan === null || activeEndPlan.deadlineMs === undefined) return false;

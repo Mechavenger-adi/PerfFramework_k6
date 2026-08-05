@@ -411,7 +411,7 @@
     ],
     "importsNode": true,
     "layer": "config",
-    "loc": 330,
+    "loc": 331,
     "path": "core_engine/src/config/SchemaValidator.ts"
   },
   {
@@ -1696,7 +1696,7 @@
     ],
     "importsNode": false,
     "layer": "scenario",
-    "loc": 91,
+    "loc": 117,
     "path": "core_engine/src/scenario/ExecutorFactory.ts"
   },
   {
@@ -1708,11 +1708,12 @@
     ],
     "imports": [
       "core_engine/src/types/TestPlanSchema.ts",
-      "core_engine/src/scenario/ExecutorFactory.ts"
+      "core_engine/src/scenario/ExecutorFactory.ts",
+      "core_engine/src/scenario/WorkloadModels.ts"
     ],
     "importsNode": false,
     "layer": "scenario",
-    "loc": 459,
+    "loc": 488,
     "path": "core_engine/src/scenario/ScenarioBuilder.ts"
   },
   {
@@ -1733,6 +1734,8 @@
   },
   {
     "exports": [
+      "DEFAULT_MAX_DURATION_MS",
+      "ITERATION_EXECUTORS",
       "K6ExecutorConfig",
       "buildConstantArrivalRateProfile",
       "buildExternallyControlledProfile",
@@ -1742,6 +1745,7 @@
       "buildSoakProfile",
       "buildSpikeProfile",
       "buildStressProfile",
+      "parseK6DurationToSeconds",
       "toK6ExecutorConfig"
     ],
     "imports": [
@@ -1749,7 +1753,7 @@
     ],
     "importsNode": false,
     "layer": "scenario",
-    "loc": 178,
+    "loc": 264,
     "path": "core_engine/src/scenario/WorkloadModels.ts"
   },
   {
@@ -1851,7 +1855,7 @@
     "imports": [],
     "importsNode": false,
     "layer": "types",
-    "loc": 215,
+    "loc": 225,
     "path": "core_engine/src/types/TestPlanSchema.ts"
   },
   {
@@ -1956,7 +1960,7 @@
     ],
     "importsNode": false,
     "layer": "utils",
-    "loc": 583,
+    "loc": 608,
     "path": "core_engine/src/utils/lifecycle.ts"
   },
   {

@@ -934,6 +934,10 @@
     },
     {
       "from": "core_engine/src/scenario/ScenarioBuilder.ts",
+      "to": "core_engine/src/scenario/WorkloadModels.ts"
+    },
+    {
+      "from": "core_engine/src/scenario/ScenarioBuilder.ts",
       "to": "core_engine/src/types/TestPlanSchema.ts"
     },
     {
