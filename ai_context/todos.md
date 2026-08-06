@@ -60,9 +60,11 @@
     `externally-controlled` — it is no longer registered in `lib/executor`, and k6 fails at load with
     `unknown executor type`. It has been dropped from `ExecutorType`, `EXECUTOR_SPECS`,
     `EXECUTOR_FIELDS`, the phase envelope and both schemas (`REMOVED_EXECUTORS` in `ExecutorFactory`
-    still explains it if an old plan uses it). `config/test_plans/templates/externally_controlled.json`
-    is stale and would now fail validation; nothing reads that directory — the live template set is
-    `templates/test_plans/*.jsonc`, surfaced by `npm run templates` / `npm run new`.
+    still explains it if an old plan uses it). The `config/test_plans/templates/` directory those 7
+    files lived in has been **deleted** — no code ever read it, and its `externally_controlled.json`
+    would now fail validation. The one live template set is `templates/test_plans/*.jsonc`, surfaced
+    by `npm run templates` / `npm run new`, which covers all six executors and all three execution
+    modes.
 - **ScriptConverter Modernization:** Updated `ScriptConverter.ts` to align with current framework patterns.
   - `buildImportBlock()`: Uses `core_engine/src/utils/` import paths; adds session.js imports; deduplicates lifecycle/session imports.
   - `applyPhaseContract()`: Added stale pattern normalization — strips `variableEvents: []`, fixes `dist/` → `core_engine/src/` paths. Emits `transaction()` + `request()` format matching ScriptGenerator output.

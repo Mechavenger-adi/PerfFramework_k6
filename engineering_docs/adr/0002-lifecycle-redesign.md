@@ -107,7 +107,7 @@ No ramp-down curve; **already reliable — keep it.** The VU knows its assigned 
 
 In arrival-rate, k6 starts iterations *at a rate* and pulls VUs from a pool. A VU is a **pooled worker, not a user**; an idle pooled VU **executes no code** — no loop, no timer — so it can never observe a time condition. At end-of-test (especially with a ramped-down rate) most of the pool is dormant.
 
-*Worked example* (`config/test_plans/templates/ramping_arrival_rate.json` style): `preAllocatedVUs: 50`, final stage ramps to `60/min = 1 iter/s`, each iteration ~0.2s ⇒ **~1 VU busy, ~49 dormant** in the final window. A time-based `endPhase` would fire for ~1 of 50 VUs — and not a predictable one. Secondary blockers: a VU can't know which iteration is its last (no budget), and ending early to be safe makes VUs peel off → the arrival rate sags, corrupting the measured throughput.
+*Worked example* (`templates/test_plans/throughput-ramping-rate.jsonc` style): `preAllocatedVUs: 50`, final stage ramps to `60/min = 1 iter/s`, each iteration ~0.2s ⇒ **~1 VU busy, ~49 dormant** in the final window. A time-based `endPhase` would fire for ~1 of 50 VUs — and not a predictable one. Secondary blockers: a VU can't know which iteration is its last (no budget), and ending early to be safe makes VUs peel off → the arrival rate sags, corrupting the measured throughput.
 
 ### 6.2 Decision
 
