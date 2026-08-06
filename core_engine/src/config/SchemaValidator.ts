@@ -153,6 +153,8 @@ const TEST_PLAN_SCHEMA_INLINE = {
       type: 'object',
       required: ['executor'],
       properties: {
+        // The six executors k6 v2.0.0 registers. 'externally-controlled' was
+        // removed upstream and now fails at load, so it is not accepted here.
         executor: {
           type: 'string',
           enum: [
@@ -162,10 +164,10 @@ const TEST_PLAN_SCHEMA_INLINE = {
             'constant-arrival-rate',
             'shared-iterations',
             'per-vu-iterations',
-            'externally-controlled',
           ],
         },
         startVUs: { type: 'number', minimum: 0 },
+        startRate: { type: 'number', minimum: 0 },
         stages: {
           type: 'array',
           items: {

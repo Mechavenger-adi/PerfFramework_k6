@@ -32,6 +32,8 @@
 
 **Second axis:** an executor can be bounded on more than one dimension. Iteration executors carry both `totalIterations` and `maxDurationMs`, and `lifecycle.ts` must treat them as OR (whichever fires first) — dropping either bound loses `endPhase`.
 
+**Third axis:** `timeline[].vus` and `timeline[].rate` are different quantities and only one is set per mode — VU-based executors emit `vus`, arrival-rate executors emit `rate` (a stage `target` means a VU count for `ramping-vus` but an arrival rate for `ramping-arrival-rate`). Reading one as the other silently produces a plausible-looking but wrong curve.
+
 ## RZ5 — k6 Flag vs JSON Config Behavior
 
 **Risk:** Not all k6 options work the same way when passed via JSON config vs CLI flags. `summaryTrendStats` only works as CLI flag.

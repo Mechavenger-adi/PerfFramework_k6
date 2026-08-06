@@ -25,7 +25,7 @@ export { RuntimeConfigManager } from './config/RuntimeConfigManager';
 export { SchemaValidator } from './config/SchemaValidator';
 
 // -- Scenario Layer ---------------------------
-export { buildLoadProfile, buildStressProfile, buildSoakProfile, buildSpikeProfile, buildIterationProfile, buildConstantArrivalRateProfile, buildRampingArrivalRateProfile, buildExternallyControlledProfile, toK6ExecutorConfig } from './scenario/WorkloadModels';
+export { buildLoadProfile, buildStressProfile, buildSoakProfile, buildSpikeProfile, buildIterationProfile, buildConstantArrivalRateProfile, buildRampingArrivalRateProfile, toK6ExecutorConfig } from './scenario/WorkloadModels';
 export { ExecutorFactory } from './scenario/ExecutorFactory';
 export { ScenarioBuilder } from './scenario/ScenarioBuilder';
 export type { K6ScenarioDefinition, K6ScenariosMap } from './scenario/ScenarioBuilder';

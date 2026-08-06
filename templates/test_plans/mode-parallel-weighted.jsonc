@@ -1,0 +1,49 @@
+{
+  "$schema": "../../config/schemas/test_plan.schema.json",
+  "_meta": {
+    "title": "Execution Mode: Parallel (weighted mix)",
+    "description": "All journeys run concurrently for the whole test, each with its own share of the load. The realistic production shape — start here for a mixed-workload test."
+  },
+  "name": "Parallel Mixed Workload",
+  "environment": "dev",
+  "execution_mode": "parallel",
+
+  // Every journey inherits this unless it declares its own loadProfile.
+  "global_load_profile": {
+    "executor": "ramping-vus",
+    // k6's startVUs default is 1, NOT 0 — say 0 explicitly for a clean ramp.
+    "startVUs": 0,
+    "stages": [
+      { "duration": "1m", "target": 50 },
+      { "duration": "5m", "target": 50 },
+      { "duration": "1m", "target": 0 }
+    ],
+    // Give endPhase (logout) room to finish before k6 removes a ramping-down VU.
+    "gracefulRampDown": "30s"
+  },
+
+  "user_journeys": [
+    // weight splits the load across journeys; the values should sum to 100.
+    {
+      "name": "browse_catalog",
+      "scriptPath": "testSuites/sample_team/tests/example.js",
+      "weight": 70,
+      "tags": { "tier": "read" }
+    },
+    {
+      "name": "checkout_flow",
+      "scriptPath": "testSuites/sample_team/tests/example.js",
+      "weight": 30,
+      "tags": { "tier": "write" }
+    }
+  ],
+
+  "global_sla": {
+    "request": { "p95": 3000, "errorRate": 5 }
+  },
+
+  // Per-journey overrides beat the global defaults for that journey only.
+  "journey_slas": {
+    "checkout_flow": { "p95": 5000 }
+  }
+}

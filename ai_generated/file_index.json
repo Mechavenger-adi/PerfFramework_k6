@@ -411,7 +411,7 @@
     ],
     "importsNode": true,
     "layer": "config",
-    "loc": 331,
+    "loc": 333,
     "path": "core_engine/src/config/SchemaValidator.ts"
   },
   {
@@ -1114,7 +1114,6 @@
       "TransactionMetricsBuilder",
       "VariableEvent",
       "buildConstantArrivalRateProfile",
-      "buildExternallyControlledProfile",
       "buildIterationProfile",
       "buildLoadProfile",
       "buildRampingArrivalRateProfile",
@@ -1696,7 +1695,7 @@
     ],
     "importsNode": false,
     "layer": "scenario",
-    "loc": 117,
+    "loc": 281,
     "path": "core_engine/src/scenario/ExecutorFactory.ts"
   },
   {
@@ -1713,7 +1712,7 @@
     ],
     "importsNode": false,
     "layer": "scenario",
-    "loc": 488,
+    "loc": 493,
     "path": "core_engine/src/scenario/ScenarioBuilder.ts"
   },
   {
@@ -1734,11 +1733,12 @@
   },
   {
     "exports": [
+      "ARRIVAL_RATE_EXECUTORS",
       "DEFAULT_MAX_DURATION_MS",
+      "DEFAULT_START_VUS",
       "ITERATION_EXECUTORS",
       "K6ExecutorConfig",
       "buildConstantArrivalRateProfile",
-      "buildExternallyControlledProfile",
       "buildIterationProfile",
       "buildLoadProfile",
       "buildRampingArrivalRateProfile",
@@ -1753,7 +1753,7 @@
     ],
     "importsNode": false,
     "layer": "scenario",
-    "loc": 264,
+    "loc": 268,
     "path": "core_engine/src/scenario/WorkloadModels.ts"
   },
   {
@@ -1855,7 +1855,7 @@
     "imports": [],
     "importsNode": false,
     "layer": "types",
-    "loc": 225,
+    "loc": 245,
     "path": "core_engine/src/types/TestPlanSchema.ts"
   },
   {
@@ -1960,7 +1960,7 @@
     ],
     "importsNode": false,
     "layer": "utils",
-    "loc": 608,
+    "loc": 610,
     "path": "core_engine/src/utils/lifecycle.ts"
   },
   {

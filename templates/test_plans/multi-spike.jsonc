@@ -1,5 +1,5 @@
 {
-  "$schema": "../../schemas/test-plan.schema.json",
+  "$schema": "../../config/schemas/test_plan.schema.json",
   "_meta": {
     "title": "Multi-Spike Test",
     "description": "Delivers repeated traffic spikes with recovery periods between each. Good for testing cumulative degradation and memory leak detection under repeated high-load events."

@@ -1,0 +1,39 @@
+{
+  "$schema": "../../config/schemas/test_plan.schema.json",
+  "_meta": {
+    "title": "Iterations: Shared Pool",
+    "description": "A fixed total number of iterations shared across VUs — whoever is free takes the next one. The natural fit for data-driven runs: one iteration per input row, processed exactly once."
+  },
+  "name": "Shared Iterations Run",
+  "environment": "dev",
+  "execution_mode": "parallel",
+
+  "global_load_profile": {
+    "executor": "shared-iterations",
+
+    // 10 VUs draw from ONE pool of 500 iterations (~50 each, but faster VUs
+    // take more). iterations must be >= vus, or some VUs get no work at all.
+    "vus": 10,
+    "iterations": 500,
+
+    // WALL-CLOCK CAP. Not optional in practice: k6 applies maxDuration whether
+    // or not you set it, and its default is 10m — a longer pool is cut off
+    // there with iterations unrun. Set it to comfortably exceed the expected
+    // total (iterations x iteration duration / vus) plus headroom.
+    "maxDuration": "30m",
+
+    "gracefulStop": "30s"
+  },
+
+  "user_journeys": [
+    {
+      "name": "process_records",
+      "scriptPath": "testSuites/sample_team/tests/example.js",
+      "weight": 100
+    }
+  ],
+
+  "global_sla": {
+    "request": { "p95": 3000, "errorRate": 1 }
+  }
+}

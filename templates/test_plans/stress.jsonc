@@ -1,5 +1,5 @@
 {
-  "$schema": "../../schemas/test-plan.schema.json",
+  "$schema": "../../config/schemas/test_plan.schema.json",
   "_meta": {
     "title": "Stress Test",
     "description": "Gradually pushes load beyond expected limits to see how the system handles heavy stress and identify bottlenecks."

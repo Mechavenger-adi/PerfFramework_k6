@@ -65,17 +65,23 @@
             "shared-iterations",
             "per-vu-iterations"
           ],
-          "description": "k6 executor type:\n• ramping-vus — Ramp VUs up/down through stages (most common for load tests).\n• constant-vus — Fixed VU count for a set duration.\n• ramping-arrival-rate — Control request rate, not VU count.\n• constant-arrival-rate — Fixed requests/second.\n• shared-iterations — Fixed total iterations across all VUs (good for data-driven tests).\n• per-vu-iterations — Each VU runs a fixed number of iterations."
+          "description": "k6 executor type:\n• ramping-vus — Ramp VUs up/down through stages (most common for load tests).\n• constant-vus — Fixed VU count for a set duration.\n• ramping-arrival-rate — Control request rate, not VU count.\n• constant-arrival-rate — Fixed requests/second.\n• shared-iterations — Fixed total iterations across all VUs (good for data-driven tests).\n• per-vu-iterations — Each VU runs a fixed number of iterations.\nNote: 'externally-controlled' was removed in k6 v2.0.0 and is no longer accepted."
         },
         "startVUs": {
           "type": "number",
           "minimum": 0,
-          "description": "Starting VU count for ramping executors. Usually 0 for a clean ramp-up. Only used with 'ramping-vus' executor.",
+          "description": "Starting VU count for the 'ramping-vus' executor — the level the ramp begins from.\nIMPORTANT: k6's default is 1, NOT 0. Omit this and the scenario starts with one VU already running; set it to 0 explicitly for a clean ramp from zero.",
+          "default": 1
+        },
+        "startRate": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Starting arrival rate for the 'ramping-arrival-rate' executor, in iterations per timeUnit, held before the first stage begins ramping. k6 defaults it to 0, so omitting it means the scenario always ramps up from nothing — set it to hold a floor, or to begin a stage-based rate change from an existing level.",
           "default": 0
         },
         "stages": {
           "type": "array",
-          "description": "Ramp stages for 'ramping-vus' executor. Each stage defines a duration and a target VU count. Classic load test pattern: ramp-up → steady state → ramp-down.",
+          "description": "Ramp stages for the 'ramping-vus' and 'ramping-arrival-rate' executors. Each stage defines a duration and a target. Classic load test pattern: ramp-up → steady state → ramp-down.\nNote what 'target' means differs by executor — VUs for ramping-vus, arrival rate for ramping-arrival-rate.",
           "items": {
             "type": "object",
             "required": ["duration", "target"],
@@ -87,7 +93,7 @@
               "target": {
                 "type": "number",
                 "minimum": 0,
-                "description": "Target VU count at the end of this stage. k6 linearly ramps from the previous stage's target to this value."
+                "description": "Value to reach by the end of this stage; k6 ramps linearly from the previous stage's target.\n• ramping-vus — a VU count.\n• ramping-arrival-rate — an arrival rate (iterations per timeUnit)."
               }
             }
           }
@@ -108,7 +114,27 @@
         "iterations": {
           "type": "number",
           "minimum": 1,
-          "description": "Total iterations for 'shared-iterations' or per-VU iterations for 'per-vu-iterations'. For shared-iterations: all VUs share this pool. For per-vu-iterations: each VU runs this many."
+          "description": "Total iterations for 'shared-iterations' or per-VU iterations for 'per-vu-iterations'. For shared-iterations: all VUs share this pool (and must be >= vus, or some VUs get no work). For per-vu-iterations: each VU runs this many."
+        },
+        "rate": {
+          "type": "number",
+          "minimum": 1,
+          "description": "Arrival rate for the 'constant-arrival-rate' executor: iterations started per timeUnit, held for the whole duration. Required for that executor. Load is driven by this rate, not by VU count — VUs are just the pool used to service it."
+        },
+        "timeUnit": {
+          "type": "string",
+          "description": "Period the arrival rate is measured over, for both arrival-rate executors. k6 duration string; defaults to '1s'. Example: rate 30 with timeUnit '1m' = 30 iterations per minute.",
+          "default": "1s"
+        },
+        "preAllocatedVUs": {
+          "type": "number",
+          "minimum": 0,
+          "description": "VUs initialised up front for the arrival-rate executors, before the test starts. Required for both. Size it for the rate you expect: too few and k6 must allocate mid-test (which costs time and shows up as dropped iterations)."
+        },
+        "maxVUs": {
+          "type": "number",
+          "minimum": 1,
+          "description": "Hard ceiling on VUs an arrival-rate executor may allocate when preAllocatedVUs is not enough to sustain the rate. Must be >= preAllocatedVUs. Defaults to preAllocatedVUs when omitted, meaning NO dynamic allocation — slow responses then surface as dropped iterations rather than extra VUs."
         },
         "gracefulRampDown": {
           "type": "string",
@@ -116,7 +142,7 @@
         },
         "gracefulStop": {
           "type": "string",
-          "description": "Time k6 waits for in-flight iterations to finish at scenario end before forcibly stopping (all executors except externally-controlled). k6 duration string, e.g. '30s'. Defaults to k6's 30s when omitted."
+          "description": "Time k6 waits for in-flight iterations to finish at scenario end before forcibly stopping. Valid on every executor. k6 duration string, e.g. '30s'. Defaults to k6's 30s when omitted."
         }
       }
     },

@@ -49,17 +49,20 @@ consumed by `lifecycle.ts` `computeEndPlan`. Both sides must move together (RZ4)
 ```typescript
 {
   mode: 'ramping-vus' | 'per-vu-iterations' | 'shared-iterations'
-      | 'constant-arrival-rate' | 'ramping-arrival-rate'
-      | 'externally-controlled' | 'unsupported';
+      | 'constant-arrival-rate' | 'ramping-arrival-rate' | 'unsupported';
+  // Cumulative load curve. `endMs` is MILLISECONDS from scenario start.
+  // `vus` (a VU count) and `rate` (an arrival rate) are NOT interchangeable —
+  // VU-based executors set `vus`, arrival-rate executors set `rate`.
+  timeline?: Array<{ endMs: number; vus?: number; rate?: number }>;
   // Ramping family (constant-vus is encoded as a synthetic ramping-vus timeline).
-  startVUs?: number;
-  timeline?: Array<{ endMs: number; vus: number }>;   // MILLISECONDS, cumulative from scenario start
+  startVUs?: number;        // defaults to k6's 1, NOT 0
   // Iteration executors.
   totalIterations?: number;
   vus?: number;
   maxDurationMs?: number;   // always set for iteration executors: plan maxDuration, else k6's 10m default
   // Arrival-rate executors.
   rate?: number;
+  startRate?: number;       // ramping-arrival-rate only; k6 default 0
   timeUnit?: string;
   preAllocatedVUs?: number;
   maxVUs?: number;

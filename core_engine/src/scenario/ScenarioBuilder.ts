@@ -8,6 +8,7 @@ import { GlobalLoadProfile, TestPlan, UserJourney } from '../types/TestPlanSchem
 import { ExecutorFactory } from './ExecutorFactory';
 import {
   DEFAULT_MAX_DURATION_MS,
+  DEFAULT_START_VUS,
   ITERATION_EXECUTORS,
   parseK6DurationToSeconds,
 } from './WorkloadModels';
@@ -17,6 +18,7 @@ export interface K6ScenarioDefinition {
   executor: string;
   exec?: string;
   startVUs?: number;
+  startRate?: number;
   stages?: Array<{ duration: string; target: number }>;
   vus?: number;
   duration?: string;
@@ -89,9 +91,9 @@ interface ScenarioPhaseEnvelope {
     | 'shared-iterations'
     | 'constant-arrival-rate'
     | 'ramping-arrival-rate'
-    | 'externally-controlled'
     | 'unsupported';
   startVUs?: number;
+  startRate?: number;
   totalIterations?: number;
   vus?: number;
   rate?: number;
@@ -105,9 +107,16 @@ interface ScenarioPhaseEnvelope {
    * k6's own 10m default — so the VU lifecycle can run endPhase before the cut.
    */
   maxDurationMs?: number;
+  /**
+   * Cumulative load curve. `vus` is a VU COUNT for the VU-based executors; for
+   * the arrival-rate executors the stage target is an arrival RATE, so it is
+   * carried in `rate` and `vus` is left unset — the two are not interchangeable
+   * and must never be read as each other (see RZ4).
+   */
   timeline?: Array<{
     endMs: number;
-    vus: number;
+    vus?: number;
+    rate?: number;
   }>;
 }
 
@@ -345,7 +354,9 @@ export class ScenarioBuilder {
 
       return {
         mode: 'ramping-vus',
-        startVUs: profile.startVUs ?? 0,
+        // k6's own default is 1, not 0 (NewRampingVUsConfig) — the curve must
+        // start where k6 actually starts it or the lifecycle's rank math is off.
+        startVUs: profile.startVUs ?? DEFAULT_START_VUS,
         timeline,
       };
     }
@@ -397,7 +408,7 @@ export class ScenarioBuilder {
         timeUnit: profile.timeUnit ?? '1s',
         preAllocatedVUs: profile.preAllocatedVUs,
         maxVUs: profile.maxVUs,
-        timeline: [{ endMs: totalMs, vus: profile.preAllocatedVUs ?? 0 }],
+        timeline: [{ endMs: totalMs, rate: profile.rate }],
       };
     }
 
@@ -407,30 +418,24 @@ export class ScenarioBuilder {
       profile.stages &&
       profile.stages.length > 0
     ) {
+      // A ramping-arrival-rate stage target is a RATE (iterations per timeUnit),
+      // not a VU count — hence `rate`, not `vus`.
       let cumulativeMs = 0;
       const timeline = profile.stages.map((stage) => {
         cumulativeMs += this.parseDurationToSeconds(stage.duration) * 1000;
         return {
           endMs: cumulativeMs,
-          vus: stage.target,
+          rate: stage.target,
         };
       });
 
       return {
         mode: 'ramping-arrival-rate',
+        startRate: profile.startRate ?? 0,
         preAllocatedVUs: profile.preAllocatedVUs,
         maxVUs: profile.maxVUs,
         timeUnit: profile.timeUnit ?? '1s',
         timeline,
-      };
-    }
-
-    // --- externally-controlled: open-ended, VU count managed via k6 REST API ---
-    if (profile.executor === 'externally-controlled' && profile.maxVUs) {
-      return {
-        mode: 'externally-controlled',
-        vus: profile.vus ?? 0,
-        maxVUs: profile.maxVUs,
       };
     }
 

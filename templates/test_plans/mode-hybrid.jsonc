@@ -1,0 +1,90 @@
+{
+  "$schema": "../../config/schemas/test_plan.schema.json",
+  "_meta": {
+    "title": "Execution Mode: Hybrid (parallel + sequential groups)",
+    "description": "Mixes both shapes: groups run in order, and journeys inside a parallel group run together. Use for a setup step, then a concurrent mixed load, then a teardown."
+  },
+  "name": "Hybrid Phased Load",
+  "environment": "dev",
+  "execution_mode": "hybrid",
+
+  "global_load_profile": {
+    "executor": "constant-vus",
+    "vus": 5,
+    "duration": "2m"
+  },
+
+  "user_journeys": [
+    {
+      "name": "setup_seed",
+      "scriptPath": "testSuites/sample_team/tests/example.js",
+      "loadProfile": {
+        "executor": "shared-iterations",
+        "vus": 2,
+        "iterations": 50,
+        "maxDuration": "2m"
+      }
+    },
+    {
+      "name": "browse_catalog",
+      "scriptPath": "testSuites/sample_team/tests/example.js",
+      "tags": { "tier": "read" },
+      "loadProfile": {
+        "executor": "ramping-vus",
+        "startVUs": 0,
+        "stages": [
+          { "duration": "1m", "target": 40 },
+          { "duration": "3m", "target": 40 },
+          { "duration": "1m", "target": 0 }
+        ],
+        "gracefulRampDown": "30s"
+      }
+    },
+    {
+      "name": "checkout_flow",
+      "scriptPath": "testSuites/sample_team/tests/example.js",
+      "tags": { "tier": "write" },
+      "loadProfile": {
+        // Throughput-driven rather than VU-driven: holds a fixed order rate
+        // regardless of how slow the system gets.
+        "executor": "constant-arrival-rate",
+        "rate": 20,
+        "timeUnit": "1s",
+        "duration": "5m",
+        "preAllocatedVUs": 30,
+        "maxVUs": 100
+      }
+    },
+    {
+      "name": "teardown_verify",
+      "scriptPath": "testSuites/sample_team/tests/example.js"
+    }
+  ],
+
+  // GROUPS RUN IN ARRAY ORDER. Within a parallel group the journeys start
+  // together and the group's length is its LONGEST journey; a sequential group
+  // chains its journeys one after another. Every journey named here must exist
+  // in user_journeys above.
+  "hybrid_groups": [
+    {
+      "mode": "sequential",
+      "journeys": ["setup_seed"]
+    },
+    {
+      // Peak phase: read and write load applied concurrently.
+      "mode": "parallel",
+      "journeys": ["browse_catalog", "checkout_flow"]
+    },
+    {
+      "mode": "sequential",
+      "journeys": ["teardown_verify"]
+    }
+  ],
+
+  "global_sla": {
+    "request": { "p95": 3000, "errorRate": 5 }
+  },
+  "journey_slas": {
+    "checkout_flow": { "p95": 5000 }
+  }
+}

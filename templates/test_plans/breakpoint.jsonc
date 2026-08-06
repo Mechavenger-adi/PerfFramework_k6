@@ -1,5 +1,5 @@
 {
-  "$schema": "../../schemas/test-plan.schema.json",
+  "$schema": "../../config/schemas/test_plan.schema.json",
   "_meta": {
     "title": "Breakpoint Test",
     "description": "Slowly increases load indefinitely until the system crashes or SLAs are severely broken to find the absolute maximum capacity."

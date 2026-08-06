@@ -12,6 +12,7 @@ import { GlobalLoadProfile, LoadStage } from '../types/TestPlanSchema';
 export interface K6ExecutorConfig {
   executor: string;
   startVUs?: number;
+  startRate?: number;
   stages?: LoadStage[];
   vus?: number;
   duration?: string;
@@ -135,10 +136,15 @@ export function buildConstantArrivalRateProfile(options: {
   };
 }
 
-/** Build a ramping arrival-rate profile */
+/**
+ * Build a ramping arrival-rate profile.
+ * `startRate` is the rate the scenario holds before the first stage ramps; k6
+ * defaults it to 0, so omitting it always starts from nothing.
+ */
 export function buildRampingArrivalRateProfile(options: {
   stages: LoadStage[];
   preAllocatedVUs: number;
+  startRate?: number;
   timeUnit?: string;
   maxVUs?: number;
 }): GlobalLoadProfile {
@@ -146,22 +152,9 @@ export function buildRampingArrivalRateProfile(options: {
     executor: 'ramping-arrival-rate',
     stages: options.stages,
     preAllocatedVUs: options.preAllocatedVUs,
+    ...(options.startRate !== undefined && { startRate: options.startRate }),
     timeUnit: options.timeUnit ?? '1s',
     maxVUs: options.maxVUs,
-  };
-}
-
-/** Build an externally-controlled profile */
-export function buildExternallyControlledProfile(options: {
-  maxVUs: number;
-  vus?: number;
-  duration?: string;
-}): GlobalLoadProfile {
-  return {
-    executor: 'externally-controlled',
-    maxVUs: options.maxVUs,
-    vus: options.vus ?? 0,
-    duration: options.duration ?? '0',
   };
 }
 
@@ -176,21 +169,32 @@ export function buildExternallyControlledProfile(options: {
  * always valid, so they're not listed here.
  *
  * Notable per-executor rules baked in below:
- *  - `startVUs` and `gracefulRampDown` are ramping-VUs only (NOT ramping-arrival-rate).
+ *  - `startVUs` and `gracefulRampDown` are ramping-VUs only. Their arrival-rate
+ *    counterpart is `startRate`; `RampingArrivalRateConfig` has NO gracefulRampDown.
  *  - iteration executors use k6's `maxDuration`, not `duration`, so `duration` is dropped
  *    for them and `maxDuration` is emitted instead. Leaving `maxDuration` unset does NOT
  *    mean "unbounded": k6 defaults it to 10m (see DEFAULT_MAX_DURATION_MS) and silently
  *    truncates the iteration pool at that point.
+ *  - `externally-controlled` is absent because k6 v2.0.0 removed it — only the six
+ *    executors below are registered, and anything else fails at load.
  */
 const EXECUTOR_FIELDS: Record<string, ReadonlyArray<keyof K6ExecutorConfig>> = {
   'ramping-vus': ['startVUs', 'stages', 'gracefulRampDown'],
   'constant-vus': ['vus', 'duration'],
-  'ramping-arrival-rate': ['stages', 'timeUnit', 'preAllocatedVUs', 'maxVUs'],
+  'ramping-arrival-rate': ['startRate', 'stages', 'timeUnit', 'preAllocatedVUs', 'maxVUs'],
   'constant-arrival-rate': ['rate', 'timeUnit', 'duration', 'preAllocatedVUs', 'maxVUs'],
   'shared-iterations': ['vus', 'iterations', 'maxDuration'],
   'per-vu-iterations': ['vus', 'iterations', 'maxDuration'],
-  'externally-controlled': ['vus', 'maxVUs', 'duration'],
 };
+
+/** Executors whose load is expressed as an arrival rate rather than a VU count. */
+export const ARRIVAL_RATE_EXECUTORS: ReadonlyArray<string> = [
+  'constant-arrival-rate',
+  'ramping-arrival-rate',
+];
+
+/** k6's default `startVUs` for ramping-vus (`NewRampingVUsConfig`) — 1, not 0. */
+export const DEFAULT_START_VUS = 1;
 
 /**
  * k6's own default for `maxDuration` on both iteration executors

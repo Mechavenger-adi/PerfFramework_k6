@@ -1,0 +1,50 @@
+{
+  "$schema": "../../config/schemas/test_plan.schema.json",
+  "_meta": {
+    "title": "Throughput: Ramping Arrival Rate",
+    "description": "Steps throughput up in stages to find the rate at which the system breaks. Same open model as constant-arrival-rate, but the target rate changes over time."
+  },
+  "name": "Ramping Throughput Test",
+  "environment": "dev",
+  "execution_mode": "parallel",
+
+  "global_load_profile": {
+    "executor": "ramping-arrival-rate",
+
+    // Rate held BEFORE the first stage starts ramping. k6 defaults it to 0, so
+    // omitting it always ramps up from nothing; set it to start from a floor.
+    "startRate": 10,
+    "timeUnit": "1s",
+
+    // For THIS executor a stage target is an arrival RATE, not a VU count.
+    "stages": [
+      { "duration": "2m", "target": 50 },
+      { "duration": "5m", "target": 50 },
+      { "duration": "2m", "target": 200 },
+      { "duration": "5m", "target": 200 },
+      { "duration": "1m", "target": 0 }
+    ],
+
+    "preAllocatedVUs": 50,
+    // Must be >= preAllocatedVUs. Size it for the PEAK stage target, not the
+    // starting one, or the top of the ramp turns into dropped iterations.
+    "maxVUs": 400,
+
+    "gracefulStop": "30s"
+
+    // No gracefulRampDown here — k6 does not define one for this executor
+    // (it belongs to ramping-vus only) and emitting it fails the run.
+  },
+
+  "user_journeys": [
+    {
+      "name": "api_traffic",
+      "scriptPath": "testSuites/sample_team/tests/example.js",
+      "weight": 100
+    }
+  ],
+
+  "global_sla": {
+    "request": { "p95": 2000, "errorRate": 2 }
+  }
+}

@@ -1,5 +1,5 @@
 {
-  "$schema": "../../schemas/test-plan.schema.json",
+  "$schema": "../../config/schemas/test_plan.schema.json",
   "_meta": {
     "title": "Step-Up (Staircase) Test",
     "description": "Increases load in discrete steps with holds at each level. Good for identifying the exact VU count where performance degrades."

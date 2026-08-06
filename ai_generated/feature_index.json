@@ -29,7 +29,7 @@
           "runJourneyLifecycle",
           "thinktime"
         ],
-        "loc": 608,
+        "loc": 610,
         "path": "core_engine/src/utils/lifecycle.ts"
       },
       {
@@ -54,16 +54,17 @@
           "ScenarioBuilder",
           "ScenarioRuntimeMetadata"
         ],
-        "loc": 488,
+        "loc": 493,
         "path": "core_engine/src/scenario/ScenarioBuilder.ts"
       },
       {
         "exports": [
+          "ARRIVAL_RATE_EXECUTORS",
           "DEFAULT_MAX_DURATION_MS",
+          "DEFAULT_START_VUS",
           "ITERATION_EXECUTORS",
           "K6ExecutorConfig",
           "buildConstantArrivalRateProfile",
-          "buildExternallyControlledProfile",
           "buildIterationProfile",
           "buildLoadProfile",
           "buildRampingArrivalRateProfile",
@@ -73,7 +74,7 @@
           "parseK6DurationToSeconds",
           "toK6ExecutorConfig"
         ],
-        "loc": 264,
+        "loc": 268,
         "path": "core_engine/src/scenario/WorkloadModels.ts"
       }
     ],
@@ -432,7 +433,7 @@
           "SchemaValidator",
           "ValidationResult"
         ],
-        "loc": 331,
+        "loc": 333,
         "path": "core_engine/src/config/SchemaValidator.ts"
       },
       {
@@ -546,16 +547,17 @@
           "ScenarioBuilder",
           "ScenarioRuntimeMetadata"
         ],
-        "loc": 488,
+        "loc": 493,
         "path": "core_engine/src/scenario/ScenarioBuilder.ts"
       },
       {
         "exports": [
+          "ARRIVAL_RATE_EXECUTORS",
           "DEFAULT_MAX_DURATION_MS",
+          "DEFAULT_START_VUS",
           "ITERATION_EXECUTORS",
           "K6ExecutorConfig",
           "buildConstantArrivalRateProfile",
-          "buildExternallyControlledProfile",
           "buildIterationProfile",
           "buildLoadProfile",
           "buildRampingArrivalRateProfile",
@@ -565,14 +567,14 @@
           "parseK6DurationToSeconds",
           "toK6ExecutorConfig"
         ],
-        "loc": 264,
+        "loc": 268,
         "path": "core_engine/src/scenario/WorkloadModels.ts"
       },
       {
         "exports": [
           "ExecutorFactory"
         ],
-        "loc": 117,
+        "loc": 281,
         "path": "core_engine/src/scenario/ExecutorFactory.ts"
       },
       {

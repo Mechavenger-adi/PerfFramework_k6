@@ -1,5 +1,5 @@
 {
-  "$schema": "../../schemas/test-plan.schema.json",
+  "$schema": "../../config/schemas/test_plan.schema.json",
   "_meta": {
     "title": "Standard Load Test",
     "description": "Gradually ramps up to a target load, holds it, and ramps down. Good for assessing general performance."

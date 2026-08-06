@@ -1,0 +1,49 @@
+{
+  "$schema": "../../config/schemas/test_plan.schema.json",
+  "_meta": {
+    "title": "Throughput: Constant Arrival Rate",
+    "description": "Holds a fixed iterations/sec regardless of response time — an OPEN model. Use when the requirement is stated as throughput ('500 orders/min'), not as concurrency."
+  },
+  "name": "Constant Throughput Test",
+  "environment": "dev",
+  "execution_mode": "parallel",
+
+  "global_load_profile": {
+    "executor": "constant-arrival-rate",
+
+    // rate per timeUnit. 100 iterations/s here; use timeUnit '1m' to express
+    // the same requirement per minute instead.
+    "rate": 100,
+    "timeUnit": "1s",
+    "duration": "10m",
+
+    // VUs are just the pool that services the rate, not the load itself.
+    // Size preAllocatedVUs at roughly rate x expected iteration duration:
+    // 100/s x 0.5s ~= 50. Too few and k6 allocates mid-test, which costs time
+    // and shows up as dropped_iterations.
+    "preAllocatedVUs": 50,
+    // Headroom for when the system slows down. Omit this and it defaults to
+    // preAllocatedVUs, meaning NO dynamic allocation — a slow system then
+    // produces dropped iterations instead of extra VUs.
+    "maxVUs": 200,
+
+    "gracefulStop": "30s"
+  },
+
+  "user_journeys": [
+    {
+      "name": "order_submission",
+      "scriptPath": "testSuites/sample_team/tests/example.js",
+      "weight": 100
+    }
+  ],
+
+  "global_sla": {
+    "request": { "p95": 3000, "errorRate": 1 }
+  }
+
+  // NOTE ON LIFECYCLE: arrival-rate executors are an open model — k6 starts an
+  // iteration on a schedule rather than looping a VU, so there is no stable
+  // per-VU session. The framework disables initPhase/endPhase here and runs
+  // everything in actionPhase. Put login inside the action if you need one.
+}

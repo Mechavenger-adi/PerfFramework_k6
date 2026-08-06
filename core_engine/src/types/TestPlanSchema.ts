@@ -5,14 +5,19 @@
  */
 
 export type ExecutionMode = 'parallel' | 'sequential' | 'hybrid';
+
+/**
+ * The executors k6 registers (`lib/executor/*.go`, `RegisterExecutorConfigType`).
+ * k6 v2.0.0 registers exactly these six — `externally-controlled` was REMOVED and
+ * now fails at load with `unknown executor type`, so it is not offered here.
+ */
 export type ExecutorType =
   | 'ramping-vus'
   | 'constant-vus'
   | 'ramping-arrival-rate'
   | 'constant-arrival-rate'
   | 'shared-iterations'
-  | 'per-vu-iterations'
-  | 'externally-controlled';
+  | 'per-vu-iterations';
 
 export type WorkloadModelType = 'load' | 'stress' | 'soak' | 'spike' | 'iteration';
 export type DataOverflowStrategy = 'terminate' | 'cycle' | 'continue_with_last';
@@ -34,8 +39,19 @@ export interface LoadStage {
 
 export interface GlobalLoadProfile {
   executor: ExecutorType;
-  /** Starting VU count (ramping executors) */
+  /**
+   * Starting VU count for `ramping-vus`. k6's default is **1**, not 0 — omit it
+   * and the scenario begins with one VU already running. Set `startVUs: 0`
+   * explicitly for a clean ramp from zero.
+   */
   startVUs?: number;
+  /**
+   * Starting arrival rate for `ramping-arrival-rate`, in iterations per
+   * `timeUnit`, before the first stage begins ramping. k6 defaults it to 0, so
+   * omitting it means the scenario always ramps up from nothing — set it to hold
+   * a floor, or to start a stage-based rate change from an existing level.
+   */
+  startRate?: number;
   /** Stages for ramping executors */
   stages?: LoadStage[];
   /** Fixed VU count (constant executors) */
@@ -60,7 +76,11 @@ export interface GlobalLoadProfile {
   timeUnit?: string;
   /** Pre-allocated VUs for arrival-rate executors (pool size at start) */
   preAllocatedVUs?: number;
-  /** Maximum VUs the executor can scale to (arrival-rate and externally-controlled) */
+  /**
+   * Hard ceiling on VUs an arrival-rate executor may allocate when
+   * `preAllocatedVUs` cannot sustain the rate. Must be >= `preAllocatedVUs`.
+   * k6 defaults it to `preAllocatedVUs`, i.e. no dynamic allocation at all.
+   */
   maxVUs?: number;
   /**
    * Graceful ramp-down window: time k6 waits for an in-flight iteration to finish

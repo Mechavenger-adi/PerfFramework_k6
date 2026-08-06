@@ -1,5 +1,5 @@
 {
-  "$schema": "../../schemas/test-plan.schema.json",
+  "$schema": "../../config/schemas/test_plan.schema.json",
   "_meta": {
     "title": "Soak Test (Endurance)",
     "description": "Runs a moderate load for an extended period (hours). Ideal for finding memory leaks or DB connection exhaustion."

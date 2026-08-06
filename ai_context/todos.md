@@ -56,6 +56,13 @@
   - `ScenarioBuilder.ts`: Extended `ScenarioPhaseEnvelope` to cover all 7 executor modes; implemented `computePhaseEnvelope()` for arrival-rate (duration/stage-based) and externally-controlled (open-ended).
   - `SchemaValidator.ts`: Added all 7 executor types to schema enum; added `rate`, `timeUnit`, `preAllocatedVUs`, `maxVUs` properties.
   - Created 7 template JSON files in `config/test_plans/templates/` (one per executor type).
+  - **SUPERSEDED (2026-08-06):** it is **six** executors, not seven. k6 v2.0.0 removed
+    `externally-controlled` — it is no longer registered in `lib/executor`, and k6 fails at load with
+    `unknown executor type`. It has been dropped from `ExecutorType`, `EXECUTOR_SPECS`,
+    `EXECUTOR_FIELDS`, the phase envelope and both schemas (`REMOVED_EXECUTORS` in `ExecutorFactory`
+    still explains it if an old plan uses it). `config/test_plans/templates/externally_controlled.json`
+    is stale and would now fail validation; nothing reads that directory — the live template set is
+    `templates/test_plans/*.jsonc`, surfaced by `npm run templates` / `npm run new`.
 - **ScriptConverter Modernization:** Updated `ScriptConverter.ts` to align with current framework patterns.
   - `buildImportBlock()`: Uses `core_engine/src/utils/` import paths; adds session.js imports; deduplicates lifecycle/session imports.
   - `applyPhaseContract()`: Added stale pattern normalization — strips `variableEvents: []`, fixes `dist/` → `core_engine/src/` paths. Emits `transaction()` + `request()` format matching ScriptGenerator output.

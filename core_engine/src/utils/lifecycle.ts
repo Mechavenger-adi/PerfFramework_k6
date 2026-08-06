@@ -468,7 +468,9 @@ function computeEndPlan(phases: PhaseMetadata): EndPlan {
     return { family: 'arrival', endDisabled: true };
   }
 
-  // externally-controlled / unsupported — best-effort (no predictable curve).
+  // 'unsupported' — no predictable curve to derive a deadline from, so this VU
+  // runs action-only and relies on gracefulStop. Reached when the envelope could
+  // not be computed (e.g. a profile missing the fields its executor needs).
   return { family: 'external' };
 }
 
@@ -518,7 +520,7 @@ function isEndDueAfter(): boolean {
  *
  * Meaningful for any family with a time deadline: the ramping family (cull
  * deadline) and the iteration executors (maxDuration). Returns false for the
- * arrival-rate and externally-controlled families, which have neither.
+ * arrival-rate and best-effort families, which have neither.
  */
 export function isEnding(): boolean {
   if (activeEndPlan === null || activeEndPlan.deadlineMs === undefined) return false;

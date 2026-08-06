@@ -1,5 +1,5 @@
 {
-  "$schema": "../../schemas/test-plan.schema.json",
+  "$schema": "../../config/schemas/test_plan.schema.json",
   "_meta": {
     "title": "Spike Test",
     "description": "Rapidly spikes to a very high load and then drops. Good for testing recovery and elasticity."

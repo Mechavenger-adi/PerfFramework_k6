@@ -1,0 +1,38 @@
+{
+  "$schema": "../../config/schemas/test_plan.schema.json",
+  "_meta": {
+    "title": "Iterations: Per VU",
+    "description": "Every VU runs the SAME fixed number of iterations. Use when each virtual user represents one account or session that must complete a set number of passes."
+  },
+  "name": "Per-VU Iterations Run",
+  "environment": "dev",
+  "execution_mode": "parallel",
+
+  "global_load_profile": {
+    "executor": "per-vu-iterations",
+
+    // Each of the 20 VUs runs 25 iterations => 500 total.
+    // Contrast shared-iterations, where 500 is the pool ACROSS all VUs.
+    "vus": 20,
+    "iterations": 25,
+
+    // Same 10m default trap as shared-iterations: k6 stops the scenario at
+    // maxDuration even with iterations outstanding. Budget for the SLOWEST VU
+    // (iterations x iteration duration), not the average.
+    "maxDuration": "20m",
+
+    "gracefulStop": "30s"
+  },
+
+  "user_journeys": [
+    {
+      "name": "account_session",
+      "scriptPath": "testSuites/sample_team/tests/example.js",
+      "weight": 100
+    }
+  ],
+
+  "global_sla": {
+    "request": { "p95": 3000, "errorRate": 1 }
+  }
+}

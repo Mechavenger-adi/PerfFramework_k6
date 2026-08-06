@@ -1,0 +1,66 @@
+{
+  "$schema": "../../config/schemas/test_plan.schema.json",
+  "_meta": {
+    "title": "Execution Mode: Sequential",
+    "description": "Journeys run one after another, never overlapping. Use for staged workflows (seed → transact → verify) where later journeys depend on earlier ones having finished."
+  },
+  "name": "Sequential Workflow",
+  "environment": "dev",
+  "execution_mode": "sequential",
+
+  // Fallback for journeys that declare no loadProfile of their own.
+  "global_load_profile": {
+    "executor": "constant-vus",
+    "vus": 5,
+    "duration": "2m"
+  },
+
+  // HOW THE ORDERING WORKS
+  // The framework gives each journey a k6 startTime offset equal to the SUM of
+  // the durations of everything before it, in array order. The offset is an
+  // upper bound derived from the profile:
+  //   - stages          -> total of every stage duration
+  //   - duration        -> that duration
+  //   - iteration execs -> maxDuration (or k6's 10m default)
+  // A journey that finishes early leaves the gap idle rather than pulling the
+  // next one forward, so keep maxDuration tight on iteration-based steps.
+  "user_journeys": [
+    {
+      // Step 1 — seed data. Bounded by iterations, capped by maxDuration.
+      "name": "step_1_seed_data",
+      "scriptPath": "testSuites/sample_team/tests/example.js",
+      "loadProfile": {
+        "executor": "shared-iterations",
+        "vus": 4,
+        "iterations": 200,
+        // Without this k6 silently cuts the pool off at 10m AND the next
+        // journey's offset would assume the full 10m.
+        "maxDuration": "3m"
+      }
+    },
+    {
+      // Step 2 — the actual load, starting after step 1's window closes.
+      "name": "step_2_transact",
+      "scriptPath": "testSuites/sample_team/tests/example.js",
+      "loadProfile": {
+        "executor": "ramping-vus",
+        "startVUs": 0,
+        "stages": [
+          { "duration": "1m", "target": 30 },
+          { "duration": "3m", "target": 30 },
+          { "duration": "1m", "target": 0 }
+        ],
+        "gracefulRampDown": "30s"
+      }
+    },
+    {
+      // Step 3 — verification pass; inherits global_load_profile.
+      "name": "step_3_verify",
+      "scriptPath": "testSuites/sample_team/tests/example.js"
+    }
+  ],
+
+  "global_sla": {
+    "request": { "p95": 3000, "errorRate": 5 }
+  }
+}
