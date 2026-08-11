@@ -16,7 +16,7 @@ sources:
   - core_engine/src/reporting/RunReportGenerator.ts
 related: [orchestration-map, reporting-contracts, risk-zones, edd]
 supersedes: archive/Distributed-Load-Test-Design-Approach.md (for the manual/Phase-1 scope)
-updated: 2026-07-14
+updated: 2026-08-11
 ---
 
 # EDD: Distributed Load Test (Manual / Shared-Location)
@@ -216,6 +216,12 @@ final is for deciding.
 - **Unit note:** CSV `responsetime` is **seconds (4dp)**; metric tables are **ms**. The reader normalizes
   so percentiles align with avg/min/max.
 - **Thresholds/SLA evaluated once, post-merge** on aggregated numbers (never per-LG).
+- **Per-machine provenance on events:** `MergedReportBuilder` stamps `machine` onto errors, warnings and
+  failure snapshots as it concatenates them. This fills the Errors tab's Machine column (previously stamped
+  only on snapshots, so it rendered empty on every merged run) and — more importantly — scopes the
+  error→snapshot join. Per-VU request ids (`req_auto_N`, and the hard-coded `replay.id` values in converted
+  scripts) repeat identically on every LG, so `machine` is what stops one agent's `req_1` from matching
+  another's. See the identity chain in [reporting-contracts.md](../../ai_context/reporting-contracts.md).
 
 ## End-of-run Collection & Merge
 1. **Auto-collect (existing):** on finish each LG copies its full local run folder to

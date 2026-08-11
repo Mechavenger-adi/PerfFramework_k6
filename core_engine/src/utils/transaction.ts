@@ -21,6 +21,24 @@ function getRuntimeErrorBehavior(): string {
   return 'continue';
 }
 
+/**
+ * The journey this VU is running, injected per-scenario by ScenarioBuilder.
+ * Stamped on every error event so the report's global scenario filter can
+ * narrow the Errors tab — without it those rows carry no journey at all and
+ * silently pass every scenario filter.
+ */
+function getJourneyName(): string | undefined {
+  try {
+    if (typeof __ENV === 'undefined') return undefined;
+    return __ENV.K6_PERF_JOURNEY_NAME || undefined;
+  } catch { return undefined; }
+}
+
+/** The framework request id (har_entry_id) for a response, via request.ts's hook. */
+function getRequestId(res: unknown): string | undefined {
+  try { return (globalThis as any).__k6PerfGetRequestId?.(res); } catch { return undefined; }
+}
+
 const txnStarts: Record<string, number> = {};
 const txnTrends: Record<string, Trend> = {};
 const txnCounters: Record<string, Counter> = {};
@@ -309,6 +327,7 @@ export function transaction(name: string, fn: () => void): void {
           console.log('[k6-perf][error-event] ' + JSON.stringify({
             ts: new Date().toISOString(),
             type: 'transaction_error',
+            journey: getJourneyName(),
             transaction: name,
             message,
             errorBehavior: behavior,
@@ -423,9 +442,13 @@ export function transaction(name: string, fn: () => void): void {
               console.log('[k6-perf][error-event] ' + JSON.stringify({
                 ts: new Date().toISOString(),
                 type: 'http_error',
+                journey: getJourneyName(),
                 transaction: name,
                 message: failMsg,
                 request: reqDesc,
+                requestId: getRequestId(res),
+                method: f.method,
+                url: f.url,
                 status: f.status,
                 vu: typeof exec !== 'undefined' && exec.vu ? exec.vu.idInInstance : undefined,
                 iteration: typeof exec !== 'undefined' && exec.vu ? exec.vu.iterationInScenario : undefined,
@@ -513,11 +536,24 @@ export function k6Check(
     const location = extractScriptLocation(new Error().stack);
     let reqDesc = '';
     let statusInfo = '';
+    let reqMethod: string | undefined;
+    let reqUrl: string | undefined;
+    let resStatus: number | undefined;
     try {
       const r = (val as any)?.request;
-      if (r && r.url) reqDesc = `${r.method || 'REQ'} ${r.url}`;
-      if (val && typeof (val as any).status !== 'undefined') statusInfo = ` (response status ${(val as any).status})`;
+      if (r && r.url) {
+        reqMethod = r.method || 'REQ';
+        reqUrl = String(r.url);
+        reqDesc = `${reqMethod} ${reqUrl}`;
+      }
+      if (val && typeof (val as any).status !== 'undefined') {
+        resStatus = Number((val as any).status);
+        statusInfo = ` (response status ${resStatus})`;
+      }
     } catch { /* val may not be an HTTP response */ }
+    // Stable per-request identity, so the report can join this event to the
+    // snapshot captured for the SAME exchange instead of guessing by transaction.
+    const requestId = getRequestId(val);
     const reqInfo = reqDesc ? ` on ${reqDesc}` : '';
     const vu = (typeof exec !== 'undefined' && exec.vu) ? exec.vu.idInInstance : undefined;
     const iter = (typeof exec !== 'undefined' && exec.vu) ? exec.vu.iterationInScenario : undefined;
@@ -526,18 +562,31 @@ export function k6Check(
       console.log('[k6-perf][error-event] ' + JSON.stringify({
         ts: new Date().toISOString(),
         type: 'check_failed',
+        journey: getJourneyName(),
         transaction: txn || undefined,
         message: failMsg,
         failingChecks: failingKeys,
         request: reqDesc || undefined,
+        requestId,
+        method: reqMethod,
+        url: reqUrl,
+        status: resStatus,
         location: location || undefined,
         vu,
         iteration: iter,
       }));
     } catch { /* never let logging throw */ }
     try {
-      const hook = (globalThis as any).__k6PerfCaptureSnapshotFromLastRequest;
-      if (typeof hook === 'function') hook('check_failed', failMsg);
+      // Snapshot the response THIS check asserted on. The last-request hook is
+      // only a fallback (checks on non-response values): using it unconditionally
+      // captured whatever request ran most recently, which is a different
+      // exchange whenever a check trails a later request() in the same block.
+      const byRes = (globalThis as any).__k6PerfCaptureSnapshotForResponse;
+      if (typeof byRes === 'function') byRes(val, 'check_failed', failMsg);
+      else {
+        const hook = (globalThis as any).__k6PerfCaptureSnapshotFromLastRequest;
+        if (typeof hook === 'function') hook('check_failed', failMsg);
+      }
     } catch { /* defensive: snapshot best-effort */ }
 
     // Always surface the failure with full detail — every errorBehavior, INCLUDING

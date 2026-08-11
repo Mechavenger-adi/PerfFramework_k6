@@ -237,8 +237,17 @@ export class MergedReportBuilder {
     const startTime = timeseries.startTime || (merge.histogram?.startTime ?? new Date().toISOString());
     const endTime = timeseries.endTime || (merge.histogram?.endTime ?? new Date().toISOString());
 
-    const allErrors = input.machines.flatMap((m) => m.errors ?? []);
-    const allWarnings = input.machines.flatMap((m) => m.warnings ?? []);
+    // Errors carry their originating machine too. The report's Errors tab has
+    // always rendered a Machine column, but nothing stamped the field — so it sat
+    // empty on every merged run. It is also load-bearing for the error→snapshot
+    // join: per-VU request ids (req_1, req_auto_3, …) repeat on every LG, so the
+    // machine name is what keeps two agents' identical ids apart.
+    const allErrors = input.machines.flatMap(
+      (m) => (m.errors ?? []).map((e) => ({ machine: m.machineName, ...e })),
+    );
+    const allWarnings = input.machines.flatMap(
+      (m) => (m.warnings ?? []).map((w) => ({ machine: m.machineName, ...w })),
+    );
     // Two DIFFERENT snapshot streams — do not conflate them:
     //  - failure snapshots (request/response at failure) → reportData.snapshots (Snapshots panel)
     //  - host CPU/mem samples → reportData.system.snapshots (System tab)

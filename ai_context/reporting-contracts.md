@@ -124,6 +124,25 @@ k6's per-sample `scenario` tag.
 | Snapshots | snapshots.json |
 | System | system-metrics.json |
 
+### Error ↔ snapshot identity
+
+Every `errors.ndjson` row and every `snapshots.json` entry carries the same
+occurrence identity, and the Errors tab joins them on it:
+
+`machine` + `vu` + `iteration` + `requestId` → `machine` + `vu` + `iteration` + `transaction` → `transaction`
+
+`requestId` is the `har_entry_id` also tagged onto that request's metrics. It is
+**not globally unique** — `nextRequestId()` counts per VU and converted scripts
+hard-code `replay.id` values that repeat for every VU — so it is only ever
+compared within a machine+VU+iteration scope. `machine` is stamped by
+`MergedReportBuilder` on distributed runs and absent (empty) on local ones, which
+compares equal on both sides.
+
+A row that carries its own `vu`/`iteration` but matches no snapshot gets **no**
+View button; only aggregate rows (null `vu`/`iteration`) fall back to the
+transaction-wide snapshot. Status shown in the Errors table always comes from the
+**event**, never from the joined snapshot.
+
 ## CI/CD Integration Pattern
 
 ```yaml

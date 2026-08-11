@@ -44,7 +44,7 @@
           "startTransaction",
           "transaction"
         ],
-        "loc": 567,
+        "loc": 616,
         "path": "core_engine/src/utils/transaction.ts"
       },
       {
@@ -299,7 +299,7 @@
         "exports": [
           "RunReportGenerator"
         ],
-        "loc": 2744,
+        "loc": 2822,
         "path": "core_engine/src/reporting/RunReportGenerator.ts"
       },
       {
@@ -683,7 +683,7 @@
           "startTransaction",
           "transaction"
         ],
-        "loc": 567,
+        "loc": 616,
         "path": "core_engine/src/utils/transaction.ts"
       },
       {

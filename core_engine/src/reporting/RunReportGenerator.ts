@@ -585,15 +585,40 @@ export class RunReportGenerator {
     // transaction metrics (authoritative journey↔transaction pairs) plus errors
     // and snapshots so the dropdowns cover everything the tabs can show.
     function collectFilterOptions() {
-      const scen = new Set(), txn = new Set(), pairs = [];
+      const scen = new Set(), txn = new Set(), pairs = [], pairSeen = new Set();
+      // Every source contributes PAIRS, not just the flat lists. Previously only
+      // the transaction-metric rows built the pairs list, so a transaction that appears
+      // only in errors/snapshots (init/end-phase work, or one that never produced
+      // a metric row) vanished from the dropdown the moment a scenario was picked
+      // — leaving it permanently unfilterable.
+      const addPair = (journey, transaction) => {
+        if (!transaction) return;
+        const s = journey ? String(journey) : '';
+        const t = String(transaction);
+        const k = s + '\\u0000' + t;
+        if (pairSeen.has(k)) return;
+        pairSeen.add(k);
+        pairs.push({ scenario: s, transaction: t });
+      };
       const txnRows = (reportData.transactions && reportData.transactions.transactions) || [];
       txnRows.forEach((r) => {
-        if (r.journey) scen.add(String(r.journey));
+        const j = r.journey || r.scenario;
+        if (j) scen.add(String(j));
         if (r.transaction) txn.add(String(r.transaction));
-        if (r.transaction) pairs.push({ scenario: r.journey ? String(r.journey) : '', transaction: String(r.transaction) });
+        addPair(j, r.transaction);
       });
-      (reportData.errors || []).forEach((e) => { const s = e.scenario || e.journey; if (s) scen.add(String(s)); if (e.transaction) txn.add(String(e.transaction)); });
-      (reportData.snapshots || []).forEach((s) => { const j = s.journey || s.scenario; if (j) scen.add(String(j)); if (s.transaction) txn.add(String(s.transaction)); });
+      (reportData.errors || []).forEach((e) => {
+        const s = e.scenario || e.journey;
+        if (s) scen.add(String(s));
+        if (e.transaction) txn.add(String(e.transaction));
+        addPair(s, e.transaction);
+      });
+      (reportData.snapshots || []).forEach((s) => {
+        const j = s.journey || s.scenario;
+        if (j) scen.add(String(j));
+        if (s.transaction) txn.add(String(s.transaction));
+        addPair(j, s.transaction);
+      });
       return { scenarios: [...scen].sort(), transactions: [...txn].sort(), pairs: pairs };
     }
 
@@ -608,8 +633,11 @@ export class RunReportGenerator {
 
       const fillTxn = (scenario) => {
         const cur = txnSel.value;
+        // Keep transactions with NO known journey in the list: matchesGlobalFilters
+        // lets rows without a scenario through, so hiding their names here would
+        // make visible rows unfilterable.
         const list = scenario
-          ? [...new Set(opts.pairs.filter((p) => p.scenario === scenario).map((p) => p.transaction))].sort()
+          ? [...new Set(opts.pairs.filter((p) => p.scenario === scenario || !p.scenario).map((p) => p.transaction))].sort()
           : opts.transactions;
         txnSel.innerHTML = '<option value="">All transactions</option>'
           + list.map((t) => '<option value="' + escapeHtml(t) + '">' + escapeHtml(t) + '</option>').join('');
@@ -1788,10 +1816,11 @@ export class RunReportGenerator {
         host.innerHTML = '<div class="empty">No transaction activity in the selected window.</div>';
         return;
       }
-      // Show a Scenario (journey) column when at least one row carries a
-      // scenario — keeps single-journey/legacy runs from getting an empty column.
-      const hasScenario = rows.some((r) => r.scenario);
-      const columns = [...(hasScenario ? ['scenario'] : []), 'transaction', 'count', 'pass', 'fail', 'errorPct', ...reportData.config.transactionStats.filter((stat) => !['count', 'pass', 'fail'].includes(stat))];
+      // Show a Scenario (journey) column when at least one row carries a journey.
+      // The rows key it as "journey" (TransactionMetricsBuilder) — testing for a
+      // "scenario" key meant this was always false and the column never rendered.
+      const hasScenario = rows.some((r) => r.journey || r.scenario);
+      const columns = [...(hasScenario ? ['journey'] : []), 'transaction', 'count', 'pass', 'fail', 'errorPct', ...reportData.config.transactionStats.filter((stat) => !['count', 'pass', 'fail'].includes(stat))];
 
       // Pass/fail are always exact (the per-iteration checkrate Rate metric) —
       // the pre-flight ScriptContractGuard blocks the raw check()/group() shapes
@@ -1907,7 +1936,7 @@ export class RunReportGenerator {
     // (\`th.sortable[data-col]\`) and an arrow indicator on the active column.
     // Human-friendly column headers. The key stays the data/sort identifier;
     // only the displayed text changes.
-    const COL_LABELS = { errorPct: 'error%' };
+    const COL_LABELS = { errorPct: 'error%', journey: 'scenario' };
     function renderSortableTable(rows, columns, sortState) {
       const header = columns.map((c) => {
         const isSorted = c === sortState.column;
@@ -1917,7 +1946,7 @@ export class RunReportGenerator {
       }).join('');
       const body = rows.map((row) =>
         '<tr>' + columns.map((c) => {
-          const cls = (c === 'transaction' || c === 'scenario') ? ' class="wrap"' : '';
+          const cls = (c === 'transaction' || c === 'scenario' || c === 'journey') ? ' class="wrap"' : '';
           return '<td' + cls + '>' + escapeHtml(formatCellValue(row[c])) + '</td>';
         }).join('') + '</tr>'
       ).join('');
@@ -1937,12 +1966,54 @@ export class RunReportGenerator {
         panel.innerHTML = '<div class="empty">No structured error events were captured for this run yet.</div>';
         return;
       }
+      // Error row → snapshot index. Joined on the strongest identity available:
+      //   1. machine + VU + iteration + requestId — the SAME exchange, exact.
+      //   2. machine + VU + iteration + transaction — the right occurrence when
+      //      the event predates requestId (legacy artifacts).
+      //   3. transaction alone — last resort, and ONLY for aggregate rows that
+      //      carry no VU/iteration of their own.
+      // Request ids are NOT globally unique: nextRequestId() counts per VU, and
+      // converted scripts hard-code replay ids (req_1, req_2, …) that repeat for
+      // every VU on every machine. So every key is scoped by machine+VU+iteration
+      // first — otherwise a distributed run would cheerfully match LG-A's req_1
+      // against LG-B's. Before this, (3) was the only rule, so every error row in
+      // a transaction opened that transaction's FIRST snapshot — a different
+      // request, VU and status than the row it was launched from.
       const snapshots = reportData.snapshots || [];
-      const snapshotByTxn = {};
+      const snapByReqId = {}, snapByOccurrence = {}, snapshotByTxn = {};
+      const SEP = String.fromCharCode(0);
+      const scopeOf = (r) => String(r.machine || '') + SEP + String(r.vu) + SEP + String(r.iteration);
+      const hasOccurrence = (r) => r.vu != null && r.iteration != null;
       snapshots.forEach(function(snap, idx) {
         const txn = snap.transaction;
+        if (hasOccurrence(snap)) {
+          if (snap.requestId) {
+            const k = scopeOf(snap) + SEP + String(snap.requestId);
+            if (!(k in snapByReqId)) snapByReqId[k] = idx;
+          }
+          if (txn) {
+            const k = scopeOf(snap) + SEP + String(txn);
+            if (!(k in snapByOccurrence)) snapByOccurrence[k] = idx;
+          }
+        }
         if (txn && !(txn in snapshotByTxn)) snapshotByTxn[txn] = idx;
       });
+      function snapshotIndexFor(row) {
+        if (hasOccurrence(row)) {
+          if (row.requestId) {
+            const k = scopeOf(row) + SEP + String(row.requestId);
+            if (k in snapByReqId) return snapByReqId[k];
+          }
+          if (row.transaction) {
+            const k = scopeOf(row) + SEP + String(row.transaction);
+            if (k in snapByOccurrence) return snapByOccurrence[k];
+          }
+          // A row that knows its own VU/iteration but matched nothing gets NO
+          // snapshot — showing another VU's request is worse than showing none.
+          return undefined;
+        }
+        return row.transaction in snapshotByTxn ? snapshotByTxn[row.transaction] : undefined;
+      }
 
       // #11 Error clustering — bucket every event into a semantic category
       // (Auth, Server 5xx, Client 4xx, Validation, Timeout/Network, …) from its
@@ -2013,24 +2084,31 @@ export class RunReportGenerator {
 
       const anyMachine = rows.some(function(r){ return r.machine; });
       const machColH = anyMachine ? '<th>Machine</th>' : '';
-      const header = '<tr><th>Timestamp</th>' + machColH + '<th>Type</th><th>Transaction</th><th>Request</th><th>VU</th><th>Iteration</th><th>Message</th><th></th></tr>';
+      const header = '<tr><th>Timestamp</th>' + machColH + '<th>Type</th><th>Transaction</th><th>Request</th><th>Status</th><th>VU</th><th>Iteration</th><th>Message</th><th></th></tr>';
       const body = rows.length ? rows.map(function(row) {
-        const snapIdx = snapshotByTxn[row.transaction];
+        const snapIdx = snapshotIndexFor(row);
         const hasSnap = typeof snapIdx === 'number';
         const vu = row.vu != null ? row.vu : (hasSnap ? snapshots[snapIdx].vu : '');
         const iteration = row.iteration != null ? row.iteration : (hasSnap ? snapshots[snapIdx].iteration : '');
+        // Status comes from the EVENT, never from the linked snapshot — reading it
+        // off the snapshot is what let a mis-joined row report another request's
+        // code (e.g. 500 for what was actually a 401).
+        const st = row.status != null ? Number(row.status) : null;
+        const stCell = st == null ? '' :
+          '<span style="font-weight:600;color:' + ((st >= 200 && st < 400) ? 'var(--ok)' : 'var(--error)') + '">' + escapeHtml(String(st)) + '</span>';
         return '<tr>' +
           '<td style="white-space:nowrap">' + escapeHtml(String(row.ts || '')) + '</td>' +
           (anyMachine ? '<td>' + escapeHtml(String(row.machine || '')) + '</td>' : '') +
           '<td>' + escapeHtml(String(row.type || '')) + '</td>' +
           '<td>' + escapeHtml(String(row.transaction || '')) + '</td>' +
           '<td class="wrap">' + escapeHtml(String(row.request || row.requestName || '')) + '</td>' +
+          '<td>' + stCell + '</td>' +
           '<td>' + escapeHtml(String(vu ?? '')) + '</td>' +
           '<td>' + escapeHtml(String(iteration ?? '')) + '</td>' +
           '<td class="wrap">' + escapeHtml(String(row.message || '')) + '</td>' +
           '<td>' + (hasSnap ? '<button class="view-btn" onclick="showSnapshotDetail(' + snapIdx + ')">View Request</button>' : '') + '</td>' +
           '</tr>';
-      }).join('') : '<tr><td colspan="' + (anyMachine ? 9 : 8) + '" class="subtle" style="text-align:center;padding:18px">No events match the current filter.</td></tr>';
+      }).join('') : '<tr><td colspan="' + (anyMachine ? 10 : 9) + '" class="subtle" style="text-align:center;padding:18px">No events match the current filter.</td></tr>';
 
       const groupsHtml = '<div class="section-title">All Error Events' + infoTip('Every captured error event; View opens the snapshot.') + '</div>';
       panel.innerHTML = clustersHtml + groupsHtml + toolbar + '<div class="table-scroll"><table><thead>' + header + '</thead><tbody>' + body + '</tbody></table></div>';

@@ -817,7 +817,7 @@
     ],
     "importsNode": false,
     "layer": "distributed",
-    "loc": 282,
+    "loc": 291,
     "path": "core_engine/src/distributed/MergedReportBuilder.ts"
   },
   {
@@ -1543,7 +1543,7 @@
     ],
     "importsNode": false,
     "layer": "reporting",
-    "loc": 2744,
+    "loc": 2822,
     "path": "core_engine/src/reporting/RunReportGenerator.ts"
   },
   {
@@ -2000,6 +2000,7 @@
       "RequestBody",
       "RequestOptions",
       "captureRequestSnapshot",
+      "captureSnapshotForResponse",
       "captureSnapshotFromLastRequest",
       "emitDeferredFailureSnapshot",
       "getRequestIdForResponse",
@@ -2016,7 +2017,7 @@
     ],
     "importsNode": false,
     "layer": "utils",
-    "loc": 593,
+    "loc": 621,
     "path": "core_engine/src/utils/request.ts"
   },
   {
@@ -2058,7 +2059,7 @@
     ],
     "importsNode": false,
     "layer": "utils",
-    "loc": 567,
+    "loc": 616,
     "path": "core_engine/src/utils/transaction.ts"
   }
 ]

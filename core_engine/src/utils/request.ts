@@ -293,13 +293,22 @@ interface LastRequestContext {
 let _lastRequestContext: LastRequestContext | null = null;
 let _capHitWarned = false;
 
+// Same context, but keyed BY RESPONSE. A k6Check knows exactly which response it
+// asserted on, so it can look up that response's own envelope instead of taking
+// whatever request happened to run last — which is a different exchange whenever
+// a check trails a later request(). `_lastRequestContext` stays as the fallback
+// for callers that have no response to hand (transaction() catch blocks).
+const _contextByResponse = new WeakMap<object, LastRequestContext>();
+
 export function recordRequestContextForSnapshot(
   method: string,
   resolvedUrl: string,
   options: RequestOptions | undefined,
   res: any,
 ): void {
-  _lastRequestContext = { method, url: resolvedUrl, options, res };
+  const ctx = { method, url: resolvedUrl, options, res };
+  _lastRequestContext = ctx;
+  if (res && typeof res === 'object') _contextByResponse.set(res, ctx);
 }
 
 /**
@@ -353,6 +362,11 @@ export function captureRequestSnapshot(
     type,
     journey: typeof __ENV !== 'undefined' ? (__ENV.K6_PERF_JOURNEY_NAME || '') : '',
     transaction: getCurrentTransaction(),
+    // Stable per-request identity (the same har_entry_id tagged onto this
+    // request's metrics). The report joins error rows to snapshots on this, so a
+    // transaction with several requests — or several VUs — links each error to
+    // the exchange it actually came from rather than the transaction's first.
+    requestId: getRequestIdForResponse(context.res),
     requestName: context.options?.name || context.url,
     vu: exec.vu.idInInstance,
     iteration: exec.vu.iterationInScenario,
@@ -400,6 +414,18 @@ export function captureSnapshotFromLastRequest(type: string, message?: string): 
   return captureRequestSnapshot(type, { ..._lastRequestContext, message });
 }
 
+/**
+ * Capture a snapshot for a SPECIFIC response — the one a failing k6Check
+ * asserted on. Falls back to the last-request context when `res` isn't a
+ * response this module issued (e.g. a check on a plain value), so behavior is
+ * never worse than the previous last-request-only path.
+ */
+export function captureSnapshotForResponse(res: any, type: string, message?: string): boolean {
+  const ctx = res && typeof res === 'object' ? _contextByResponse.get(res) : undefined;
+  if (!ctx) return captureSnapshotFromLastRequest(type, message);
+  return captureRequestSnapshot(type, { ...ctx, message });
+}
+
 /** Internal: legacy HTTP-status-failure trigger, kept for source compatibility. */
 function emitSnapshotEvent(
   method: string,
@@ -431,6 +457,8 @@ export function emitDeferredFailureSnapshot(
 //   - capture from the last request  → k6Check failures + transaction() catch
 //   - emit deferred failure snapshot  → transaction() finally (checks-first fallback)
 (globalThis as any).__k6PerfCaptureSnapshotFromLastRequest = captureSnapshotFromLastRequest;
+//   capture for a specific response → k6Check failures (the response it asserted on)
+(globalThis as any).__k6PerfCaptureSnapshotForResponse = captureSnapshotForResponse;
 (globalThis as any).__k6PerfEmitDeferredFailureSnapshot = emitDeferredFailureSnapshot;
 //   get request id for a response  → k6Check tags checks with the request id
 (globalThis as any).__k6PerfGetRequestId = getRequestIdForResponse;

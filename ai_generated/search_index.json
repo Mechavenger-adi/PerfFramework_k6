@@ -380,6 +380,7 @@
       "warnings.ndjson Schema (one JSON per line)",
       "timeseries.json Schema",
       "RunReport.html Tabs",
+      "Error ↔ snapshot identity",
       "CI/CD Integration Pattern",
       "Pipeline reads run-summary.json, not console output"
     ],
