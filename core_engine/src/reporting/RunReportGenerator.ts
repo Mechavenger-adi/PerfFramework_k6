@@ -1816,11 +1816,12 @@ export class RunReportGenerator {
         host.innerHTML = '<div class="empty">No transaction activity in the selected window.</div>';
         return;
       }
-      // Show a Scenario (journey) column when at least one row carries a journey.
-      // The rows key it as "journey" (TransactionMetricsBuilder) — testing for a
-      // "scenario" key meant this was always false and the column never rendered.
-      const hasScenario = rows.some((r) => r.journey || r.scenario);
-      const columns = [...(hasScenario ? ['journey'] : []), 'transaction', 'count', 'pass', 'fail', 'errorPct', ...reportData.config.transactionStats.filter((stat) => !['count', 'pass', 'fail'].includes(stat))];
+      // Show a Scenario (journey) column when at least one row carries a
+      // scenario — keeps single-journey/legacy runs from getting an empty column.
+      // (txnRowsForRange surfaces the rows' journey under a scenario field, and
+      // the CSV export reuses these keys as its header row — don't rename them.)
+      const hasScenario = rows.some((r) => r.scenario);
+      const columns = [...(hasScenario ? ['scenario'] : []), 'transaction', 'count', 'pass', 'fail', 'errorPct', ...reportData.config.transactionStats.filter((stat) => !['count', 'pass', 'fail'].includes(stat))];
 
       // Pass/fail are always exact (the per-iteration checkrate Rate metric) —
       // the pre-flight ScriptContractGuard blocks the raw check()/group() shapes
@@ -1936,7 +1937,7 @@ export class RunReportGenerator {
     // (\`th.sortable[data-col]\`) and an arrow indicator on the active column.
     // Human-friendly column headers. The key stays the data/sort identifier;
     // only the displayed text changes.
-    const COL_LABELS = { errorPct: 'error%', journey: 'scenario' };
+    const COL_LABELS = { errorPct: 'error%' };
     function renderSortableTable(rows, columns, sortState) {
       const header = columns.map((c) => {
         const isSorted = c === sortState.column;
@@ -1946,7 +1947,7 @@ export class RunReportGenerator {
       }).join('');
       const body = rows.map((row) =>
         '<tr>' + columns.map((c) => {
-          const cls = (c === 'transaction' || c === 'scenario' || c === 'journey') ? ' class="wrap"' : '';
+          const cls = (c === 'transaction' || c === 'scenario') ? ' class="wrap"' : '';
           return '<td' + cls + '>' + escapeHtml(formatCellValue(row[c])) + '</td>';
         }).join('') + '</tr>'
       ).join('');
