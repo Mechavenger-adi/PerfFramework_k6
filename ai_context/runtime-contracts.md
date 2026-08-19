@@ -81,6 +81,16 @@ Read from `K6_PERF_RUNTIME_METADATA`:
 - `stop_vu` → set `state.terminated = true`, VU sleeps forever
 - `abort_test` → re-throw error, k6 terminates on uncaught exception
 
+**Checks-first (all behaviours).** Inside a transaction, a failing response (status 0 or ≥ 400) is
+**registered, not thrown on**. The `k6Check` that follows may claim the status outcome — a *passing*
+check on an EXPECTED non-2xx (503 while draining, 404 for missing, 409 on duplicate) means no error at
+all. Only a failure **no status check claimed** falls back to raw status, enforced at the next boundary
+where a check can no longer arrive: the **top of the next `request()`** (so nothing further goes on the
+wire) and the **end of the transaction body**. Ownership is detected by `k6Check` when the predicate
+source references `status`; a body-only check does not claim it. Requests **outside** a transaction
+keep the immediate throw — the registry is transaction-scoped. `continue` is unchanged: its backstop in
+`transaction()`'s `finally` already owned this path.
+
 **Phase exception (FR6).** `stop_iteration` is iteration-scoped, but `initPhase` runs once per VU
 *outside* the iteration loop — there is no next init to resume into. So an error escaping `initPhase`
 under `stop_iteration` is **escalated to `stop_vu`**: the VU terminates rather than running

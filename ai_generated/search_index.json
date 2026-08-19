@@ -744,6 +744,7 @@
       "Sequence Diagram",
       "State Diagram",
       "Init-failure semantics (approved 2026-08-19)",
+      "Checks-first under strict error behaviours (approved 2026-08-19)",
       "Design Patterns",
       "Interfaces",
       "Configuration",

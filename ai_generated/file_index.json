@@ -2017,7 +2017,7 @@
     ],
     "importsNode": false,
     "layer": "utils",
-    "loc": 621,
+    "loc": 634,
     "path": "core_engine/src/utils/request.ts"
   },
   {
@@ -2043,6 +2043,7 @@
   {
     "exports": [
       "endTransaction",
+      "enforceUncheckedFailures",
       "getCurrentTransaction",
       "initTransactions",
       "isJsRuntimeError",
@@ -2059,7 +2060,7 @@
     ],
     "importsNode": false,
     "layer": "utils",
-    "loc": 616,
+    "loc": 691,
     "path": "core_engine/src/utils/transaction.ts"
   }
 ]

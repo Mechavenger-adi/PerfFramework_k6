@@ -35,6 +35,7 @@
       {
         "exports": [
           "endTransaction",
+          "enforceUncheckedFailures",
           "getCurrentTransaction",
           "initTransactions",
           "isJsRuntimeError",
@@ -44,7 +45,7 @@
           "startTransaction",
           "transaction"
         ],
-        "loc": 616,
+        "loc": 691,
         "path": "core_engine/src/utils/transaction.ts"
       },
       {
@@ -674,6 +675,7 @@
       {
         "exports": [
           "endTransaction",
+          "enforceUncheckedFailures",
           "getCurrentTransaction",
           "initTransactions",
           "isJsRuntimeError",
@@ -683,7 +685,7 @@
           "startTransaction",
           "transaction"
         ],
-        "loc": 616,
+        "loc": 691,
         "path": "core_engine/src/utils/transaction.ts"
       },
       {

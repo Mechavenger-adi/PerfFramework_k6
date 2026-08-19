@@ -77,6 +77,101 @@ export function recordFailingResponse(
   _uncheckedFailingResponses.set(res, info);
 }
 
+/** Human-readable description of a failing response, shared by every reporting path. */
+function failureMessage(f: { method: string; url: string; status: number }): string {
+  return f.status === 0
+    ? `Transport error on ${f.method} ${f.url} (no response)`
+    : `HTTP ${f.status} on ${f.method} ${f.url}`;
+}
+
+/**
+ * Report one unclaimed failing response: the deferred request-failure snapshot
+ * plus the `http_error` event the report's Errors tab consumes. Shared by the
+ * strict-behaviour enforcement below and the `continue` backstop in
+ * transaction()'s finally, so both surface a failure identically.
+ */
+function reportUncheckedFailure(
+  res: object,
+  f: { method: string; url: string; status: number; options?: unknown },
+  transactionName: string,
+  message: string,
+): void {
+  try {
+    const snap = (globalThis as any).__k6PerfEmitDeferredFailureSnapshot;
+    if (typeof snap === 'function') snap(res, { method: f.method, url: f.url, options: f.options });
+  } catch { /* snapshot best-effort */ }
+  try {
+    console.log('[k6-perf][error-event] ' + JSON.stringify({
+      ts: new Date().toISOString(),
+      type: 'http_error',
+      journey: getJourneyName(),
+      transaction: transactionName,
+      message,
+      request: `${f.method} ${f.url}`,
+      requestId: getRequestId(res),
+      method: f.method,
+      url: f.url,
+      status: f.status,
+      vu: typeof exec !== 'undefined' && exec.vu ? exec.vu.idInInstance : undefined,
+      iteration: typeof exec !== 'undefined' && exec.vu ? exec.vu.iterationInScenario : undefined,
+    }));
+  } catch { /* never let event emission throw */ }
+}
+
+/**
+ * Checks-first enforcement for the STRICT error behaviours (everything except
+ * `continue`).
+ *
+ * request() no longer throws the moment a response comes back failing — it
+ * registers the response instead, so the `k6Check` that follows gets the chance
+ * to claim the status outcome (a passing check on an EXPECTED non-2xx must not
+ * be overruled by raw HTTP status). This runs at the two boundaries where a
+ * check can no longer arrive:
+ *   • the top of the next request() — bail before another request goes on the wire
+ *   • the end of the transaction body — catch-all for the last request
+ * If no status check claimed the failure by then, raw status is the fallback and
+ * the configured behaviour fires here.
+ *
+ * `continue` returns immediately: its backstop in transaction()'s finally already
+ * implements checks-first and must stay the single owner of that path.
+ * See EDD-lifecycle "Checks-first under strict error behaviours".
+ */
+export function enforceUncheckedFailures(): void {
+  if (_uncheckedFailingResponses.size === 0) return;
+  const behavior = getRuntimeErrorBehavior();
+  if (behavior === 'continue') return;
+
+  // Insertion order == wire order, so the FIRST unclaimed failure is the one to
+  // report — it is what actually broke the flow.
+  let first: { res: object; f: { method: string; url: string; status: number; options?: unknown } } | null = null;
+  for (const [res, f] of _uncheckedFailingResponses) {
+    first = { res, f };
+    break;
+  }
+  if (!first) return;
+
+  const name = _activeTransaction;
+  const message = failureMessage(first.f);
+  // Consume the whole registry: we are about to end the transaction/iteration, so
+  // nothing later can claim the rest, and leaving them would double-report via
+  // the finally backstop.
+  _uncheckedFailingResponses.clear();
+  _currentIterationFailed = true;
+
+  reportUncheckedFailure(first.res, first.f, name, message);
+  console.error(
+    `[k6-perf][transaction:${name}] ${message}\n`
+    + `  → no status check claimed this response; applying errorBehavior=${behavior}`,
+  );
+
+  if (behavior === 'abort_test') {
+    exec.test.abort(`[k6-perf] ${message}`);
+    return;
+  }
+  // stop_iteration / stop_vu — throw so transaction()'s catch applies the rest.
+  throw new Error(`[k6-perf] ${message}`);
+}
+
 /**
  * Pull a user-script source location (path:line[:col]) out of an Error.stack
  * string. k6 runs scripts under the Goja JS engine which produces stack
@@ -305,6 +400,10 @@ export function transaction(name: string, fn: () => void): void {
       _currentIterationFailed = false;
       try {
         fn();
+        // Checks-first boundary: the LAST request in this transaction may have
+        // failed with no check after it to claim the status. Enforce here —
+        // inside the try, so the existing catch applies the behaviour uniformly.
+        enforceUncheckedFailures();
       } catch (error) {
         // Any thrown error inside the body counts as a failed iteration —
         // transport errors from request(), correlation failures, user-thrown
@@ -417,43 +516,19 @@ export function transaction(name: string, fn: () => void): void {
         // iteration failed so <name>_checkrate reflects it even under
         // errorBehavior 'continue'. Transaction-level only — per-request
         // visibility already comes from http_req_failed + the failure snapshot.
+        // Reached when NO status check claimed the response — a status check
+        // (pass or fail) removes the entry in k6Check before we get here, so a
+        // failure the user already owns is never double-reported. Under the
+        // strict behaviours `enforceUncheckedFailures` normally consumes the
+        // registry first; anything left here is a transaction whose body threw
+        // for an unrelated reason before the next boundary was reached.
         if (_uncheckedFailingResponses.size > 0) {
           for (const [res, f] of _uncheckedFailingResponses) {
-            const reqDesc = `${f.method} ${f.url}`;
-            const failMsg = `Http error failed request: ${reqDesc} → HTTP ${f.status} ( status check unavailable, fallback status check applied)`;
+            const failMsg = `Http error failed request: ${f.method} ${f.url} → HTTP ${f.status} ( status check unavailable, fallback status check applied)`;
             console.error(
               `[k6-perf][transaction:${name}] ${failMsg}; marking transaction failed`,
             );
-            // Checks-first snapshot fallback: this response had no status check,
-            // so emit the deferred request-failure snapshot now. Skipped by the
-            // per-response dedup if a failing check already captured one.
-            try {
-              const snap = (globalThis as any).__k6PerfEmitDeferredFailureSnapshot;
-              if (typeof snap === 'function') snap(res, { method: f.method, url: f.url, options: f.options });
-            } catch { /* snapshot best-effort */ }
-            // Surface in the report's Errors tab, aligned with check_failed /
-            // transaction_error events. Only reached when the user applied NO
-            // status check to a failing request — a status check (pass or fail)
-            // removes the entry in k6Check before we get here, so we never
-            // double-report a failure the user already owns. Registration is
-            // gated to errorBehavior 'continue' in request(); under stop_*/abort
-            // the request throws and transaction_error already covers it.
-            try {
-              console.log('[k6-perf][error-event] ' + JSON.stringify({
-                ts: new Date().toISOString(),
-                type: 'http_error',
-                journey: getJourneyName(),
-                transaction: name,
-                message: failMsg,
-                request: reqDesc,
-                requestId: getRequestId(res),
-                method: f.method,
-                url: f.url,
-                status: f.status,
-                vu: typeof exec !== 'undefined' && exec.vu ? exec.vu.idInInstance : undefined,
-                iteration: typeof exec !== 'undefined' && exec.vu ? exec.vu.iterationInScenario : undefined,
-              }));
-            } catch { /* never let event emission throw */ }
+            reportUncheckedFailure(res, f, name, failMsg);
           }
           _currentIterationFailed = true;
         }

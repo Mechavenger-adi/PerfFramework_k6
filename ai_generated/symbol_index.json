@@ -5908,7 +5908,7 @@
     "file": "core_engine/src/utils/transaction.ts",
     "jsdoc": "",
     "kind": "const",
-    "line": 158,
+    "line": 253,
     "name": "_activeTransaction"
   },
   "core_engine/src/utils/transaction.ts#_currentIterationFailed": {
@@ -5932,7 +5932,7 @@
     "file": "core_engine/src/utils/transaction.ts",
     "jsdoc": "",
     "kind": "const",
-    "line": 162,
+    "line": 257,
     "name": "_vuTerminated"
   },
   "core_engine/src/utils/transaction.ts#endTransaction": {
@@ -5940,23 +5940,39 @@
     "file": "core_engine/src/utils/transaction.ts",
     "jsdoc": "End a transaction (LoadRunner equivalent). Records elapsed duration since startTransaction; safe to call in finally blocks.",
     "kind": "function",
-    "line": 235,
+    "line": 330,
     "name": "endTransaction"
+  },
+  "core_engine/src/utils/transaction.ts#enforceUncheckedFailures": {
+    "exported": true,
+    "file": "core_engine/src/utils/transaction.ts",
+    "jsdoc": "Checks-first enforcement for the STRICT error behaviours (everything except `continue`). request() no longer throws the moment a response comes back failing — it registers the response instead, so the `k6Check` that follows gets the chance to claim the status outcome (a passing check on an EXPECTED non-2xx must not be overruled by raw HTTP status). This runs at the two boundaries where a check can no longer arrive: • the top of the next request() — bail before another request goes on the wire • the end of the transaction body — catch-all for the last request If no status check claimed the failure by then, raw status is the fallback and the configured behaviour fires here. `continue` returns immediately: its backstop in transaction()'s finally already implements checks-first and must stay the single owner of that path. See EDD-lifecycle \"Checks-first under strict error behaviours\".",
+    "kind": "function",
+    "line": 139,
+    "name": "enforceUncheckedFailures"
   },
   "core_engine/src/utils/transaction.ts#extractScriptLocation": {
     "exported": false,
     "file": "core_engine/src/utils/transaction.ts",
     "jsdoc": "Pull a user-script source location (path:line[:col]) out of an Error.stack string. k6 runs scripts under the Goja JS engine which produces stack frames in several shapes depending on the call form, e.g.: at file:///D:/.../script.js:258:5(15) at action_phase (file:///D:/.../script.js:258:5) at /abs/path/script.js:42:7 script.js:42 To stay robust against future format tweaks we look for any token that looks like `<something>:<digits>[:<digits>]` and pick the first one that doesn't belong to framework internals (`dist/utils/`). Returns the bare `path:line:col` (or `path:line`) substring, or `\"\"` when nothing usable is present.",
     "kind": "function",
-    "line": 94,
+    "line": 189,
     "name": "extractScriptLocation"
+  },
+  "core_engine/src/utils/transaction.ts#failureMessage": {
+    "exported": false,
+    "file": "core_engine/src/utils/transaction.ts",
+    "jsdoc": "Human-readable description of a failing response, shared by every reporting path.",
+    "kind": "function",
+    "line": 81,
+    "name": "failureMessage"
   },
   "core_engine/src/utils/transaction.ts#formatStackSnippet": {
     "exported": false,
     "file": "core_engine/src/utils/transaction.ts",
     "jsdoc": "First N non-empty stack lines, joined — useful when `extractScriptLocation` couldn't find a clean frame but the raw stack still has useful info.",
     "kind": "function",
-    "line": 124,
+    "line": 219,
     "name": "formatStackSnippet"
   },
   "core_engine/src/utils/transaction.ts#getCurrentTransaction": {
@@ -5964,7 +5980,7 @@
     "file": "core_engine/src/utils/transaction.ts",
     "jsdoc": "Returns the name of the currently active transaction for this VU, or '' if none. Used by request() to auto-attach transaction context to replay log entries.",
     "kind": "function",
-    "line": 213,
+    "line": 308,
     "name": "getCurrentTransaction"
   },
   "core_engine/src/utils/transaction.ts#getJourneyName": {
@@ -5996,7 +6012,7 @@
     "file": "core_engine/src/utils/transaction.ts",
     "jsdoc": "Initializes Trends and Counters for the specified transactions. MUST be called in the script's init context (global scope), not inside VU functions. K6_PERF_TRANSACTION_NAMES. Keep calling this for legacy scripts and standalone execution.",
     "kind": "function",
-    "line": 191,
+    "line": 286,
     "name": "initTransactions"
   },
   "core_engine/src/utils/transaction.ts#isJsRuntimeError": {
@@ -6004,7 +6020,7 @@
     "file": "core_engine/src/utils/transaction.ts",
     "jsdoc": "True when `error` is a JS-engine error type that signals a programming bug in the script — an undefined identifier, calling a non-function, a bad property access, etc. (ReferenceError / TypeError / RangeError / SyntaxError / URIError / EvalError). Failed checks and HTTP errors are raised by the framework as plain `Error` and are NOT matched here, so they still follow the configured errorBehavior; a runtime bug always aborts the test instead.",
     "kind": "function",
-    "line": 142,
+    "line": 237,
     "name": "isJsRuntimeError"
   },
   "core_engine/src/utils/transaction.ts#isVuTerminated": {
@@ -6012,7 +6028,7 @@
     "file": "core_engine/src/utils/transaction.ts",
     "jsdoc": "Returns true if this VU was stopped via stop_vu errorBehavior.",
     "kind": "function",
-    "line": 165,
+    "line": 260,
     "name": "isVuTerminated"
   },
   "core_engine/src/utils/transaction.ts#k6Check": {
@@ -6020,7 +6036,7 @@
     "file": "core_engine/src/utils/transaction.ts",
     "jsdoc": "Framework-aware check() that wraps k6's native check() so metrics are always recorded, then applies errorBehavior when one or more checks fail. Drop-in replacement for k6's check() — same signature, same metric output.",
     "kind": "function",
-    "line": 481,
+    "line": 556,
     "name": "k6Check"
   },
   "core_engine/src/utils/transaction.ts#recordFailingResponse": {
@@ -6031,12 +6047,20 @@
     "line": 72,
     "name": "recordFailingResponse"
   },
+  "core_engine/src/utils/transaction.ts#reportUncheckedFailure": {
+    "exported": false,
+    "file": "core_engine/src/utils/transaction.ts",
+    "jsdoc": "Report one unclaimed failing response: the deferred request-failure snapshot plus the `http_error` event the report's Errors tab consumes. Shared by the strict-behaviour enforcement below and the `continue` backstop in transaction()'s finally, so both surface a failure identically.",
+    "kind": "function",
+    "line": 93,
+    "name": "reportUncheckedFailure"
+  },
   "core_engine/src/utils/transaction.ts#startTransaction": {
     "exported": true,
     "file": "core_engine/src/utils/transaction.ts",
     "jsdoc": "Start a transaction (LoadRunner equivalent).",
     "kind": "function",
-    "line": 221,
+    "line": 316,
     "name": "startTransaction"
   },
   "core_engine/src/utils/transaction.ts#transaction": {
@@ -6044,7 +6068,7 @@
     "file": "core_engine/src/utils/transaction.ts",
     "jsdoc": "Execute a named transaction with group wrapping, metric recording, and lifecycle gating. Replaces the manual pattern: group('name', () => { startTransaction('name'); ...; endTransaction('name'); }); Behavior: - Checks lifecycle gate: if the VU is ramping down for the final time, skips the transaction. - Wraps the body in k6 group() for hierarchical result grouping. - Guarantees endTransaction() runs even if fn() throws (finally block). - Applies the configured errorBehavior (continue | stop_iteration | stop_vu | abort_test). Nesting: nested transaction() calls are rejected with a descriptive error.",
     "kind": "function",
-    "line": 268,
+    "line": 363,
     "name": "transaction"
   },
   "core_engine/src/utils/transaction.ts#txnCounters": {

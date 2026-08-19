@@ -176,6 +176,45 @@ Terminated VUs park on `sleep(86400)` via the existing guard and do **not** run 
 outcome `stop_vu` has always had, on the reasoning that a VU that never logged in has nothing to log
 out. Arrival-rate executors are unaffected because they never run `initPhase` at all.
 
+## Checks-first under strict error behaviours (approved 2026-08-19)
+
+**Problem.** The framework's checks-first contract says a `k6Check` that asserts on status **owns**
+that response's outcome; only failures no check claimed fall back to raw HTTP status. That held under
+`continue` only. Under `stop_iteration` / `stop_vu` / `abort_test`, `request()` called
+`applyErrorBehaviorForStatus` and **threw before the user's check ever ran**, so the ownership
+heuristic in `k6Check` was unreachable and raw status always won. An expected non-2xx therefore could
+not be expressed under strict behaviour:
+
+```js
+k6Check(res, { 'returns 503 while draining': (r) => r.status === 503 });
+```
+
+Under `continue` this passes. Under `stop_iteration` the 503 threw inside `request()`, the check never
+ran, and a correct, asserted outcome was recorded as a transaction failure.
+
+**Decision (option 2 — defer to the next framework call).** Inside a transaction, a failing response
+(status 0 or ≥ 400) is **registered, not thrown on**, for *every* behaviour. The pending failure is
+then enforced at the next framework boundary:
+
+1. **`k6Check` asserting on status claims it** — entry deleted. Check passes → no error at all. Check
+   fails → `k6Check` applies the behaviour itself, as it always has.
+2. **Top of the next `request()`** — anything still unclaimed fires now, so the VU never puts another
+   request on the wire after an unhandled failure.
+3. **End of the transaction body** (after `fn()` returns, inside the existing `try`) — catch-all for
+   the last request in a transaction.
+
+This keeps `stop_iteration`'s fail-fast promise in substance (no further request is issued) while
+restoring checks-first in practice, because the real script shape is `request → check → request →
+check`. If there is no check between two requests, raw status is the fallback — exactly as asked.
+
+**Scope.** `continue` is untouched: its deferred backstop in `transaction()`'s `finally` already
+implemented checks-first correctly. Requests **outside** a transaction keep the old immediate throw —
+there is no registry lifetime or transaction end to defer to, and the registry is transaction-scoped.
+
+**Consequence to accept.** Between the failing request and the next boundary, the script keeps
+executing (typically just the check). Code sitting between a failed request and the next `request()`
+now runs where it previously did not.
+
 ## Design Patterns
 Proxy (auto-tracking `ctx` writes, [:78]); Strategy-by-mode (`computeEndPlan` family switch);
 Published-hook to break a module cycle (`globalThis.__k6PerfTxnGate`, [:308-313]).

@@ -3,7 +3,7 @@ import http from 'k6/http';
 // @ts-ignore - K6 runtime module
 import exec from 'k6/execution';
 import { resolvePath, registerBaseUrl } from './session.js';
-import { getCurrentTransaction, recordFailingResponse } from './transaction.js';
+import { getCurrentTransaction, recordFailingResponse, enforceUncheckedFailures } from './transaction.js';
 import { logExchange } from './replayLogger.js';
 import { mergeRequestHeaders } from './autoHeaders.js';
 
@@ -476,6 +476,12 @@ export function request(
   pathOrUrl: string,
   options?: RequestOptions,
 ): any {
+  // Checks-first boundary: if an earlier request in this transaction failed and
+  // no status check claimed it, that failure fires NOW — before another request
+  // goes on the wire. Keeps stop_iteration's fail-fast promise (nothing further
+  // is sent) while still having let the check that follows a request run.
+  enforceUncheckedFailures();
+
   const resolvedUrl = resolvePath(pathOrUrl, options?.service);
 
   if (resolvedUrl) {
@@ -575,23 +581,30 @@ export function request(
   // a response slipped past error behavior entirely.
   if (res && (res.status === 0 || res.status >= 400)) {
     const inTransaction = getCurrentTransaction() !== '';
-    if (inTransaction && getRuntimeErrorBehavior() === 'continue') {
-      // Checks-first snapshot: DON'T emit the request-failure snapshot now.
-      // Register the failing response (with its full request context) for
-      // transaction()'s finally. If a k6Check later runs against it, the check
-      // owns the outcome — a failing check emits its own `check_failed` snapshot
-      // and clears this entry; a passing check (expected non-2xx) clears it with
-      // no snapshot. Only if NO status check claims it does finally emit the
-      // deferred `http_error` fallback. This also registers the txn-fail
-      // backstop. Under stop_*/abort we skip registration: the request throws
-      // below and transaction()'s catch captures a `transaction_error` snapshot.
+    if (inTransaction) {
+      // Checks-first, for EVERY error behavior. DON'T emit the request-failure
+      // snapshot and DON'T apply the error behavior now — register the failing
+      // response (with its full request context) and let the `k6Check` that
+      // follows claim the status outcome. A failing check emits its own
+      // `check_failed` snapshot and clears this entry; a passing check (an
+      // EXPECTED non-2xx) clears it with no error at all.
+      //
+      // Only a failure NO status check claims falls back to raw status, applied
+      // at the next boundary where a check can no longer arrive:
+      //   • the top of the next request() — see enforceUncheckedFailures() below
+      //   • the end of the transaction body / finally, in transaction.ts
+      // Previously the strict behaviors threw right here, before the user's
+      // check could run, which made the ownership heuristic unreachable and an
+      // expected non-2xx impossible to assert. See EDD-lifecycle "Checks-first
+      // under strict error behaviours".
       recordFailingResponse(res, { method, url: resolvedUrl, status: res.status, options });
     } else {
-      // No transaction to defer to (init/end phase) — emit the request-failure
-      // snapshot immediately, as there is no finally to flush it.
+      // No transaction to defer to (a bare request in init/end phase) — there is
+      // no registry lifetime or transaction end to enforce at, so keep the
+      // immediate snapshot + error behavior.
       emitSnapshotEvent(method, resolvedUrl, options, res);
+      applyErrorBehaviorForStatus(method, resolvedUrl, res.status, res.error);
     }
-    applyErrorBehaviorForStatus(method, resolvedUrl, res.status, res.error);
   }
 
   if (__ENV.K6_PERF_DEBUG) {
