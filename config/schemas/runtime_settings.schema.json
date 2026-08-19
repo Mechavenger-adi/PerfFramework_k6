@@ -125,7 +125,7 @@
     "errorBehavior": {
       "type": "string",
       "enum": ["continue", "stop_iteration", "stop_vu", "abort_test"],
-      "description": "What happens when an error occurs during script execution.\n• continue — Log the error and keep running (best for load tests where some errors are expected).\n• stop_iteration — Skip remaining actions in this iteration, start the next one (good for data-dependent flows).\n• stop_vu — Terminate this virtual user permanently (strict mode).\n• abort_test — Halt the entire test immediately (use for critical-path validation).",
+      "description": "What happens when an error occurs during script execution.\n• continue — Log the error and keep running (best for load tests where some errors are expected).\n• stop_iteration — Skip remaining actions in this iteration, start the next one (good for data-dependent flows). In initPhase this is escalated to stop_vu: init runs once per VU, outside the iteration loop, so there is no next init to resume into and the VU would otherwise run actionPhase forever without a completed login.\n• stop_vu — Terminate this virtual user permanently (strict mode).\n• abort_test — Halt the entire test immediately (use for critical-path validation).",
       "default": "continue"
     },
     "reporting": {

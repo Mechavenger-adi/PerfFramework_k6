@@ -4876,7 +4876,7 @@
     "file": "core_engine/src/utils/lifecycle.ts",
     "jsdoc": "",
     "kind": "interface",
-    "line": 345,
+    "line": 367,
     "name": "CurvePoint"
   },
   "core_engine/src/utils/lifecycle.ts#EndFamily": {
@@ -4884,7 +4884,7 @@
     "file": "core_engine/src/utils/lifecycle.ts",
     "jsdoc": "",
     "kind": "type",
-    "line": 322,
+    "line": 344,
     "name": "EndFamily"
   },
   "core_engine/src/utils/lifecycle.ts#EndPlan": {
@@ -4892,7 +4892,7 @@
     "file": "core_engine/src/utils/lifecycle.ts",
     "jsdoc": "Absolute wall-clock ms at/after which this VU logs out (ramping, and the maxDuration bound of the count family). May coexist with `lastIteration` — whichever fires first ends the VU.",
     "kind": "interface",
-    "line": 324,
+    "line": 346,
     "name": "EndPlan"
   },
   "core_engine/src/utils/lifecycle.ts#JourneyContext": {
@@ -4924,7 +4924,7 @@
     "file": "core_engine/src/utils/lifecycle.ts",
     "jsdoc": "",
     "kind": "const",
-    "line": 482,
+    "line": 504,
     "name": "LIFECYCLE_END_SAFETY_MS"
   },
   "core_engine/src/utils/lifecycle.ts#PhaseFns": {
@@ -4964,7 +4964,7 @@
     "file": "core_engine/src/utils/lifecycle.ts",
     "jsdoc": "",
     "kind": "interface",
-    "line": 284,
+    "line": 306,
     "name": "TransactionGate"
   },
   "core_engine/src/utils/lifecycle.ts#__ENV": {
@@ -4980,7 +4980,7 @@
     "file": "core_engine/src/utils/lifecycle.ts",
     "jsdoc": "",
     "kind": "const",
-    "line": 202,
+    "line": 224,
     "name": "_currentPhase"
   },
   "core_engine/src/utils/lifecycle.ts#activeEndPlan": {
@@ -4988,7 +4988,7 @@
     "file": "core_engine/src/utils/lifecycle.ts",
     "jsdoc": "",
     "kind": "const",
-    "line": 342,
+    "line": 364,
     "name": "activeEndPlan"
   },
   "core_engine/src/utils/lifecycle.ts#applyPacing": {
@@ -5004,7 +5004,7 @@
     "file": "core_engine/src/utils/lifecycle.ts",
     "jsdoc": "",
     "kind": "const",
-    "line": 343,
+    "line": 365,
     "name": "arrivalNoticePrinted"
   },
   "core_engine/src/utils/lifecycle.ts#buildVuCurve": {
@@ -5012,7 +5012,7 @@
     "file": "core_engine/src/utils/lifecycle.ts",
     "jsdoc": "Build the piecewise-linear VU curve: (0, startVUs) followed by the timeline.",
     "kind": "function",
-    "line": 348,
+    "line": 370,
     "name": "buildVuCurve"
   },
   "core_engine/src/utils/lifecycle.ts#computeEndPlan": {
@@ -5020,7 +5020,7 @@
     "file": "core_engine/src/utils/lifecycle.ts",
     "jsdoc": "Compute the per-VU EndPlan once, from the injected phase envelope.",
     "kind": "function",
-    "line": 416,
+    "line": 438,
     "name": "computeEndPlan"
   },
   "core_engine/src/utils/lifecycle.ts#createContext": {
@@ -5036,7 +5036,7 @@
     "file": "core_engine/src/utils/lifecycle.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 227,
+    "line": 249,
     "name": "createJourneyLifecycleStore"
   },
   "core_engine/src/utils/lifecycle.ts#createState": {
@@ -5084,7 +5084,7 @@
     "file": "core_engine/src/utils/lifecycle.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 290,
+    "line": 312,
     "name": "getTransactionGate"
   },
   "core_engine/src/utils/lifecycle.ts#handlePhaseError": {
@@ -5100,7 +5100,7 @@
     "file": "core_engine/src/utils/lifecycle.ts",
     "jsdoc": "Linearly interpolate the planned VU count at a given time offset on the curve.",
     "kind": "function",
-    "line": 357,
+    "line": 379,
     "name": "interpolateTarget"
   },
   "core_engine/src/utils/lifecycle.ts#isEndDueAfter": {
@@ -5108,7 +5108,7 @@
     "file": "core_engine/src/utils/lifecycle.ts",
     "jsdoc": "Should this VU end AFTER the action it just ran? The two bounds are OR'd, not prioritised: an iteration executor carries both a `lastIteration` and a maxDuration `deadlineMs`, and k6 stops the scenario at whichever it hits first.",
     "kind": "function",
-    "line": 500,
+    "line": 522,
     "name": "isEndDueAfter"
   },
   "core_engine/src/utils/lifecycle.ts#isEndDueBefore": {
@@ -5116,7 +5116,7 @@
     "file": "core_engine/src/utils/lifecycle.ts",
     "jsdoc": "Should this VU end BEFORE running another action?",
     "kind": "function",
-    "line": 485,
+    "line": 507,
     "name": "isEndDueBefore"
   },
   "core_engine/src/utils/lifecycle.ts#isEnding": {
@@ -5124,7 +5124,7 @@
     "file": "core_engine/src/utils/lifecycle.ts",
     "jsdoc": "Script-facing: true once this VU has reached its logout deadline. Use it as the guard of a long action loop so the loop bails out near the deadline instead of overrunning it: while (!isEnding()) { transaction('search', () => {...}); thinktime(); } Meaningful for any family with a time deadline: the ramping family (cull deadline) and the iteration executors (maxDuration). Returns false for the arrival-rate and best-effort families, which have neither.",
     "kind": "function",
-    "line": 525,
+    "line": 547,
     "name": "isEnding"
   },
   "core_engine/src/utils/lifecycle.ts#parseJsonEnv": {
@@ -5140,7 +5140,7 @@
     "file": "core_engine/src/utils/lifecycle.ts",
     "jsdoc": "Per-VU lifecycle shell. Runs initPhase once, then actionPhase per iteration, and proactively runs endPhase a margin BEFORE k6 culls the VU (deadline ranked by onboarding time so it matches k6's handle cull order). Covers every executor family via computeEndPlan: ramping (time deadline), count (per-vu/shared iterations), arrival (action-only), external (best-effort).",
     "kind": "function",
-    "line": 539,
+    "line": 561,
     "name": "runJourneyLifecycle"
   },
   "core_engine/src/utils/lifecycle.ts#runSafely": {
@@ -5148,7 +5148,7 @@
     "file": "core_engine/src/utils/lifecycle.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 204,
+    "line": 226,
     "name": "runSafely"
   },
   "core_engine/src/utils/lifecycle.ts#terminalDeadlineMs": {
@@ -5156,7 +5156,7 @@
     "file": "core_engine/src/utils/lifecycle.ts",
     "jsdoc": "Terminal-crossing deadline for a VU whose handle \"rank\" is `rank` (its VU-count level — see computeEndPlan, where rank is derived from the curve value at the VU's onboarding time, which mirrors k6's handle index). Returns sup{ t : target(t) >= rank } — the LAST time the curve is at or above that level. k6 culls the matching handle just after the curve drops below it, so this is the moment the VU is about to be removed; the lifecycle fires endPhase a safety margin BEFORE it (LIFECYCLE_END_SAFETY_MS) while the VU is still scheduled. Because we have the whole curve up front, this is correct for every ramping shape: load, soak, stress, step-down, spike, and multi-spike (a VU only ends at the dip after which it is never exceeded again — no premature logout of VUs k6 will reuse). Survivors that never cross (curve ends above the rank) get the total duration → they log out at scenario end under gracefulStop.",
     "kind": "function",
-    "line": 388,
+    "line": 410,
     "name": "terminalDeadlineMs"
   },
   "core_engine/src/utils/lifecycle.ts#thinktime": {
@@ -5164,7 +5164,7 @@
     "file": "core_engine/src/utils/lifecycle.ts",
     "jsdoc": "",
     "kind": "function",
-    "line": 234,
+    "line": 256,
     "name": "thinktime"
   },
   "core_engine/src/utils/logger.ts#Logger": {

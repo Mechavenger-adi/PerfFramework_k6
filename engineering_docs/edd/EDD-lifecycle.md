@@ -8,7 +8,7 @@ sources:
   - core_engine/src/scenario/ScenarioBuilder.ts
   - core_engine/src/scenario/WorkloadModels.ts
 related: [runtime-contracts, execution-flow, risk-zones, fragile-areas, edd]
-updated: 2026-08-06
+updated: 2026-08-19
 ---
 
 # EDD: VU Lifecycle & Phase Envelope
@@ -46,7 +46,8 @@ from a phase envelope the runner injects as `K6_PERF_PHASES`, and runs `endPhase
 | FR2 | `endPhase` runs before cull, once | [lifecycle.ts:557](../../core_engine/src/utils/lifecycle.ts#L557), [:578](../../core_engine/src/utils/lifecycle.ts#L578) |
 | FR3 | Every executor family handled | `computeEndPlan` [lifecycle.ts:410-458](../../core_engine/src/utils/lifecycle.ts#L410) |
 | FR4 | Action transactions skipped once ending | transaction gate [lifecycle.ts:288](../../core_engine/src/utils/lifecycle.ts#L288) |
-| FR5 | Uniform `errorBehavior` across phases | [lifecycle.ts:158](../../core_engine/src/utils/lifecycle.ts#L158), [transaction.ts:360-394](../../core_engine/src/utils/transaction.ts#L360) |
+| FR5 | Uniform `errorBehavior` across phases, except FR6 | [lifecycle.ts:158](../../core_engine/src/utils/lifecycle.ts#L158), [transaction.ts:360-394](../../core_engine/src/utils/transaction.ts#L360) |
+| FR6 | `stop_iteration` in `initPhase` escalates to `stop_vu` | [lifecycle.ts:160-215](../../core_engine/src/utils/lifecycle.ts#L160) — see "Init-failure semantics" |
 
 ## Non-Functional Requirements
 - **RZ1 (k6/Node boundary):** this code compiles to `dist/utils/` and runs in k6's goja engine —
@@ -91,7 +92,7 @@ flowchart LR
 | **Deadline math (F5)** | Rank = interpolated curve value at the VU's **onboarding offset** (`Date.now()-scenario.startTime`), NOT `idInInstance` (shuffled). `terminalDeadlineMs` = `sup{t : target(t) ≥ rank}` — last time the curve is at/above the rank; k6 culls just after. | rank [:428-429](../../core_engine/src/utils/lifecycle.ts#L428), sup [:382-407](../../core_engine/src/utils/lifecycle.ts#L382) |
 | **Validation logic** | `parseJsonEnv` swallows bad JSON → fallbacks (`{mode:'unsupported'}` / `{errorBehavior:'continue'}`). Missing counter/trend → `console.error` but no throw. | [:112-125](../../core_engine/src/utils/lifecycle.ts#L112), [transaction.ts:206-231](../../core_engine/src/utils/transaction.ts#L206) |
 | **Fallback logic** | `sup<0` (curve never reaches rank) → return total duration → VU never logs out early, relies on scenario end + `gracefulStop` [:401-406]. `external` family → best-effort action-only. | [:401](../../core_engine/src/utils/lifecycle.ts#L401), [:456](../../core_engine/src/utils/lifecycle.ts#L456) |
-| **Error paths** | Phase body throw → `handlePhaseError`: `isJsRuntimeError` (ReferenceError/TypeError/…) → **always `exec.test.abort`** regardless of errorBehavior; else `stop_vu`→`terminated=true`, `abort_test`→abort, `stop_iteration`/`continue`→return behavior. Inside `transaction()` the same four behaviors branch at [transaction.ts:360-394]. | [lifecycle.ts:158-194](../../core_engine/src/utils/lifecycle.ts#L158), [transaction.ts:342-394](../../core_engine/src/utils/transaction.ts#L342) |
+| **Error paths** | Phase body throw → `handlePhaseError`: `isJsRuntimeError` (ReferenceError/TypeError/…) → **always `exec.test.abort`** regardless of errorBehavior; else the behavior is resolved to an `effective` one — **in `init` only, `stop_iteration` escalates to `stop_vu` (FR6)** — then `stop_vu`→`terminated=true`, `abort_test`→abort, `stop_iteration`/`continue`→return. `handlePhaseError` returns the **effective** behavior, so the caller's `!== 'continue'` early-return is unchanged. Inside `transaction()` the same four behaviors branch at [transaction.ts:360-394] (phase-agnostic — it re-throws for `stop_iteration` and the lifecycle applies FR6). | [lifecycle.ts:158-215](../../core_engine/src/utils/lifecycle.ts#L158), [transaction.ts:342-394](../../core_engine/src/utils/transaction.ts#L342) |
 | **State changes** | Module-scope per-VU: `activeEndPlan` [:336], `_currentPhase` [:200], `arrivalNoticePrinted` [:337]; store `state.{initialized,ended,terminated}` [:104]; `transaction.ts` `_vuTerminated` [:144], `_activeTransaction` [:140], `_currentIterationFailed` [:36]. k6 gives fresh module scope per VU, so module-level vars ARE per-VU state [:334-336]. | as cited |
 | **Object lifecycle** | Metrics (`Trend`/`Counter`/`Rate`) created in **init context** via `autoInitTransactionsFromEnv` IIFE reading `K6_PERF_TRANSACTION_NAMES`; never at VU runtime. `framework_iterations` Counter at module load. | [transaction.ts:154-164](../../core_engine/src/utils/transaction.ts#L154), [lifecycle.ts:69](../../core_engine/src/utils/lifecycle.ts#L69) |
 | **Configuration influence** | Test-plan load profile (`executor`, `stages`, `duration`, `vus`, `iterations`, `rate`, `preAllocatedVUs`, `maxVUs`) → envelope shape. `runtime.errorBehavior`, `runtime.pacing.{enabled,mode,fixed,min,max}`, `runtime.thinkTime.{ignoreThinkTime,globalOverride,mode,fixed,min,max}`. | envelope [ScenarioBuilder.ts:323-424], pacing [lifecycle.ts:134-150], think [:243-274] |
@@ -131,11 +132,49 @@ stateDiagram-v2
   Uninitialized --> Active: initPhase ok
   Active --> Active: actionPhase per iteration
   Active --> Ended: isEndDue runs endPhase
+  Uninitialized --> Terminated: init error (stop_vu, or stop_iteration escalated — FR6)
   Active --> Terminated: stop_vu or JS runtime error
   Ended --> Parked: sleep 86400
   Terminated --> Parked
   Parked --> [*]: scenario end
 ```
+
+## Init-failure semantics (approved 2026-08-19)
+
+**Decision:** an error escaping `initPhase` under `errorBehavior: stop_iteration` **terminates the
+VU** (`state.terminated = true`), exactly as `stop_vu` does. `continue`, `stop_vu` and `abort_test`
+are unchanged, and `stop_iteration` in `actionPhase`/`endPhase` is unchanged.
+
+**Why.** `stop_iteration` is an *iteration-scoped* policy: end this iteration, carry on with the
+next. `initPhase` runs **once per VU, outside the iteration loop**, so there is no "next init" for
+the policy to resume into. The previous code latched `state.initialized = true` before inspecting
+the outcome, which conflated *init was attempted* with *init succeeded*. A VU whose login threw
+half-way therefore skipped the rest of `initPhase` and then ran `actionPhase` on **every subsequent
+iteration** against a session that was never established — emitting a permanent stream of 401/403s
+that describe the framework, not the system under test.
+
+**LoadRunner parity.** This framework mirrors LR's `vuser_init` → `Action` (iterated) → `vuser_end`
+model, where iterations likewise apply only to `Action`. LR exposes a single *Continue on error*
+runtime setting (`lr_continue_on_error(0|1)`); with it **off**, an error escaping `vuser_init` puts
+the Vuser in **Error** state and it never reaches `Action`. LR has no `stop_iteration` analogue for
+`vuser_init` precisely because the phase sits outside the loop. Mapping:
+
+| LoadRunner | Framework |
+|---|---|
+| Continue on error **ON** | `continue` |
+| Continue on error **OFF** | `stop_vu` |
+| — (no analogue) | `stop_iteration` → escalated to `stop_vu` **in init only** |
+
+**Rejected alternative.** *Do not latch `initialized` on failure, so init retries next iteration.*
+Rejected: it is not LR behaviour (a Vuser initializes once), and it would aim repeated logins at an
+endpoint that is already failing — every VU retrying turns a login outage into a login storm. A VU
+whose init failed is not a VU worth salvaging mid-run; stopping it is both the honest signal and the
+safe one.
+
+**Blast radius.** Escalation is gated on `phaseName === 'init'` **and** `behavior === 'stop_iteration'`.
+Terminated VUs park on `sleep(86400)` via the existing guard and do **not** run `endPhase` — the same
+outcome `stop_vu` has always had, on the reasoning that a VU that never logged in has nothing to log
+out. Arrival-rate executors are unaffected because they never run `initPhase` at all.
 
 ## Design Patterns
 Proxy (auto-tracking `ctx` writes, [:78]); Strategy-by-mode (`computeEndPlan` family switch);

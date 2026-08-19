@@ -81,6 +81,14 @@ Read from `K6_PERF_RUNTIME_METADATA`:
 - `stop_vu` → set `state.terminated = true`, VU sleeps forever
 - `abort_test` → re-throw error, k6 terminates on uncaught exception
 
+**Phase exception (FR6).** `stop_iteration` is iteration-scoped, but `initPhase` runs once per VU
+*outside* the iteration loop — there is no next init to resume into. So an error escaping `initPhase`
+under `stop_iteration` is **escalated to `stop_vu`**: the VU terminates rather than running
+`actionPhase` forever on a session init never finished building. `actionPhase` and `endPhase` are
+unaffected. Mirrors LoadRunner, where an error escaping `vuser_init` with continue-on-error off puts
+the Vuser in Error state and it never reaches Action. See
+[EDD-lifecycle.md](../engineering_docs/edd/EDD-lifecycle.md) "Init-failure semantics".
+
 ## Replay Log Emission Contract
 
 `logExchange(requestDef, response)`:

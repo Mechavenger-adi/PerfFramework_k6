@@ -743,6 +743,7 @@
       "Runtime Flow + Implementation Reverse-Engineering (§4A)",
       "Sequence Diagram",
       "State Diagram",
+      "Init-failure semantics (approved 2026-08-19)",
       "Design Patterns",
       "Interfaces",
       "Configuration",

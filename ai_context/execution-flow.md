@@ -123,6 +123,8 @@ Default function called per VU iteration:
      e. Error behavior enforcement (handlePhaseError):
         - continue → log, proceed
         - stop_iteration → skip remaining phases
+            · in initPhase ONLY, escalated to stop_vu (FR6): init runs once per VU,
+              outside the iteration loop, so there is no next init to resume into
         - stop_vu → state.terminated = true, VU sleeps
         - abort_test → re-throw, k6 terminates
 ```

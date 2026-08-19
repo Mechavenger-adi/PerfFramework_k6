@@ -184,15 +184,37 @@ function handlePhaseError(
 
   console.error(`[k6-perf][${phaseName}] ${message}`);
 
-  if (behavior === 'stop_vu') {
+  // FR6 — `stop_iteration` is an ACTION-phase policy: end this iteration, resume
+  // with the next. initPhase runs ONCE per VU, OUTSIDE the iteration loop, so
+  // there is no "next init" to resume into. Left as-is, the VU skipped the rest
+  // of its login and then ran actionPhase on every later iteration against a
+  // session that was never established — a permanent stream of 401/403s that
+  // describes the framework, not the system under test. LoadRunner (whose
+  // vuser_init/Action model this mirrors) puts the Vuser in Error state when an
+  // error escapes vuser_init with continue-on-error off, and never reaches
+  // Action. Escalate to the same outcome. See EDD-lifecycle "Init-failure
+  // semantics". Deliberately scoped to init: action/end keep stock behavior.
+  const effective = (phaseName === 'init' && behavior === 'stop_iteration')
+    ? 'stop_vu'
+    : behavior;
+
+  if (effective !== behavior) {
+    console.error(
+      `[k6-perf][${phaseName}] errorBehavior 'stop_iteration' does not apply to the init phase `
+      + '(it runs once per VU, outside the iteration loop)\n'
+      + '  → stopping this VU instead, so it cannot run actionPhase without a completed init',
+    );
+  }
+
+  if (effective === 'stop_vu') {
     store.state.terminated = true;
   }
 
-  if (behavior === 'abort_test') {
+  if (effective === 'abort_test') {
     exec.test.abort(`[k6-perf][${phaseName}] Aborting test due to error: ${message}`);
   }
 
-  return behavior;
+  return effective;
 }
 
 // Which lifecycle phase this VU is currently executing. Read by the
